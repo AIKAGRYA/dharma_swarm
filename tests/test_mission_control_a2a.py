@@ -266,6 +266,29 @@ async def test_authority_is_refreshed_immediately_before_transport_publish(
 
 
 @pytest.mark.asyncio
+async def test_final_authority_refresh_cannot_mutate_task_before_transport(
+    tmp_path: Path,
+) -> None:
+    class MutatingRefreshAuthorizer(_Authorizer):
+        async def authorize(
+            self, intent: A2ADispatchIntent
+        ) -> A2ADispatchAuthorization:
+            authorization = await super().authorize(intent)
+            if len(self.calls) == 2:
+                await stack.board.assign(stack.request.task_id, "intruder")
+            return authorization
+
+    authorizer = MutatingRefreshAuthorizer()
+    stack = await _stack(tmp_path, authorizer=authorizer)
+
+    with pytest.raises(A2AAdapterError):
+        await stack.adapter.dispatch(stack.request)
+
+    assert len(authorizer.calls) == 2
+    assert stack.broker.calls == []
+
+
+@pytest.mark.asyncio
 async def test_untyped_or_mismatched_authority_blocks_before_publish(tmp_path: Path) -> None:
     stack = await _stack(tmp_path, authorizer=_Authorizer(corrupt="operation_digest"))
 
@@ -277,6 +300,31 @@ async def test_untyped_or_mismatched_authority_blocks_before_publish(tmp_path: P
     )
     assert stack.broker.calls == []
     assert await stack.runtime.get_execution_identity(run_id) is None
+
+
+@pytest.mark.asyncio
+async def test_authorization_subclass_cannot_override_exact_evidence_semantics(
+    tmp_path: Path,
+) -> None:
+    class ForeignAuthorization(A2ADispatchAuthorization):
+        pass
+
+    class ForeignAuthorizer(_Authorizer):
+        async def authorize(
+            self, intent: A2ADispatchIntent
+        ) -> A2ADispatchAuthorization:
+            authorization = await super().authorize(intent)
+            values = {
+                field: getattr(authorization, field)
+                for field in authorization.__dataclass_fields__
+            }
+            return ForeignAuthorization(**values)
+
+    stack = await _stack(tmp_path, authorizer=ForeignAuthorizer())
+    with pytest.raises(A2AAdapterError, match="untyped authorization"):
+        await stack.adapter.dispatch(stack.request)
+
+    assert stack.broker.calls == []
 
 
 @pytest.mark.asyncio

@@ -406,6 +406,34 @@ async def test_revocation_is_refreshed_immediately_before_owner_dispatch(
 
 
 @pytest.mark.asyncio
+async def test_final_authority_refresh_cannot_mutate_task_before_owner_dispatch(
+    tmp_path: Path,
+) -> None:
+    case = await _case(tmp_path)
+
+    async def mutate_on_refresh() -> None:
+        if case.verifier.calls == 2:
+            await case.board.update_task(
+                case.request.task_id,
+                description="mutated during final authority refresh",
+            )
+
+    case.verifier.hook = mutate_on_refresh
+    with pytest.raises(
+        MissionControlError, match="changed during final authority refresh"
+    ):
+        await case.dispatcher.dispatch(
+            case.request,
+            case.governed,
+            case.admission,
+            case.authority,
+        )
+
+    assert case.verifier.calls == 2
+    assert case.executor.calls == 0
+
+
+@pytest.mark.asyncio
 async def test_canonical_semantics_block_low_risk_a2a_label_smuggling(
     tmp_path: Path,
 ) -> None:

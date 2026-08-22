@@ -123,6 +123,7 @@ class A2AMissionAdapter:
         self._require_authorization(intent, refreshed)
         if refreshed != authorization:
             raise A2AAdapterError("A2A authority changed before transport publish")
+        a2a_task = await self._revalidate_intent(intent)
         a2a_task.metadata.update({**identity.metadata, "session_id": identity.session_id})
         try:
             ack = await self._transport.publish_task(a2a_task, identity=identity)
@@ -264,7 +265,7 @@ class A2AMissionAdapter:
     def _require_authorization(intent: A2ADispatchIntent,
                                authorization: A2ADispatchAuthorization) -> None:
         request = intent.request
-        if not isinstance(authorization, A2ADispatchAuthorization):
+        if type(authorization) is not A2ADispatchAuthorization:
             raise A2AAdapterError("authorizer returned an untyped authorization")
         expected = (request.mission_id, request.task_id, request.dispatch_key,
                     request.claimed_principal, intent.operation_digest)
@@ -488,8 +489,7 @@ class A2AMissionAdapter:
             "context_id": publish_ref.context_id, "authority_ref": publish_ref.authority_ref,
             "authority_digest": publish_ref.authority_digest, "subject": publish_ref.subject,
             "nats_operation_hash": _operation_hash(
-                publish_ref.subject, publish_ref.external_a2a_task_id,
-                publish_ref.correlation_id),
+                publish_ref.subject, publish_ref.external_a2a_task_id, publish_ref.correlation_id),
         }
         return ExecutionIdentity(
             publish_ref.trace_id, publish_ref.correlation_id, publish_ref.task_id,

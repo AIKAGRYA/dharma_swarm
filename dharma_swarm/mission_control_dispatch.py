@@ -261,15 +261,6 @@ class GovernedMissionDispatcher:
         snapshot_guard = _admission_digest(admission)
         verified, preliminary, final, final_admission = await self._authorize_flow(
             request, governed_request, admission, authority)
-        current = await self._binding(request, governed_request)
-        _need(current == preliminary, "canonical task changed before owner dispatch")
-        self._require_verified(request, authority, verified)
-        self._require_lease(request, verified)
-        current_final = await self._binding(request, verified=verified)
-        _need(current_final == final, "workspace authority changed before owner dispatch")
-        expected = self._admission_from(
-            current_final, request, self._evaluate(current_final, require_allow=True))
-        _need(final_admission == expected, "final governance admission changed before dispatch")
         _need(
             _admission_digest(caller) == caller_guard and _admission_digest(admission) == snapshot_guard,
             "governance admission changed before dispatch",
@@ -277,6 +268,13 @@ class GovernedMissionDispatcher:
         verified = await self._verify_authority(authority, request=request, admission=final_admission)
         self._require_verified(request, authority, verified)
         self._require_lease(request, verified)
+        current = await self._binding(request)
+        _need(current == preliminary, "canonical task changed during final authority refresh")
+        current_final = await self._binding(request, verified=verified)
+        _need(current_final == final, "workspace authority changed during final authority refresh")
+        expected = self._admission_from(
+            current_final, request, self._evaluate(current_final, require_allow=True))
+        _need(final_admission == expected, "final governance admission changed before dispatch")
         execution = await self._executor.dispatch(
             request.mission_id, request.task_id, dispatch_key=request.dispatch_key
         )
