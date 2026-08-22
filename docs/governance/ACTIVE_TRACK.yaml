@@ -905,6 +905,13 @@ active_tracks:
       - tests/test_runtime_state_claim_cas.py
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0-ADMISSION.json
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0.json
+      # Operator-authorized SADHANA A2A identity repair (2026-08-23): the
+      # governed adapter must never select a latest-wins execution identity
+      # when an external A2A task identifier maps to multiple durable runs.
+      # These packet records admit only the fail-closed exact-one lookup and
+      # its adversarial insertion-order proof on already-owned P2 surfaces.
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-IDENTITY-P0-ADMISSION.json
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-IDENTITY-P0.json
       # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
       # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
       # refinery (free-model army as mutation operator, three-ring verification as
@@ -1036,6 +1043,10 @@ active_tracks:
         blocker: true
       - id: 17
         what: "SADHANA mobile shell P0: remove the shared dashboard's unconditional 260px mobile offset, make the nested dashboard flex chain shrink below its 720px min-content width without clipping, render a bounded mobile navigation seam while preserving the desktop sidebar contract, and prove the real unmodified control-surface route at a 390px viewport has no horizontal document overflow. Component isolation is supporting evidence only; the completion oracle is a Playwright browser run against the actual root layout."
+        kind: code
+        blocker: true
+      - id: 18
+        what: "SADHANA governed A2A identity P0: replace latest-wins lookup of external A2A task identifiers with a bounded exact-one identity proof before status recovery or any publish decision. Zero matches may follow only the typed new-dispatch path; two or more matches are ambiguity and must fail closed independent of insertion order, timestamps, or otherwise-valid authority. Prove duplicate ambiguity performs no transport publish and cannot be hidden by metadata refresh."
         kind: code
         blocker: true
 
