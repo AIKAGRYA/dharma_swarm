@@ -912,6 +912,16 @@ active_tracks:
       # its adversarial insertion-order proof on already-owned P2 surfaces.
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-IDENTITY-P0-ADMISSION.json
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-IDENTITY-P0.json
+      # Operator-authorized SADHANA bootstrap P0 (2026-08-23): one
+      # contract-digest-pinned initializer may seed the existing Mission
+      # Control and TaskBoard owners before the supervisor starts. The
+      # initializer is not a scheduler, executor, campaign-session writer,
+      # acceptance oracle, or deployment unit.
+      - dharma_swarm/mission_control_bootstrap.py
+      - scripts/runtime/sadhana_campaign_bootstrap.py
+      - tests/test_mission_control_bootstrap.py
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0-ADMISSION.json
+      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0.json
       # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
       # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
       # refinery (free-model army as mutation operator, three-ring verification as
@@ -1047,6 +1057,10 @@ active_tracks:
         blocker: true
       - id: 18
         what: "SADHANA governed A2A identity P0: replace latest-wins lookup of external A2A task identifiers with a bounded exact-one identity proof before status recovery or any publish decision. Zero matches may follow only the typed new-dispatch path; two or more matches are ambiguity and must fail closed independent of insertion order, timestamps, or otherwise-valid authority. Prove duplicate ambiguity performs no transport publish and cannot be hidden by metadata refresh."
+        kind: code
+        blocker: true
+      - id: 19
+        what: "SADHANA campaign bootstrap P0: verify the exact external ten-goal contract bytes, schema, campaign identity, and acyclic dependency graph before opening canonical owners; then, under a one-shot bootstrap fence, preflight every existing Mission Control mission/task identity before effects, topologically seed only missing dependency-closed tasks with stable idempotency keys, and emit a byte-stable goal-to-task map plus the G05 canary ID for supervisor configuration. Drift or conflicting partial state must add zero writes; task existence and canary identity never imply execution or acceptance."
         kind: code
         blocker: true
 
