@@ -83,7 +83,55 @@ export function Sidebar() {
   const { level, levelUp, levelDown } = useLevel();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[260px] flex-col border-r border-sumi-700/40 bg-sumi-900/80 backdrop-blur-md">
+    <>
+      <header
+        data-testid="mobile-dashboard-nav"
+        className="fixed inset-x-0 top-0 z-50 flex h-12 items-center justify-between gap-2 border-b border-sumi-700/40 bg-sumi-900/95 px-3 backdrop-blur-md lg:hidden"
+      >
+        <Link
+          href="/dashboard"
+          prefetch={false}
+          className="flex min-w-0 items-center gap-1.5 text-aozora"
+          aria-label="Dharma Command overview"
+        >
+          <Sparkles size={16} aria-hidden="true" />
+          <span className="font-heading text-[10px] font-bold tracking-[0.12em]">
+            DHARMA
+          </span>
+        </Link>
+        <nav
+          aria-label="Mobile dashboard navigation"
+          className="flex items-center gap-1"
+        >
+          <Link
+            href="/dashboard"
+            prefetch={false}
+            aria-current={pathname === "/dashboard" ? "page" : undefined}
+            className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-torinoko/75 hover:bg-sumi-800/70 hover:text-torinoko"
+          >
+            <LayoutDashboard size={14} aria-hidden="true" />
+            Overview
+          </Link>
+          <Link
+            href="/dashboard/control-surface#mission-sarathi-title"
+            prefetch={false}
+            aria-current={
+              pathname.startsWith("/dashboard/control-surface")
+                ? "page"
+                : undefined
+            }
+            className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-torinoko/75 hover:bg-sumi-800/70 hover:text-torinoko"
+          >
+            <Network size={14} aria-hidden="true" />
+            Constellation
+          </Link>
+        </nav>
+      </header>
+
+      <aside
+        data-testid="desktop-dashboard-sidebar"
+        className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-sumi-700/40 bg-sumi-900/80 backdrop-blur-md lg:flex"
+      >
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5">
         <Sparkles className="text-aozora" size={20} />
@@ -139,7 +187,8 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
