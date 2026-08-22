@@ -1,9 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.11
 """One-shot, authority-neutral initialization of the pinned SADHANA campaign.
 
-Example systemd ``ExecStartPre`` command::
+Example systemd ``ExecStartPre`` command (use absolute paths and the project's
+Python 3.11+ environment; do not rely on the host ``python3`` alias)::
 
-    python3 scripts/runtime/sadhana_campaign_bootstrap.py initialize \
+    ExecStartPre=/absolute/repo/.venv/bin/python \
+      /absolute/repo/scripts/runtime/sadhana_campaign_bootstrap.py initialize \
       --contracts /path/to/goal-contracts.v1.json \
       --state-dir /path/to/campaign-state --operator-id operator
 
@@ -16,15 +18,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import fcntl
 import json
-import os
 import sqlite3
-import stat
 import sys
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Sequence
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
@@ -32,18 +30,17 @@ if str(_REPO_ROOT) not in sys.path:
 
 from dharma_swarm.mission_control import MissionControl  # noqa: E402
 from dharma_swarm.mission_control_bootstrap import (  # noqa: E402
+    BootstrapLockError,
+    CampaignBootstrapLock,
     GoalContractError,
     GoalPortfolio,
+    campaign_bootstrap_lock,
     initialize_sadhana_campaign,
     load_goal_contract,
 )
 from dharma_swarm.mission_control_contract import MissionControlError  # noqa: E402
 from dharma_swarm.runtime_state import RuntimeStateStore  # noqa: E402
 from dharma_swarm.task_board import TaskBoard, TaskBoardError  # noqa: E402
-
-
-class BootstrapLockError(RuntimeError):
-    """Raised when the one-shot cross-process bootstrap lock is unavailable."""
 
 
 def _canonical_state_dir(value: str) -> Path:
@@ -56,49 +53,12 @@ def _canonical_state_dir(value: str) -> Path:
     return path
 
 
-def _require_safe_lock_file(descriptor: int) -> None:
-    details = os.fstat(descriptor)
-    if not stat.S_ISREG(details.st_mode):
-        raise BootstrapLockError("bootstrap lock must be a regular file")
-    if details.st_nlink != 1:
-        raise BootstrapLockError("bootstrap lock must have exactly one hard link")
-    if hasattr(os, "getuid") and details.st_uid != os.getuid():
-        raise BootstrapLockError("bootstrap lock must be owned by the current account")
-    if stat.S_IMODE(details.st_mode) & 0o022:
-        raise BootstrapLockError("bootstrap lock must not be group/world writable")
-
-
-@contextmanager
-def _bootstrap_lock(path: Path) -> Iterator[None]:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if nofollow is None:
-        raise BootstrapLockError("bootstrap lock requires O_NOFOLLOW support")
-    flags = os.O_CREAT | os.O_RDWR | nofollow | getattr(os, "O_CLOEXEC", 0)
-    try:
-        descriptor = os.open(os.fspath(path), flags, 0o600)
-    except OSError as exc:
-        raise BootstrapLockError(f"cannot securely open bootstrap lock: {exc}") from exc
-    acquired = False
-    try:
-        _require_safe_lock_file(descriptor)
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise BootstrapLockError("another SADHANA bootstrap is active") from exc
-        acquired = True
-        yield
-    finally:
-        if acquired:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-        os.close(descriptor)
-
-
 async def _initialize(
     portfolio: GoalPortfolio,
     *,
     state_dir: Path,
     operator_id: str,
+    lock: CampaignBootstrapLock,
 ) -> str:
     runtime = RuntimeStateStore(
         state_dir / "state" / "runtime.db",
@@ -112,8 +72,8 @@ async def _initialize(
     result = await initialize_sadhana_campaign(
         portfolio,
         MissionControl(board, runtime),
-        board,
         operator_id=operator_id,
+        lock=lock,
     )
     return result.to_json()
 
@@ -165,12 +125,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Contract validation intentionally precedes every filesystem effect.
         portfolio = load_goal_contract(args.contracts)
         lock_path = args.state_dir / "locks" / "sadhana-bootstrap.lock"
-        with _bootstrap_lock(lock_path):
+        with campaign_bootstrap_lock(lock_path) as lock:
             output = asyncio.run(
                 _initialize(
                     portfolio,
                     state_dir=args.state_dir,
                     operator_id=args.operator_id,
+                    lock=lock,
                 )
             )
     except (

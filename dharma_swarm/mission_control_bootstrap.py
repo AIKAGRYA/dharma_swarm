@@ -7,16 +7,19 @@ session, dispatch authority, an executor, or an acceptance claim.
 
 from __future__ import annotations
 
+import asyncio
+import fcntl
 import hashlib
 import json
 import math
 import os
 import re
 import stat
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_contract import (
@@ -58,6 +61,7 @@ MISSION_GOAL = (
 BOOTSTRAP_CREATED_BY = "sadhana-bootstrap"
 DISPATCH_BLOCKER = "authority_unbound"
 MAX_CONTRACT_BYTES = 1_000_000
+BOOTSTRAP_LOCK_NAME = "sadhana-bootstrap.lock"
 
 _GOAL_ID_RE = re.compile(r"G[0-9]{2}_[A-Z0-9_]+")
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -111,10 +115,15 @@ _PRIORITY = {
     "P2": TaskPriority.NORMAL,
     "P3": TaskPriority.LOW,
 }
+_LOCK_CONSTRUCTION_SENTINEL = object()
 
 
 class GoalContractError(ValueError):
     """Raised before owner state is opened when the pinned contract is invalid."""
+
+
+class BootstrapLockError(RuntimeError):
+    """Raised when the mandatory campaign bootstrap lock is invalid or busy."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +150,7 @@ class GoalPortfolio:
     goals: tuple[GoalContract, ...]
     dependency_order: tuple[str, ...]
     campaign_deadline: str
+    _contract_bytes: bytes = dataclass_field(repr=False)
 
     @property
     def by_id(self) -> dict[str, GoalContract]:
@@ -222,6 +232,84 @@ class BootstrapResult:
 class _ObservedBootstrap:
     mission: MissionView | None
     tasks_by_goal: dict[str, Task]
+
+
+class CampaignBootstrapLock:
+    """Opaque proof that the canonical cross-process bootstrap lock is held."""
+
+    __slots__ = ("_active", "_async_lock", "_descriptor", "path")
+
+    def __init__(self, path: Path, descriptor: int, sentinel: object) -> None:
+        if sentinel is not _LOCK_CONSTRUCTION_SENTINEL:
+            raise BootstrapLockError(
+                "CampaignBootstrapLock can only be created by campaign_bootstrap_lock"
+            )
+        self.path = path
+        self._descriptor = descriptor
+        self._active = True
+        self._async_lock = asyncio.Lock()
+
+    def _require_active(self, expected_path: Path) -> None:
+        if not self._active or self.path != expected_path:
+            raise BootstrapLockError(
+                "initializer requires the active canonical campaign bootstrap lock"
+            )
+        details = os.fstat(self._descriptor)
+        observed = os.lstat(self.path)
+        if (details.st_dev, details.st_ino) != (observed.st_dev, observed.st_ino):
+            raise BootstrapLockError("campaign bootstrap lock identity changed")
+
+
+def _absolute_lexical_path(path: Path | str) -> Path:
+    return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def _require_safe_lock_file(descriptor: int) -> None:
+    details = os.fstat(descriptor)
+    if not stat.S_ISREG(details.st_mode):
+        raise BootstrapLockError("bootstrap lock must be a regular file")
+    if details.st_nlink != 1:
+        raise BootstrapLockError("bootstrap lock must have exactly one hard link")
+    if hasattr(os, "getuid") and details.st_uid != os.getuid():
+        raise BootstrapLockError("bootstrap lock must be owned by the current account")
+    if stat.S_IMODE(details.st_mode) & 0o022:
+        raise BootstrapLockError("bootstrap lock must not be group/world writable")
+
+
+@contextmanager
+def campaign_bootstrap_lock(path: Path | str) -> Iterator[CampaignBootstrapLock]:
+    """Acquire the mandatory canonical lock used by every bootstrap API call."""
+    candidate = _absolute_lexical_path(path)
+    candidate.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
+        raise BootstrapLockError("bootstrap lock requires O_NOFOLLOW support")
+    flags = os.O_CREAT | os.O_RDWR | nofollow | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(os.fspath(candidate), flags, 0o600)
+    except OSError as exc:
+        raise BootstrapLockError(f"cannot securely open bootstrap lock: {exc}") from exc
+    acquired = False
+    token: CampaignBootstrapLock | None = None
+    try:
+        _require_safe_lock_file(descriptor)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise BootstrapLockError("another SADHANA bootstrap is active") from exc
+        acquired = True
+        token = CampaignBootstrapLock(
+            candidate,
+            descriptor,
+            _LOCK_CONSTRUCTION_SENTINEL,
+        )
+        yield token
+    finally:
+        if token is not None:
+            token._active = False
+        if acquired:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -495,6 +583,7 @@ def _decode_goal_contract(raw_bytes: bytes, *, expected_sha256: str) -> GoalPort
         goals=goals,
         dependency_order=dependency_order,
         campaign_deadline=campaign_deadline,
+        _contract_bytes=raw_bytes,
     )
 
 
@@ -577,6 +666,7 @@ def _task_metadata(portfolio: GoalPortfolio, goal: GoalContract) -> dict[str, An
         "sadhana_bootstrap_schema": BOOTSTRAP_SCHEMA,
         "goal_contract_schema": portfolio.schema,
         "goal_contract_sha256": goal.content_digest,
+        "portfolio_contract_sha256": portfolio.digest,
         "campaign_id": portfolio.campaign_id,
         "goal_id": goal.goal_id,
         "goal_dependencies": list(goal.dependencies),
@@ -787,86 +877,121 @@ async def _create_or_verify_task(
     return task
 
 
+def _revalidate_portfolio(portfolio: GoalPortfolio) -> GoalPortfolio:
+    if not isinstance(portfolio, GoalPortfolio):
+        raise GoalContractError("initializer requires a validated GoalPortfolio")
+    validated = _decode_goal_contract(
+        portfolio._contract_bytes,
+        expected_sha256=EXPECTED_CONTRACT_SHA256,
+    )
+    if validated != portfolio:
+        raise GoalContractError(
+            "GoalPortfolio differs from its exact pinned contract bytes"
+        )
+    return validated
+
+
+def _canonical_owner_board(control: MissionControl) -> tuple[TaskBoard, Path]:
+    # MissionControl has no public owner accessor.  Deriving its sole board here
+    # is safer than accepting a second caller-supplied board that can diverge.
+    board = getattr(control, "_board", None)
+    if not isinstance(board, TaskBoard):
+        raise MissionControlError("MissionControl has no canonical TaskBoard owner")
+    task_db = _absolute_lexical_path(board._db_path)
+    if task_db.name != "tasks.db" or task_db.parent.name != "db":
+        raise MissionControlError(
+            "TaskBoard must use the canonical <state-dir>/db/tasks.db path"
+        )
+    lock_path = task_db.parent.parent / "locks" / BOOTSTRAP_LOCK_NAME
+    return board, lock_path
+
+
 async def initialize_sadhana_campaign(
     portfolio: GoalPortfolio,
     control: MissionControl,
-    board: TaskBoard,
     *,
     operator_id: str = "operator",
+    lock: CampaignBootstrapLock,
 ) -> BootstrapResult:
     """Create or verify the exact mission and ten tasks without dispatch authority."""
-    if portfolio.digest != EXPECTED_CONTRACT_DIGEST:
-        raise GoalContractError(
-            "initializer requires the exact SADHANA contract digest"
-        )
+    portfolio = _revalidate_portfolio(portfolio)
+    board, expected_lock_path = _canonical_owner_board(control)
+    lock._require_active(expected_lock_path)
     operator_id = str(operator_id or "").strip()
     if not operator_id or any(character.isspace() for character in operator_id):
         raise MissionControlError("operator_id must be a canonical identifier")
-    observed = await _inspect_bootstrap(portfolio, control, board, operator_id)
+    async with lock._async_lock:
+        lock._require_active(expected_lock_path)
+        observed = await _inspect_bootstrap(portfolio, control, board, operator_id)
 
-    await control.create_mission(
-        portfolio.campaign_id,
-        title=MISSION_TITLE,
-        goal=MISSION_GOAL,
-        operator_id=operator_id,
-        metadata=_mission_metadata(portfolio),
-    )
-    task_ids = {goal_id: task.id for goal_id, task in observed.tasks_by_goal.items()}
-
-    # Verify every existing owner creation hash before creating one missing task.
-    for goal_id in portfolio.dependency_order:
-        if goal_id not in observed.tasks_by_goal:
-            continue
-        task = await _create_or_verify_task(
-            portfolio,
-            portfolio.by_id[goal_id],
-            control,
-            board,
-            task_ids,
+        await control.create_mission(
+            portfolio.campaign_id,
+            title=MISSION_TITLE,
+            goal=MISSION_GOAL,
+            operator_id=operator_id,
+            metadata=_mission_metadata(portfolio),
         )
-        if task.id != task_ids[goal_id]:
-            raise MissionControlError(f"goal {goal_id} changed task identity")
+        task_ids = {
+            goal_id: task.id for goal_id, task in observed.tasks_by_goal.items()
+        }
 
-    for goal_id in portfolio.dependency_order:
-        if goal_id in task_ids:
-            continue
-        task = await _create_or_verify_task(
-            portfolio,
-            portfolio.by_id[goal_id],
-            control,
-            board,
-            task_ids,
+        # Verify every existing creation hash before creating one missing task.
+        for goal_id in portfolio.dependency_order:
+            if goal_id not in observed.tasks_by_goal:
+                continue
+            task = await _create_or_verify_task(
+                portfolio,
+                portfolio.by_id[goal_id],
+                control,
+                board,
+                task_ids,
+            )
+            if task.id != task_ids[goal_id]:
+                raise MissionControlError(f"goal {goal_id} changed task identity")
+
+        for goal_id in portfolio.dependency_order:
+            if goal_id in task_ids:
+                continue
+            task = await _create_or_verify_task(
+                portfolio,
+                portfolio.by_id[goal_id],
+                control,
+                board,
+                task_ids,
+            )
+            task_ids[goal_id] = task.id
+
+        final = await _inspect_bootstrap(portfolio, control, board, operator_id)
+        if len(final.tasks_by_goal) != len(EXPECTED_GOAL_IDS):
+            raise MissionControlError("bootstrap did not converge to exactly ten tasks")
+        final_ids = {
+            goal_id: final.tasks_by_goal[goal_id].id for goal_id in EXPECTED_GOAL_IDS
+        }
+        if final_ids != task_ids:
+            raise MissionControlError("goal-to-task mapping changed during bootstrap")
+        return BootstrapResult(
+            mission_id=portfolio.campaign_id,
+            contract_digest=portfolio.digest,
+            campaign_deadline=portfolio.campaign_deadline,
+            dependency_order=portfolio.dependency_order,
+            goal_task_map=tuple(
+                (goal_id, final_ids[goal_id]) for goal_id in EXPECTED_GOAL_IDS
+            ),
+            goal_contract_digests=tuple(
+                (goal.goal_id, goal.content_digest) for goal in portfolio.goals
+            ),
+            canary_goal_id=CANARY_GOAL_ID,
+            canary_task_id=final_ids[CANARY_GOAL_ID],
         )
-        task_ids[goal_id] = task.id
-
-    final = await _inspect_bootstrap(portfolio, control, board, operator_id)
-    if len(final.tasks_by_goal) != len(EXPECTED_GOAL_IDS):
-        raise MissionControlError("bootstrap did not converge to exactly ten tasks")
-    final_ids = {
-        goal_id: final.tasks_by_goal[goal_id].id for goal_id in EXPECTED_GOAL_IDS
-    }
-    if final_ids != task_ids:
-        raise MissionControlError("goal-to-task mapping changed during bootstrap")
-    return BootstrapResult(
-        mission_id=portfolio.campaign_id,
-        contract_digest=portfolio.digest,
-        campaign_deadline=portfolio.campaign_deadline,
-        dependency_order=portfolio.dependency_order,
-        goal_task_map=tuple(
-            (goal_id, final_ids[goal_id]) for goal_id in EXPECTED_GOAL_IDS
-        ),
-        goal_contract_digests=tuple(
-            (goal.goal_id, goal.content_digest) for goal in portfolio.goals
-        ),
-        canary_goal_id=CANARY_GOAL_ID,
-        canary_task_id=final_ids[CANARY_GOAL_ID],
-    )
 
 
 __all__ = [
     "BOOTSTRAP_SCHEMA",
+    "BOOTSTRAP_LOCK_NAME",
+    "BootstrapLockError",
     "BootstrapResult",
     "CANARY_GOAL_ID",
+    "CampaignBootstrapLock",
     "DISPATCH_BLOCKER",
     "EXPECTED_CAMPAIGN_ID",
     "EXPECTED_CONTRACT_DIGEST",
@@ -876,6 +1001,7 @@ __all__ = [
     "GoalContract",
     "GoalContractError",
     "GoalPortfolio",
+    "campaign_bootstrap_lock",
     "initialize_sadhana_campaign",
     "load_goal_contract",
     "task_idempotency_key",

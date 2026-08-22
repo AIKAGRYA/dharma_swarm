@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import fcntl
 import hashlib
 import json
 import os
+import subprocess
+import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -161,6 +165,26 @@ async def _owners(
     return runtime, board, MissionControl(board, runtime)
 
 
+def _owner_lock_path(control: MissionControl) -> Path:
+    task_db = Path(control._board._db_path).absolute()
+    return task_db.parent.parent / "locks" / bootstrap.BOOTSTRAP_LOCK_NAME
+
+
+async def _run_bootstrap(
+    portfolio: bootstrap.GoalPortfolio,
+    control: MissionControl,
+    *,
+    operator_id: str = "operator",
+) -> bootstrap.BootstrapResult:
+    with bootstrap.campaign_bootstrap_lock(_owner_lock_path(control)) as lock:
+        return await bootstrap.initialize_sadhana_campaign(
+            portfolio,
+            control,
+            operator_id=operator_id,
+            lock=lock,
+        )
+
+
 def test_production_contract_pin_is_frozen() -> None:
     assert bootstrap.EXPECTED_CONTRACT_DIGEST == (
         "sha256:e2891fcb2171563adc87a339d5fca42b155ee8aa5dc96b153ab3515f01051101"
@@ -225,12 +249,7 @@ async def test_fresh_initialization_seeds_exact_graph_and_authority_neutral_outp
     portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
     runtime, board, control = await _owners(tmp_path / "owners")
 
-    result = await bootstrap.initialize_sadhana_campaign(
-        portfolio,
-        control,
-        board,
-        operator_id="operator",
-    )
+    result = await _run_bootstrap(portfolio, control, operator_id="operator")
     payload = json.loads(result.to_json())
     tasks = await board.list_tasks(limit=20)
     by_goal = {task.metadata["goal_id"]: task for task in tasks}
@@ -269,6 +288,7 @@ async def test_fresh_initialization_seeds_exact_graph_and_authority_neutral_outp
         assert task.title == goal.goal_id
         assert task.description == goal.definition_of_done
         assert task.metadata["goal_contract_sha256"] == goal.content_digest
+        assert task.metadata["portfolio_contract_sha256"] == portfolio.digest
         assert task.metadata["dispatch_ready"] is False
         assert task.metadata["dispatch_blocker"] == "authority_unbound"
         assert sorted(task.depends_on) == sorted(
@@ -283,17 +303,133 @@ async def test_second_initialization_is_byte_stable_no_op(
 ) -> None:
     portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
     runtime, board, control = await _owners(tmp_path / "owners")
-    first = await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+    first = await _run_bootstrap(portfolio, control)
 
     async def forbidden_write(*args: Any, **kwargs: Any) -> Any:
         raise AssertionError("second initialization attempted an owner write")
 
     monkeypatch.setattr(runtime, "upsert_session", forbidden_write)
     monkeypatch.setattr(board, "create", forbidden_write)
-    second = await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+    second = await _run_bootstrap(portfolio, control)
 
     assert second.to_json().encode() == first.to_json().encode()
     assert len(await board.list_tasks(limit=20)) == 10
+
+
+@pytest.mark.asyncio
+async def test_forged_portfolio_is_redecoded_before_owner_io(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    runtime, board, control = await _owners(tmp_path / "owners")
+    forged = replace(portfolio, schema="attacker.asserted.schema")
+    owner_calls = 0
+
+    async def forbidden_owner_io(*args: Any, **kwargs: Any) -> Any:
+        nonlocal owner_calls
+        owner_calls += 1
+        raise AssertionError("forged portfolio reached an owner")
+
+    monkeypatch.setattr(runtime, "get_session", forbidden_owner_io)
+    monkeypatch.setattr(runtime, "upsert_session", forbidden_owner_io)
+    monkeypatch.setattr(board, "list_tasks", forbidden_owner_io)
+    monkeypatch.setattr(board, "create", forbidden_owner_io)
+    with bootstrap.campaign_bootstrap_lock(_owner_lock_path(control)) as lock:
+        with pytest.raises(bootstrap.GoalContractError, match="differs from"):
+            await bootstrap.initialize_sadhana_campaign(
+                forged,
+                control,
+                lock=lock,
+            )
+    assert owner_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_calls_share_mandatory_core_lock_without_duplicates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    runtime, board, first_control = await _owners(tmp_path / "owners")
+    second_control = MissionControl(board, runtime)
+
+    with bootstrap.campaign_bootstrap_lock(_owner_lock_path(first_control)) as lock:
+        first, second = await asyncio.gather(
+            bootstrap.initialize_sadhana_campaign(
+                portfolio,
+                first_control,
+                lock=lock,
+            ),
+            bootstrap.initialize_sadhana_campaign(
+                portfolio,
+                second_control,
+                lock=lock,
+            ),
+        )
+
+    assert first.to_json() == second.to_json()
+    assert len(await board.list_tasks(limit=20)) == 10
+
+
+@pytest.mark.asyncio
+async def test_task_seed_readiness_mutation_fails_before_owner_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    runtime, board, control = await _owners(tmp_path / "owners")
+    result = await _run_bootstrap(portfolio, control)
+    task_id = dict(result.goal_task_map)[bootstrap.CANARY_GOAL_ID]
+    task = await board.get(task_id)
+    assert task is not None
+    await board.update_task(
+        task_id,
+        metadata={**task.metadata, "dispatch_ready": True},
+    )
+    writes = 0
+
+    async def forbidden_write(*args: Any, **kwargs: Any) -> Any:
+        nonlocal writes
+        writes += 1
+        raise AssertionError("mutated seed state attempted an owner write")
+
+    monkeypatch.setattr(runtime, "upsert_session", forbidden_write)
+    monkeypatch.setattr(board, "create", forbidden_write)
+    with pytest.raises(MissionControlError, match="metadata conflicts"):
+        await _run_bootstrap(portfolio, control)
+    assert writes == 0
+
+
+@pytest.mark.asyncio
+async def test_mission_seed_readiness_mutation_fails_before_owner_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    runtime, board, control = await _owners(tmp_path / "owners")
+    await _run_bootstrap(portfolio, control)
+    session_id = f"mission:{portfolio.campaign_id}"
+    session = await runtime.get_session(session_id)
+    assert session is not None
+    await runtime.upsert_session(
+        replace(
+            session,
+            metadata={**session.metadata, "dispatch_ready": True},
+        )
+    )
+    writes = 0
+
+    async def forbidden_write(*args: Any, **kwargs: Any) -> Any:
+        nonlocal writes
+        writes += 1
+        raise AssertionError("mutated mission attempted an owner write")
+
+    monkeypatch.setattr(runtime, "upsert_session", forbidden_write)
+    monkeypatch.setattr(board, "create", forbidden_write)
+    with pytest.raises(MissionControlError, match="metadata conflicts"):
+        await _run_bootstrap(portfolio, control)
+    assert writes == 0
 
 
 @pytest.mark.asyncio
@@ -332,7 +468,7 @@ async def test_conflicting_nonclosed_partial_state_has_zero_additional_writes(
     monkeypatch.setattr(runtime, "upsert_session", forbidden_write)
     monkeypatch.setattr(board, "create", forbidden_write)
     with pytest.raises(MissionControlError, match="not dependency-closed"):
-        await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+        await _run_bootstrap(portfolio, control)
 
     assert writes == 0
     assert await board.list_tasks(limit=20) == before_tasks
@@ -357,24 +493,24 @@ async def test_dependency_closed_crash_prefix_resumes_without_duplicates(
 
     monkeypatch.setattr(board, "create", crash_on_fourth)
     with pytest.raises(RuntimeError, match="simulated crash"):
-        await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+        await _run_bootstrap(portfolio, control)
     prefix = await board.list_tasks(limit=20)
     assert {task.metadata["goal_id"] for task in prefix} == set(_ORDER[:3])
 
     monkeypatch.setattr(board, "create", original_create)
-    result = await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+    result = await _run_bootstrap(portfolio, control)
     assert len(await board.list_tasks(limit=20)) == 10
     assert set(dict(result.goal_task_map)) == set(bootstrap.EXPECTED_GOAL_IDS)
 
 
 @pytest.mark.asyncio
-async def test_additive_authority_binding_does_not_corrupt_seed_provenance(
+async def test_additive_authority_metadata_is_preserved_without_proving_readiness(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
     _, board, control = await _owners(tmp_path / "owners")
-    first = await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+    first = await _run_bootstrap(portfolio, control)
     canary_id = dict(first.goal_task_map)[bootstrap.CANARY_GOAL_ID]
     canary = await board.get(canary_id)
     assert canary is not None
@@ -383,17 +519,17 @@ async def test_additive_authority_binding_does_not_corrupt_seed_provenance(
         metadata={
             **canary.metadata,
             "mission_campaign_authority": {
-                "schema": "dharma.mission_campaign_authority.v1",
-                "status": "bound",
+                "schema": "test.unverified_authority_annotation.v1",
+                "status": "not_evaluated",
             },
         },
     )
 
-    second = await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+    second = await _run_bootstrap(portfolio, control)
     rebound = await board.get(canary_id)
     assert second.to_json() == first.to_json()
     assert rebound is not None
-    assert rebound.metadata["mission_campaign_authority"]["status"] == "bound"
+    assert rebound.metadata["mission_campaign_authority"]["status"] == "not_evaluated"
     assert rebound.metadata["dispatch_ready"] is False
     assert rebound.metadata["dispatch_blocker"] == "authority_unbound"
 
@@ -418,7 +554,7 @@ async def test_tasks_without_mission_fail_before_mission_write(
 
     monkeypatch.setattr(runtime, "upsert_session", forbidden_write)
     with pytest.raises(MissionControlError, match="foreign task"):
-        await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+        await _run_bootstrap(portfolio, control)
     assert writes == 0
     assert await control.get_mission(portfolio.campaign_id) is None
 
@@ -481,6 +617,46 @@ def test_cli_contract_mismatch_fails_before_state_effects(
     assert not state_dir.exists()
 
 
+def test_cli_direct_absolute_interpreter_smoke_from_foreign_working_directory(
+    tmp_path: Path,
+) -> None:
+    script = Path(cli.__file__).resolve()
+    help_result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert help_result.returncode == 0
+    assert "{initialize}" in help_result.stdout
+
+    contract_path = tmp_path / "wrong.json"
+    contract_path.write_text("{}", encoding="utf-8")
+    contract_path.chmod(0o600)
+    state_dir = tmp_path / "must-not-exist"
+    initialize_result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "initialize",
+            "--contracts",
+            str(contract_path),
+            "--state-dir",
+            str(state_dir),
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert initialize_result.returncode == 2
+    assert json.loads(initialize_result.stderr)["error_type"] == "GoalContractError"
+    assert not state_dir.exists()
+
+
 def test_cli_lock_contention_fails_closed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -522,7 +698,7 @@ async def test_output_never_claims_dispatch_ready(
 ) -> None:
     portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
     _, board, control = await _owners(tmp_path / "owners")
-    result = await bootstrap.initialize_sadhana_campaign(portfolio, control, board)
+    result = await _run_bootstrap(portfolio, control)
     output = json.loads(result.to_json())
     assert output["dispatch_ready"] is False
     assert output["dispatch_blocker"] == "authority_unbound"
