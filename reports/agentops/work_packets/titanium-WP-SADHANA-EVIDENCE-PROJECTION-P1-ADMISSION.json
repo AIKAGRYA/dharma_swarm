@@ -1,0 +1,94 @@
+{
+  "id": "titanium-WP-SADHANA-EVIDENCE-PROJECTION-P1-ADMISSION",
+  "base_ref": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
+  "branch": "agent/sadhana-evidence-provider-20260823",
+  "worktree": ".",
+  "intent": "Admit one bounded extension of the Titanium-owned immutable SADHANA JSON reader. A later implementation packet may validate and return a nested campaign_evidence object containing supervisor-derived owner observations and independent-acceptance verdict sets, but this admission performs no code change and grants no generic runtime database, process-liveness, dispatch, completion, or mutation authority.",
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-SADHANA-EVIDENCE-PROJECTION-P1-ADMISSION.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "agentops-admission-contract",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k session_entry",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "tracked-copy-custody-remains-required",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_work_packet.py -k test_session_entry_requires_canonical_tracked_path_in_allowed_files",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit SADHANA evidence projection"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-EVIDENCE-PROJECTION-P1-ADMISSION",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "7e05f43b1444a3c544d245d1818cf33f50f076b6",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The secure provider currently returns only mission_snapshot even though the same digested producer envelope already contains owner_executions and independently validated verdict sets.",
+      "The generic runtime projection cannot resolve Orchestrator owner-session identities and must remain unavailable.",
+      "The Organism-owned Constellation hook cannot consume fields that the Titanium reader discards; provider production and UI consumption require separate packets."
+    ],
+    "closest_existing_implementation": [
+      "api/mission_snapshot_provider.py",
+      "api/mission_snapshot_validation.py",
+      "tests/test_mission_snapshot_provider.py",
+      "dharma_swarm/mission_control_campaign.py"
+    ],
+    "honest_blockers": [
+      "Admission changes no provider, API response, dashboard, daemon, task, agent, acceptance, network route, or external system.",
+      "Same-UID self-digested projection custody is not an independent signature or proof of an uncompromised producer.",
+      "Owner observation may support bounded motion language; verified completion still requires terminal success plus independent acceptance."
+    ],
+    "rollback": "Revert this admission record. No implementation or runtime state exists to roll back.",
+    "packet_digest": "9c3b737a7724f4b844ff1e042457c588e7283efeea4ffb5166bd3477479db6ae"
+  }
+}
