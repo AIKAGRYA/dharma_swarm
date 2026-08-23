@@ -1,6 +1,6 @@
 {
   "id": "dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0",
-  "base_ref": "1083a091f099cb4cd1a391aec34d21defc78ce55",
+  "base_ref": "84644114529d1ec0df26c96e00eb5153ed6146e1",
   "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
   "intent": "Implement the exact eight-file dharmagraph SADHANA pre-effect and provider-identity fence. AgentPool exposes bounded ownership-CAS reserve/release methods without leaking private locks. Orchestrator resolves campaign authority to exactly one idle authenticated principal, never substitutes another agent, waits for its scheduled background owner to reach the final campaign-session fence immediately before provider invocation, and bypasses generic same-generation retry for typed campaign work. Its existing background execution control flow and operation order move into a sub-1000-line import-leaf async helper behind a thin same-signature host method solely to preserve the immutable module ceiling; the host passes its logger explicitly. AgentRunner derives every campaign routing coordinate exclusively from the validated nested provider/model lock, rejects every task/config widening alias before both direct and ModelRouter effects, captures the exact request/provider/route coordinates across the awaited final fence, revalidates them after that await, and validates returned provider/model identity plus the fallback-free route decision. ModelRouter consumes a closed restriction-only carrier isolated in a sub-1000-line provider guard to make exactly one request-scoped provider attempt without shared-state mutation, and Ollama maps one exact logical :cloud identity at the trusted exact normalized origin to one exact wire model with no frontier fallback. Generic routing, retry, fallback, and lifecycle behavior remain unchanged when campaign authority is absent. The same packet also removes the three pre-existing Ruff blockers in its owned AgentRunner file without broader cleanup.",
@@ -107,7 +107,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "1083a091f099cb4cd1a391aec34d21defc78ce55",
+      "checked_at_sha": "84644114529d1ec0df26c96e00eb5153ed6146e1",
       "details": []
     },
     "cross_packet_interface": {
@@ -160,6 +160,6 @@
       "The helper preserves control flow and await/operation ordering, not frame identity: traceback, source-file, and helper qualname frames name dharma_swarm.orchestrator_execution."
     ],
     "rollback": "Stop the campaign supervisor and revert this eight-file implementation, including both restriction-only helper modules. Generic non-campaign routing returns to its prior behavior; campaign dispatch must remain disabled because exact principal reservation, queued-before-pause protection, and exact single-model provider execution would no longer hold. Preserve all existing tasks, runs, claims, receipts, and leases; no external cancellation or cleanup is authorized.",
-    "packet_digest": "1ae74b16aa5e681e62f09ffebf831d30d6dea0b81c5369dae216597dcd357b28"
+    "packet_digest": "36eb677cd211c8724ead6e0310189579683baa09618b582d3fd519832702a808"
   }
 }
