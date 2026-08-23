@@ -1,0 +1,114 @@
+{
+  "id": "dharmagraph-WP-SADHANA-PRE-EFFECT-MODULE-SPLIT-P0-ADMISSION",
+  "base_ref": "51d7c11c18ff0e5782a14d89fc8efffcaf68fb6c",
+  "branch": "agent/sadhana-authority-final-20260823",
+  "worktree": ".",
+  "intent": "Admit two restriction-only helpers required by the immutable module line-budget: extract Orchestrator._execute_task control flow and operation ordering into a sub-1000-line import-leaf async helper while retaining a thin same-signature Orchestrator method that passes the host logger explicitly, and isolate the closed SADHANA provider carrier, exact route validation, and exact trusted-origin Ollama invocation in a sub-1000-line provider guard. This admission changes no intended runtime behavior, grants no authority, and admits no ceiling waiver.",
+  "allowed_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0.json",
+    "reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-MODULE-SPLIT-P0-ADMISSION.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "scripts/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "active-track-governance",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "undeclared-packet-custody-remains-rejected",
+      "command": "python3 -m pytest -q tests/test_agent_work_packet.py -k test_session_entry_requires_canonical_tracked_path_in_allowed_files",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit SADHANA pre-effect module split"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-PRE-EFFECT-MODULE-SPLIT-P0-ADMISSION",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "51d7c11c18ff0e5782a14d89fc8efffcaf68fb6c",
+      "details": []
+    },
+    "cross_packet_interface": {
+      "sibling_packet": "organism-rewire-WP-SADHANA-AUTHORITY-EXTENSIONS-P0",
+      "dharmagraph_provides": [
+        "one import-leaf orchestrator_execution.execute_task helper behind the existing same-signature Orchestrator._execute_task method",
+        "one restriction-only campaign provider guard with exact carrier, route, origin, logical-model, and wire-model checks"
+      ],
+      "organism_provides": [
+        "typed campaign authority and control-generation fence",
+        "sole-writer dispatch serialization and durable recovery evidence"
+      ],
+      "shared_proof": "the structural split changes neither lifecycle ordering nor provider eligibility while keeping all touched production modules within their immutable line ceilings"
+    },
+    "interface_mismatches": [
+      "Orchestrator is already exactly at its immutable 3215-line grandfather ceiling before the required campaign pre-effect handshake.",
+      "Providers has only 44 lines of remaining grandfather headroom, less than the closed carrier, trusted-origin, and exact-model proof surface.",
+      "The line-budget evaluator grades committed objects, so a green dirty-worktree invocation is not evidence that the final implementation fits."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/orchestrator.py",
+      "dharma_swarm/providers.py",
+      "dharma_swarm/mission_control_executor_guard.py",
+      "tests/test_orchestrator.py",
+      "tests/test_providers.py"
+    ],
+    "honest_blockers": [
+      "Admission performs no provider, verifier, task, lease, process, transport, deployment, or external-world effect.",
+      "The async helper is a structural extraction only; it must not reorder lifecycle, recovery, scheduling, or provider-boundary operations.",
+      "The helper must never import Orchestrator, and the host wrapper must pass dharma_swarm.orchestrator.logger as one explicit keyword-only dependency at invocation time.",
+      "Orchestrator constructor, class module, MRO, public method signature, and monkeypatch target remain unchanged.",
+      "Traceback, source-file, and helper qualname frames necessarily name dharma_swarm.orchestrator_execution after extraction; no bytecode or frame-identity equivalence is claimed.",
+      "The provider guard is restriction-only and cannot create campaign authority or make a generic provider exact.",
+      "No module ceiling, secret scan, test gate, or history gate is waived or weakened."
+    ],
+    "rollback": "Revert the later eight-file implementation and this admission. Keep campaign dispatch disabled until the prior generic modules are restored without exceeding immutable ceilings; preserve all durable state and external evidence.",
+    "packet_digest": "b472eb11ccb935265a2357f5f08df57c8f6d6afe92ca2184afed64fc5f281854"
+  }
+}

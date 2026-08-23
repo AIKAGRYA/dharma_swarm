@@ -3,10 +3,12 @@
   "base_ref": "1083a091f099cb4cd1a391aec34d21defc78ce55",
   "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
-  "intent": "Implement the exact six-file dharmagraph SADHANA pre-effect and provider-identity fence. AgentPool exposes bounded ownership-CAS reserve/release methods without leaking private locks. Orchestrator resolves campaign authority to exactly one idle authenticated principal, never substitutes another agent, waits for its scheduled background owner to reach the final campaign-session fence immediately before provider invocation, and bypasses generic same-generation retry for typed campaign work. AgentRunner derives every campaign routing coordinate exclusively from the validated nested provider/model lock, rejects every task/config widening alias before both direct and ModelRouter effects, and validates returned provider/model identity plus the fallback-free route decision. ModelRouter consumes a closed restriction-only carrier to make exactly one request-scoped provider attempt without shared-state mutation, and Ollama maps one exact logical :cloud identity to one exact wire model with no frontier fallback. Generic routing, retry, fallback, and lifecycle behavior remain unchanged when campaign authority is absent. The same packet also removes the three pre-existing Ruff blockers in its owned AgentRunner file without broader cleanup.",
+  "intent": "Implement the exact eight-file dharmagraph SADHANA pre-effect and provider-identity fence. AgentPool exposes bounded ownership-CAS reserve/release methods without leaking private locks. Orchestrator resolves campaign authority to exactly one idle authenticated principal, never substitutes another agent, waits for its scheduled background owner to reach the final campaign-session fence immediately before provider invocation, and bypasses generic same-generation retry for typed campaign work. Its existing background execution control flow and operation order move into a sub-1000-line import-leaf async helper behind a thin same-signature host method solely to preserve the immutable module ceiling; the host passes its logger explicitly. AgentRunner derives every campaign routing coordinate exclusively from the validated nested provider/model lock, rejects every task/config widening alias before both direct and ModelRouter effects, captures the exact request/provider/route coordinates across the awaited final fence, revalidates them after that await, and validates returned provider/model identity plus the fallback-free route decision. ModelRouter consumes a closed restriction-only carrier isolated in a sub-1000-line provider guard to make exactly one request-scoped provider attempt without shared-state mutation, and Ollama maps one exact logical :cloud identity at the trusted exact normalized origin to one exact wire model with no frontier fallback. Generic routing, retry, fallback, and lifecycle behavior remain unchanged when campaign authority is absent. The same packet also removes the three pre-existing Ruff blockers in its owned AgentRunner file without broader cleanup.",
   "allowed_files": [
     "dharma_swarm/agent_runner.py",
+    "dharma_swarm/campaign_provider_guard.py",
     "dharma_swarm/orchestrator.py",
+    "dharma_swarm/orchestrator_execution.py",
     "dharma_swarm/providers.py",
     "tests/test_agent_runner.py",
     "tests/test_orchestrator.py",
@@ -41,13 +43,19 @@
   "gates": [
     {
       "name": "pre-effect-fence-and-generic-routing",
-      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_runner.py tests/test_orchestrator.py tests/test_providers.py",
+      "command": "python3 -m pytest -q tests/test_agent_runner.py tests/test_orchestrator.py tests/test_providers.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
       "name": "pre-effect-fence-ruff",
-      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/providers.py tests/test_agent_runner.py tests/test_orchestrator.py tests/test_providers.py",
+      "command": "python3 -m ruff check dharma_swarm/agent_runner.py dharma_swarm/campaign_provider_guard.py dharma_swarm/orchestrator.py dharma_swarm/orchestrator_execution.py dharma_swarm/providers.py tests/test_agent_runner.py tests/test_orchestrator.py tests/test_providers.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "orchestrator-and-provider-helper-structure",
+      "command": "python3 -m pytest -q tests/test_orchestrator.py tests/test_providers.py -k 'orchestrator_execution_helper or campaign_provider_guard_import'",
       "expected_exit": 0,
       "timeout_seconds": 120
     },
@@ -67,7 +75,7 @@
   "negative_controls": [
     {
       "name": "pause-race-substitution-and-generic-bypass-negatives",
-      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_runner.py tests/test_orchestrator.py tests/test_providers.py -k 'campaign_route_lock or campaign_dispatch_does_not_release_before_provider_fence or campaign_idle_snapshot_race_never_starts_owner_provider or campaign_authority_missing_or_busy_principal_never_falls_back or route_next_never_bypasses_campaign_authority or generic_dispatch_routing_is_unchanged_without_campaign_authority or campaign_actual_router or campaign_routing_alias or campaign_direct_response_identity or campaign_routed_result_identity or campaign_exact_provider_failure or campaign_provider_call or campaign_ollama'",
+      "command": "python3 -m pytest -q tests/test_agent_runner.py tests/test_orchestrator.py tests/test_providers.py -k 'campaign_route_lock or campaign_dispatch_does_not_release_before_provider_fence or campaign_idle_snapshot_race_never_starts_owner_provider or campaign_authority_missing_or_busy_principal_never_falls_back or route_next_never_bypasses_campaign_authority or generic_dispatch_routing_is_unchanged_without_campaign_authority or campaign_actual_router or campaign_routing_alias or campaign_direct_response_identity or campaign_routed_result_identity or campaign_exact_provider_failure or campaign_provider_call or campaign_provider_fence_toctou or campaign_ollama'",
       "expected_exit": 0,
       "timeout_seconds": 240
     }
@@ -127,11 +135,15 @@
       "Reservation recovery must release only the exact opaque owner token this dispatch acquired and must never release a foreign task or another attempt generation.",
       "A campaign pre-provider failure is organism-owned typed recovery and must not enter generic Orchestrator provider retry/requeue.",
       "Campaign top-level and AgentConfig routing metadata are not authority for typed work; any widening alias must be rejected before provider selection, while the nested v5 route-lock alone names the eligible lane.",
-      "ModelRouter retries and provider-internal model fallback can create multiple effects behind one apparent call; typed campaign execution requires one request-scoped attempt and one attested served wire model."
+      "ModelRouter retries and provider-internal model fallback can create multiple effects behind one apparent call; typed campaign execution requires one request-scoped attempt and one attested served wire model.",
+      "The final control fence is awaited; mutable task, request, AgentConfig, or provider references must be captured and exactly revalidated after the await so authority cannot drift in that scheduling window.",
+      "The extracted Orchestrator helper must be import-leaf and preserve host-owned logger/monkeypatch semantics, constructor, module, MRO, method signature, and lifecycle operation order."
     ],
     "closest_existing_implementation": [
       "dharma_swarm/agent_runner.py",
+      "dharma_swarm/campaign_provider_guard.py",
       "dharma_swarm/orchestrator.py",
+      "dharma_swarm/orchestrator_execution.py",
       "dharma_swarm/providers.py",
       "dharma_swarm/mission_control_execution.py",
       "tests/test_agent_runner.py",
@@ -144,9 +156,10 @@
       "AgentPool CAS and effect readiness prove only local control ordering, not provider liveness, useful output, independent acceptance, promotion, merge, deployment, or publication.",
       "Write-capable task confinement is not implemented here; campaign production dispatch remains read-only/inference-only unless a separately enforced sandbox is injected.",
       "Exact-model execution is fail-closed per provider implementation. The admitted SADHANA roster is Ollama-only; any future provider must add and prove its own non-multiplexing exact-model implementation before campaign use.",
-      "The exact-model provider carrier is restriction-only; it cannot create campaign authority, attest model usefulness, or authorize a second effect."
+      "The exact-model provider carrier is restriction-only; it cannot create campaign authority, attest model usefulness, or authorize a second effect.",
+      "The helper preserves control flow and await/operation ordering, not frame identity: traceback, source-file, and helper qualname frames name dharma_swarm.orchestrator_execution."
     ],
-    "rollback": "Stop the campaign supervisor and revert this six-file implementation. Generic non-campaign routing returns to its prior behavior; campaign dispatch must remain disabled because exact principal reservation, queued-before-pause protection, and exact single-model provider execution would no longer hold. Preserve all existing tasks, runs, claims, receipts, and leases; no external cancellation or cleanup is authorized.",
-    "packet_digest": "9ec4672c57f6942acbaeb18df349c599162f925c8b6352af62cdeca8d1bbcc63"
+    "rollback": "Stop the campaign supervisor and revert this eight-file implementation, including both restriction-only helper modules. Generic non-campaign routing returns to its prior behavior; campaign dispatch must remain disabled because exact principal reservation, queued-before-pause protection, and exact single-model provider execution would no longer hold. Preserve all existing tasks, runs, claims, receipts, and leases; no external cancellation or cleanup is authorized.",
+    "packet_digest": "1ae74b16aa5e681e62f09ffebf831d30d6dea0b81c5369dae216597dcd357b28"
   }
 }

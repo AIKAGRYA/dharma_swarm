@@ -1183,6 +1183,14 @@ active_tracks:
       - tests/test_providers.py
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0-ADMISSION.json
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0.json
+      # Governed line-budget decomposition (2026-08-23): move the existing
+      # Orchestrator background execution body behind one import-leaf async
+      # helper and isolate the restriction-only campaign provider fence. The
+      # same-signature host wrapper passes the host logger explicitly;
+      # no ceiling waiver, routing authority, or lifecycle ownership moves.
+      - dharma_swarm/orchestrator_execution.py
+      - dharma_swarm/campaign_provider_guard.py
+      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-MODULE-SPLIT-P0-ADMISSION.json
       - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
       - .github/workflows/langgraph-oracle.yml
       - tests/test_workflow.py
