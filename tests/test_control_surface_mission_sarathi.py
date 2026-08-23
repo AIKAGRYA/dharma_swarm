@@ -120,6 +120,27 @@ def _snapshot() -> MissionSnapshot:
     )
 
 
+def _operator_control_evidence() -> dict[str, Any]:
+    return {
+        "schema_version": "dharma.sadhana.operator_control_evidence.v1",
+        "claim_stage": "authority_applied",
+        "control_state": "PAUSED",
+        "campaign_generation": 3,
+        "transition_sequence": 1,
+        "request_id": "pause-one",
+        "idempotency_key": "pause-idempotency-one",
+        "action": "pause",
+        "source_envelope_sha256": "sha256:" + "a" * 64,
+        "authority_receipt_ref": "runtime-receipt:pause-one",
+        "authority_receipt_sha256": "sha256:" + "b" * 64,
+        "authority_applied_at": "2026-08-23T01:29:57Z",
+        "effect_state": "unobserved",
+        "effect_receipt_ref": "",
+        "effect_receipt_sha256": "",
+        "effect_observed_at": None,
+    }
+
+
 def test_snapshot_endpoint_without_provider_is_typed_unknown() -> None:
     response = _client().get(f"/api/control-surface/missions/{MISSION_ID}/snapshot")
 
@@ -163,6 +184,7 @@ def test_snapshot_endpoint_projects_exact_canonical_snapshot() -> None:
     assert body["data"]["proves_executor_liveness"] is False
     assert body["data"]["runtime_projection_ready"] is True
     assert body["data"]["runtime_projection_mode"] == "immutable_copy"
+    assert "operator_control_evidence" not in body["data"]
     snapshot = body["data"]["snapshot"]
     assert snapshot["mission"]["mission_id"] == MISSION_ID
     assert snapshot["tasks"][0]["status"] == "running"
@@ -173,6 +195,58 @@ def test_snapshot_endpoint_projects_exact_canonical_snapshot() -> None:
     assert snapshot["leases"][0]["active"] is True
     assert snapshot["reconciliation"] == "coherent"
     assert snapshot["observed_at"] == "2026-08-23T01:30:00+00:00"
+
+
+def test_snapshot_endpoint_attaches_atomic_operator_control_sibling() -> None:
+    class Provider:
+        runtime_projection_mode = "unavailable"
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def get_snapshot_with_operator_control(
+            self, mission_id: str
+        ) -> tuple[MissionSnapshot, dict[str, Any]]:
+            self.calls.append(mission_id)
+            return _snapshot(), _operator_control_evidence()
+
+        async def get_snapshot(self, _mission_id: str) -> MissionSnapshot:
+            raise AssertionError("atomic provider bundle must be read exactly once")
+
+    provider = Provider()
+    response = _client(provider).get(
+        f"/api/control-surface/missions/{MISSION_ID}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert provider.calls == [MISSION_ID]
+    assert body["source_errors"] == []
+    projection = body["data"]
+    assert projection["state"] == "observed"
+    assert projection["runtime_projection_mode"] == "unavailable"
+    assert projection["operator_control_evidence"] == _operator_control_evidence()
+    assert "operator_control_evidence" not in projection["snapshot"]
+
+
+def test_snapshot_endpoint_rejects_foreign_operator_control_shape() -> None:
+    class Provider:
+        async def get_snapshot_with_operator_control(
+            self, _mission_id: str
+        ) -> tuple[MissionSnapshot, dict[str, Any]]:
+            evidence = {**_operator_control_evidence(), "operator_login": "private"}
+            return _snapshot(), evidence
+
+    response = _client(Provider()).get(
+        f"/api/control-surface/missions/{MISSION_ID}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert "operator_login" not in response.text
+    assert body["source_errors"][0]["error"] == "read failed (TypeError)"
 
 
 def test_snapshot_endpoint_preserves_exact_mission_absence_as_unknown() -> None:

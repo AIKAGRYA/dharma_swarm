@@ -41,6 +41,13 @@ _A2A_INBOX_BRIDGE_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "inbox_bridge_
 _A2A_DOMAIN_REPLY_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "domain_reply_receipts"
 _A2A_REPLY_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "reply_receipts"
 _SEMANTIC_RECEIPT_ROOT = _REPO_ROOT / "reports" / "agentops" / "semantic_receipts"
+_OPERATOR_CONTROL_EVIDENCE_SCHEMA = "dharma.sadhana.operator_control_evidence.v1"
+_OPERATOR_CONTROL_EVIDENCE_FIELDS = frozenset(
+    "schema_version claim_stage control_state campaign_generation transition_sequence "
+    "request_id idempotency_key action source_envelope_sha256 authority_receipt_ref "
+    "authority_receipt_sha256 authority_applied_at effect_state effect_receipt_ref "
+    "effect_receipt_sha256 effect_observed_at".split()
+)
 _IMPORT_LOCK = threading.Lock()
 _ENVELOPE_TYPES: tuple[Any, Any, Any] | None = None
 _CONTROL_SURFACE_FUNCS: tuple[Any, Any, Any] | None = None
@@ -178,10 +185,11 @@ def _mission_snapshot_projection(
     *,
     state: str,
     snapshot: dict[str, Any] | None = None,
+    operator_control_evidence: dict[str, Any] | None = None,
     runtime_projection_ready: bool = False,
 ) -> dict[str, Any]:
     """Return the non-promotional projection for one explicit mission."""
-    return {
+    projection = {
         "schema_version": "dharma.control_surface.mission_snapshot_projection.v1",
         "mission_id": mission_id,
         "state": state,
@@ -195,6 +203,9 @@ def _mission_snapshot_projection(
         # acknowledgement, identifier, or receipt into proof.
         "proves_executor_liveness": False,
     }
+    if operator_control_evidence is not None:
+        projection["operator_control_evidence"] = operator_control_evidence
+    return projection
 
 
 def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]:
@@ -211,6 +222,17 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         raise TypeError("mission snapshot reconciliation must be a string")
     if not isinstance(projected.get("observed_at"), str):
         raise TypeError("mission snapshot observed_at must be an ISO timestamp")
+    return projected
+
+
+def _project_operator_control_evidence(evidence: Any) -> dict[str, Any]:
+    projected = jsonable_encoder(evidence)
+    if (
+        not isinstance(projected, dict)
+        or set(projected) != _OPERATOR_CONTROL_EVIDENCE_FIELDS
+        or projected.get("schema_version") != _OPERATOR_CONTROL_EVIDENCE_SCHEMA
+    ):
+        raise TypeError("operator control evidence has a foreign shape")
     return projected
 
 
@@ -470,7 +492,9 @@ async def control_surface_mission_snapshot(
             ],
         )
 
-    reader = getattr(provider, "get_snapshot", None)
+    bundle_reader = getattr(provider, "get_snapshot_with_operator_control", None)
+    reads_bundle = callable(bundle_reader)
+    reader = bundle_reader if reads_bundle else getattr(provider, "get_snapshot", None)
     if reader is None and callable(provider):
         reader = provider
     if not callable(reader):
@@ -486,8 +510,8 @@ async def control_surface_mission_snapshot(
 
     try:
         candidate = reader(mission_id)
-        snapshot = await candidate if inspect.isawaitable(candidate) else candidate
-        if snapshot is None:
+        admitted = await candidate if inspect.isawaitable(candidate) else candidate
+        if admitted is None:
             return _build_envelope(
                 _mission_snapshot_projection(mission_id, state="unknown"),
                 [
@@ -496,6 +520,15 @@ async def control_surface_mission_snapshot(
                         "error": "canonical state was not observed for this mission",
                     }
                 ],
+            )
+        operator_evidence = None
+        snapshot = admitted
+        if reads_bundle:
+            if not isinstance(admitted, tuple) or len(admitted) != 2:
+                raise TypeError("mission snapshot provider returned a malformed bundle")
+            snapshot, raw_operator_evidence = admitted
+            operator_evidence = _project_operator_control_evidence(
+                raw_operator_evidence
             )
         projected = _project_injected_snapshot(snapshot, mission_id)
         runtime_projection_ready = (
@@ -506,6 +539,7 @@ async def control_surface_mission_snapshot(
                 mission_id,
                 state="observed",
                 snapshot=projected,
+                operator_control_evidence=operator_evidence,
                 runtime_projection_ready=runtime_projection_ready,
             )
         )
