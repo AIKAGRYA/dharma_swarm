@@ -100,7 +100,7 @@ def _typed_campaign_metadata(principal: str, task_id: str) -> dict[str, Any]:
         "preferred_provider": "local",
         "preferred_model": "fixture-model",
         "mission_campaign_authority": {
-            "schema_version": "dharma.sadhana.campaign_task_authority.v4",
+            "schema_version": "dharma.sadhana.campaign_task_authority.v5",
             "campaign_id": MISSION_ID,
             "mission_id": MISSION_ID,
             "goal_id": "goal-one",
@@ -130,6 +130,14 @@ def _typed_campaign_metadata(principal: str, task_id: str) -> dict[str, Any]:
                 "sha256:" + "1" * 64
             ),
             "observed_input_ref": observed_ref,
+            "route_lock": {
+                "schema_version": "dharma.sadhana.campaign_route_lock.v1",
+                "task_id": task_id,
+                "principal_id": principal,
+                "provider": "local",
+                "model": "fixture-model",
+                "allow_provider_routing": False,
+            },
         },
     }
 DISPATCH_KEY = "default"

@@ -27,6 +27,10 @@ from dharma_swarm.mission_control_dispatch import (
     VerifiedDispatchAuthority,
 )
 from dharma_swarm.mission_control_execution import OwnerExecutionRef
+from dharma_swarm.mission_control_executor_guard import (
+    CAMPAIGN_ROUTE_LOCK_KEY,
+    campaign_route_lock_matches,
+)
 from dharma_swarm.mission_control_observed_input import (
     OBSERVED_INPUT_REF_KEY,
     render_bound_observed_input_prompt,
@@ -43,7 +47,7 @@ from dharma_swarm.operator_core.execution_lease import (
 from dharma_swarm.task_board import TaskBoard
 
 CAMPAIGN_AUTHORITY_METADATA_KEY = "mission_campaign_authority"
-CAMPAIGN_AUTHORITY_SCHEMA_VERSION = "dharma.sadhana.campaign_task_authority.v4"
+CAMPAIGN_AUTHORITY_SCHEMA_VERSION = "dharma.sadhana.campaign_task_authority.v5"
 SADHANA_BOOTSTRAP_SCHEMA_VERSION = "dharma.sadhana.mission_bootstrap.v1"
 SADHANA_GOAL_CONTRACT_SCHEMA_VERSION = "dharma.sadhana.goal_contracts.v1"
 _SHA256_RE = re.compile(r"sha256:[0-9a-f]{64}")
@@ -388,6 +392,7 @@ class GovernedCampaignTaskDispatcher:
             "authority_digest",
             "attempt_generation",
             "max_attempts",
+            CAMPAIGN_ROUTE_LOCK_KEY,
         }
         if set(authority) != required:
             raise MissionControlError("campaign authority fields are not exact")
@@ -524,6 +529,14 @@ class GovernedCampaignTaskDispatcher:
             or not metadata["preferred_model"]
         ):
             raise MissionControlError("campaign pinned provider/model routing is invalid")
+        if not campaign_route_lock_matches(
+            authority.get(CAMPAIGN_ROUTE_LOCK_KEY),
+            task_id=task.task_id,
+            principal_id=str(authority.get("claimed_principal", "")),
+            provider=metadata["preferred_provider"],
+            model=metadata["preferred_model"],
+        ):
+            raise MissionControlError("campaign route lock is not exact")
 
 
 __all__ = [

@@ -17,7 +17,19 @@ from dharma_swarm.models import (
 
 _AUTHORITY_KEY = "mission_campaign_authority"
 _BOOTSTRAP_SCHEMA = "dharma.sadhana.mission_bootstrap.v1"
-_AUTHORITY_SCHEMA = "dharma.sadhana.campaign_task_authority.v4"
+_AUTHORITY_SCHEMA = "dharma.sadhana.campaign_task_authority.v5"
+CAMPAIGN_ROUTE_LOCK_KEY = "route_lock"
+CAMPAIGN_ROUTE_LOCK_SCHEMA = "dharma.sadhana.campaign_route_lock.v1"
+_ROUTE_LOCK_FIELDS = frozenset(
+    {
+        "schema_version",
+        "task_id",
+        "principal_id",
+        "provider",
+        "model",
+        "allow_provider_routing",
+    }
+)
 _AUTHORITY_FIELDS = frozenset(
     {
         "schema_version",
@@ -48,6 +60,7 @@ _AUTHORITY_FIELDS = frozenset(
         "authority_digest",
         "attempt_generation",
         "max_attempts",
+        CAMPAIGN_ROUTE_LOCK_KEY,
     }
 )
 
@@ -58,6 +71,45 @@ def _exact_text(value: Any) -> bool:
         and value
         and value == value.strip()
         and not any(char.isspace() for char in value)
+    )
+
+
+def build_campaign_route_lock(task_id: str, principal: AgentState) -> dict[str, Any]:
+    """Bind one campaign task to its boot-local provider and model lane."""
+    if not all(
+        _exact_text(value)
+        for value in (task_id, principal.id, principal.provider, principal.model)
+    ):
+        raise ValueError("campaign route lock coordinates must be exact text")
+    return {
+        "schema_version": CAMPAIGN_ROUTE_LOCK_SCHEMA,
+        "task_id": task_id,
+        "principal_id": principal.id,
+        "provider": principal.provider,
+        "model": principal.model,
+        "allow_provider_routing": False,
+    }
+
+
+def campaign_route_lock_matches(
+    value: Any,
+    *,
+    task_id: str,
+    principal_id: str,
+    provider: str,
+    model: str,
+) -> bool:
+    """Return whether a nested route lock names one exact immutable lane."""
+    return bool(
+        isinstance(value, dict)
+        and set(value) == _ROUTE_LOCK_FIELDS
+        and value.get("schema_version") == CAMPAIGN_ROUTE_LOCK_SCHEMA
+        and value.get("task_id") == task_id
+        and value.get("principal_id") == principal_id
+        and value.get("provider") == provider
+        and value.get("model") == model
+        and value.get("allow_provider_routing") is False
+        and all(_exact_text(item) for item in (task_id, principal_id, provider, model))
     )
 
 
@@ -140,6 +192,11 @@ def campaign_principal(task: Task | None) -> tuple[bool, str]:
     )
     authority = metadata.get(_AUTHORITY_KEY)
     principal = authority.get("claimed_principal") if isinstance(authority, dict) else ""
+    route_lock = (
+        authority.get(CAMPAIGN_ROUTE_LOCK_KEY)
+        if isinstance(authority, dict)
+        else None
+    )
     routing_safe = bool(
         metadata.get("campaign_effect_mode") == "read_only"
         and metadata.get("requires_tooling") is False
@@ -149,6 +206,13 @@ def campaign_principal(task: Task | None) -> tuple[bool, str]:
         and metadata["provider_allowlist"][0] == metadata.get("preferred_provider")
         and _exact_text(metadata.get("preferred_provider"))
         and _exact_text(metadata.get("preferred_model"))
+        and campaign_route_lock_matches(
+            route_lock,
+            task_id=task.id,
+            principal_id=principal,
+            provider=metadata.get("preferred_provider"),
+            model=metadata.get("preferred_model"),
+        )
     )
     observed_safe = False
     if isinstance(authority, dict):
@@ -245,7 +309,18 @@ def plan_campaign_dispatch(
     selected = exact_idle_principal(idle, principal)
     authority = task.metadata.get(_AUTHORITY_KEY, {})
     generation = authority.get("attempt_generation")
-    if selected is None or not isinstance(generation, int) or isinstance(generation, bool):
+    if (
+        selected is None
+        or not isinstance(generation, int)
+        or isinstance(generation, bool)
+        or not campaign_route_lock_matches(
+            authority.get(CAMPAIGN_ROUTE_LOCK_KEY),
+            task_id=task.id,
+            principal_id=selected.id,
+            provider=selected.provider,
+            model=selected.model,
+        )
+    ):
         return None
     dispatch = TaskDispatch(
         task_id=task.id,

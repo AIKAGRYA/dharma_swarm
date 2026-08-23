@@ -44,7 +44,7 @@ def _campaign_attempt_metadata(
     maximum: int = 2,
 ) -> dict:
     authority = {
-        "schema_version": "dharma.sadhana.campaign_task_authority.v4",
+        "schema_version": "dharma.sadhana.campaign_task_authority.v5",
         "campaign_id": "campaign-exact",
         "mission_id": "campaign-exact",
         "goal_id": "G01",
@@ -80,6 +80,14 @@ def _campaign_attempt_metadata(
             "artifact_record_sha256": "sha256:" + "2" * 64,
             "content_sha256": "sha256:" + "3" * 64,
         },
+        "route_lock": {
+            "schema_version": "dharma.sadhana.campaign_route_lock.v1",
+            "task_id": task_id,
+            "principal_id": "agent-exact",
+            "provider": "ollama",
+            "model": "fixture-model",
+            "allow_provider_routing": False,
+        },
     }
     governance = {
         key: value
@@ -87,7 +95,7 @@ def _campaign_attempt_metadata(
         if key
         not in {
             "agent_name", "claimed_principal", "dispatch_key", "request_id",
-            "authority_ref", "authority_digest",
+            "authority_ref", "authority_digest", "route_lock",
         }
     }
     governance["schema_version"] = "dharma.sadhana.campaign_governance.v4"

@@ -44,6 +44,11 @@ from dharma_swarm.mission_control_dispatch import (
     GOVERNANCE_METADATA_KEY,
     MissionDispatchRequest,
 )
+from dharma_swarm.mission_control_executor_guard import (
+    CAMPAIGN_ROUTE_LOCK_KEY,
+    build_campaign_route_lock,
+    campaign_route_lock_matches,
+)
 from dharma_swarm.mission_control_binding_manifest import (
     AUTHORITY_ACTIONS,
     AUTHORITY_MANIFEST_MAX_BYTES,
@@ -338,6 +343,7 @@ def _authority_envelope(
         "max_attempts": goal.max_attempts,
         "authority_ref": lease["lease_id"],
         "authority_digest": lease["content_hash"],
+        CAMPAIGN_ROUTE_LOCK_KEY: build_campaign_route_lock(request.task_id, principal),
     }
 
 
@@ -493,6 +499,7 @@ def _require_existing_authority_lineage(
     authority: Mapping[str, Any],
     manifest: CampaignAuthorityManifest,
     goal: CampaignGoalAuthority,
+    principal: AgentState,
     request: MissionDispatchRequest,
     lease_id: str,
 ) -> None:
@@ -534,7 +541,22 @@ def _require_existing_authority_lineage(
         _need(authority.get(key) == value, f"existing task authority has foreign {key}")
     _exact_identifier(authority.get("claimed_principal"), "existing claimed_principal")
     _exact_sha256(authority.get("authority_digest"), "existing authority_digest")
-    _need(set(authority) == {*expected, "claimed_principal", "authority_digest"},
+    _need(
+        campaign_route_lock_matches(
+            authority.get(CAMPAIGN_ROUTE_LOCK_KEY),
+            task_id=request.task_id,
+            principal_id=str(authority["claimed_principal"]),
+            provider=principal.provider,
+            model=principal.model,
+        ),
+        "existing task authority has foreign route_lock",
+    )
+    _need(set(authority) == {
+        *expected,
+        "claimed_principal",
+        "authority_digest",
+        CAMPAIGN_ROUTE_LOCK_KEY,
+    },
           "existing task authority has foreign fields")
 
 
@@ -663,7 +685,7 @@ def _plan_task(
         _need(type(raw_authority) is dict, "existing task authority has an invalid shape")
         authority = raw_authority
         _require_existing_authority_lineage(
-            authority, manifest, goal, request, lease_id
+            authority, manifest, goal, principal, request, lease_id
         )
         if existing is not None and authority.get("claimed_principal") == existing.get("issued_to"):
             _need(

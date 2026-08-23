@@ -7,13 +7,17 @@ from typing import Any, Literal, Protocol
 
 import aiosqlite
 
+from dharma_swarm.mission_control_executor_guard import (
+    CAMPAIGN_ROUTE_LOCK_KEY,
+    campaign_route_lock_matches,
+)
 from dharma_swarm.models import TaskStatus, _utc_now
 
 CAMPAIGN_AUTHORITY_KEY = "mission_campaign_authority"
 CAMPAIGN_GOVERNANCE_KEY = "mission_control_governance"
 CAMPAIGN_ATTEMPT_HISTORY_KEY = "campaign_dispatch_attempt_history"
 OWNER_EXECUTION_KEY = "mission_control_owner_execution"
-AUTHORITY_SCHEMA_V4 = "dharma.sadhana.campaign_task_authority.v4"
+AUTHORITY_SCHEMA_V5 = "dharma.sadhana.campaign_task_authority.v5"
 GOVERNANCE_SCHEMA_V4 = "dharma.sadhana.campaign_governance.v4"
 OWNER_SCHEMA_V2 = "dharma.mission_control.owner_execution.v2"
 RECOVERY_SCHEMA_V2 = "dharma.sadhana.dispatch_recovery.v2"
@@ -49,6 +53,7 @@ _AUTHORITY_FIELDS = frozenset(
         "deployment_authority_topology_sha256",
         "deployment_authority_credential_clarification_sha256",
         "observed_input_ref",
+        CAMPAIGN_ROUTE_LOCK_KEY,
     }
 )
 _GOVERNANCE_FIELDS = frozenset(
@@ -89,7 +94,7 @@ _EVIDENCE_FIELDS = frozenset(
 _DYNAMIC_AUTHORITY_FIELDS = frozenset(
     {
         "claimed_principal", "dispatch_key", "request_id", "authority_ref",
-        "authority_digest", "attempt_generation",
+        "authority_digest", "attempt_generation", CAMPAIGN_ROUTE_LOCK_KEY,
     }
 )
 
@@ -155,11 +160,12 @@ def _validate_authority(authority: Any, *, task_id: str = "") -> tuple[int, int]
     _need(
         isinstance(authority, dict)
         and set(authority) == _AUTHORITY_FIELDS
-        and authority.get("schema_version") == AUTHORITY_SCHEMA_V4,
+        and authority.get("schema_version") == AUTHORITY_SCHEMA_V5,
         "campaign authority evidence is not exact",
     )
     generation = authority["attempt_generation"]
     maximum = authority["max_attempts"]
+    route_lock = authority.get(CAMPAIGN_ROUTE_LOCK_KEY)
     _need(
         _generation(generation)
         and _generation(maximum)
@@ -189,6 +195,17 @@ def _validate_authority(authority: Any, *, task_id: str = "") -> tuple[int, int]
         )
         and _observed_ref(authority.get("observed_input_ref")),
         "campaign authority generation is invalid",
+    )
+    _need(
+        isinstance(route_lock, dict)
+        and campaign_route_lock_matches(
+            route_lock,
+            task_id=task_id,
+            principal_id=str(authority.get("claimed_principal", "")),
+            provider=str(route_lock.get("provider", "")),
+            model=str(route_lock.get("model", "")),
+        ),
+        "campaign authority route lock is invalid",
     )
     return generation, maximum
 
@@ -551,7 +568,14 @@ async def advance_campaign_dispatch_attempt(
             and next_routing.get("provider_allowlist")
             == [next_routing.get("preferred_provider")]
             and _text(next_routing.get("preferred_provider"))
-            and _text(next_routing.get("preferred_model")),
+            and _text(next_routing.get("preferred_model"))
+            and campaign_route_lock_matches(
+                next_authority.get(CAMPAIGN_ROUTE_LOCK_KEY),
+                task_id=task_id,
+                principal_id=str(next_authority.get("claimed_principal", "")),
+                provider=str(next_routing.get("preferred_provider", "")),
+                model=str(next_routing.get("preferred_model", "")),
+            ),
             "next campaign attempt authority is not an exact successor",
         )
         evidence = {

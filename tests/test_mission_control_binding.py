@@ -525,6 +525,14 @@ async def test_exact_ten_goal_binding_is_idempotent_and_preserves_seed_provenanc
         assert authority["request_id"] == bound.request_id
         assert authority["max_usd"] == 0
         assert authority["allowed_files"] == governance["allowed_files"]
+        assert authority["route_lock"] == {
+            "schema_version": "dharma.sadhana.campaign_route_lock.v1",
+            "task_id": task.id,
+            "principal_id": bound.principal_id,
+            "provider": task.metadata["preferred_provider"],
+            "model": task.metadata["preferred_model"],
+            "allow_provider_routing": False,
+        }
         lease = load_execution_lease(case.lease_root, bound.authority_ref)
         for field in (
             "operator_control_semantics_sha256",
@@ -894,6 +902,51 @@ async def test_foreign_partial_state_is_rejected_before_any_write(
     still_early = await case.board.get(early.task_id)
     assert still_early is not None
     assert CAMPAIGN_AUTHORITY_METADATA_KEY not in still_early.metadata
+    assert _index_lines(case) == before_index
+
+
+@pytest.mark.asyncio
+async def test_foreign_nested_route_lock_is_rejected_before_any_write(
+    tmp_path: Path,
+) -> None:
+    case = await _case(tmp_path, goal_count=1)
+    first = await bind_campaign_authority(
+        manifest_path=case.manifest_path,
+        mission_control=case.control,
+        board=case.board,
+        agent_pool=case.roster,
+        campaign_roster=case.campaign_roster,
+        observed_inputs=case.observed_inputs,
+        runtime_state=case.runtime,
+        lease_root=case.lease_root,
+        now=case.now,
+    )
+    task = await case.board.get(first.tasks[0].task_id)
+    assert task is not None
+    metadata = dict(task.metadata)
+    authority = dict(metadata[CAMPAIGN_AUTHORITY_METADATA_KEY])
+    authority["route_lock"] = {
+        **authority["route_lock"],
+        "provider": "foreign-provider",
+        "allow_provider_routing": True,
+    }
+    metadata[CAMPAIGN_AUTHORITY_METADATA_KEY] = authority
+    await case.board.update_task(task.id, metadata=metadata)
+    before_index = _index_lines(case)
+
+    with pytest.raises(MissionControlError, match="foreign route_lock"):
+        await bind_campaign_authority(
+            manifest_path=case.manifest_path,
+            mission_control=case.control,
+            board=case.board,
+            agent_pool=case.roster,
+            campaign_roster=case.campaign_roster,
+            observed_inputs=case.observed_inputs,
+            runtime_state=case.runtime,
+            lease_root=case.lease_root,
+            now=case.now + timedelta(seconds=1),
+        )
+
     assert _index_lines(case) == before_index
 
 

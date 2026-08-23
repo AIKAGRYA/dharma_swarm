@@ -1440,7 +1440,7 @@ async def test_file_authority_reloads_revocation_before_governed_effect(
         "max_attempts": 1,
     }
     authority = {
-        "schema_version": "dharma.sadhana.campaign_task_authority.v4",
+        "schema_version": "dharma.sadhana.campaign_task_authority.v5",
         "campaign_id": MISSION_ID,
         "mission_id": MISSION_ID,
         "goal_id": "goal-one",
@@ -1468,6 +1468,14 @@ async def test_file_authority_reloads_revocation_before_governed_effect(
         "authority_digest": lease["content_hash"],
         "attempt_generation": 0,
         "max_attempts": 1,
+        "route_lock": {
+            "schema_version": "dharma.sadhana.campaign_route_lock.v1",
+            "task_id": task.task_id,
+            "principal_id": request.claimed_principal,
+            "provider": "ollama",
+            "model": "fixture-model:cloud",
+            "allow_provider_routing": False,
+        },
     }
     await board.update_task(
         task.task_id,
