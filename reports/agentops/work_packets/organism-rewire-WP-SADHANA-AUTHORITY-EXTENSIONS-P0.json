@@ -3,7 +3,7 @@
   "base_ref": "f5e23f2d982fbf21f1ed1c0043c5a793f8035102",
   "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
-  "intent": "Implement the organism-owned SADHANA campaign authority stack as one fail-closed vertical slice: exact post-boot principal and lease binding, bounded immutable attempt generations, dispatch recovery before provider effect, hash-pinned observed input, a root-sandboxed held-out oracle request/terminal protocol, fair automatic distinct-family verification, observer-health activation, strict operator pause/resume authority with durable replay, and deterministic runtime-manifest rendering. Generic routing and the final provider-boundary handshake remain separately owned by the sibling dharmagraph packet.",
+  "intent": "Implement the organism-owned SADHANA campaign authority stack as one fail-closed vertical slice: exact post-boot principal, provider/model route-lock, and lease binding, bounded immutable attempt generations, dispatch recovery before provider effect, hash-pinned observed input, a root-sandboxed held-out oracle request/terminal protocol, fair automatic distinct-family verification, observer-health activation, strict operator pause/resume authority with durable replay, and deterministic runtime-manifest rendering. Generic routing and the route-lock consumer/final provider-boundary handshake remain separately owned by the sibling dharmagraph packet.",
   "allowed_files": [
     "dharma_swarm/mission_control_activation.py",
     "dharma_swarm/mission_control_attempts.py",
@@ -156,14 +156,16 @@
       "organism_provides": [
         "exact campaign-session generation and pause validator",
         "typed attempt, authority, lease, verifier, and pre-effect recovery state",
+        "nested exact provider/model route-lock bound to task and boot-local principal",
         "async mobile operator-control authority callback and runtime composition"
       ],
       "dharmagraph_provides": [
         "atomic exact AgentPool reserve and release CAS",
         "exact principal routing with no campaign fallback",
+        "pre-provider route-lock validation and single-lane ModelRouter restriction",
         "provider-boundary fence and readiness handshake before control-gate release"
       ],
-      "shared_proof": "an exact campaign owner reaches its provider only while the captured session generation remains running, and queued work cannot cross a durable pause"
+      "shared_proof": "an exact campaign owner reaches only its route-locked provider/model while the captured session generation remains running, and queued work cannot cross a durable pause"
     },
     "interface_mismatches": [
       "Bootstrap seed readiness remains immutable false/authority_unbound provenance; runtime readiness comes only from the typed current authority envelope and exact lease.",
@@ -190,6 +192,6 @@
       "Exact durable evidence does not by itself prove usefulness, promotion, merge, deployment, publication, or external-world success."
     ],
     "rollback": "Stop the campaign writer and revert this implementation. Preserve all TaskBoard, RuntimeState, lease, verifier, oracle, and operator-control evidence for audit; remove only unused deterministic lease/request files under separate operational authorization. No provider cancellation, credential mutation, promotion, merge, deployment, or external publication is authorized by rollback.",
-    "packet_digest": "61da6c9da099c97d7a0586e979566a6fb87b9763582d533060208a07fe601c26"
+    "packet_digest": "2424879968b303789b3dde0ba64963b564ba8aefcc4d36e6d84aa7c44e538f15"
   }
 }
