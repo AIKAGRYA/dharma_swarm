@@ -1,9 +1,9 @@
 {
   "id": "dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0-ADMISSION",
-  "base_ref": "6153bdf8a2e9aa21bb513ee051984801c182975a",
-  "branch": "agent/sadhana-authority-binding-20260823",
+  "base_ref": "819aad0e3dad4bc60b4184cc0446a7b0daa72eb4",
+  "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
-  "intent": "Admit exactly the four-file dharmagraph shared seam required to prevent a queued campaign owner from starting a provider after durable pause: AgentPool exact reservation/release ownership CAS plus Orchestrator exact-principal routing, campaign effect-fence threading, and a readiness handshake before the campaign control gate is released. This admission changes no runtime behavior and leaves all campaign authority/session/recovery semantics to the sibling organism packet.",
+  "intent": "Amend the dharmagraph shared seam to exactly six implementation files required to prevent a queued campaign owner from starting or widening a provider effect after durable pause: AgentPool exact reservation/release ownership CAS; Orchestrator exact-principal routing, effect-fence threading, and readiness handshake; AgentRunner closed route-lock consumption and response identity validation; and ModelRouter/provider request-scoped single-attempt, fallback-free, exact-model execution. This admission changes no runtime behavior and leaves all campaign authority/session/recovery semantics to the sibling organism packet.",
   "allowed_files": [
     "CLAUDE.md",
     "docs/governance/ACTIVE_TRACK.yaml",
@@ -72,7 +72,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "6153bdf8a2e9aa21bb513ee051984801c182975a",
+      "checked_at_sha": "819aad0e3dad4bc60b4184cc0446a7b0daa72eb4",
       "details": []
     },
     "cross_packet_interface": {
@@ -80,7 +80,8 @@
       "dharmagraph_provides": [
         "AgentPool.reserve(agent_id, task_id) and release_reservation(agent_id, task_id) ownership CAS",
         "exact campaign principal selection with no preferred-agent fallback",
-        "provider-boundary effect fence and readiness handshake"
+        "provider-boundary effect fence and readiness handshake",
+        "request-scoped one-attempt, fallback-free exact-provider/model invocation with served-identity validation"
       ],
       "organism_provides": [
         "captured exact campaign generation/control-state validator",
@@ -93,22 +94,28 @@
       "Orchestrator dispatch historically returns immediately after scheduling a background task, allowing pause to commit before the background owner enters its provider.",
       "Preferred-agent routing is advisory and can fall back to another idle agent; authenticated campaign authority requires exact-one current principal or no dispatch.",
       "AgentPool internal lock/state are private; the supervisor needs only bounded atomic reserve/release methods and must never reach into private fields.",
+      "ModelRouter's process-wide retry policy and Ollama's internal frontier fallback can each create multiple effects inside one campaign generation; the campaign restriction must be request-scoped and must not mutate shared router/provider state.",
+      "Ollama cloud authority names a logical roster ID ending in :cloud while its HTTP wire ID omits only that suffix; the provider must attest the exact wire ID before returning the exact logical identity.",
       "Generic Orchestrator retries can reuse one identity, while typed campaign generations and pre-effect recovery are organism-owned and must bypass generic requeue without changing non-campaign behavior."
     ],
     "closest_existing_implementation": [
       "dharma_swarm/agent_runner.py",
       "dharma_swarm/orchestrator.py",
+      "dharma_swarm/providers.py",
       "dharma_swarm/mission_control_execution.py",
       "tests/test_agent_runner.py",
-      "tests/test_orchestrator.py"
+      "tests/test_orchestrator.py",
+      "tests/test_providers.py"
     ],
     "honest_blockers": [
       "Admission performs no provider, verifier, task, lease, process, transport, deployment, or external-world effect.",
       "The final pre-provider callback is a trusted-process fence for the sole production supervisor, not an opaque membrane against hostile in-process plugins.",
       "Crossing the final provider boundary is not cancellable by this packet; pause/stop fence later starts but provider cancellation remains a separate invoker concern.",
+      "The exact-model carrier is restriction-only and cannot grant campaign authority; it is emitted only after the typed task authority and route lock validate.",
+      "Exact-model execution is fail-closed per provider implementation. The admitted SADHANA roster is Ollama-only; any future provider must add and prove its own non-multiplexing exact-model implementation before campaign use.",
       "AgentPool reservation proves only local ownership state, not provider liveness, semantic usefulness, acceptance, promotion, merge, or publication."
     ],
-    "rollback": "Revert the later four-file implementation and this admission. Generic routing remains the prior behavior, but campaign dispatch must stay disabled because queued-before-pause protection and exact reservation CAS would no longer be proved. Preserve all TaskBoard, RuntimeState, lease, and provider evidence; no external effect is authorized by admission rollback.",
-    "packet_digest": "df298bda19e552a4324f4c288641155e6cabe65eeb3d4e9f37057f456404e3a0"
+    "rollback": "Revert the later six-file implementation and this admission. Generic routing remains the prior behavior, but campaign dispatch must stay disabled because queued-before-pause protection, exact reservation CAS, and single-model provider execution would no longer be proved. Preserve all TaskBoard, RuntimeState, lease, and provider evidence; no external effect is authorized by admission rollback.",
+    "packet_digest": "5f46ed70832082c6098d14db7012c61dbaf1b844c03a18bf5225d9485d997bb0"
   }
 }

@@ -1176,8 +1176,11 @@ active_tracks:
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0.json
       # Operator-authorized SADHANA pre-effect-fence scope correction
       # (2026-08-23): bind the exact AgentPool reservation/release CAS and the
-      # Orchestrator provider-boundary readiness handshake as one four-file
-      # shared seam. Campaign-less generic routing remains behaviorally fixed.
+      # Orchestrator provider-boundary readiness handshake plus the provider's
+      # request-scoped exact-model entry point as one six-file shared seam.
+      # Campaign-less generic routing remains behaviorally fixed.
+      - dharma_swarm/providers.py
+      - tests/test_providers.py
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0-ADMISSION.json
       - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0.json
       - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
