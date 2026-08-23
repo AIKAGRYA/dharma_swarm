@@ -1,7 +1,7 @@
 {
   "id": "organism-rewire-WP-SADHANA-AUTHORITY-EXTENSIONS-P0",
-  "base_ref": "d92242e230b327a00fb6677fc844e7d5f1b5a242",
-  "branch": "agent/sadhana-authority-binding-20260823",
+  "base_ref": "f5e23f2d982fbf21f1ed1c0043c5a793f8035102",
+  "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
   "intent": "Implement the organism-owned SADHANA campaign authority stack as one fail-closed vertical slice: exact post-boot principal and lease binding, bounded immutable attempt generations, dispatch recovery before provider effect, hash-pinned observed input, a root-sandboxed held-out oracle request/terminal protocol, fair automatic distinct-family verification, observer-health activation, strict operator pause/resume authority with durable replay, and deterministic runtime-manifest rendering. Generic routing and the final provider-boundary handshake remain separately owned by the sibling dharmagraph packet.",
   "allowed_files": [
@@ -148,7 +148,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "d92242e230b327a00fb6677fc844e7d5f1b5a242",
+      "checked_at_sha": "f5e23f2d982fbf21f1ed1c0043c5a793f8035102",
       "details": []
     },
     "cross_packet_interface": {
@@ -190,6 +190,6 @@
       "Exact durable evidence does not by itself prove usefulness, promotion, merge, deployment, publication, or external-world success."
     ],
     "rollback": "Stop the campaign writer and revert this implementation. Preserve all TaskBoard, RuntimeState, lease, verifier, oracle, and operator-control evidence for audit; remove only unused deterministic lease/request files under separate operational authorization. No provider cancellation, credential mutation, promotion, merge, deployment, or external publication is authorized by rollback.",
-    "packet_digest": "74d7e4603af62635d1a80ade5aff88cb214aec8f7920410885c8335995e9edef"
+    "packet_digest": "61da6c9da099c97d7a0586e979566a6fb87b9763582d533060208a07fe601c26"
   }
 }
