@@ -1,9 +1,9 @@
 {
   "id": "dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0",
-  "base_ref": "ba63faafb2e6e8e98aa3c5d2cb30306f9cdab6a8",
-  "branch": "agent/sadhana-authority-binding-20260823",
+  "base_ref": "786a630c9a578848be9fcf2448c9406523a1e910",
+  "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
-  "intent": "Implement the exact four-file dharmagraph SADHANA pre-effect fence. AgentPool exposes bounded ownership-CAS reserve/release methods without leaking private locks. Orchestrator resolves campaign authority to exactly one idle authenticated principal, never substitutes another agent, waits for its scheduled background owner to reach the final campaign-session fence immediately before provider invocation, and bypasses generic same-generation retry for typed campaign work. Routing and lifecycle behavior remain unchanged when campaign authority is absent.",
+  "intent": "Implement the exact four-file dharmagraph SADHANA pre-effect fence and route-lock consumer. AgentPool exposes bounded ownership-CAS reserve/release methods without leaking private locks. Orchestrator resolves campaign authority to exactly one idle authenticated principal, never substitutes another agent, waits for its scheduled background owner to reach the final campaign-session fence immediately before provider invocation, and bypasses generic same-generation retry for typed campaign work. AgentRunner derives every campaign routing coordinate exclusively from the validated nested provider/model lock, rejects task/config widening before both direct and ModelRouter effects, and admits exactly one provider/model lane. Generic routing and lifecycle behavior remain unchanged when campaign authority is absent. The same packet also removes the three pre-existing Ruff blockers in its owned AgentRunner file without broader cleanup.",
   "allowed_files": [
     "dharma_swarm/agent_runner.py",
     "dharma_swarm/orchestrator.py",
@@ -65,7 +65,7 @@
   "negative_controls": [
     {
       "name": "pause-race-substitution-and-generic-bypass-negatives",
-      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_orchestrator.py -k 'campaign_dispatch_does_not_release_before_provider_fence or campaign_idle_snapshot_race_never_starts_owner_provider or campaign_authority_missing_or_busy_principal_never_falls_back or route_next_never_bypasses_campaign_authority or generic_dispatch_routing_is_unchanged_without_campaign_authority'",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_agent_runner.py tests/test_orchestrator.py -k 'campaign_route_lock or campaign_dispatch_does_not_release_before_provider_fence or campaign_idle_snapshot_race_never_starts_owner_provider or campaign_authority_missing_or_busy_principal_never_falls_back or route_next_never_bypasses_campaign_authority or generic_dispatch_routing_is_unchanged_without_campaign_authority'",
       "expected_exit": 0,
       "timeout_seconds": 240
     }
@@ -97,7 +97,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "ba63faafb2e6e8e98aa3c5d2cb30306f9cdab6a8",
+      "checked_at_sha": "786a630c9a578848be9fcf2448c9406523a1e910",
       "details": []
     },
     "cross_packet_interface": {
@@ -105,20 +105,24 @@
       "dharmagraph_provides": [
         "atomic local reservation ownership CAS",
         "exact principal selection without campaign fallback",
+        "validated nested route-lock consumption before direct or routed provider effect",
+        "one exact eligible provider/model lane with all mergeable routing aliases excluded",
         "final provider-boundary callback and readiness handshake"
       ],
       "organism_provides": [
         "campaign session generation/control-state fence implementation",
         "typed authority/lease/attempt identity and failure recovery",
+        "v5 task/principal/provider/model route-lock construction and lineage validation",
         "sole-writer control-gate serialization around dispatch and operator transition"
       ],
-      "shared_proof": "a queued owner cannot begin its provider after pause because dispatch retains campaign control serialization until the background task validates the final session fence"
+      "shared_proof": "a queued owner can reach only its exact route-locked provider/model and cannot begin that provider after pause because dispatch retains campaign control serialization until the background task validates the final session fence"
     },
     "interface_mismatches": [
       "The existing scheduler returns after create_task, not after provider-effect readiness, leaving a deliberate asyncio yield window where pause can overtake the owner.",
       "Generic topology preference can fall back to another idle agent; typed campaign authority requires exact ID equality and no dispatch when the principal is missing, busy, duplicated, or races idle-to-busy.",
       "Reservation recovery must release only the exact opaque owner token this dispatch acquired and must never release a foreign task or another attempt generation.",
-      "A campaign pre-provider failure is organism-owned typed recovery and must not enter generic Orchestrator provider retry/requeue."
+      "A campaign pre-provider failure is organism-owned typed recovery and must not enter generic Orchestrator provider retry/requeue.",
+      "Campaign top-level and AgentConfig routing metadata are not authority for typed work; any widening alias must be rejected before provider selection, while the nested v5 route-lock alone names the eligible lane."
     ],
     "closest_existing_implementation": [
       "dharma_swarm/agent_runner.py",
@@ -134,6 +138,6 @@
       "Write-capable task confinement is not implemented here; campaign production dispatch remains read-only/inference-only unless a separately enforced sandbox is injected."
     ],
     "rollback": "Stop the campaign supervisor and revert this four-file implementation. Generic non-campaign routing returns to its prior behavior; campaign dispatch must remain disabled because exact principal reservation and queued-before-pause protection would no longer hold. Preserve all existing tasks, runs, claims, receipts, and leases; no external cancellation or cleanup is authorized.",
-    "packet_digest": "653ef3a3efc675f04f053942e61f6546f331dd5c2de1bfaad013d4ce61cf7eec"
+    "packet_digest": "c5a365560823911dd23640bcb70dafee136ae0b168fa174cd2509a91dc2ed5af"
   }
 }
