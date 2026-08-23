@@ -342,9 +342,16 @@ def test_custody_race_cannot_overwrite_new_destination(
         return original_rename(*args)
 
     monkeypatch.setattr(control_fs, "rename_noreplace", inject_destination_then_rename)
-    with pytest.raises(ControlIdempotencyConflict, match="different canonical bytes"):
+    with pytest.raises(
+        ControlIdempotencyConflict, match="different canonical bytes"
+    ) as caught:
         control_module._atomic_move_regular(publication.path, inflight)
-    assert publication.path.is_file()
+    claim_path = caught.value.claim_path
+    assert isinstance(claim_path, Path)
+    assert claim_path.parent == inflight
+    assert claim_path.is_file()
+    assert claim_path.read_bytes() != collision_bytes
+    assert not publication.path.exists()
     assert collision.read_bytes() == collision_bytes
 
 
@@ -361,7 +368,7 @@ def test_filesystem_custody_requires_nofollow_and_directory_flags(
         )
 
 
-def test_replay_cleanup_substitution_cannot_replace_authority_candidate(
+def test_existing_identical_destination_replay_uses_claimed_bytes_only(
     inboxes: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     normal, emergency, inflight, _, _ = _normal_custody(inboxes)
@@ -373,27 +380,25 @@ def test_replay_cleanup_substitution_cannot_replace_authority_candidate(
     destination = inflight / publication.path.name
     destination.write_bytes(canonical)
     destination.chmod(0o640)
-    hostile = b"substituted-after-replay-comparison"
+    hostile = b"replacement-after-private-claim"
     original_rename = control_fs.rename_noreplace
     calls = 0
 
-    def substitute_before_private_claim(*args):
+    def replace_public_name_after_claim(*args):
         nonlocal calls
         calls += 1
-        if calls == 2:
-            publication.path.unlink()
+        result = original_rename(*args)
+        if calls == 1:
             publication.path.write_bytes(hostile)
             publication.path.chmod(0o640)
-        return original_rename(*args)
+        return result
 
-    monkeypatch.setattr(control_fs, "rename_noreplace", substitute_before_private_claim)
-    with pytest.raises(UnsafeInboxEntry, match="private replay cleanup"):
-        control_module._atomic_move_regular(publication.path, inflight)
+    monkeypatch.setattr(control_fs, "rename_noreplace", replace_public_name_after_claim)
+    moved = control_module._atomic_move_regular(publication.path, inflight)
+    assert moved == canonical
     assert destination.read_bytes() == canonical
-    assert not publication.path.exists()
-    quarantined = list(inflight.glob(f".replay.{publication.path.name}.*"))
-    assert len(quarantined) == 1
-    assert quarantined[0].read_bytes() == hostile
+    assert publication.path.read_bytes() == hostile
+    assert not list(inflight.glob(".claim.*"))
 
 
 def test_candidate_reader_rejects_same_size_metadata_mutation(
@@ -513,15 +518,276 @@ def _authority_application(
     *,
     status: ApplicationStatus = ApplicationStatus.APPLIED,
 ) -> AuthorityApplication:
+    terminal = status is not ApplicationStatus.DEFERRED
     return AuthorityApplication(
         request_id=request.request_id,
         idempotency_key=request.idempotency_key,
         envelope_sha256=envelope_sha256,
         status=status,
-        authority_receipt_ref=f"campaign-control:{request.action.value}:{request.request_id}",
-        authority_receipt_sha256="sha256:" + "a" * 64,
+        authority_receipt_ref=(
+            f"campaign-control:{request.action.value}:{request.request_id}"
+            if terminal
+            else ""
+        ),
+        authority_receipt_sha256="sha256:" + "a" * 64 if terminal else "",
         effect_observed=False,
     )
+
+
+async def test_first_claim_rename_source_substitution_is_quarantined_and_same_key_recovers(
+    inboxes: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    request = OperatorControlRequest.from_mapping(_request())
+    publication = ControlInboxPublisher(normal, emergency).publish(
+        request, operator_login=LOGIN, secret=SECRET, now=NOW
+    )
+    original_rename = control_fs.rename_noreplace
+    substituted = False
+
+    def substitute_at_first_claim(
+        source_directory: int,
+        source_name: str,
+        destination_directory: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal substituted
+        if not substituted and destination_name.startswith(".claim."):
+            substituted = True
+            publication.path.unlink()
+            publication.path.write_bytes(b"attacker-controlled replacement")
+            publication.path.chmod(0o640)
+        original_rename(
+            source_directory,
+            source_name,
+            destination_directory,
+            destination_name,
+        )
+
+    monkeypatch.setattr(control_fs, "rename_noreplace", substitute_at_first_claim)
+    callback_calls = 0
+
+    async def apply(control, _login, digest):
+        nonlocal callback_calls
+        callback_calls += 1
+        return _authority_application(control, digest)
+
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+    )
+    [invalid] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert invalid.status is ReconcileStatus.INVALID
+    assert invalid.error_code == "invalid_schema"
+    assert callback_calls == 0
+    assert not list(normal.iterdir())
+    assert not list(inflight.iterdir())
+    assert not (rejected / publication.path.name).exists()
+    assert not (rejected / terminal_filename(publication.path.name)).exists()
+    quarantines = [
+        path
+        for path in rejected.iterdir()
+        if control_fs.CONTROL_QUARANTINE_FILENAME_RE.fullmatch(path.name)
+    ]
+    assert len(quarantines) == 1
+    assert quarantines[0].read_bytes() == b"attacker-controlled replacement"
+    assert (
+        rejected / control_fs.quarantine_receipt_filename(quarantines[0].name)
+    ).is_file()
+
+    replay = ControlInboxPublisher(normal, emergency).publish(
+        request, operator_login=LOGIN, secret=SECRET, now=NOW
+    )
+    assert replay.replayed is False
+    [recovered] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert recovered.status is ReconcileStatus.APPLIED
+    assert callback_calls == 1
+    assert (applied / publication.path.name).is_file()
+    assert (applied / terminal_filename(publication.path.name)).is_file()
+
+
+async def test_crash_after_private_claim_is_recovered_without_source_retry(
+    inboxes: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    request = OperatorControlRequest.from_mapping(_request())
+    publication = ControlInboxPublisher(normal, emergency).publish(
+        request, operator_login=LOGIN, secret=SECRET, now=NOW
+    )
+    original_rename = control_fs.rename_noreplace
+    crashed = False
+
+    def claim_then_crash(*args):
+        nonlocal crashed
+        original_rename(*args)
+        destination_name = args[3]
+        if not crashed and destination_name.startswith(".claim."):
+            crashed = True
+            raise RuntimeError("crash after private claim")
+
+    monkeypatch.setattr(control_fs, "rename_noreplace", claim_then_crash)
+    callback_calls = 0
+
+    async def apply(control, _login, digest):
+        nonlocal callback_calls
+        callback_calls += 1
+        return _authority_application(control, digest)
+
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+    )
+    with pytest.raises(RuntimeError, match="crash after private claim"):
+        await reconciler.reconcile_once(
+            SupervisorControlCallbacks(apply=apply), now=NOW
+        )
+    assert callback_calls == 0
+    assert not publication.path.exists()
+    assert len(list(inflight.glob(".claim.*"))) == 1
+
+    [recovered] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert recovered.status is ReconcileStatus.APPLIED
+    assert callback_calls == 1
+    assert not list(inflight.iterdir())
+    assert (applied / publication.path.name).is_file()
+
+
+async def test_crash_after_terminal_destination_claim_is_recovered(
+    inboxes: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    request = OperatorControlRequest.from_mapping(_request())
+    publication = ControlInboxPublisher(normal, emergency).publish(
+        request, operator_login=LOGIN, secret=SECRET, now=NOW
+    )
+    original_rename = control_fs.rename_noreplace
+    claim_moves = 0
+
+    def second_claim_then_crash(*args):
+        nonlocal claim_moves
+        original_rename(*args)
+        destination_name = args[3]
+        if destination_name.startswith(".claim."):
+            claim_moves += 1
+            if claim_moves == 2:
+                raise RuntimeError("crash after terminal destination claim")
+
+    monkeypatch.setattr(control_fs, "rename_noreplace", second_claim_then_crash)
+    durable: dict[str, AuthorityApplication] = {}
+    callback_calls = 0
+    mutations = 0
+
+    async def apply(control, _login, digest):
+        nonlocal callback_calls, mutations
+        callback_calls += 1
+        if control.idempotency_key not in durable:
+            mutations += 1
+            durable[control.idempotency_key] = _authority_application(control, digest)
+        return durable[control.idempotency_key]
+
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+    )
+    with pytest.raises(RuntimeError, match="crash after terminal destination claim"):
+        await reconciler.reconcile_once(
+            SupervisorControlCallbacks(apply=apply), now=NOW
+        )
+    assert callback_calls == 1
+    assert mutations == 1
+    assert not list(inflight.iterdir())
+    assert len(list(applied.glob(".claim.*"))) == 1
+
+    [recovered] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert recovered.status is ReconcileStatus.APPLIED
+    assert callback_calls == 2
+    assert mutations == 1
+    assert not list(applied.glob(".claim.*"))
+    assert (applied / publication.path.name).is_file()
+    assert (applied / terminal_filename(publication.path.name)).is_file()
+
+
+async def test_crash_after_quarantine_move_recovers_typed_evidence_only(
+    inboxes: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normal, _, inflight, applied, rejected = _normal_custody(inboxes)
+    filename = "0" * 64 + ".control.json"
+    source = normal / filename
+    source.write_bytes(b"not-an-authenticated-envelope")
+    source.chmod(0o640)
+    original_rename = control_fs.rename_noreplace
+    crashed = False
+
+    def quarantine_then_crash(*args):
+        nonlocal crashed
+        original_rename(*args)
+        destination_name = args[3]
+        if not crashed and destination_name.startswith(".quarantine."):
+            crashed = True
+            raise RuntimeError("crash after quarantine move")
+
+    monkeypatch.setattr(control_fs, "rename_noreplace", quarantine_then_crash)
+    callback_calls = 0
+
+    async def apply(*_args):
+        nonlocal callback_calls
+        callback_calls += 1
+        raise AssertionError("invalid candidate reached authority")
+
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+    )
+    with pytest.raises(RuntimeError, match="crash after quarantine move"):
+        await reconciler.reconcile_once(
+            SupervisorControlCallbacks(apply=apply), now=NOW
+        )
+    assert callback_calls == 0
+    assert not source.exists()
+    assert not list(inflight.iterdir())
+    [quarantine] = [
+        path
+        for path in rejected.iterdir()
+        if control_fs.CONTROL_QUARANTINE_FILENAME_RE.fullmatch(path.name)
+    ]
+    assert not (
+        rejected / control_fs.quarantine_receipt_filename(quarantine.name)
+    ).exists()
+
+    [recovered] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert recovered.status is ReconcileStatus.INVALID
+    assert recovered.error_code == "invalid_schema"
+    assert callback_calls == 0
+    assert (
+        rejected / control_fs.quarantine_receipt_filename(quarantine.name)
+    ).is_file()
+    assert not (rejected / terminal_filename(filename)).exists()
 
 
 def test_authority_application_bounds_receipt_ref_and_effect_claim() -> None:
@@ -545,6 +811,64 @@ def test_authority_application_bounds_receipt_ref_and_effect_claim() -> None:
             authority_receipt_sha256="sha256:" + "a" * 64,
             effect_observed=True,
         )
+
+
+def test_authority_application_receipts_are_typed_by_terminal_status() -> None:
+    request = OperatorControlRequest.from_mapping(_request())
+    identity = {
+        "request_id": request.request_id,
+        "idempotency_key": request.idempotency_key,
+        "envelope_sha256": "sha256:" + "b" * 64,
+    }
+    deferred = AuthorityApplication(
+        **identity,
+        status=ApplicationStatus.DEFERRED,
+        authority_receipt_ref="",
+        authority_receipt_sha256="",
+    )
+    assert deferred.authority_receipt_ref == ""
+    assert deferred.authority_receipt_sha256 == ""
+
+    for fields in (
+        {
+            "authority_receipt_ref": "campaign-control:synthetic",
+            "authority_receipt_sha256": "",
+        },
+        {
+            "authority_receipt_ref": "",
+            "authority_receipt_sha256": "sha256:" + "a" * 64,
+        },
+    ):
+        with pytest.raises(ValueError, match="cannot claim a persisted"):
+            AuthorityApplication(
+                **identity,
+                status=ApplicationStatus.DEFERRED,
+                **fields,
+            )
+
+    for status in (ApplicationStatus.APPLIED, ApplicationStatus.REJECTED):
+        terminal = AuthorityApplication(
+            **identity,
+            status=status,
+            authority_receipt_ref="campaign-control:receipt",
+            authority_receipt_sha256="sha256:" + "a" * 64,
+        )
+        assert terminal.status is status
+        with pytest.raises(ValueError, match="receipt reference"):
+            AuthorityApplication(
+                **identity,
+                status=status,
+                authority_receipt_ref="",
+                authority_receipt_sha256="sha256:" + "a" * 64,
+            )
+        for invalid_digest in ("", "a" * 64, "sha256:" + "z" * 64):
+            with pytest.raises(ValueError, match="canonical receipt sha256"):
+                AuthorityApplication(
+                    **identity,
+                    status=status,
+                    authority_receipt_ref="campaign-control:receipt",
+                    authority_receipt_sha256=invalid_digest,
+                )
 
 
 async def test_reconciler_separates_inbox_ack_from_applied_authority(
@@ -758,7 +1082,7 @@ async def test_unapplied_expired_inflight_is_authority_rejected_without_mutation
     assert (rejected / publication.path.name).is_file()
 
 
-async def test_crash_after_terminal_sidecar_recovers_without_second_authority_mutation(
+async def test_crash_after_terminal_candidate_move_recovers_missing_sidecar(
     inboxes: tuple[Path, Path],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -784,24 +1108,31 @@ async def test_crash_after_terminal_sidecar_recovers_without_second_authority_mu
         rejected_inbox=rejected,
         secret=SECRET,
     )
-    original_move = control_module._atomic_move_regular
+    original_publish = control_module._atomic_publish
     crashed = False
 
-    def crash_after_sidecar(source: Path, destination: Path) -> bytes:
+    def crash_before_terminal_sidecar(
+        directory: Path,
+        filename: str,
+        payload: bytes,
+        **kwargs,
+    ) -> bool:
         nonlocal crashed
-        if source.parent == inflight and destination == applied and not crashed:
+        if directory == applied and filename.endswith(".terminal.json") and not crashed:
             crashed = True
-            terminal = applied / terminal_filename(source.name)
-            assert terminal.is_file()
-            raise RuntimeError("crash after terminal sidecar")
-        return original_move(source, destination)
+            candidate = applied / publication.path.name
+            assert candidate.is_file()
+            assert not (applied / terminal_filename(candidate.name)).exists()
+            raise RuntimeError("crash after terminal candidate move")
+        return original_publish(directory, filename, payload, **kwargs)
 
-    monkeypatch.setattr(control_module, "_atomic_move_regular", crash_after_sidecar)
-    with pytest.raises(RuntimeError, match="crash after terminal sidecar"):
+    monkeypatch.setattr(control_module, "_atomic_publish", crash_before_terminal_sidecar)
+    with pytest.raises(RuntimeError, match="crash after terminal candidate move"):
         await reconciler.reconcile_once(
             SupervisorControlCallbacks(apply=apply), now=NOW
         )
-    assert (inflight / publication.path.name).is_file()
+    assert not (inflight / publication.path.name).exists()
+    assert (applied / publication.path.name).is_file()
     [recovered] = await reconciler.reconcile_once(
         SupervisorControlCallbacks(apply=apply), now=NOW
     )
@@ -810,6 +1141,64 @@ async def test_crash_after_terminal_sidecar_recovers_without_second_authority_mu
     assert not list(inflight.glob("*.control.json"))
     assert (applied / publication.path.name).is_file()
     assert len(list(applied.glob("*.terminal.json"))) == 1
+
+
+async def test_crash_after_terminal_receipt_publish_leaves_complete_pair(
+    inboxes: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    request = OperatorControlRequest.from_mapping(_request())
+    publication = ControlInboxPublisher(normal, emergency).publish(
+        request, operator_login=LOGIN, secret=SECRET, now=NOW
+    )
+    durable: dict[str, AuthorityApplication] = {}
+    mutations = 0
+
+    async def apply(control, _login, digest):
+        nonlocal mutations
+        if control.idempotency_key not in durable:
+            mutations += 1
+            durable[control.idempotency_key] = _authority_application(control, digest)
+        return durable[control.idempotency_key]
+
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+    )
+    original_publish = control_module._atomic_publish
+    crashed = False
+
+    def publish_then_crash(
+        directory: Path,
+        filename: str,
+        payload: bytes,
+        **kwargs,
+    ) -> bool:
+        nonlocal crashed
+        replayed = original_publish(directory, filename, payload, **kwargs)
+        if directory == applied and filename.endswith(".terminal.json") and not crashed:
+            crashed = True
+            raise RuntimeError("crash after terminal receipt publish")
+        return replayed
+
+    monkeypatch.setattr(control_module, "_atomic_publish", publish_then_crash)
+    with pytest.raises(RuntimeError, match="crash after terminal receipt publish"):
+        await reconciler.reconcile_once(
+            SupervisorControlCallbacks(apply=apply), now=NOW
+        )
+    assert mutations == 1
+    assert (applied / publication.path.name).is_file()
+    assert (applied / terminal_filename(publication.path.name)).is_file()
+
+    recovered = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert recovered == []
+    assert mutations == 1
 
 
 async def test_authority_echo_mismatch_is_terminally_rejected(
@@ -839,9 +1228,17 @@ async def test_authority_echo_mismatch_is_terminally_rejected(
     assert result.applied is False
     assert not list(inflight.glob("*.control.json"))
     assert not list(applied.iterdir())
-    assert (rejected / publication.path.name).is_file()
+    assert not (rejected / publication.path.name).exists()
+    assert not (rejected / terminal_filename(publication.path.name)).exists()
+    [quarantine] = [
+        path
+        for path in rejected.iterdir()
+        if control_fs.CONTROL_QUARANTINE_FILENAME_RE.fullmatch(path.name)
+    ]
     receipt = json.loads(
-        (rejected / terminal_filename(publication.path.name)).read_text()
+        (
+            rejected / control_fs.quarantine_receipt_filename(quarantine.name)
+        ).read_text()
     )
     assert receipt["error_code"] == "idempotency_conflict"
     assert receipt["authority_applied"] is False
@@ -880,7 +1277,7 @@ async def test_poison_entry_is_rejected_without_starving_valid_candidate(
         ReconcileStatus.APPLIED,
     ]
     assert not poison.exists()
-    assert list(rejected.glob(".unsafe.*"))
+    assert list(rejected.glob(".quarantine.*.unsafe_inbox_entry.*"))
     assert (applied / publication.path.name).is_file()
 
 
@@ -913,7 +1310,8 @@ async def test_reconciler_rejects_emergency_on_normal_transport(
     assert result.status is ReconcileStatus.INVALID
     assert result.error_code == "invalid_schema"
     assert calls == []
-    assert list(rejected.glob("*.control.json"))
+    assert list(rejected.glob(".quarantine.*.invalid_schema.*"))
+    assert not (rejected / terminal_filename(control_filename("stop-key"))).exists()
 
 
 def test_semantics_contract_hash_is_pinned() -> None:

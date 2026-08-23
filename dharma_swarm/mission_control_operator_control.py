@@ -26,8 +26,11 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm._mission_control_operator_control_fs import (
+    CONTROL_CLAIM_FILENAME_RE as _CONTROL_CLAIM_FILENAME_RE,
     CONTROL_FILE_MODE,
     CONTROL_FILENAME_RE as _CONTROL_FILENAME_RE,
+    CONTROL_QUARANTINE_FILENAME_RE as _CONTROL_QUARANTINE_FILENAME_RE,
+    CONTROL_QUARANTINE_RECEIPT_FILENAME_RE as _CONTROL_QUARANTINE_RECEIPT_FILENAME_RE,
     MAX_ENVELOPE_BYTES,
     TERMINAL_FILENAME_RE as _TERMINAL_FILENAME_RE,
     ControlAuthenticationError,
@@ -41,8 +44,12 @@ from dharma_swarm._mission_control_operator_control_fs import (
     UnsafeInboxEntry,
     atomic_move_regular as _atomic_move_regular,
     atomic_publish as _atomic_publish,
+    claimed_control_filename as _claimed_control_filename,
     open_directory_nofollow as _open_directory_nofollow,
+    promote_claimed_regular as _promote_claimed_regular,
+    quarantine_receipt_filename as _quarantine_receipt_filename,
     quarantine_unsafe as _quarantine_unsafe,
+    quarantined_control_identity as _quarantined_control_identity,
     read_regular_entry as _read_regular_entry,
 )
 
@@ -515,11 +522,21 @@ class AuthorityApplication:
         _validate_identifier(self.idempotency_key, field="idempotency_key")
         if not _SHA256_REF_RE.fullmatch(self.envelope_sha256):
             raise ValueError("authority application requires an envelope sha256 ref")
-        if not _SHA256_REF_RE.fullmatch(self.authority_receipt_sha256):
-            raise ValueError("authority application requires a receipt sha256 ref")
         _validate_authority_receipt_ref(self.authority_receipt_ref)
-        if self.status is ApplicationStatus.APPLIED and not self.authority_receipt_ref:
-            raise ValueError("applied control requires an authority receipt reference")
+        if self.status is ApplicationStatus.DEFERRED:
+            if self.authority_receipt_ref or self.authority_receipt_sha256:
+                raise ValueError(
+                    "deferred control cannot claim a persisted authority receipt"
+                )
+        else:
+            if not self.authority_receipt_ref:
+                raise ValueError(
+                    "terminal control requires an authority receipt reference"
+                )
+            if not _SHA256_REF_RE.fullmatch(self.authority_receipt_sha256):
+                raise ValueError(
+                    "terminal control requires a canonical receipt sha256 ref"
+                )
         if self.effect_observed is not False:
             raise ValueError(
                 "authority application cannot self-claim an observed effect"
@@ -644,17 +661,49 @@ class OperatorControlInboxReconciler:
             raise ValueError("normal custody directories must be distinct")
 
     @staticmethod
-    def _candidate_names(directory: Path, *, limit: int) -> list[str]:
+    def _matching_names(
+        directory: Path, *, pattern: re.Pattern[str], limit: int
+    ) -> list[str]:
         directory_descriptor = _open_directory_nofollow(directory)
         try:
             names = sorted(
                 name
                 for name in os.listdir(directory_descriptor)
-                if _CONTROL_FILENAME_RE.fullmatch(name)
+                if pattern.fullmatch(name)
             )
         finally:
             os.close(directory_descriptor)
         return names[:limit]
+
+    @classmethod
+    def _candidate_names(cls, directory: Path, *, limit: int) -> list[str]:
+        return cls._matching_names(
+            directory, pattern=_CONTROL_FILENAME_RE, limit=limit
+        )
+
+    @classmethod
+    def _claim_names(cls, directory: Path, *, limit: int) -> list[str]:
+        return cls._matching_names(
+            directory, pattern=_CONTROL_CLAIM_FILENAME_RE, limit=limit
+        )
+
+    @classmethod
+    def _quarantine_names(cls, directory: Path, *, limit: int) -> list[str]:
+        return cls._matching_names(
+            directory, pattern=_CONTROL_QUARANTINE_FILENAME_RE, limit=limit
+        )
+
+    @classmethod
+    def _quarantine_receipt_names(
+        cls, directory: Path, *, limit: int
+    ) -> set[str]:
+        return set(
+            cls._matching_names(
+                directory,
+                pattern=_CONTROL_QUARANTINE_RECEIPT_FILENAME_RE,
+                limit=limit,
+            )
+        )
 
     async def reconcile_once(
         self,
@@ -662,8 +711,47 @@ class OperatorControlInboxReconciler:
         *,
         now: datetime | None = None,
     ) -> list[ReconcileResult]:
-        results: list[ReconcileResult] = []
+        results = self._recover_quarantine_evidence()
         processed = 0
+
+        for claim_directory in (
+            self._inflight_inbox,
+            self._applied_inbox,
+            self._rejected_inbox,
+        ):
+            for claim_name in self._claim_names(
+                claim_directory, limit=self._max_scan
+            ):
+                claim_path = claim_directory / claim_name
+                control_name = _claimed_control_filename(claim_name)
+                try:
+                    _promote_claimed_regular(claim_path)
+                except OperatorControlError as exc:
+                    results.append(
+                        self._resolve_claim_failure(
+                            claim_path,
+                            control_filename=control_name,
+                            error=exc,
+                        )
+                    )
+
+        for destination, expected_status in (
+            (self._applied_inbox, ApplicationStatus.APPLIED),
+            (self._rejected_inbox, ApplicationStatus.REJECTED),
+        ):
+            for filename in self._unterminated_candidate_names(destination):
+                if processed >= self._max_candidates:
+                    return results
+                results.append(
+                    await self._recover_terminal_candidate(
+                        destination / filename,
+                        expected_status=expected_status,
+                        callbacks=callbacks,
+                        now=now,
+                    )
+                )
+                processed += 1
+
         inflight_names = self._candidate_names(
             self._inflight_inbox, limit=self._max_scan
         )
@@ -687,7 +775,10 @@ class OperatorControlInboxReconciler:
                 )
             except OperatorControlError as exc:
                 results.append(
-                    self._terminalize_unsafe(self._normal_inbox / filename, error=exc)
+                    self._resolve_move_failure(
+                        source=self._normal_inbox / filename,
+                        error=exc,
+                    )
                 )
                 continue
             results.append(
@@ -695,6 +786,172 @@ class OperatorControlInboxReconciler:
             )
             processed += 1
         return results
+
+    def _recover_quarantine_evidence(self) -> list[ReconcileResult]:
+        """Finish sidecars only after their exact quarantine carrier exists."""
+
+        receipts = self._quarantine_receipt_names(
+            self._rejected_inbox, limit=self._max_scan
+        )
+        results: list[ReconcileResult] = []
+        for quarantine_name in self._quarantine_names(
+            self._rejected_inbox, limit=self._max_scan
+        ):
+            if _quarantine_receipt_filename(quarantine_name) in receipts:
+                continue
+            results.append(
+                self._record_quarantine_evidence(
+                    self._rejected_inbox / quarantine_name
+                )
+            )
+        return results
+
+    def _unterminated_candidate_names(self, directory: Path) -> list[str]:
+        directory_descriptor = _open_directory_nofollow(directory)
+        try:
+            names = set(os.listdir(directory_descriptor))
+        finally:
+            os.close(directory_descriptor)
+        return [
+            name
+            for name in sorted(names)
+            if _CONTROL_FILENAME_RE.fullmatch(name)
+            and terminal_filename(name) not in names
+        ][: self._max_scan]
+
+    async def _recover_terminal_candidate(
+        self,
+        path: Path,
+        *,
+        expected_status: ApplicationStatus,
+        callbacks: SupervisorControlCallbacks,
+        now: datetime | None,
+    ) -> ReconcileResult:
+        """Complete a candidate-first terminal transition after a crash."""
+
+        try:
+            envelope = read_control_candidate(
+                path,
+                secret=self._secret,
+                now=now,
+                expected_actions=frozenset({ControlAction.PAUSE, ControlAction.RESUME}),
+                freshness_policy=FreshnessPolicy.AUTHORITY_REPLAY,
+            )
+        except OperatorControlError as exc:
+            return self._terminalize_invalid(path, error=exc)
+
+        try:
+            application = await callbacks.apply(
+                envelope.request,
+                envelope.operator_login,
+                envelope.envelope_sha256,
+            )
+        except Exception:
+            return _envelope_result(
+                path.name,
+                ReconcileStatus.DEFERRED,
+                envelope,
+                terminal_candidate_path=str(path),
+                error_code="authority_callback_failed",
+            )
+        try:
+            self._validate_application(application, envelope)
+        except (TypeError, ValueError, ControlIdempotencyConflict):
+            return _envelope_result(
+                path.name,
+                ReconcileStatus.CONFLICT,
+                envelope,
+                terminal_candidate_path=str(path),
+                error_code="idempotency_conflict",
+            )
+        if application.status is not expected_status:
+            return _envelope_result(
+                path.name,
+                ReconcileStatus.CONFLICT,
+                envelope,
+                authority_receipt_ref=application.authority_receipt_ref,
+                authority_receipt_sha256=application.authority_receipt_sha256,
+                terminal_candidate_path=str(path),
+                error_code="idempotency_conflict",
+            )
+
+        error_code = (
+            "" if expected_status is ApplicationStatus.APPLIED else "authority_rejected"
+        )
+        receipt = _terminal_receipt_bytes(
+            envelope=envelope,
+            envelope_sha256=envelope.envelope_sha256,
+            status=expected_status.value,
+            error_code=error_code,
+            application=application,
+        )
+        receipt_path = path.parent / terminal_filename(path.name)
+        try:
+            _atomic_publish(
+                path.parent,
+                receipt_path.name,
+                receipt,
+                filename_pattern=_TERMINAL_FILENAME_RE,
+            )
+        except OperatorControlError as exc:
+            return _envelope_result(
+                path.name,
+                ReconcileStatus.CONFLICT,
+                envelope,
+                authority_receipt_ref=application.authority_receipt_ref,
+                authority_receipt_sha256=application.authority_receipt_sha256,
+                terminal_candidate_path=str(path),
+                error_code=exc.code,
+            )
+        return _envelope_result(
+            path.name,
+            ReconcileStatus(expected_status.value),
+            envelope,
+            authority_receipt_ref=application.authority_receipt_ref,
+            authority_receipt_sha256=application.authority_receipt_sha256,
+            applied=expected_status is ApplicationStatus.APPLIED,
+            terminal_receipt_path=str(receipt_path),
+            terminal_candidate_path=str(path),
+            error_code=error_code,
+        )
+
+    def _resolve_move_failure(
+        self, *, source: Path, error: OperatorControlError
+    ) -> ReconcileResult:
+        claim_path = error.claim_path
+        control_name = error.control_filename or source.name
+        if isinstance(claim_path, Path):
+            return self._resolve_claim_failure(
+                claim_path,
+                control_filename=control_name,
+                error=error,
+            )
+        return ReconcileResult(
+            filename=source.name,
+            status=ReconcileStatus.DEFERRED,
+            error_code=error.code,
+        )
+
+    def _resolve_claim_failure(
+        self,
+        claim_path: Path,
+        *,
+        control_filename: str,
+        error: OperatorControlError,
+    ) -> ReconcileResult:
+        if isinstance(error, InboxUnavailable):
+            return ReconcileResult(
+                filename=control_filename,
+                status=ReconcileStatus.DEFERRED,
+                inbox_acknowledged=True,
+                terminal_candidate_path=str(claim_path),
+                error_code=error.code,
+            )
+        return self._quarantine_candidate(
+            claim_path,
+            control_filename=control_filename,
+            error=error,
+        )
 
     async def _reconcile_inflight(
         self,
@@ -766,7 +1023,18 @@ class OperatorControlInboxReconciler:
             error_code=error_code,
             application=application,
         )
-        receipt_path, candidate_path = self._terminalize(path, destination, receipt)
+        try:
+            receipt_path, candidate_path = self._terminalize(
+                path, destination, receipt
+            )
+        except OperatorControlError as exc:
+            return self._terminal_move_failure(
+                source=path,
+                destination=destination,
+                envelope=envelope,
+                application=application,
+                error=exc,
+            )
         return _envelope_result(
             filename,
             ReconcileStatus(application.status.value),
@@ -801,6 +1069,10 @@ class OperatorControlInboxReconciler:
         destination: Path,
         receipt: bytes,
     ) -> tuple[Path, Path]:
+        # The canonical terminal receipt is the final commit marker.  Moving the
+        # exact candidate first makes a crash recoverable without ever leaving a
+        # receipt that claims a carrier which failed to enter terminal custody.
+        _atomic_move_regular(source, destination)
         receipt_path = destination / terminal_filename(source.name)
         _atomic_publish(
             destination,
@@ -808,42 +1080,15 @@ class OperatorControlInboxReconciler:
             receipt,
             filename_pattern=_TERMINAL_FILENAME_RE,
         )
-        _atomic_move_regular(source, destination)
         return receipt_path, destination / source.name
 
     def _terminalize_invalid(
         self, source: Path, *, error: OperatorControlError
     ) -> ReconcileResult:
-        try:
-            directory_descriptor = _open_directory_nofollow(source.parent)
-            try:
-                raw = _read_regular_entry(directory_descriptor, source.name)
-            finally:
-                os.close(directory_descriptor)
-            digest = f"sha256:{hashlib.sha256(raw).hexdigest()}"
-        except OperatorControlError:
-            return self._terminalize_unsafe(source, error=error)
-        receipt = _terminal_receipt_bytes(
-            envelope=None,
-            envelope_sha256=digest,
-            status="rejected",
-            error_code=error.code,
-        )
-        receipt_path, candidate_path = self._terminalize(
-            source, self._rejected_inbox, receipt
-        )
-        return ReconcileResult(
-            filename=source.name,
-            status=(
-                ReconcileStatus.CONFLICT
-                if isinstance(error, ControlIdempotencyConflict)
-                else ReconcileStatus.INVALID
-            ),
-            envelope_sha256=digest,
-            inbox_acknowledged=True,
-            terminal_receipt_path=str(receipt_path),
-            terminal_candidate_path=str(candidate_path),
-            error_code=error.code,
+        return self._quarantine_candidate(
+            source,
+            control_filename=source.name,
+            error=error,
         )
 
     def _terminalize_verified_rejection(
@@ -853,49 +1098,134 @@ class OperatorControlInboxReconciler:
         envelope: OperatorControlEnvelope,
         error: OperatorControlError,
     ) -> ReconcileResult:
-        receipt = _terminal_receipt_bytes(
-            envelope=envelope,
-            envelope_sha256=envelope.envelope_sha256,
-            status="rejected",
-            error_code=error.code,
-        )
-        receipt_path, candidate_path = self._terminalize(
-            source, self._rejected_inbox, receipt
+        quarantined = self._quarantine_candidate(
+            source,
+            control_filename=source.name,
+            error=error,
         )
         return _envelope_result(
             source.name,
             ReconcileStatus.CONFLICT,
             envelope,
-            terminal_receipt_path=str(receipt_path),
-            terminal_candidate_path=str(candidate_path),
+            terminal_receipt_path=quarantined.terminal_receipt_path,
+            terminal_candidate_path=quarantined.terminal_candidate_path,
             error_code=error.code,
         )
 
-    def _terminalize_unsafe(
-        self, source: Path, *, error: OperatorControlError
+    def _terminal_move_failure(
+        self,
+        *,
+        source: Path,
+        destination: Path,
+        envelope: OperatorControlEnvelope,
+        application: AuthorityApplication | None,
+        error: OperatorControlError,
     ) -> ReconcileResult:
-        receipt = _terminal_receipt_bytes(
-            envelope=None,
-            envelope_sha256="",
-            status="rejected",
+        claim_path = error.claim_path
+        if isinstance(claim_path, Path) and not isinstance(error, InboxUnavailable):
+            quarantined = self._quarantine_candidate(
+                claim_path,
+                control_filename=source.name,
+                error=error,
+            )
+            return _envelope_result(
+                source.name,
+                ReconcileStatus.CONFLICT,
+                envelope,
+                authority_receipt_ref=(
+                    application.authority_receipt_ref if application else ""
+                ),
+                authority_receipt_sha256=(
+                    application.authority_receipt_sha256 if application else ""
+                ),
+                terminal_receipt_path=quarantined.terminal_receipt_path,
+                terminal_candidate_path=quarantined.terminal_candidate_path,
+                error_code=error.code,
+            )
+        durable_candidate = destination / source.name
+        return _envelope_result(
+            source.name,
+            (
+                ReconcileStatus.CONFLICT
+                if isinstance(error, ControlIdempotencyConflict)
+                else ReconcileStatus.DEFERRED
+            ),
+            envelope,
+            authority_receipt_ref=(
+                application.authority_receipt_ref if application else ""
+            ),
+            authority_receipt_sha256=(
+                application.authority_receipt_sha256 if application else ""
+            ),
+            terminal_candidate_path=(
+                str(durable_candidate) if durable_candidate.exists() else ""
+            ),
             error_code=error.code,
         )
-        receipt_path = self._rejected_inbox / terminal_filename(source.name)
+
+    def _quarantine_candidate(
+        self,
+        source: Path,
+        *,
+        control_filename: str,
+        error: OperatorControlError,
+    ) -> ReconcileResult:
+        quarantine_path = _quarantine_unsafe(
+            source,
+            self._rejected_inbox,
+            control_filename=control_filename,
+            error_code=error.code,
+        )
+        return self._record_quarantine_evidence(quarantine_path)
+
+    def _record_quarantine_evidence(
+        self, quarantine_path: Path
+    ) -> ReconcileResult:
+        control_name, error_code = _quarantined_control_identity(
+            quarantine_path.name
+        )
+        digest = ""
+        try:
+            directory_descriptor = _open_directory_nofollow(quarantine_path.parent)
+            try:
+                raw = _read_regular_entry(
+                    directory_descriptor,
+                    quarantine_path.name,
+                    require_mode=False,
+                )
+            finally:
+                os.close(directory_descriptor)
+            digest = f"sha256:{hashlib.sha256(raw).hexdigest()}"
+        except OperatorControlError:
+            pass
+        receipt = _terminal_receipt_bytes(
+            envelope=None,
+            envelope_sha256=digest,
+            status="rejected",
+            error_code=error_code,
+        )
+        receipt_path = self._rejected_inbox / _quarantine_receipt_filename(
+            quarantine_path.name
+        )
         _atomic_publish(
             self._rejected_inbox,
             receipt_path.name,
             receipt,
-            filename_pattern=_TERMINAL_FILENAME_RE,
+            filename_pattern=_CONTROL_QUARANTINE_RECEIPT_FILENAME_RE,
         )
-        quarantine_path = _quarantine_unsafe(source, self._rejected_inbox)
         return ReconcileResult(
-            filename=source.name,
-            status=ReconcileStatus.INVALID,
+            filename=control_name,
+            status=(
+                ReconcileStatus.CONFLICT
+                if error_code == ControlIdempotencyConflict.code
+                else ReconcileStatus.INVALID
+            ),
+            envelope_sha256=digest,
+            inbox_acknowledged=True,
             terminal_receipt_path=str(receipt_path),
             terminal_candidate_path=str(quarantine_path),
-            error_code=error.code,
+            error_code=error_code,
         )
-
 
 __all__ = (
     "ApplicationStatus",

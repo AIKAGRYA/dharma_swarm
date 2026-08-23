@@ -14,12 +14,29 @@ MAX_ENVELOPE_BYTES = 4096
 CONTROL_FILE_MODE = 0o640
 CONTROL_FILENAME_RE = re.compile(r"\A[0-9a-f]{64}\.control\.json\Z")
 TERMINAL_FILENAME_RE = re.compile(r"\A[0-9a-f]{64}\.terminal\.json\Z")
+CONTROL_CLAIM_FILENAME_RE = re.compile(
+    r"\A\.claim\.(?P<control>[0-9a-f]{64}\.control\.json)\."
+    r"(?P<nonce>[0-9a-f]{32})\Z"
+)
+CONTROL_QUARANTINE_FILENAME_RE = re.compile(
+    r"\A\.quarantine\.(?P<control>[0-9a-f]{64}\.control\.json)\."
+    r"(?P<error>[a-z][a-z0-9_]*)\.(?P<nonce>[0-9a-f]{32})\Z"
+)
+CONTROL_QUARANTINE_RECEIPT_FILENAME_RE = re.compile(
+    r"\A\.quarantine\.(?P<control>[0-9a-f]{64}\.control\.json)\."
+    r"(?P<error>[a-z][a-z0-9_]*)\.(?P<nonce>[0-9a-f]{32})"
+    r"\.terminal\.json\Z"
+)
+_ERROR_CODE_RE = re.compile(r"\A[a-z][a-z0-9_]*\Z")
+_PRIVATE_NAME_ATTEMPTS = 8
 
 
 class OperatorControlError(ValueError):
     """Base class for safe, typed protocol failures."""
 
     code = "invalid_control_request"
+    claim_path: Path | None = None
+    control_filename: str = ""
 
 
 class ControlConfigurationError(ValueError):
@@ -270,75 +287,216 @@ def atomic_publish(
 
 
 def atomic_move_regular(source: Path, destination_directory: Path) -> bytes:
-    """Atomically move one safe candidate, accepting only an identical replay."""
+    """Claim before reading, then promote only the exact claimed regular file.
+
+    The public dropbox name is never opened before it is atomically moved to an
+    unpredictable name in the private destination.  Any validation failure is
+    annotated with that durable claim path so the caller can quarantine the
+    object it actually owns instead of retrying a possibly replaced source.
+    """
+
+    if not CONTROL_FILENAME_RE.fullmatch(source.name):
+        raise ControlSchemaError("control candidate filename is invalid")
+    claim_path = claim_control_candidate(source, destination_directory)
+    return promote_claimed_regular(claim_path)
+
+
+def claim_control_candidate(source: Path, destination_directory: Path) -> Path:
+    """Atomically take custody under an unpredictable private claim name."""
 
     if not CONTROL_FILENAME_RE.fullmatch(source.name):
         raise ControlSchemaError("control candidate filename is invalid")
     source_directory = open_directory_nofollow(source.parent)
-    destination = open_directory_nofollow(destination_directory)
     try:
-        payload = read_regular_entry(source_directory, source.name)
-        try:
-            rename_noreplace(source_directory, source.name, destination, source.name)
-        except FileExistsError:
-            if read_regular_entry(destination, source.name) != payload:
-                raise ControlIdempotencyConflict(
-                    "custody destination contains different canonical bytes"
+        destination = open_directory_nofollow(destination_directory)
+    except Exception:
+        os.close(source_directory)
+        raise
+    claimed_name = ""
+    claimed = False
+    try:
+        for _ in range(_PRIVATE_NAME_ATTEMPTS):
+            claimed_name = f".claim.{source.name}.{secrets.token_hex(16)}"
+            try:
+                rename_noreplace(
+                    source_directory,
+                    source.name,
+                    destination,
+                    claimed_name,
                 )
-            # Claim the duplicate into the private destination before cleanup.
-            # A writer with access to the source dropbox can replace its stable
-            # name, but cannot make those substituted bytes become the canonical
-            # destination or race the subsequent private-directory unlink.
-            replay_name = f".replay.{source.name}.{secrets.token_hex(16)}"
-            rename_noreplace(
-                source_directory,
-                source.name,
-                destination,
-                replay_name,
-            )
-            os.fsync(source_directory)
-            os.fsync(destination)
-            claimed_payload = read_regular_entry(destination, replay_name)
-            if (
-                claimed_payload != payload
-                or read_regular_entry(destination, source.name) != payload
-            ):
-                raise UnsafeInboxEntry(
-                    "control source changed before private replay cleanup"
-                )
-            os.unlink(replay_name, dir_fd=destination)
-        except OSError as exc:
-            raise InboxUnavailable("control custody move failed atomically") from exc
+                claimed = True
+                break
+            except FileExistsError:
+                continue
+            except OSError as exc:
+                raise InboxUnavailable(
+                    "control custody claim failed atomically"
+                ) from exc
+        if not claimed:
+            raise InboxUnavailable("control custody claim name could not be allocated")
         os.fsync(source_directory)
         os.fsync(destination)
-        if read_regular_entry(destination, source.name) != payload:
-            raise UnsafeInboxEntry("control candidate changed during custody move")
-        return payload
+        return destination_directory / claimed_name
+    except OperatorControlError as exc:
+        if claimed:
+            _annotate_claim_error(
+                exc,
+                claim_path=destination_directory / claimed_name,
+                control_filename=source.name,
+            )
+        raise
+    except OSError as exc:
+        unavailable = InboxUnavailable("control custody claim was not made durable")
+        if claimed:
+            _annotate_claim_error(
+                unavailable,
+                claim_path=destination_directory / claimed_name,
+                control_filename=source.name,
+            )
+        raise unavailable from exc
     finally:
         os.close(source_directory)
         os.close(destination)
 
 
-def quarantine_unsafe(source: Path, rejected_directory: Path) -> Path:
-    """Move an unsafe name without following or later treating it as evidence."""
+def claimed_control_filename(claim_name: str) -> str:
+    """Return the canonical name bound into one private custody claim."""
+
+    match = CONTROL_CLAIM_FILENAME_RE.fullmatch(claim_name)
+    if match is None:
+        raise ControlSchemaError("control custody claim filename is invalid")
+    return match.group("control")
+
+
+def promote_claimed_regular(claim_path: Path) -> bytes:
+    """Validate a private claim and promote it without replacing canonical state."""
+
+    control_name = claimed_control_filename(claim_path.name)
+    directory = open_directory_nofollow(claim_path.parent)
+    promoted = False
+    try:
+        payload = read_regular_entry(directory, claim_path.name)
+        try:
+            rename_noreplace(directory, claim_path.name, directory, control_name)
+            promoted = True
+        except FileExistsError:
+            if read_regular_entry(directory, control_name) != payload:
+                raise ControlIdempotencyConflict(
+                    "custody destination contains different canonical bytes"
+                )
+            if read_regular_entry(directory, claim_path.name) != payload:
+                raise UnsafeInboxEntry("private custody claim changed before replay")
+            try:
+                os.unlink(claim_path.name, dir_fd=directory)
+                promoted = True
+            except OSError as exc:
+                raise InboxUnavailable(
+                    "private replay claim could not be removed"
+                ) from exc
+        except OSError as exc:
+            raise InboxUnavailable(
+                "control custody promotion failed atomically"
+            ) from exc
+        os.fsync(directory)
+        if read_regular_entry(directory, control_name) != payload:
+            raise UnsafeInboxEntry("control candidate changed during custody promotion")
+        return payload
+    except OperatorControlError as exc:
+        _annotate_claim_error(
+            exc,
+            claim_path=(claim_path.parent / control_name if promoted else claim_path),
+            control_filename=control_name,
+        )
+        raise
+    except OSError as exc:
+        unavailable = InboxUnavailable("control custody promotion was not durable")
+        _annotate_claim_error(
+            unavailable,
+            claim_path=(claim_path.parent / control_name if promoted else claim_path),
+            control_filename=control_name,
+        )
+        raise unavailable from exc
+    finally:
+        os.close(directory)
+
+
+def _annotate_claim_error(
+    error: OperatorControlError, *, claim_path: Path, control_filename: str
+) -> None:
+    """Bind a typed failure to the private object that actually caused it."""
+
+    error.claim_path = claim_path
+    error.control_filename = control_filename
+
+
+def quarantine_unsafe(
+    source: Path,
+    rejected_directory: Path,
+    *,
+    control_filename: str,
+    error_code: str,
+) -> Path:
+    """Move a claimed object to collision-safe, non-canonical quarantine."""
+
+    if not CONTROL_FILENAME_RE.fullmatch(control_filename):
+        raise ControlSchemaError("quarantine control filename is invalid")
+    if not _ERROR_CODE_RE.fullmatch(error_code):
+        raise ControlSchemaError("quarantine error code is invalid")
 
     source_directory = open_directory_nofollow(source.parent)
-    rejected = open_directory_nofollow(rejected_directory)
-    quarantine_name = f".unsafe.{source.name}.{secrets.token_hex(16)}"
+    try:
+        rejected = open_directory_nofollow(rejected_directory)
+    except Exception:
+        os.close(source_directory)
+        raise
+    quarantine_name = ""
+    quarantined = False
     try:
         try:
             os.stat(source.name, dir_fd=source_directory, follow_symlinks=False)
         except OSError as exc:
             raise UnsafeInboxEntry("control custody entry is unavailable") from exc
-        rename_noreplace(
-            source_directory,
-            source.name,
-            rejected,
-            quarantine_name,
-        )
+        for _ in range(_PRIVATE_NAME_ATTEMPTS):
+            quarantine_name = (
+                f".quarantine.{control_filename}.{error_code}."
+                f"{secrets.token_hex(16)}"
+            )
+            try:
+                rename_noreplace(
+                    source_directory,
+                    source.name,
+                    rejected,
+                    quarantine_name,
+                )
+                quarantined = True
+                break
+            except FileExistsError:
+                continue
+            except OSError as exc:
+                raise InboxUnavailable(
+                    "control quarantine move failed atomically"
+                ) from exc
+        if not quarantined:
+            raise InboxUnavailable("control quarantine name could not be allocated")
         os.fsync(source_directory)
         os.fsync(rejected)
     finally:
         os.close(source_directory)
         os.close(rejected)
     return rejected_directory / quarantine_name
+
+
+def quarantined_control_identity(quarantine_name: str) -> tuple[str, str]:
+    """Return the canonical source name and typed error for a quarantine."""
+
+    match = CONTROL_QUARANTINE_FILENAME_RE.fullmatch(quarantine_name)
+    if match is None:
+        raise ControlSchemaError("control quarantine filename is invalid")
+    return match.group("control"), match.group("error")
+
+
+def quarantine_receipt_filename(quarantine_name: str) -> str:
+    """Return the collision-safe evidence sidecar for one exact quarantine."""
+
+    quarantined_control_identity(quarantine_name)
+    return f"{quarantine_name}.terminal.json"
