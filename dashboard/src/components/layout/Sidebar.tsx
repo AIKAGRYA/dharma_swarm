@@ -125,6 +125,20 @@ export function Sidebar() {
             <Network size={14} aria-hidden="true" />
             Constellation
           </Link>
+          <Link
+            href="/dashboard/sadhana-control"
+            prefetch={false}
+            aria-label="Operator control"
+            aria-current={
+              pathname.startsWith("/dashboard/sadhana-control")
+                ? "page"
+                : undefined
+            }
+            className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-torinoko/75 hover:bg-sumi-800/70 hover:text-torinoko"
+          >
+            <Shield size={14} aria-hidden="true" />
+            Control
+          </Link>
         </nav>
       </header>
 
@@ -145,6 +159,19 @@ export function Sidebar() {
 
       {/* Nav sections */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <Link
+          href="/dashboard/sadhana-control"
+          prefetch={false}
+          aria-current={
+            pathname.startsWith("/dashboard/sadhana-control")
+              ? "page"
+              : undefined
+          }
+          className="mb-3 flex items-center gap-3 rounded-lg border border-bengara/20 bg-bengara/5 px-3 py-2 text-xs text-torinoko/80 hover:border-bengara/40 hover:bg-bengara/10 hover:text-torinoko"
+        >
+          <Shield size={16} aria-hidden="true" />
+          <span>Operator control</span>
+        </Link>
         {sections.map((section) => (
           <SectionGroup
             key={section.label}

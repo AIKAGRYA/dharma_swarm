@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -467,16 +468,26 @@ export function MissionSarathiStrip({ missionId }: { missionId: string }) {
             work.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          disabled={isFetching}
-          className="inline-flex min-h-10 items-center gap-2 rounded-md border border-sumi-700/50 bg-sumi-900/50 px-3 py-2 text-xs text-sumi-300 hover:border-aozora/40 hover:text-torinoko disabled:cursor-wait disabled:opacity-60"
-          aria-label="Refresh mission constellation"
-        >
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          {isFetching ? "Checking…" : "Refresh"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/dashboard/sadhana-control"
+            prefetch={false}
+            data-testid="constellation-operator-control-link"
+            className="inline-flex min-h-10 items-center rounded-md border border-bengara/30 bg-bengara/5 px-3 py-2 text-xs font-medium text-torinoko/85 hover:border-bengara/50 hover:bg-bengara/10 hover:text-torinoko"
+          >
+            Operator control
+          </Link>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={isFetching}
+            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-sumi-700/50 bg-sumi-900/50 px-3 py-2 text-xs text-sumi-300 hover:border-aozora/40 hover:text-torinoko disabled:cursor-wait disabled:opacity-60"
+            aria-label="Refresh mission constellation"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {isFetching ? "Checking…" : "Refresh"}
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 gap-px border-b border-sumi-800/50 bg-sumi-800/50 sm:grid-cols-5">
