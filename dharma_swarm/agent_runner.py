@@ -7,6 +7,7 @@ Each AgentRunner manages a single agent; AgentPool manages the fleet.
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Awaitable, Callable, Dict, Optional, Protocol, runtime_checkable
 
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
@@ -43,6 +44,8 @@ from dharma_swarm.agent_runner_quality import (
     semantic_attempt_timeout_seconds as _semantic_attempt_timeout_seconds,
     semantic_repair_attempts as _semantic_repair_attempts,
 )
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
+from dharma_swarm.campaign_provider_guard import CampaignProviderEffectBoundary
 from dharma_swarm.jikoku_samaya import get_global_tracer as _jikoku_tracer
 from dharma_swarm.runtime_fields import (
     RuntimeFieldRegistry,
@@ -63,8 +66,6 @@ from dharma_swarm.spine.receipt import EvidenceReceipt  # noqa: F401  (spine-ado
 from dharma_swarm.spine.routing import RoutingDecision  # noqa: F401  (spine-adoption declaration)
 
 logger = logging.getLogger(__name__)
-
-from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 
 _HEARTBEAT_THRESHOLD = timedelta(seconds=_SWARM_CFG.agent.heartbeat_threshold_seconds)
 _ERROR_PREFIXES = (
@@ -420,6 +421,7 @@ class RoutedCompletionProvider(Protocol):
         request: LLMRequest,
         *,
         available_provider_types: list[ProviderType] | None = None,
+        campaign_effect_boundary: CampaignProviderEffectBoundary | None = None,
     ) -> tuple[Any, LLMResponse]: ...
 
     def record_task_feedback(
@@ -539,7 +541,139 @@ def _is_routed_provider(provider: object | None) -> bool:
     )
 
 
+_CAMPAIGN_ROUTING_FIELDS = frozenset(
+    {
+        "allow_provider_routing",
+        "available_provider_types",
+        "model_catalog_selector",
+        "model_pack",
+        "model_selector",
+        "preferred_model",
+        "preferred_provider",
+        "provider_allowlist",
+        "provider_pack",
+        "route_context",
+        "routed_execution",
+        "use_router",
+    }
+)
+_CAMPAIGN_TASK_ROUTE_FIELDS = frozenset(
+    {
+        "allow_provider_routing",
+        "preferred_model",
+        "preferred_provider",
+        "provider_allowlist",
+    }
+)
+
+
+def _campaign_route_lock_metadata(
+    task: Task,
+    config: AgentConfig,
+) -> dict[str, Any] | None:
+    """Return one authority-derived route or reject a campaign widening."""
+    from dharma_swarm.mission_control_executor_guard import (
+        CAMPAIGN_ROUTE_LOCK_KEY,
+        campaign_principal,
+        campaign_route_lock_matches,
+    )
+
+    metadata = _task_metadata(task)
+    bound, principal_id = campaign_principal(task)
+    if not bound:
+        return None
+    if not principal_id:
+        raise RuntimeError("campaign authority or route lock is not exact")
+    authority = metadata.get("mission_campaign_authority")
+    if not isinstance(authority, dict):
+        raise RuntimeError("campaign route lock is missing")
+    route_lock = authority.get(CAMPAIGN_ROUTE_LOCK_KEY)
+    provider = config.provider.value
+    if not campaign_route_lock_matches(
+        route_lock,
+        task_id=task.id,
+        principal_id=config.id,
+        provider=provider,
+        model=config.model,
+    ):
+        raise RuntimeError("campaign route lock conflicts with AgentConfig")
+    expected = {
+        "allow_provider_routing": False,
+        "preferred_model": config.model,
+        "preferred_provider": provider,
+        "provider_allowlist": [provider],
+    }
+    if any(metadata.get(key) != value for key, value in expected.items()):
+        raise RuntimeError("campaign task routing coordinates are not exact")
+    forbidden_task = (
+        _CAMPAIGN_ROUTING_FIELDS - _CAMPAIGN_TASK_ROUTE_FIELDS
+    ) & metadata.keys()
+    if forbidden_task:
+        raise RuntimeError(
+            "campaign task contains a routing widening alias: "
+            + ", ".join(sorted(forbidden_task))
+        )
+    config_metadata = config.metadata if isinstance(config.metadata, dict) else {}
+    forbidden_config = _CAMPAIGN_ROUTING_FIELDS & config_metadata.keys()
+    if forbidden_config:
+        raise RuntimeError(
+            "campaign AgentConfig contains a routing widening alias: "
+            + ", ".join(sorted(forbidden_config))
+        )
+    return {
+        "allow_provider_routing": False,
+        "available_provider_types": [provider],
+        "principal_id": config.id,
+        "preferred_model": config.model,
+        "preferred_provider": provider,
+        "provider_allowlist": [provider],
+        "requires_tooling": False,
+        "routed_execution": False,
+        "task_id": task.id,
+        "use_router": False,
+    }
+
+
+def _campaign_provider_result_is_exact(
+    campaign_route: dict[str, Any] | None,
+    response: Any,
+    *,
+    routed: bool,
+    route_decision: Any | None,
+) -> None:
+    """Reject provider results whose served identity can escape a campaign lock."""
+    if campaign_route is None:
+        return
+    expected_provider = campaign_route["preferred_provider"]
+    expected_model = campaign_route["preferred_model"]
+    response_provider = getattr(response, "provider", None)
+    response_model = getattr(response, "model", None)
+    if not isinstance(response_provider, str) or response_provider != expected_provider:
+        raise RuntimeError("campaign response provider conflicts with route lock")
+    if not isinstance(response_model, str) or response_model != expected_model:
+        raise RuntimeError("campaign response model conflicts with route lock")
+    if not routed:
+        if route_decision is not None:
+            raise RuntimeError("direct campaign response carried a route decision")
+        return
+    if route_decision is None:
+        raise RuntimeError("campaign routed response is missing its route decision")
+    selected_provider = getattr(route_decision, "selected_provider", None)
+    if isinstance(selected_provider, ProviderType):
+        selected_provider = selected_provider.value
+    if selected_provider != expected_provider:
+        raise RuntimeError("campaign route decision provider conflicts with route lock")
+    if getattr(route_decision, "selected_model_hint", None) != expected_model:
+        raise RuntimeError("campaign route decision model conflicts with route lock")
+    fallback_providers = getattr(route_decision, "fallback_providers", None)
+    fallback_models = getattr(route_decision, "fallback_model_hints", None)
+    if fallback_providers != [] or fallback_models != []:
+        raise RuntimeError("campaign route decision contains a fallback plan")
+
+
 def _requires_tooling(task: Task, config: AgentConfig) -> bool:
+    if _campaign_route_lock_metadata(task, config) is not None:
+        return False
     metadata = _task_metadata(task)
     override = _metadata_bool(
         metadata,
@@ -560,6 +694,8 @@ def _requires_tooling(task: Task, config: AgentConfig) -> bool:
 
 
 def _requires_frontier_precision(task: Task, config: AgentConfig) -> bool:
+    if _campaign_route_lock_metadata(task, config) is not None:
+        return False
     metadata = _task_metadata(task)
     override = _metadata_bool(
         metadata,
@@ -578,7 +714,9 @@ def _requires_frontier_precision(task: Task, config: AgentConfig) -> bool:
     } and task.priority in {TaskPriority.HIGH, TaskPriority.URGENT}
 
 
-def _is_privileged_action(task: Task) -> bool:
+def _is_privileged_action(task: Task, config: AgentConfig) -> bool:
+    if _campaign_route_lock_metadata(task, config) is not None:
+        return False
     metadata = _task_metadata(task)
     override = _metadata_bool(
         metadata,
@@ -645,6 +783,9 @@ def _available_provider_types(
 
 
 def _resolved_routing_metadata(task: Task, config: AgentConfig) -> dict[str, Any]:
+    campaign_route = _campaign_route_lock_metadata(task, config)
+    if campaign_route is not None:
+        return campaign_route
     config_metadata = (
         apply_model_pack_metadata(config.metadata)
         if isinstance(config.metadata, dict)
@@ -693,11 +834,12 @@ def _build_route_request(
 ) -> Any:
     from dharma_swarm.provider_policy import ProviderRouteRequest
 
+    campaign_route = _campaign_route_lock_metadata(task, config)
     metadata = _resolved_routing_metadata(task, config)
     lowered = _task_text(task).lower()
     requires_tooling = _requires_tooling(task, config)
     requires_frontier = _requires_frontier_precision(task, config)
-    privileged_action = _is_privileged_action(task)
+    privileged_action = _is_privileged_action(task, config)
 
     urgency = _metadata_number(metadata, "urgency", "urgency_score")
     if urgency is None:
@@ -808,6 +950,17 @@ def _build_route_request(
         and len(available_provider_types) == 1
         and available_provider_types[0] == preferred_provider
     )
+    if campaign_route is not None:
+        from dharma_swarm.campaign_provider_guard import (
+            build_campaign_exact_provider_call,
+        )
+
+        context["campaign_exact_provider_call"] = build_campaign_exact_provider_call(
+            task_id=task.id,
+            principal_id=config.id,
+            provider=config.provider.value,
+            model=config.model,
+        )
     selector = selector_from_metadata(metadata)
     if selector:
         context["model_catalog_selector"] = str(metadata.get("model_catalog_selector") or selector)
@@ -1281,6 +1434,7 @@ def _build_prompt(
     task: Task,
     config: AgentConfig,
     plan_context: str = "",
+    observed_context: str = "",
 ) -> LLMRequest:
     """Build an LLMRequest from a task and agent config.
 
@@ -1291,6 +1445,8 @@ def _build_prompt(
     """
     system = _build_system_prompt(config)
     user_parts = [f"## Task: {task.title}\n\n{task.description}"]
+    if observed_context:
+        user_parts.append("\n\n" + observed_context)
     metadata = task.metadata if isinstance(task.metadata, dict) else {}
     metadata.pop("_memory_recall_consumer", None)
     try:
@@ -1620,7 +1776,6 @@ def _local_tool_workdir(task: Task, config: AgentConfig) -> Path:
 def _resolve_local_tool_path(raw_path: str, *, workdir: Path) -> Path:
     # Normalize ~ and ~/ to the actual home directory
     raw = raw_path.strip()
-    home = str(Path.home())
     if raw.startswith("~/"):
         candidate = Path.home() / raw[2:]
     elif raw.startswith("~"):
@@ -1845,7 +2000,7 @@ class AgentRunner:
         async def remember(key: str, content: str, scope: str = "working", ttl: int | None = None) -> str:
             """Store a memory. Scope: working, short_term, long_term, shared."""
             s = MemoryScope(scope)
-            mem = await mgr.remember(key, content, scope=s, ttl=ttl)
+            await mgr.remember(key, content, scope=s, ttl=ttl)
             return f"Remembered '{key}' in {scope}"
 
         async def recall(query: str, scope: str | None = None, limit: int = 5) -> str:
@@ -1889,6 +2044,8 @@ class AgentRunner:
         self,
         task: Task,
         request: LLMRequest,
+        *,
+        campaign_effect_boundary: CampaignProviderEffectBoundary | None = None,
     ) -> tuple[Any | None, Any | None, LLMResponse]:
         # Defense in depth at the actual provider boundary. run_task injects
         # earlier so the genome is present during all prompt composition, while
@@ -1896,23 +2053,194 @@ class AgentRunner:
         # semantic retries, routed providers, and every tool-loop round cannot
         # dispatch a stale, wrong-role, duplicated, or missing genome.
         request = _prepend_organism_genome(request, self._config)
+        campaign_route = _campaign_route_lock_metadata(task, self._config)
+        if campaign_route is not None:
+            if campaign_effect_boundary is None:
+                raise RuntimeError("campaign provider effect has no final control fence")
+            if request.model != campaign_route["preferred_model"]:
+                raise RuntimeError("campaign request model conflicts with route lock")
         if self._provider is None:
             raise RuntimeError("Provider unavailable")
-        if _is_routed_provider(self._provider):
-            available_provider_types = _available_provider_types(task, self._config)
-            route_request = _build_route_request(
-                task,
-                self._config,
-                request,
-                available_provider_types=available_provider_types,
+
+        boundary_provider = self._provider
+        boundary_request: LLMRequest | None = None
+        boundary_route: dict[str, Any] | None = None
+        boundary_available: list[ProviderType] | None = None
+        boundary_route_request: Any | None = None
+        boundary_provider_coordinates: Any | None = None
+        boundary_complete_exact: Callable[[LLMRequest], Awaitable[LLMResponse]] | None = None
+        boundary_router_complete: Callable[..., Awaitable[Any]] | None = None
+        boundary_routed = False
+        if campaign_route is not None:
+            from dharma_swarm.campaign_provider_guard import (
+                capture_campaign_provider_boundary,
             )
-            route_decision, response = await self._provider.complete_for_task(
-                route_request,
-                request,
-                available_provider_types=available_provider_types,
+
+            boundary_routed = _is_routed_provider(boundary_provider)
+            boundary_request = request.model_copy(deep=True)
+            boundary_route = copy.deepcopy(campaign_route)
+            boundary_available = _available_provider_types(task, self._config)
+            if boundary_routed:
+                from dharma_swarm.providers import ModelRouter
+
+                if (
+                    type(boundary_provider) is not ModelRouter
+                    or "complete_for_task" in vars(boundary_provider)
+                ):
+                    raise RuntimeError(
+                        "campaign routed execution requires the audited ModelRouter"
+                    )
+                boundary_router_complete = ModelRouter.complete_for_task
+                boundary_route_request = copy.deepcopy(
+                    _build_route_request(
+                        task,
+                        self._config,
+                        boundary_request,
+                        available_provider_types=boundary_available,
+                    )
+                )
+            else:
+                complete_exact = getattr(boundary_provider, "complete_exact_model", None)
+                if not callable(complete_exact):
+                    raise RuntimeError("campaign provider lacks exact-model execution")
+                boundary_complete_exact = complete_exact
+                boundary_provider_coordinates = capture_campaign_provider_boundary(
+                    self._config.provider,
+                    boundary_provider,
+                )
+
+        def require_boundary_unchanged() -> None:
+            from dharma_swarm.campaign_provider_guard import (
+                require_campaign_provider_boundary,
+            )
+
+            if self._provider is not boundary_provider:
+                raise RuntimeError("campaign provider changed at the final boundary")
+            if _is_routed_provider(boundary_provider) is not boundary_routed:
+                raise RuntimeError("campaign provider surface changed at the final boundary")
+            if campaign_route is None:
+                return
+            if boundary_request is None or boundary_route is None:
+                raise RuntimeError("campaign provider boundary was not captured")
+            if request.model_dump(mode="python") != boundary_request.model_dump(
+                mode="python"
+            ):
+                raise RuntimeError("campaign request changed at the final boundary")
+            current_route = _campaign_route_lock_metadata(task, self._config)
+            if current_route != boundary_route:
+                raise RuntimeError("campaign route lock changed at the final boundary")
+            current_available = _available_provider_types(task, self._config)
+            if current_available != boundary_available:
+                raise RuntimeError("campaign provider allowlist changed at the final boundary")
+            if boundary_route_request is not None:
+                current_route_request = _build_route_request(
+                    task,
+                    self._config,
+                    boundary_request,
+                    available_provider_types=current_available,
+                )
+                if current_route_request != boundary_route_request:
+                    raise RuntimeError(
+                        "campaign routing request changed at the final boundary"
+                    )
+            elif boundary_provider_coordinates is not None:
+                require_campaign_provider_boundary(
+                    boundary_provider_coordinates,
+                    provider_type=self._config.provider,
+                    provider=boundary_provider,
+                )
+
+        routed_effect_boundary: CampaignProviderEffectBoundary | None = None
+        if campaign_route is not None and boundary_routed:
+            assert campaign_effect_boundary is not None
+
+            async def await_routed_fence() -> None:
+                require_boundary_unchanged()
+                await campaign_effect_boundary.await_fence()
+                require_boundary_unchanged()
+
+            routed_effect_boundary = CampaignProviderEffectBoundary(
+                await_routed_fence,
+                campaign_effect_boundary.mark_ready,
+            )
+        elif campaign_effect_boundary is not None and boundary_routed:
+            raise RuntimeError(
+                "routed provider effect fencing requires authenticated campaign authority"
+            )
+        elif campaign_effect_boundary is not None:
+            require_boundary_unchanged()
+            await campaign_effect_boundary.await_fence()
+            require_boundary_unchanged()
+
+        invocation_provider = (
+            boundary_provider if campaign_route is not None else self._provider
+        )
+        if invocation_provider is None:
+            raise RuntimeError("Provider unavailable")
+        invocation_routed = (
+            boundary_routed
+            if campaign_route is not None
+            else _is_routed_provider(invocation_provider)
+        )
+        if invocation_routed:
+            available_provider_types = (
+                boundary_available
+                if campaign_route is not None
+                else _available_provider_types(task, self._config)
+            )
+            route_request = (
+                boundary_route_request
+                if campaign_route is not None
+                else _build_route_request(
+                    task,
+                    self._config,
+                    request,
+                    available_provider_types=available_provider_types,
+                )
+            )
+            invoked_request = (
+                boundary_request if boundary_request is not None else request
+            )
+            if campaign_route is not None:
+                assert boundary_router_complete is not None
+                assert routed_effect_boundary is not None
+                route_decision, response = await boundary_router_complete(
+                    invocation_provider,
+                    route_request,
+                    invoked_request,
+                    available_provider_types=available_provider_types,
+                    campaign_effect_boundary=routed_effect_boundary,
+                )
+            else:
+                route_decision, response = await invocation_provider.complete_for_task(
+                    route_request,
+                    invoked_request,
+                    available_provider_types=available_provider_types,
+                )
+            _campaign_provider_result_is_exact(
+                campaign_route,
+                response,
+                routed=True,
+                route_decision=route_decision,
             )
             return route_request, route_decision, response
-        return None, None, await self._provider.complete(request)
+        if campaign_route is not None:
+            assert boundary_request is not None
+            assert boundary_complete_exact is not None
+            assert campaign_effect_boundary is not None
+            campaign_effect_boundary.mark_ready()
+            response = await boundary_complete_exact(boundary_request)
+        else:
+            if campaign_effect_boundary is not None:
+                campaign_effect_boundary.mark_ready()
+            response = await invocation_provider.complete(request)
+        _campaign_provider_result_is_exact(
+            campaign_route,
+            response,
+            routed=False,
+            route_decision=None,
+        )
+        return None, None, response
 
     async def _execute_local_tool(
         self,
@@ -2042,6 +2370,8 @@ class AgentRunner:
         self,
         task: Task,
         request: LLMRequest,
+        *,
+        campaign_effect_boundary: CampaignProviderEffectBoundary | None = None,
     ) -> tuple[Any | None, Any | None, LLMResponse, str]:
         tool_request = request.model_copy(
             update={
@@ -2061,6 +2391,7 @@ class AgentRunner:
             route_request, route_decision, response = await self._invoke_provider(
                 task,
                 current_request,
+                campaign_effect_boundary=campaign_effect_boundary,
             )
             if route_request is not None:
                 last_route_request = route_request
@@ -2126,6 +2457,7 @@ class AgentRunner:
         request: LLMRequest,
         *,
         attempt_index: int,
+        campaign_effect_boundary: CampaignProviderEffectBoundary | None = None,
     ) -> tuple[Any | None, Any | None, LLMResponse, str, float]:
         response: LLMResponse | None = None
         completion_latency_ms = 0.0
@@ -2148,12 +2480,17 @@ class AgentRunner:
                 and _requires_tooling(task, self._config)
             ):
                 route_request, route_decision, response, result = (
-                    await self._complete_with_tool_loop(task, request)
+                    await self._complete_with_tool_loop(
+                        task,
+                        request,
+                        campaign_effect_boundary=campaign_effect_boundary,
+                    )
                 )
             else:
                 route_request, route_decision, response = await self._invoke_provider(
                     task,
                     request,
+                    campaign_effect_boundary=campaign_effect_boundary,
                 )
                 result = response.content
             completion_latency_ms = (time.monotonic() - completion_started) * 1000.0
@@ -2217,10 +2554,18 @@ class AgentRunner:
         await self._publish_bus_presence()
         await self._ensure_bus_subscriptions()
 
-    async def run_task(self, task: Task) -> str:
+    async def run_task(
+        self,
+        task: Task,
+        *,
+        campaign_effect_fence: Callable[[], Awaitable[None]] | None = None,
+        campaign_effect_ready: Callable[[], None] | None = None,
+    ) -> str:
         """Execute a task and return the result string.
 
-        Sets status to BUSY during execution, then back to IDLE.
+        Sets status to BUSY during execution, then back to IDLE for generic
+        work.  Campaign work retains BUSY ownership until its orchestrator
+        performs the exact opaque-token release.
         If no provider is attached, returns a mock result.
 
         Args:
@@ -2229,9 +2574,29 @@ class AgentRunner:
         Returns:
             The LLM completion content, or a mock placeholder.
         """
+        if (campaign_effect_fence is None) != (campaign_effect_ready is None):
+            raise ValueError("campaign effect fence and readiness callback are inseparable")
+        campaign_effect_boundary = (
+            CampaignProviderEffectBoundary(
+                campaign_effect_fence,
+                campaign_effect_ready,
+            )
+            if campaign_effect_fence is not None and campaign_effect_ready is not None
+            else None
+        )
+
         async with self._lock:
-            self._state.status = AgentStatus.BUSY
-            self._state.current_task = task.id
+            if campaign_effect_boundary is not None:
+                if (
+                    self._state.status is not AgentStatus.BUSY
+                    or self._state.current_task != task.id
+                ):
+                    raise RuntimeError(
+                        "campaign runner lost its exact reserved task before entry"
+                    )
+            else:
+                self._state.status = AgentStatus.BUSY
+                self._state.current_task = task.id
 
         # ── Lifecycle event: task started ──
         try:
@@ -2324,7 +2689,23 @@ class AgentRunner:
                     "- Apply these lenses before execution:\n"
                     + "\n".join(f"  - {s}" for s in gate.suggestions)
                 )
-            request = _build_prompt(task, self._config, plan_context=plan_context)
+            observed_context = ""
+            if (
+                "mission_campaign_authority" in meta
+                or meta.get("sadhana_bootstrap_schema")
+                == "dharma.sadhana.mission_bootstrap.v1"
+            ):
+                from dharma_swarm.mission_control_observed_input import (
+                    render_bound_observed_input_prompt,
+                )
+
+                observed_context = render_bound_observed_input_prompt(meta)
+            request = _build_prompt(
+                task,
+                self._config,
+                plan_context=plan_context,
+                observed_context=observed_context,
+            )
             # Organism genome: every dispatched request, on every provider,
             # inherits the invariant plural genome BEFORE its first token. This
             # is composed at the dispatch seam (not inside _build_system_prompt)
@@ -2384,7 +2765,11 @@ class AgentRunner:
 
             if self._provider is not None:
                 current_request = request
-                attempts_remaining = _semantic_repair_attempts(task, self._config)
+                attempts_remaining = (
+                    0
+                    if campaign_effect_fence is not None
+                    else _semantic_repair_attempts(task, self._config)
+                )
                 attempt_index = 1
                 accepted_checkpoint: Any | None = None
                 while True:
@@ -2398,6 +2783,11 @@ class AgentRunner:
                             task,
                             current_request,
                             attempt_index=attempt_index,
+                            campaign_effect_boundary=(
+                                campaign_effect_boundary
+                                if campaign_effect_fence is not None
+                                else None
+                            ),
                         )
                         if attempt_timeout_seconds is not None:
                             (
@@ -2484,6 +2874,10 @@ class AgentRunner:
                     attempts_remaining -= 1
                     attempt_index += 1
             else:
+                if campaign_effect_fence is not None:
+                    raise RuntimeError(
+                        "campaign provider effect cannot use a mock completion"
+                    )
                 result = (
                     f"[mock] Agent {self._config.name} completed: {task.title}"
                 )
@@ -2582,9 +2976,11 @@ class AgentRunner:
             async with self._lock:
                 self._state.turns_used += 1
                 self._state.tasks_completed += 1
-                self._state.current_task = None
+                if campaign_effect_boundary is None:
+                    self._state.current_task = None
                 self._state.last_heartbeat = _utc_now()
-            await self._post_task_lifecycle(task)
+            if campaign_effect_boundary is None:
+                await self._post_task_lifecycle(task)
 
             await _leave_task_mark(
                 agent_name=self._config.name,
@@ -2846,9 +3242,11 @@ class AgentRunner:
                 logger.debug("Telic seam recording failed", exc_info=True)
 
             async with self._lock:
-                self._state.current_task = None
+                if campaign_effect_boundary is None:
+                    self._state.current_task = None
                 self._state.error = str(exc)
-            await self._post_task_lifecycle(task)
+            if campaign_effect_boundary is None:
+                await self._post_task_lifecycle(task)
             # Close outer task span (failure)
             try:
                 _task_tracer.end(_task_span, success=False, error=str(exc)[:200])
@@ -3406,6 +3804,8 @@ class AgentPool:
     def __init__(self) -> None:
         self._agents: dict[str, AgentRunner] = {}
         self._lock = asyncio.Lock()
+        self._reservation_tokens: dict[str, tuple[str, object]] = {}
+        self._reservation_runners: dict[str, AgentRunner] = {}
 
     async def spawn(
         self,
@@ -3503,12 +3903,13 @@ class AgentPool:
             return [runner.state for runner in self._agents.values()]
 
     async def get_idle(self) -> list[AgentRunner]:
-        """Return all agents whose status is IDLE."""
+        """Return IDLE agents that have no outstanding opaque reservation."""
         async with self._lock:
             return [
                 runner
-                for runner in self._agents.values()
+                for agent_id, runner in self._agents.items()
                 if runner.state.status == AgentStatus.IDLE
+                and agent_id not in self._reservation_tokens
             ]
 
     async def get_idle_agents(self) -> list[AgentState]:
@@ -3516,11 +3917,96 @@ class AgentPool:
         runners = await self.get_idle()
         return [r.state for r in runners]
 
+    async def reserve(
+        self,
+        agent_id: str,
+        task_id: str,
+        *,
+        reservation_token: object | None = None,
+    ) -> bool:
+        """Atomically reserve one exactly-idle runner for one task."""
+        runner = await self.get(agent_id)
+        if runner is None:
+            return False
+        async with runner._lock:
+            if (
+                self._agents.get(agent_id) is not runner
+                or agent_id in self._reservation_tokens
+                or runner._state.status is not AgentStatus.IDLE
+                or runner._state.current_task
+            ):
+                return False
+            runner._state.status = AgentStatus.BUSY
+            runner._state.current_task = task_id
+            if reservation_token is not None:
+                self._reservation_tokens[agent_id] = (task_id, reservation_token)
+                self._reservation_runners[agent_id] = runner
+            return True
+
+    def owns_reservation(
+        self,
+        agent_id: str,
+        task_id: str,
+        *,
+        reservation_token: object,
+    ) -> bool:
+        """Synchronously attest one exact BUSY reservation without yielding."""
+        runner = self._agents.get(agent_id)
+        owned = self._reservation_tokens.get(agent_id)
+        bound_runner = self._reservation_runners.get(agent_id)
+        return bool(
+            runner is not None
+            and bound_runner is runner
+            and owned is not None
+            and owned[0] == task_id
+            and owned[1] is reservation_token
+            and runner._state.status is AgentStatus.BUSY
+            and runner._state.current_task == task_id
+        )
+
+    async def release_reservation(
+        self,
+        agent_id: str,
+        task_id: str,
+        *,
+        reservation_token: object | None = None,
+    ) -> bool:
+        """Release only the exact reservation still owned by ``task_id``."""
+        runner = await self.get(agent_id)
+        if runner is None:
+            return False
+        async with runner._lock:
+            owned = self._reservation_tokens.get(agent_id)
+            bound_runner = self._reservation_runners.get(agent_id)
+            if self._agents.get(agent_id) is not runner:
+                return False
+            if reservation_token is not None and bound_runner is not runner:
+                return False
+            if owned is not None and (
+                owned[0] != task_id or owned[1] is not reservation_token
+            ):
+                return False
+            if owned is None and reservation_token is not None:
+                return False
+            if runner._state.status is not AgentStatus.BUSY:
+                return False
+            if runner._state.current_task != task_id:
+                return False
+            self._reservation_tokens.pop(agent_id, None)
+            self._reservation_runners.pop(agent_id, None)
+            runner._state.current_task = None
+            runner._state.status = AgentStatus.IDLE
+            return True
+
     async def assign(self, agent_id: str, task_id: str) -> None:
         """Mark an agent as assigned to a task (orchestrator interface)."""
         runner = await self.get(agent_id)
         if runner:
             async with runner._lock:
+                if agent_id in self._reservation_tokens:
+                    raise RuntimeError(
+                        "agent has an outstanding opaque campaign reservation"
+                    )
                 runner._state.current_task = task_id
 
     async def release(self, agent_id: str) -> None:
@@ -3528,6 +4014,9 @@ class AgentPool:
         runner = await self.get(agent_id)
         if runner:
             async with runner._lock:
+                owned = self._reservation_tokens.get(agent_id)
+                if owned is not None:
+                    return
                 runner._state.current_task = None
                 runner._state.status = AgentStatus.IDLE
 
