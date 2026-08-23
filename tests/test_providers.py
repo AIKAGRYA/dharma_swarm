@@ -1187,6 +1187,119 @@ async def test_campaign_router_rejects_wrong_identity_before_success_evidence(
 
 
 @pytest.mark.asyncio
+async def test_campaign_router_snapshots_attested_response_before_success_await(
+    tmp_path,
+) -> None:
+    model = "minimax-m3:cloud"
+    trusted_response = LLMResponse(
+        content="trusted campaign result",
+        provider="ollama",
+        model=model,
+        usage={
+            "prompt_tokens": 4,
+            "completion_tokens": 6,
+            "total_tokens": 10,
+        },
+        tool_calls=[{"id": "trusted", "name": "bounded", "arguments": "{}"}],
+        stop_reason="stop",
+    )
+
+    class _RetainedResponseProvider:
+        available = True
+        _model = model
+        _transport_mode = "cloud_api"
+        _base_url = "https://ollama.com"
+
+        def __init__(self) -> None:
+            self.response = trusted_response
+            self.calls = 0
+
+        async def complete_exact_model(self, _request):
+            self.calls += 1
+            return self.response
+
+    provider = _RetainedResponseProvider()
+    audit_path = tmp_path / "routing.jsonl"
+    router = ModelRouter(
+        {ProviderType.OLLAMA: provider},
+        routing_audit_path=audit_path,
+        learning_enabled=True,
+        telemetry_enabled=False,
+        key_liveness_provider=lambda: None,
+    )
+    success_telemetry_entered = asyncio.Event()
+    success_telemetry_release = asyncio.Event()
+    attempt_outcomes: list[dict] = []
+    route_outcomes: list[dict] = []
+
+    async def block_success_telemetry(**kwargs) -> None:
+        attempt_outcomes.append(dict(kwargs))
+        if kwargs["success"]:
+            success_telemetry_entered.set()
+            await success_telemetry_release.wait()
+
+    async def capture_route_telemetry(**kwargs) -> None:
+        route_outcomes.append(dict(kwargs))
+
+    router._record_provider_attempt_outcome = block_success_telemetry
+    router._record_route_execution_telemetry = capture_route_telemetry
+    route_request = _exact_ollama_route_request(model)
+    route_request.context["session_id"] = "campaign-session"
+
+    pending = asyncio.create_task(
+        router.complete_for_task(
+            route_request,
+            LLMRequest(
+                model=model,
+                messages=[{"role": "user", "content": "bounded evidence"}],
+            ),
+            available_provider_types=[ProviderType.OLLAMA],
+            campaign_effect_boundary=_allow_campaign_provider_effect(),
+        )
+    )
+    await asyncio.wait_for(success_telemetry_entered.wait(), timeout=1)
+
+    trusted_response.content = "foreign mutation"
+    trusted_response.provider = "anthropic"
+    trusted_response.model = "foreign-model:cloud"
+    trusted_response.usage["total_tokens"] = 199_999
+    trusted_response.tool_calls[0]["name"] = "foreign"
+    trusted_response.stop_reason = "mutated"
+    success_telemetry_release.set()
+
+    decision, response = await asyncio.wait_for(pending, timeout=1)
+
+    assert provider.calls == 1
+    assert response is not trusted_response
+    assert response == LLMResponse(
+        content="trusted campaign result",
+        provider="ollama",
+        model=model,
+        usage={
+            "prompt_tokens": 4,
+            "completion_tokens": 6,
+            "total_tokens": 10,
+        },
+        tool_calls=[{"id": "trusted", "name": "bounded", "arguments": "{}"}],
+        stop_reason="stop",
+    )
+    assert decision.selected_provider is ProviderType.OLLAMA
+    assert attempt_outcomes[-1]["provider"] is ProviderType.OLLAMA
+    assert attempt_outcomes[-1]["model"] == model
+    assert attempt_outcomes[-1]["total_tokens"] == 10
+    assert route_outcomes[-1]["selected_provider"] is ProviderType.OLLAMA
+    assert route_outcomes[-1]["selected_model"] == model
+    assert route_outcomes[-1]["response_model"] == model
+    assert router._provider_rewards[f"ollama:{model}"] == pytest.approx(0.99995)
+    assert router._session_affinity["campaign-session"]["provider"] is ProviderType.OLLAMA
+    assert router._session_affinity["campaign-session"]["model"] == model
+    audit = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    assert audit[-1]["provider_selected"] == "ollama"
+    assert audit[-1]["model_selected"] == model
+    assert audit[-1]["result"] == "success"
+
+
+@pytest.mark.asyncio
 async def test_generic_provider_failure_retains_configured_retry_policy(tmp_path) -> None:
     class _FailingProvider:
         available = True

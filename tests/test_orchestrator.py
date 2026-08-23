@@ -2042,6 +2042,54 @@ async def test_campaign_direct_response_identity_fails_closed_after_one_call(
 
 
 @pytest.mark.asyncio
+async def test_campaign_direct_response_is_detached_after_attestation(
+    tmp_path: Path,
+) -> None:
+    class _RetainedDirectProvider(_CampaignProviderSpy):
+        def __init__(self) -> None:
+            super().__init__()
+            self.response = LLMResponse(
+                content="trusted direct result",
+                provider="ollama",
+                model="fixture-model:cloud",
+                usage={"total_tokens": 7},
+                tool_calls=[{"id": "trusted", "name": "bounded"}],
+            )
+
+        async def complete_exact_model(self, request: LLMRequest) -> LLMResponse:
+            self.requests.append(request)
+            return self.response
+
+    config = _campaign_config(tmp_path)
+    provider = _RetainedDirectProvider()
+    runner = AgentRunner(config, provider=provider)
+
+    _, _, response = await runner._invoke_provider(
+        _campaign_task(config),
+        LLMRequest(
+            model=config.model,
+            messages=[{"role": "user", "content": "Bounded campaign work"}],
+        ),
+        campaign_effect_boundary=_allow_campaign_boundary(),
+    )
+
+    provider.response.provider = "anthropic"
+    provider.response.model = "foreign-model:cloud"
+    provider.response.content = "foreign mutation"
+    provider.response.usage["total_tokens"] = 199_999
+    provider.response.tool_calls[0]["name"] = "foreign"
+
+    assert response is not provider.response
+    assert response == LLMResponse(
+        content="trusted direct result",
+        provider="ollama",
+        model="fixture-model:cloud",
+        usage={"total_tokens": 7},
+        tool_calls=[{"id": "trusted", "name": "bounded"}],
+    )
+
+
+@pytest.mark.asyncio
 async def test_campaign_direct_provider_without_exact_entry_point_makes_no_call(
     tmp_path: Path,
 ) -> None:

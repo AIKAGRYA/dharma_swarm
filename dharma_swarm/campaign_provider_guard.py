@@ -311,6 +311,27 @@ def require_routed_campaign_invocation(
         raise RuntimeError("campaign routed coordinates changed before effect")
 
 
+def snapshot_attested_campaign_response(
+    response: LLMResponse,
+    *,
+    provider: str,
+    model: str,
+) -> LLMResponse:
+    """Detach one exact response before mutable aliases cross an await."""
+    if getattr(response, "provider", None) != provider:
+        raise RuntimeError(
+            "campaign response provider conflicts with exact invocation"
+        )
+    if getattr(response, "model", None) != model:
+        raise RuntimeError("campaign response model conflicts with exact invocation")
+    if type(response) is not LLMResponse:
+        raise RuntimeError("campaign provider returned a noncanonical response")
+    snapshot = response.model_copy(deep=True)
+    if snapshot.provider != provider or snapshot.model != model:
+        raise RuntimeError("campaign response identity changed while snapshotting")
+    return snapshot
+
+
 async def execute_routed_campaign_invocation(
     invocation: RoutedCampaignInvocation,
     boundary: CampaignProviderEffectBoundary,
@@ -337,15 +358,11 @@ async def execute_routed_campaign_invocation(
     boundary.mark_ready()
     try:
         response = await invocation.complete(invocation.request)
-        if getattr(response, "provider", None) != invocation.provider_type.value:
-            raise RuntimeError(
-                "campaign response provider conflicts with exact routed invocation"
-            )
-        if getattr(response, "model", None) != invocation.model:
-            raise RuntimeError(
-                "campaign response model conflicts with exact routed invocation"
-            )
-        return response
+        return snapshot_attested_campaign_response(
+            response,
+            provider=invocation.provider_type.value,
+            model=invocation.model,
+        )
     except Exception as exc:
         on_provider_error(exc, 1)
         raise

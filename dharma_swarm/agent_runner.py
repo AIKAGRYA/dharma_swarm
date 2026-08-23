@@ -2230,6 +2230,15 @@ class AgentRunner:
             assert campaign_effect_boundary is not None
             campaign_effect_boundary.mark_ready()
             response = await boundary_complete_exact(boundary_request)
+            from dharma_swarm.campaign_provider_guard import (
+                snapshot_attested_campaign_response,
+            )
+
+            response = snapshot_attested_campaign_response(
+                response,
+                provider=campaign_route["preferred_provider"],
+                model=campaign_route["preferred_model"],
+            )
         else:
             if campaign_effect_boundary is not None:
                 campaign_effect_boundary.mark_ready()
