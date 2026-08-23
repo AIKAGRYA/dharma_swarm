@@ -1,7 +1,7 @@
 {
   "id": "organism-rewire-WP-SADHANA-AUTHORITY-EXTENSIONS-P0-ADMISSION",
-  "base_ref": "dae089b2fd547ac51e21e997a14812df2aef4e12",
-  "branch": "agent/sadhana-authority-binding-20260823",
+  "base_ref": "f12bcdfd9e187968c655f6a2f1eb53c44d9c1955",
+  "branch": "agent/sadhana-authority-final-20260823",
   "worktree": ".",
   "intent": "Admit the previously enumerated but not yet file-bound SADHANA authority extensions: observer activation, immutable authority-manifest parsing, hash-pinned observed inputs, external held-out oracle custody, strict operator pause/resume state, roster validation, runtime-manifest rendering, and typed attempt helpers. This admission changes no runtime behavior and explicitly leaves AgentRunner and Orchestrator to a sibling dharmagraph packet.",
   "allowed_files": [
@@ -72,7 +72,7 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "dae089b2fd547ac51e21e997a14812df2aef4e12",
+      "checked_at_sha": "f12bcdfd9e187968c655f6a2f1eb53c44d9c1955",
       "details": []
     },
     "cross_packet_interface": {
@@ -107,6 +107,6 @@
       "Mobile ACK and inbox custody are not campaign authority or effect evidence."
     ],
     "rollback": "Revert this admission and its deterministic managed mirrors. Preserve all runtime databases, task rows, receipts, artifacts, manifests, and mobile custody files; no external effect or canonical runtime mutation is authorized by admission.",
-    "packet_digest": "f1b07db714bede63ed3638a34e9e403b159d49a7d4c473d88c9c6cde888bd2f4"
+    "packet_digest": "58f024768da156abeea4b03341bfa067b2b194f0d0096477ba5132d298fc22b1"
   }
 }
