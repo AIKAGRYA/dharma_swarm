@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import dharma_swarm._mission_control_operator_control_fs as control_fs
+import dharma_swarm._mission_control_operator_control_protocol as control_protocol
 import dharma_swarm.mission_control_operator_control as control_module
 from dharma_swarm.mission_control_operator_control import (
     ApplicationStatus,
@@ -59,6 +60,55 @@ def test_public_module_preserves_filesystem_exception_identity() -> None:
         assert getattr(control_module, name) is getattr(control_fs, name)
     assert callable(control_module.decode_and_verify_envelope)
     assert callable(control_module.OperatorControlInboxReconciler)
+
+
+def test_public_facade_preserves_pre_split_protocol_surface() -> None:
+    pre_split_protocol_globals = frozenset(
+        {
+            "AUTHORITY_BINDING_SHA256",
+            "ApplicationStatus",
+            "CONTROL_HTTP_BINDING_SHA256",
+            "CONTROL_SCHEMA",
+            "CONTROL_SEMANTICS_SHA256",
+            "ControlAction",
+            "ControlInboxPublisher",
+            "DEFAULT_APPLIED_INBOX",
+            "DEFAULT_CONTROL_ROOT",
+            "DEFAULT_EMERGENCY_INBOX",
+            "DEFAULT_INFLIGHT_INBOX",
+            "DEFAULT_NORMAL_INBOX",
+            "DEFAULT_REJECTED_INBOX",
+            "ENVELOPE_FIELDS",
+            "FreshnessPolicy",
+            "InboxKind",
+            "InboxPublication",
+            "MAX_AUTHORITY_RECEIPT_REF_CHARS",
+            "MAX_IDENTIFIER_CHARS",
+            "MAX_ISSUED_AT_SKEW",
+            "MAX_OPERATOR_LOGIN_CHARS",
+            "MAX_REASON_CHARS",
+            "MAX_REQUEST_TTL",
+            "OPERATOR_CONTROL_AUTHORITY_BINDING_SHA256",
+            "OPERATOR_CONTROL_HTTP_BINDING_SHA256",
+            "OPERATOR_CONTROL_SEMANTICS_SHA256",
+            "OperatorControlEnvelope",
+            "OperatorControlRequest",
+            "REQUEST_FIELDS",
+            "ReconcileStatus",
+            "TERMINAL_RECEIPT_SCHEMA",
+            "UNSIGNED_ENVELOPE_FIELDS",
+            "UNSUPPORTED_DECISION_ACTIONS",
+            "canonical_json_bytes",
+            "control_filename",
+            "decode_and_verify_envelope",
+            "read_control_candidate",
+            "utc_now",
+            "validate_operator_login",
+        }
+    )
+    assert pre_split_protocol_globals <= vars(control_module).keys()
+    for name in pre_split_protocol_globals:
+        assert getattr(control_module, name) is getattr(control_protocol, name)
 
 
 def _timestamp(value: datetime) -> str:
@@ -1377,18 +1427,28 @@ def test_shared_emergency_decoder_vectors() -> None:
 
 
 def test_module_has_no_store_database_provider_tool_or_systemctl_boundary() -> None:
-    source = Path("dharma_swarm/mission_control_operator_control.py").read_text(
-        encoding="utf-8"
-    )
     imported: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
+    for module_path in (
+        Path("dharma_swarm/mission_control_operator_control.py"),
+        Path("dharma_swarm/_mission_control_operator_control_protocol.py"),
+    ):
+        source = module_path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module)
     forbidden = set(
         "sqlite3 aiosqlite subprocess dharma_swarm.mission_control_campaign "
         "dharma_swarm.mission_control_lifecycle dharma_swarm.runtime_state "
         "dharma_swarm.task_board dharma_swarm.providers dharma_swarm.tool_registry".split()
     )
     assert imported.isdisjoint(forbidden)
+
+
+def test_split_modules_stay_under_module_budget() -> None:
+    for module_path in (
+        Path("dharma_swarm/mission_control_operator_control.py"),
+        Path("dharma_swarm/_mission_control_operator_control_protocol.py"),
+    ):
+        assert len(module_path.read_text(encoding="utf-8").splitlines()) < 1000

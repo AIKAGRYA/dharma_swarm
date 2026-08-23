@@ -1,0 +1,115 @@
+{
+  "id": "organism-rewire-WP-SADHANA-OPERATOR-DECOMPOSITION-P0",
+  "base_ref": "f148f7d2fc59f2cfc8929b57990295a06fda79a9",
+  "branch": "agent/sadhana-operator-decomposition-20260823",
+  "worktree": ".",
+  "intent": "Decompose the oversized SADHANA operator-control module into one private protocol module and one stable public authority/custody facade without changing protocol behavior, exception identity, import compatibility, or authority boundaries, while making both resulting modules satisfy the hard 1000-line module budget.",
+  "allowed_files": [
+    "dharma_swarm/_mission_control_operator_control_protocol.py",
+    "dharma_swarm/mission_control_operator_control.py",
+    "tests/test_mission_control_operator_control.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-OPERATOR-DECOMPOSITION-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "dharma_swarm/_mission_control_operator_control_fs.py",
+    "dharma_swarm/mission_control_campaign.py",
+    "dharma_swarm/mission_control_service.py",
+    "dharma_swarm/mission_control_authority.py",
+    "dharma_swarm/runtime_state.py",
+    "tests/test_sadhana_control_api.py",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "operator-and-api-contracts",
+      "command": "python3 -m pytest -q tests/test_mission_control_operator_control.py tests/test_sadhana_control_api.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "operator-decomposition-ruff",
+      "command": "python3 -m ruff check dharma_swarm/_mission_control_operator_control_protocol.py dharma_swarm/mission_control_operator_control.py tests/test_mission_control_operator_control.py tests/test_sadhana_control_api.py scripts/runtime/sadhana_control_api.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "hard-module-budget",
+      "command": "python3 -m pytest -q tests/test_mission_control_operator_control.py::test_split_modules_stay_under_module_budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "facade-and-authority-boundary-regressions",
+      "command": "python3 -m pytest -q tests/test_mission_control_operator_control.py -k 'public_facade_preserves_pre_split_protocol_surface or public_module_preserves_filesystem_exception_identity or module_has_no_store_database_provider_tool_or_systemctl_boundary or split_modules_stay_under_module_budget'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "refactor(control): split operator protocol from authority facade"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-OPERATOR-DECOMPOSITION-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f148f7d2fc59f2cfc8929b57990295a06fda79a9",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The pre-split facade exposed protocol defaults and validation constants as module globals even when they were absent from __all__; scripts/runtime/sadhana_control_api.py imports DEFAULT_NORMAL_INBOX and DEFAULT_EMERGENCY_INBOX directly, so a split that preserves only __all__ breaks API collection.",
+      "Protocol types and filesystem exceptions cross module boundaries by identity; wrappers or duplicate definitions would change isinstance, callback validation, replay handling, and exception matching.",
+      "The authority reconciler must remain free of canonical stores, providers, tools, and systemd while the private protocol module must remain equally authority-free.",
+      "A module-budget repair is acceptable only when all pre-split classes and functions remain text-identical and the stable public module continues to re-export every legacy protocol global."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_operator_control.py",
+      "dharma_swarm/_mission_control_operator_control_fs.py",
+      "scripts/runtime/sadhana_control_api.py",
+      "tests/test_mission_control_operator_control.py"
+    ],
+    "honest_blockers": [
+      "This packet proves local source, import, and focused behavioral compatibility only; it does not prove a deployed control service, live supervisor application, or an observed external effect.",
+      "The private protocol module is an implementation dependency, not a new authority owner or public control surface.",
+      "Mission Control's read-only projection did not contain campaign sadhana-10-20260823, so no runtime mission-state claim is made from this work."
+    ],
+    "rollback": "Revert the protocol extraction, facade aliases, frozen compatibility and module-boundary fixtures, and this packet together. No schema, database, deployment, host, provider, or external effect is introduced by this refactor.",
+    "packet_digest": "f2bcf1c29759c2751c4a4ff2f855e8925d9a29882e4644436a60239f1fa44641"
+  }
+}
