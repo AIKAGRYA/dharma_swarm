@@ -954,7 +954,6 @@ active_tracks:
       - tests/test_mission_control_auto_verifier.py
       - tests/test_runtime_state_campaign_attempts.py
       - tests/test_task_board.py
-      - tests/test_agent_runner.py
       - reports/agentops/work_packets/organism-rewire-WP-SADHANA-ATTEMPT-GENERATION-P0-ADMISSION.json
       # Operator-authorized SADHANA authority-extension scope correction
       # (2026-08-23): bind the extracted activation, observed-input, held-out
