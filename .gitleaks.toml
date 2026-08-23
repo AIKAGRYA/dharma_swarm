@@ -72,6 +72,10 @@ paths = [
 regexes = [
     # Common test/example token shapes that match generic-api-key heuristics
     '''(?i)(example|test|placeholder|your[-_]?api[-_]?key|xxxxx+|todo|fake[-_]?token)''',
+    # Co-located SADHANA TypeScript tests use this exact deterministic,
+    # three-digit idempotency fixture. Keep this value-shaped exception
+    # narrower than a dashboard/test path allowlist.
+    '''^idempotency-[0-9]{3}$''',
     # Anthropic / OpenAI documented placeholder shapes
     '''sk-ant-api03-AAAAA[A-Za-z0-9_-]{20,}''',
     '''sk-proj-XXXXX''',

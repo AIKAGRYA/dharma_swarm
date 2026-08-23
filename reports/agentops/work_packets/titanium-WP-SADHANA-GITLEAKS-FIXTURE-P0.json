@@ -1,0 +1,100 @@
+{
+  "id": "titanium-WP-SADHANA-GITLEAKS-FIXTURE-P0",
+  "base_ref": "f148f7d2fc59f2cfc8929b57990295a06fda79a9",
+  "branch": "agent/sadhana-gitleaks-fixture-20260823",
+  "worktree": ".",
+  "intent": "Adjudicate six generic-api-key findings from co-located SADHANA TypeScript test fixtures with one value-shaped exception that admits only lowercase `idempotency-` plus exactly three decimal digits; mechanically reject broader suffixes, prefixes, production-like tokens, and any dashboard-wide path exemption while preserving full-history secret scanning.",
+  "allowed_files": [
+    ".gitleaks.toml",
+    "tests/test_gitleaks_config.py",
+    "reports/agentops/work_packets/titanium-WP-SADHANA-GITLEAKS-FIXTURE-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "exact-gitleaks-config-contract",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_gitleaks_config.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "gitleaks-config-test-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check tests/test_gitleaks_config.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "broad-idempotency-wildcard-is-rejected",
+      "command": "python3 -c \"from pathlib import Path; import subprocess,sys; p=Path('.gitleaks.toml'); t=p.read_text(); old='^idempotency-[0-9]{3}$'; new='^idempotency-.*$'; assert old in t; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_gitleaks_config.py::test_sadhana_idempotency_exception_is_exact_and_not_path_wide'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(security): bound SADHANA fixture allowlist"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-GITLEAKS-FIXTURE-P0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f148f7d2fc59f2cfc8929b57990295a06fda79a9",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The existing tests/ path exception does not cover co-located dashboard/src/lib/*.test.ts fixtures, while adding dashboard or dashboard-test paths would suppress unrelated production-adjacent content.",
+      "All six findings are the same deterministic 15-character fixture family, not six independent credentials; the exception therefore binds the exact value shape rather than a file location."
+    ],
+    "closest_existing_implementation": [
+      ".gitleaks.toml",
+      ".github/workflows/gitleaks.yml",
+      "tests/test_gitleaks_workflow.py"
+    ],
+    "honest_blockers": [
+      "A redacted full-history Gitleaks 8.30.1 candidate scan is external evidence and must be repeated against the final integrated exact commit in a clean disposable clone.",
+      "An allowlist exception is not proof that no secret exists; the executable shape test proves only that this exception cannot absorb prefixes, suffixes, letter variants, high-entropy tails, or a dashboard-wide path.",
+      "This packet neither rewrites the six historical fixtures nor broadens the existing tests/ path exception."
+    ],
+    "rollback": "Revert the exact regex, focused contract test, and this packet together. The six deterministic fixture findings will again block full-history scanning; no secret history or scan result is altered by rollback.",
+    "packet_digest": "1f72feb413b62031cd604b888fa803b84576bdda03c7a6489d300fde5f156d07"
+  }
+}
