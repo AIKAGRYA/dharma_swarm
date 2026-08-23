@@ -70,6 +70,13 @@ def ensure_execution_identity_for_dispatch(
         metadata={
             "source": "runtime_lifecycle.ensure_execution_identity",
             **dict(merged.get("metadata") or {}),
+            **(
+                {"attempt_generation": merged["attempt_generation"]}
+                if isinstance(merged.get("attempt_generation"), int)
+                and not isinstance(merged.get("attempt_generation"), bool)
+                and merged["attempt_generation"] >= 0
+                else {}
+            ),
         },
     )
     td.metadata.update(_identity_metadata(identity))
@@ -91,4 +98,9 @@ def _identity_metadata(identity: ExecutionIdentity) -> dict[str, Any]:
         "agent_id": identity.agent_id,
         "session_id": identity.session_id,
         "idempotency_key": identity.idempotency_key,
+        **(
+            {"attempt_generation": identity.metadata["attempt_generation"]}
+            if "attempt_generation" in identity.metadata
+            else {}
+        ),
     }

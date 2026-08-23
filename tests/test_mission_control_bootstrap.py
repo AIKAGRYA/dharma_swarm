@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,23 @@ import pytest
 from dharma_swarm import mission_control_bootstrap as bootstrap
 from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_contract import MissionControlError
+from dharma_swarm.mission_control_held_out_oracle import (
+    load_held_out_oracle_manifest,
+    render_held_out_oracle_manifest,
+)
+from dharma_swarm.mission_control_observed_input import (
+    observed_input_manifest_digest,
+)
+from dharma_swarm.mission_control_roster import (
+    CampaignAgentRoster,
+    CampaignAgentSeat,
+)
+from dharma_swarm.mission_control_runtime_manifests import (
+    RUNTIME_MANIFEST_NAMES,
+    RuntimeManifestPins,
+    render_runtime_manifests,
+)
+from dharma_swarm.models import AgentRole, ProviderType
 from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.task_board import TaskBoard
 from scripts.runtime import sadhana_campaign_bootstrap as cli
@@ -185,12 +203,162 @@ async def _run_bootstrap(
         )
 
 
+def _observed_source(
+    path: Path,
+    portfolio: bootstrap.GoalPortfolio,
+) -> Path:
+    goals: dict[str, dict[str, Any]] = {}
+    observed_at = datetime.now(timezone.utc).isoformat()
+    for goal_id in portfolio.dependency_order:
+        content = f"Observed owner evidence for {goal_id}; verify independently.\n"
+        goals[goal_id] = {
+            "goal_contract_sha256": portfolio.by_id[goal_id].content_digest,
+            "observed_at": observed_at,
+            "epistemic_state": "observed_unverified",
+            "authority_scope": "prompt_context_only",
+            "media_type": "text/markdown; charset=utf-8",
+            "content": content,
+            "content_sha256": "sha256:" + hashlib.sha256(content.encode()).hexdigest(),
+        }
+    payload: dict[str, Any] = {
+        "schema_version": "dharma.sadhana.observed_input_source.v1",
+        "campaign_id": portfolio.campaign_id,
+        "mission_id": portfolio.campaign_id,
+        "portfolio_contract_sha256": portfolio.digest,
+        "goals": goals,
+    }
+    payload["manifest_digest"] = observed_input_manifest_digest(payload)
+    path.write_bytes(_encoded(payload) + b"\n")
+    path.chmod(0o600)
+    return path
+
+
 def test_production_contract_pin_is_frozen() -> None:
     assert bootstrap.EXPECTED_CONTRACT_DIGEST == (
         "sha256:e2891fcb2171563adc87a339d5fca42b155ee8aa5dc96b153ab3515f01051101"
     )
     assert bootstrap.EXPECTED_CAMPAIGN_ID == "sadhana-10-20260823"
     assert bootstrap.GOAL_CONTRACT_SCHEMA == "dharma.sadhana.goal_contracts.v1"
+
+
+@pytest.mark.asyncio
+async def test_runtime_manifest_transaction_is_exact_replay_and_authority_neutral(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    state_dir = tmp_path / "owners"
+    runtime, board, control = await _owners(state_dir)
+    await _run_bootstrap(portfolio, control)
+    source = _observed_source(tmp_path / "observed-inputs.source.json", portfolio)
+    deadline = datetime.fromisoformat(portfolio.campaign_deadline)
+    roster = CampaignAgentRoster(
+        campaign_id=portfolio.campaign_id,
+        objective_sha256="a" * 64,
+        activation_at=datetime.now(timezone.utc),
+        expires_at=deadline,
+        catalog_observed_at=datetime.now(timezone.utc),
+        catalog_models=("producer:cloud", "validator:cloud"),
+        seats=(
+            CampaignAgentSeat(
+                name="sadhana-producer",
+                role=AgentRole.CODER,
+                provider=ProviderType.OLLAMA,
+                model="producer:cloud",
+                family="producer-family",
+                thread="production",
+                system_prompt="Produce bounded evidence.",
+            ),
+            CampaignAgentSeat(
+                name="sadhana-verifier",
+                role=AgentRole.VALIDATOR,
+                provider=ProviderType.OLLAMA,
+                model="validator:cloud",
+                family="validator-family",
+                thread="verification",
+                system_prompt="Verify independently.",
+            ),
+        ),
+        manifest_sha256="b" * 64,
+    )
+    pins = RuntimeManifestPins(
+        evaluator_path=tmp_path / "held-out" / "g10-evaluator.py",
+        evaluator_sha256="sha256:" + "1" * 64,
+        policy_path=tmp_path / "held-out" / "g10-policy.json",
+        policy_sha256="sha256:" + "2" * 64,
+        operator_control_semantics_sha256="sha256:" + "3" * 64,
+        operator_control_authority_binding_sha256="sha256:" + "4" * 64,
+        deployment_authority_topology_sha256="sha256:" + "5" * 64,
+        deployment_authority_credential_clarification_sha256=(
+            "sha256:" + "6" * 64
+        ),
+    )
+    output = tmp_path / "runtime-manifests"
+    lock_path = _owner_lock_path(control)
+    with bootstrap.campaign_bootstrap_lock(lock_path) as lock:
+        first = await render_runtime_manifests(
+            portfolio,
+            control,
+            board,
+            runtime,
+            roster,
+            observed_source_path=source,
+            output_root=output,
+            verifier_seat_name="sadhana-verifier",
+            pins=pins,
+            operator_id="operator",
+            lock=lock,
+        )
+    before = {path.name: path.read_bytes() for path in output.iterdir()}
+    with bootstrap.campaign_bootstrap_lock(lock_path) as lock:
+        second = await render_runtime_manifests(
+            portfolio,
+            control,
+            board,
+            runtime,
+            roster,
+            observed_source_path=source,
+            output_root=output,
+            verifier_seat_name="sadhana-verifier",
+            pins=pins,
+            operator_id="operator",
+            lock=lock,
+        )
+
+    assert first == second
+    assert set(before) == set(RUNTIME_MANIFEST_NAMES)
+    assert before == {path.name: path.read_bytes() for path in output.iterdir()}
+    assert all(path.stat().st_mode & 0o777 == 0o600 for path in output.iterdir())
+    tasks = await board.list_tasks(limit=20)
+    assert len(tasks) == 10
+    assert all(task.metadata["dispatch_ready"] is False for task in tasks)
+    assert all("mission_campaign_authority" not in task.metadata for task in tasks)
+    assert json.loads(first.to_json())["authority_state"] == "rendered_not_bound"
+
+
+def test_runtime_manifest_cli_exposes_exact_post_bootstrap_inputs() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(
+                Path(__file__).parents[1]
+                / "scripts/runtime/sadhana_render_campaign_manifests.py"
+            ),
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0
+    for flag in (
+        "--observed-source",
+        "--verifier-seat",
+        "--operator-control-authority-binding-sha256",
+        "--deployment-authority-topology-sha256",
+        "--deployment-authority-credential-clarification-sha256",
+    ):
+        assert flag in completed.stdout
 
 
 def test_contract_loader_pins_exact_bytes_and_rejects_schema_drift(
@@ -532,6 +700,70 @@ async def test_additive_authority_metadata_is_preserved_without_proving_readines
     assert rebound.metadata["mission_campaign_authority"]["status"] == "not_evaluated"
     assert rebound.metadata["dispatch_ready"] is False
     assert rebound.metadata["dispatch_blocker"] == "authority_unbound"
+
+
+@pytest.mark.asyncio
+async def test_complete_bootstrap_can_be_inspected_without_owner_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    runtime, board, control = await _owners(tmp_path / "owners")
+    initialized = await _run_bootstrap(portfolio, control)
+
+    async def forbidden_write(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("inspection attempted an owner write")
+
+    monkeypatch.setattr(runtime, "upsert_session", forbidden_write)
+    monkeypatch.setattr(board, "create", forbidden_write)
+    with bootstrap.campaign_bootstrap_lock(_owner_lock_path(control)) as lock:
+        inspected = await bootstrap.inspect_sadhana_campaign(
+            portfolio,
+            control,
+            lock=lock,
+        )
+
+    assert inspected == initialized
+
+
+@pytest.mark.asyncio
+async def test_held_out_manifest_renderer_binds_exact_bootstrap_g10_task(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portfolio, _ = _pinned_portfolio(tmp_path, monkeypatch)
+    _, board, control = await _owners(tmp_path / "owners")
+    result = await _run_bootstrap(portfolio, control)
+    evaluator = tmp_path / "held-out" / "g10-evaluator.py"
+    policy = tmp_path / "held-out" / "g10-policy.json"
+    evaluator_sha = "sha256:" + "1" * 64
+    policy_sha = "sha256:" + "2" * 64
+
+    first = await render_held_out_oracle_manifest(
+        result,
+        board,
+        evaluator_path=evaluator,
+        evaluator_sha256=evaluator_sha,
+        policy_path=policy,
+        policy_sha256=policy_sha,
+    )
+    second = await render_held_out_oracle_manifest(
+        result,
+        board,
+        evaluator_path=evaluator,
+        evaluator_sha256=evaluator_sha,
+        policy_path=policy,
+        policy_sha256=policy_sha,
+    )
+    path = tmp_path / "held-out-oracle.json"
+    path.write_bytes(first)
+    path.chmod(0o600)
+    loaded = load_held_out_oracle_manifest(path)
+
+    assert second == first
+    assert loaded.task_id == dict(result.goal_task_map)["G10_SAFETY_TCB"]
+    assert loaded.evaluator_sha256 == evaluator_sha
+    assert loaded.policy_sha256 == policy_sha
 
 
 @pytest.mark.asyncio

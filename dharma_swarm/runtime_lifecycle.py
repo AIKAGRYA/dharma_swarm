@@ -166,6 +166,8 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "claim_id": identity.claim_id,
                 "failure_code": failure_code,
+                **({"attempt_generation": td.metadata["attempt_generation"]}
+                   if "attempt_generation" in td.metadata else {}),
                 **mission,
                 "receipt_status": status,
                 **route_payload,
@@ -297,6 +299,8 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "failure_code": failure_code,
                 "result_chars": len(result or ""),
+                **({"attempt_generation": td.metadata["attempt_generation"]}
+                   if "attempt_generation" in td.metadata else {}),
                 **mission,
                 "artifact_refs": artifact_refs,
                 "no_artifact_refs_reason": ""

@@ -1,5 +1,6 @@
 """Tests for dharma_swarm.task_board."""
 
+import copy
 import sqlite3
 
 import pytest
@@ -34,6 +35,114 @@ async def persisted_quarantined_task(board):
         )
         await db.commit()
     return task.id
+
+
+def _campaign_attempt_metadata(
+    task_id: str,
+    *,
+    generation: int = 0,
+    maximum: int = 2,
+) -> dict:
+    authority = {
+        "schema_version": "dharma.sadhana.campaign_task_authority.v4",
+        "campaign_id": "campaign-exact",
+        "mission_id": "campaign-exact",
+        "goal_id": "G01",
+        "portfolio_contract_sha256": "sha256:" + "a" * 64,
+        "goal_contract_sha256": "sha256:" + "b" * 64,
+        "manifest_digest": "sha256:" + "c" * 64,
+        "agent_roster_sha256": "d" * 64,
+        "effect_mode": "read_only",
+        "campaign_end": "2026-09-02T00:00:00+00:00",
+        "agent_name": "exact-seat",
+        "claimed_principal": "agent-exact",
+        "dispatch_key": f"dispatch-{generation}",
+        "request_id": f"request-{generation}",
+        "workspace_path": "workspaces/exact",
+        "allowed_files": ["workspaces/exact"],
+        "max_usd": 0.0,
+        "authority_ref": f"lease-{generation}",
+        "authority_digest": "sha256:" + f"{generation + 1:x}" * 64,
+        "attempt_generation": generation,
+        "max_attempts": maximum,
+        "observed_input_manifest_digest": "sha256:" + "e" * 64,
+        "held_out_oracle_manifest_digest": "sha256:" + "f" * 64,
+        "operator_control_semantics_sha256": "sha256:" + "0" * 64,
+        "operator_control_authority_binding_sha256": "sha256:" + "4" * 64,
+        "deployment_authority_topology_sha256": "sha256:" + "5" * 64,
+        "deployment_authority_credential_clarification_sha256": (
+            "sha256:" + "6" * 64
+        ),
+        "observed_input_ref": {
+            "receipt_id": "observed-receipt",
+            "receipt_sha256": "sha256:" + "1" * 64,
+            "artifact_id": "observed-artifact",
+            "artifact_record_sha256": "sha256:" + "2" * 64,
+            "content_sha256": "sha256:" + "3" * 64,
+        },
+    }
+    governance = {
+        key: value
+        for key, value in authority.items()
+        if key
+        not in {
+            "agent_name", "claimed_principal", "dispatch_key", "request_id",
+            "authority_ref", "authority_digest",
+        }
+    }
+    governance["schema_version"] = "dharma.sadhana.campaign_governance.v4"
+    governance["forbidden_files"] = []
+    owner = {
+        "schema_version": "dharma.mission_control.owner_execution.v2",
+        "backend": "orchestrator",
+        "mission_id": authority["mission_id"],
+        "task_id": task_id,
+        "dispatch_key": authority["dispatch_key"],
+        "attempt_generation": generation,
+        "run_id": f"run-{generation}",
+        "claim_id": f"claim-{generation}",
+        "idempotency_key": f"idem-{generation}",
+        "trace_id": f"trace-{generation}",
+        "correlation_id": f"correlation-{generation}",
+    }
+    return {
+        "attempt_ceiling": maximum,
+        "attempt_generation": generation,
+        "mission_campaign_authority": authority,
+        "mission_control_governance": governance,
+        "mission_control_owner_execution": owner,
+        **{
+            key: owner[key]
+            for key in (
+                "run_id", "claim_id", "idempotency_key", "trace_id",
+                "correlation_id",
+            )
+        },
+    }
+
+
+def _next_attempt(metadata: dict) -> tuple[dict, dict, dict]:
+    authority = copy.deepcopy(metadata["mission_campaign_authority"])
+    authority.update(
+        {
+            "attempt_generation": 1,
+            "dispatch_key": "dispatch-1",
+            "request_id": "request-1",
+            "authority_ref": "lease-1",
+            "authority_digest": "sha256:" + "2" * 64,
+        }
+    )
+    governance = copy.deepcopy(metadata["mission_control_governance"])
+    governance["attempt_generation"] = 1
+    routing = {
+        "campaign_effect_mode": "read_only",
+        "requires_tooling": False,
+        "allow_provider_routing": False,
+        "provider_allowlist": ["ollama"],
+        "preferred_provider": "ollama",
+        "preferred_model": "fixture-model",
+    }
+    return authority, governance, routing
 
 
 @pytest.mark.asyncio
@@ -156,6 +265,246 @@ async def test_full_lifecycle(board):
     task = await board.complete(task.id, result="done!")
     assert task.status == TaskStatus.COMPLETED
     assert task.result == "done!"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("prior", "terminal"),
+    [
+        (TaskStatus.ASSIGNED, TaskStatus.CANCELLED),
+        (TaskStatus.RUNNING, TaskStatus.FAILED),
+    ],
+)
+async def test_campaign_pre_effect_failure_is_exact_owner_cas(
+    board: TaskBoard,
+    prior: TaskStatus,
+    terminal: TaskStatus,
+) -> None:
+    task = await board.create("Campaign task")
+    metadata = _campaign_attempt_metadata(task.id)
+    await board.update_task(task.id, metadata=metadata)
+    task = await board.assign(task.id, "agent-exact", metadata=metadata)
+    if prior is TaskStatus.RUNNING:
+        task = await board.start(task.id, metadata=metadata)
+
+    result = await board.resolve_campaign_pre_effect_failure(
+        task.id,
+        expected_status=prior,
+        expected_agent_id="agent-exact",
+        expected_metadata=metadata,
+        authenticated_principal="agent-exact",
+    )
+    resolved = await board.get(task.id)
+
+    assert result == "indeterminate"
+    assert resolved is not None
+    assert resolved.status is terminal
+    assert resolved.assigned_to == "agent-exact"
+    assert resolved.metadata["campaign_dispatch_recovery"] == {
+        "schema_version": "dharma.sadhana.dispatch_recovery.v2",
+        "state": "dispatch_indeterminate",
+        "task_id": task.id,
+        "authenticated_principal": "agent-exact",
+        "prior_status": prior.value,
+        "provider_task_scheduled": False,
+        "attempt_generation": 0,
+        "max_attempts": 2,
+        "dispatch_key": "dispatch-0",
+        "request_id": "request-0",
+        "authority_ref": "lease-0",
+        "authority_digest": "sha256:" + "1" * 64,
+        "run_id": "run-0",
+        "claim_id": "claim-0",
+        "idempotency_key": "idem-0",
+    }
+
+
+@pytest.mark.asyncio
+async def test_campaign_pre_effect_failure_never_overwrites_drift(board: TaskBoard) -> None:
+    task = await board.create("Campaign task")
+    metadata = _campaign_attempt_metadata(task.id)
+    await board.update_task(task.id, metadata=metadata)
+    assigned = await board.assign(
+        task.id,
+        "agent-exact",
+        metadata=metadata,
+    )
+    await board.update_task(task.id, metadata={"owner": "concurrent"})
+
+    result = await board.resolve_campaign_pre_effect_failure(
+        task.id,
+        expected_status=assigned.status,
+        expected_agent_id="agent-exact",
+        expected_metadata=assigned.metadata,
+        authenticated_principal="agent-exact",
+    )
+    unchanged = await board.get(task.id)
+
+    assert result == "conflict"
+    assert unchanged is not None
+    assert unchanged.status is TaskStatus.ASSIGNED
+    assert unchanged.metadata == {"owner": "concurrent"}
+
+
+@pytest.mark.asyncio
+async def test_campaign_pending_recovery_witness_is_byte_stable(board: TaskBoard) -> None:
+    task = await board.create("Campaign task")
+    metadata = _campaign_attempt_metadata(task.id)
+    await board.update_task(task.id, metadata=metadata)
+    task = await board.get(task.id)
+    assert task is not None
+
+    result = await board.resolve_campaign_pre_effect_failure(
+        task.id,
+        expected_status=TaskStatus.PENDING,
+        expected_agent_id=None,
+        expected_metadata=task.metadata,
+        authenticated_principal="agent-exact",
+    )
+
+    assert result == "pending"
+    assert await board.get(task.id) == task
+
+
+async def _indeterminate_campaign_task(
+    board: TaskBoard,
+    *,
+    maximum: int = 2,
+) -> tuple[object, dict]:
+    task = await board.create("Campaign attempt")
+    metadata = _campaign_attempt_metadata(task.id, maximum=maximum)
+    task = await board.assign(task.id, "agent-exact", metadata=metadata)
+    outcome = await board.resolve_campaign_pre_effect_failure(
+        task.id,
+        expected_status=TaskStatus.ASSIGNED,
+        expected_agent_id="agent-exact",
+        expected_metadata=metadata,
+        authenticated_principal="agent-exact",
+    )
+    assert outcome == "indeterminate"
+    terminal = await board.get(task.id)
+    assert terminal is not None
+    return terminal, metadata
+
+
+@pytest.mark.asyncio
+async def test_campaign_attempt_advance_is_exact_and_append_only(board: TaskBoard) -> None:
+    terminal, original = await _indeterminate_campaign_task(board)
+    authority, governance, routing = _next_attempt(original)
+
+    result = await board.advance_campaign_dispatch_attempt(
+        terminal.id,
+        expected_status=TaskStatus.CANCELLED,
+        expected_agent_id="agent-exact",
+        expected_metadata=terminal.metadata,
+        next_authority=authority,
+        next_governance=governance,
+        next_routing=routing,
+    )
+
+    assert result == "advanced"
+    advanced = await board.get(terminal.id)
+    assert advanced is not None
+    assert advanced.status is TaskStatus.PENDING
+    assert advanced.assigned_to is None
+    assert advanced.metadata["attempt_generation"] == 1
+    evidence = advanced.metadata["campaign_dispatch_attempt_history"]
+    assert len(evidence) == 1
+    assert evidence[0]["authority"] == original["mission_campaign_authority"]
+    assert evidence[0]["owner_execution"] == original["mission_control_owner_execution"]
+
+
+@pytest.mark.asyncio
+async def test_campaign_attempt_advance_rejects_nested_history_forgery(
+    board: TaskBoard,
+) -> None:
+    terminal, original = await _indeterminate_campaign_task(board, maximum=3)
+    authority, governance, routing = _next_attempt(original)
+    assert await board.advance_campaign_dispatch_attempt(
+        terminal.id,
+        expected_status=TaskStatus.CANCELLED,
+        expected_agent_id="agent-exact",
+        expected_metadata=terminal.metadata,
+        next_authority=authority,
+        next_governance=governance,
+        next_routing=routing,
+    ) == "advanced"
+    advanced = await board.get(terminal.id)
+    assert advanced is not None
+    generation_one = _campaign_attempt_metadata(terminal.id, generation=1, maximum=3)
+    active = copy.deepcopy(advanced.metadata)
+    owner = generation_one["mission_control_owner_execution"]
+    active["mission_control_owner_execution"] = owner
+    active.update(
+        {
+            key: owner[key]
+            for key in (
+                "run_id", "claim_id", "idempotency_key", "trace_id",
+                "correlation_id",
+            )
+        }
+    )
+    assigned = await board.assign(terminal.id, "agent-exact", metadata=active)
+    assert await board.resolve_campaign_pre_effect_failure(
+        terminal.id,
+        expected_status=TaskStatus.ASSIGNED,
+        expected_agent_id="agent-exact",
+        expected_metadata=assigned.metadata,
+        authenticated_principal="agent-exact",
+    ) == "indeterminate"
+    loaded = await board.get(terminal.id)
+    assert loaded is not None
+    forged = copy.deepcopy(loaded.metadata)
+    forged["campaign_dispatch_attempt_history"][0]["authority"]["goal_id"] = "foreign"
+    await board.update_task(terminal.id, metadata=forged)
+    next_authority = copy.deepcopy(authority)
+    next_authority.update(
+        attempt_generation=2,
+        dispatch_key="dispatch-2",
+        request_id="request-2",
+        authority_ref="lease-2",
+        authority_digest="sha256:" + "3" * 64,
+    )
+    next_governance = copy.deepcopy(governance)
+    next_governance["attempt_generation"] = 2
+
+    with pytest.raises(TaskBoardError, match="history authority is foreign"):
+        await board.advance_campaign_dispatch_attempt(
+            terminal.id,
+            expected_status=TaskStatus.CANCELLED,
+            expected_agent_id="agent-exact",
+            expected_metadata=forged,
+            next_authority=next_authority,
+            next_governance=next_governance,
+            next_routing=routing,
+        )
+
+
+@pytest.mark.asyncio
+async def test_campaign_attempt_exhaustion_is_exact_row_fenced(board: TaskBoard) -> None:
+    terminal, _ = await _indeterminate_campaign_task(board, maximum=1)
+    bogus = copy.deepcopy(terminal.metadata["mission_campaign_authority"])
+
+    assert await board.advance_campaign_dispatch_attempt(
+        terminal.id,
+        expected_status=TaskStatus.CANCELLED,
+        expected_agent_id="agent-exact",
+        expected_metadata=terminal.metadata,
+        next_authority=bogus,
+        next_governance=terminal.metadata["mission_control_governance"],
+        next_routing={},
+    ) == "exhausted"
+
+    await board.update_task(terminal.id, result="concurrent-drift")
+    assert await board.advance_campaign_dispatch_attempt(
+        terminal.id,
+        expected_status=TaskStatus.CANCELLED,
+        expected_agent_id="agent-exact",
+        expected_metadata=terminal.metadata,
+        next_authority=bogus,
+        next_governance=terminal.metadata["mission_control_governance"],
+        next_routing={},
+    ) == "conflict"
 
 
 @pytest.mark.asyncio

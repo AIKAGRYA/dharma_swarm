@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
+import types
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,6 +13,8 @@ import pytest
 
 import dharma_swarm.mission_control_service as service_module
 from dharma_swarm.mission_control_campaign import CampaignConfig
+from dharma_swarm.mission_control_auto_verifier import CandidateReconcileOutcome
+from dharma_swarm.mission_control_contract import MissionControlError
 from dharma_swarm.mission_control_service import (
     CAMPAIGN_PROJECTION_SCHEMA_VERSION,
     CAMPAIGN_WRITER_IDENTITY_SCHEMA_VERSION,
@@ -27,7 +31,12 @@ from dharma_swarm.mission_control_service import (
     read_writer_lock_identity,
     writer_lock_is_held,
 )
-from scripts.runtime import mission_control_campaign as campaign_cli
+
+
+def _campaign_cli() -> Any:
+    from scripts.runtime import mission_control_campaign  # noqa: PLC0415
+
+    return mission_control_campaign
 
 
 @dataclass(frozen=True)
@@ -50,6 +59,9 @@ class _Snapshot:
     writer_lock_held: bool = True
     observed_at: datetime = datetime(2026, 8, 23, tzinfo=timezone.utc)
     proves_process_liveness: bool = True
+    candidate_task_ids: tuple[str, ...] = ()
+    accepted_task_ids: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +79,9 @@ class _Snapshot:
             "transport_state": "unobserved",
             "model_execution_state": "unobserved",
             "acceptance_state": "unobserved",
+            "candidate_task_ids": list(self.candidate_task_ids),
+            "accepted_task_ids": list(self.accepted_task_ids),
+            "errors": list(self.errors),
         }
 
 
@@ -102,6 +117,54 @@ class _BlockingSupervisor:
         return _Snapshot(datetime.now(timezone.utc))
 
 
+class _AutomaticSupervisor:
+    config = _Config()
+
+    def __init__(self) -> None:
+        self.accepted: list[object] = []
+
+    async def cycle(self, *, writer_lock_held: bool):
+        assert writer_lock_held is True
+        return _Snapshot(
+            datetime.now(timezone.utc),
+            candidate_task_ids=("candidate-task",),
+        )
+
+    async def accept(self, acceptance: object) -> None:
+        self.accepted.append(acceptance)
+
+    async def status(self, *, writer_lock_held: bool):
+        assert writer_lock_held is True
+        return _Snapshot(
+            datetime.now(timezone.utc),
+            candidate_task_ids=(),
+            accepted_task_ids=("candidate-task",),
+        )
+
+
+class _AutomaticVerifier:
+    def __init__(self, acceptance: object) -> None:
+        self.acceptance = acceptance
+        self.calls = 0
+
+    async def reconcile(
+        self,
+        snapshot: _Snapshot,
+        *,
+        effect_ready=None,
+    ) -> CandidateReconcileOutcome:
+        self.calls += 1
+        assert snapshot.candidate_task_ids == ("candidate-task",)
+        if effect_ready is not None:
+            effect_ready()
+        return CandidateReconcileOutcome(
+            "accepted",
+            task_id="candidate-task",
+            attempt=1,
+            acceptance=self.acceptance,  # type: ignore[arg-type]
+        )
+
+
 def test_writer_lock_identity_is_exact_and_malformed_data_fails_closed(
     tmp_path: Path,
 ) -> None:
@@ -135,6 +198,7 @@ def test_writer_lock_identity_is_exact_and_malformed_data_fails_closed(
 
 @pytest.mark.asyncio
 async def test_cli_initializes_campaign_from_fresh_state_root(tmp_path: Path) -> None:
+    campaign_cli = _campaign_cli()
     state_dir = tmp_path / "fresh-state"
     state_dir.mkdir()
     board = await campaign_cli._board(state_dir)
@@ -152,6 +216,59 @@ async def test_cli_initializes_campaign_from_fresh_state_root(tmp_path: Path) ->
     assert session.session_id == "mission_campaign:mission-alpha"
     assert (state_dir / "db" / "tasks.db").is_file()
     assert (state_dir / "state" / "runtime.db").is_file()
+
+
+@pytest.mark.asyncio
+async def test_cli_prepare_is_idempotent_effect_free_and_rejects_config_drift(
+    tmp_path: Path,
+) -> None:
+    campaign_cli = _campaign_cli()
+    state_dir = tmp_path / "prepared-state"
+    board = await campaign_cli._board(state_dir)
+    runtime = campaign_cli._runtime_store(state_dir)
+    await runtime.init_db()
+    control = campaign_cli.MissionControl(board, runtime)
+    await control.create_mission("mission-alpha", title="Mission Alpha")
+    argv = [
+        "prepare",
+        "--state-dir",
+        str(state_dir),
+        "--mission-id",
+        "mission-alpha",
+    ]
+
+    first = await campaign_cli.prepare_campaign(
+        campaign_cli.build_parser().parse_args(argv)
+    )
+    session_before = await runtime.get_session("mission_campaign:mission-alpha")
+    second = await campaign_cli.prepare_campaign(
+        campaign_cli.build_parser().parse_args(argv)
+    )
+    session_after = await runtime.get_session("mission_campaign:mission-alpha")
+
+    assert first["status"] == second["status"] == "prepared"
+    assert first["initialized"] is True
+    assert second["initialized"] is False
+    assert first["generation"] == second["generation"] == 1
+    assert session_after == session_before
+    assert first["provider_effect_performed"] is False
+    assert first["tool_effect_performed"] is False
+    assert first["work_performed"] is False
+    receipts = await runtime.list_runtime_receipts(
+        correlation_id="mission_campaign:mission-alpha",
+        receipt_type="mission_campaign_control",
+        limit=10,
+    )
+    assert [(receipt.status, receipt.payload["generation"]) for receipt in receipts] == [
+        ("start", 1)
+    ]
+
+    drift = campaign_cli.build_parser().parse_args(
+        [*argv, "--max-dispatch-per-cycle", "5"]
+    )
+    with pytest.raises(MissionControlError, match="conflicts"):
+        await campaign_cli.prepare_campaign(drift)
+    assert await runtime.get_session("mission_campaign:mission-alpha") == session_before
 
 
 @pytest.mark.asyncio
@@ -398,6 +515,200 @@ async def test_control_gate_serializes_stop_with_inflight_cycle(tmp_path: Path) 
 
 
 @pytest.mark.asyncio
+async def test_service_automatically_promotes_candidate_before_projection(
+    tmp_path: Path,
+) -> None:
+    supervisor = _AutomaticSupervisor()
+    acceptance = object()
+    verifier = _AutomaticVerifier(acceptance)
+    projection_path = tmp_path / "status.json"
+    service = CampaignService(
+        supervisor,  # type: ignore[arg-type]
+        lock_path=tmp_path / "campaign.lock",
+        projection_path=projection_path,
+        candidate_verifier=verifier,  # type: ignore[arg-type]
+    )
+
+    result = await service.run(max_cycles=1, start_campaign=False)
+
+    assert verifier.calls == 1
+    assert supervisor.accepted == [acceptance]
+    assert result.snapshot.accepted_task_ids == ("candidate-task",)
+    projection = read_campaign_projection(projection_path)
+    assert projection is not None
+    assert projection["accepted_task_ids"] == ["candidate-task"]
+
+
+@pytest.mark.asyncio
+async def test_verifier_submission_is_fenced_but_terminal_wait_is_not(
+    tmp_path: Path,
+) -> None:
+    gate_path = tmp_path / "campaign.control.lock"
+    submitted = asyncio.Event()
+    terminal = asyncio.Event()
+
+    class _FencedVerifier:
+        async def reconcile(self, snapshot, *, effect_ready):
+            probe = CampaignControlGate(gate_path)
+            assert probe.try_acquire() is False
+            effect_ready()
+            submitted.set()
+            await terminal.wait()
+            return CandidateReconcileOutcome("blocked", task_id="candidate-task")
+
+    service = CampaignService(
+        _AutomaticSupervisor(),  # type: ignore[arg-type]
+        lock_path=tmp_path / "campaign.lock",
+        control_gate_path=gate_path,
+        projection_path=tmp_path / "status.json",
+        candidate_verifier=_FencedVerifier(),  # type: ignore[arg-type]
+    )
+    run = asyncio.create_task(service.run(max_cycles=1, start_campaign=False))
+    await asyncio.wait_for(submitted.wait(), timeout=1)
+
+    stop_probe = CampaignControlGate(gate_path)
+    for _ in range(100):
+        if stop_probe.try_acquire():
+            break
+        await asyncio.sleep(0.001)
+    else:
+        pytest.fail("control gate remained held until verifier terminal")
+    stop_probe.release()
+    terminal.set()
+    result = await asyncio.wait_for(run, timeout=1)
+
+    assert result.completed_cycles == 1
+
+
+@pytest.mark.asyncio
+async def test_activation_barrier_precedes_every_cycle_and_provider_effect(
+    tmp_path: Path,
+) -> None:
+    verifier = _AutomaticVerifier(object())
+    admitted = False
+
+    async def barrier() -> None:
+        nonlocal admitted
+        admitted = True
+
+    class _OrderedSupervisor(_AutomaticSupervisor):
+        async def cycle(self, *, writer_lock_held: bool):
+            assert admitted is True
+            return await super().cycle(writer_lock_held=writer_lock_held)
+
+    service = CampaignService(
+        _OrderedSupervisor(),  # type: ignore[arg-type]
+        lock_path=tmp_path / "campaign.lock",
+        projection_path=tmp_path / "status.json",
+        activation_barrier=barrier,
+        candidate_verifier=verifier,  # type: ignore[arg-type]
+    )
+    await service.run(max_cycles=1, start_campaign=False)
+    assert verifier.calls == 1
+
+    class _ForbiddenBarrier:
+        async def __call__(self) -> None:
+            raise CampaignProjectionError("observer health is not accepted")
+
+    blocked_supervisor = _AutomaticSupervisor()
+    blocked_verifier = _AutomaticVerifier(object())
+    blocked = CampaignService(
+        blocked_supervisor,  # type: ignore[arg-type]
+        lock_path=tmp_path / "blocked.lock",
+        projection_path=tmp_path / "blocked.json",
+        activation_barrier=_ForbiddenBarrier(),
+        candidate_verifier=blocked_verifier,  # type: ignore[arg-type]
+    )
+    with pytest.raises(CampaignProjectionError, match="not accepted"):
+        await blocked.run(max_cycles=1, start_campaign=False)
+    assert blocked_verifier.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_operator_reconciliation_under_gate_pauses_all_effect_lanes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    gate_path = tmp_path / "campaign.control.lock"
+
+    class _Callbacks:
+        def __init__(self, *, apply) -> None:
+            self.apply = apply
+
+    adapter = types.ModuleType("dharma_swarm.mission_control_operator_control")
+    adapter.SupervisorControlCallbacks = _Callbacks  # type: ignore[attr-defined]
+    monkeypatch.setitem(
+        sys.modules,
+        "dharma_swarm.mission_control_operator_control",
+        adapter,
+    )
+
+    class _PausedSupervisor:
+        config = _Config()
+
+        def __init__(self) -> None:
+            self.paused = False
+            self.cycles = 0
+
+        async def apply_operator_control(self, request, login, envelope):
+            events.append(f"apply:{request}:{login}:{envelope}")
+            self.paused = True
+            return object()
+
+        async def effects_enabled(self) -> bool:
+            events.append("effects")
+            return not self.paused
+
+        async def cycle(self, *, writer_lock_held: bool):
+            assert writer_lock_held is True
+            events.append("cycle")
+            self.cycles += 1
+            return _Snapshot(
+                datetime.now(timezone.utc),
+                campaign_status="paused",
+                candidate_task_ids=("candidate-task",),
+            )
+
+    class _Reconciler:
+        async def reconcile_once(self, callbacks):
+            probe = CampaignControlGate(gate_path)
+            assert probe.try_acquire() is False
+            events.append("control")
+            await callbacks.apply("request", "login", "sha256:" + "a" * 64)
+
+    barrier_calls = 0
+
+    async def barrier() -> None:
+        nonlocal barrier_calls
+        barrier_calls += 1
+
+    verifier = _AutomaticVerifier(object())
+    supervisor = _PausedSupervisor()
+    service = CampaignService(
+        supervisor,  # type: ignore[arg-type]
+        lock_path=tmp_path / "campaign.lock",
+        control_gate_path=gate_path,
+        projection_path=tmp_path / "status.json",
+        activation_barrier=barrier,
+        candidate_verifier=verifier,  # type: ignore[arg-type]
+        operator_control_reconciler=_Reconciler(),
+    )
+
+    result = await service.run(max_cycles=1, start_campaign=False)
+
+    assert result.snapshot.campaign_status == "paused"
+    assert events == [
+        "control",
+        "apply:request:login:sha256:" + "a" * 64,
+        "effects",
+        "cycle",
+    ]
+    assert barrier_calls == 0
+    assert verifier.calls == 0
+
+
+@pytest.mark.asyncio
 async def test_cancelled_control_gate_waiter_never_leaks_lock(tmp_path: Path) -> None:
     gate_path = tmp_path / "campaign.control.lock"
     owner = CampaignControlGate(gate_path)
@@ -453,9 +764,22 @@ def test_cli_start_rejects_nonfinite_timeouts_before_side_effects(
     tmp_path: Path,
     field: str,
 ) -> None:
+    campaign_cli = _campaign_cli()
     state_dir = tmp_path / "uncreated-state"
     args = campaign_cli.build_parser().parse_args(
-        ["start", "--state-dir", str(state_dir), "--mission-id", "mission-alpha"]
+        [
+            "start",
+            "--state-dir",
+            str(state_dir),
+            "--mission-id",
+            "mission-alpha",
+            "--authority-manifest",
+            str(tmp_path / "authority.json"),
+            "--observed-input-manifest",
+            str(tmp_path / "observed-inputs.json"),
+            "--held-out-oracle-manifest",
+            str(tmp_path / "held-out-oracle.json"),
+        ]
     )
     setattr(args, field, float("nan"))
 
@@ -469,6 +793,7 @@ def test_cli_start_rejects_nonfinite_timeouts_before_side_effects(
 
 
 def test_campaign_paths_are_pairwise_distinct(tmp_path: Path) -> None:
+    campaign_cli = _campaign_cli()
     same = tmp_path / "same"
     with pytest.raises(ValueError, match="must differ"):
         campaign_cli.CampaignPaths(same, same, tmp_path / "status", tmp_path / "log")

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+from types import SimpleNamespace
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
@@ -51,6 +53,85 @@ from dharma_swarm.task_board import TaskBoard
 
 MISSION_ID = "mission-alpha"
 OWNER_SESSION_ID = "owner-session-alpha"
+
+
+def _typed_campaign_metadata(principal: str, task_id: str) -> dict[str, Any]:
+    portfolio = "sha256:" + "a" * 64
+    goal = "sha256:" + "b" * 64
+    content = "Observed execution fixture; verify independently.\n"
+    content_sha256 = "sha256:" + hashlib.sha256(content.encode()).hexdigest()
+    observed_manifest = "sha256:" + "3" * 64
+    observed_ref = {
+        "receipt_id": "observed-receipt-fixture",
+        "receipt_sha256": "sha256:" + "4" * 64,
+        "artifact_id": "observed-artifact-fixture",
+        "artifact_record_sha256": "sha256:" + "5" * 64,
+        "content_sha256": content_sha256,
+    }
+    return {
+        "campaign_id": MISSION_ID,
+        "goal_id": "goal-one",
+        "portfolio_contract_sha256": portfolio,
+        "goal_contract_sha256": goal,
+        "attempt_ceiling": 3,
+        "attempt_generation": 0,
+        "mission_task_id": task_id,
+        "mission_observed_input": {
+            "schema_version": "dharma.sadhana.observed_input_prompt.v1",
+            "campaign_id": MISSION_ID,
+            "mission_id": MISSION_ID,
+            "goal_id": "goal-one",
+            "task_id": task_id,
+            "manifest_digest": observed_manifest,
+            "goal_contract_sha256": goal,
+            "task_creation_hash": "6" * 64,
+            "observed_at": "2026-08-23T00:00:00+00:00",
+            "epistemic_state": "observed_unverified",
+            "authority_scope": "prompt_context_only",
+            "media_type": "text/markdown; charset=utf-8",
+            "content": content,
+            "content_sha256": content_sha256,
+            "observed_input_ref": observed_ref,
+        },
+        "campaign_effect_mode": "read_only",
+        "requires_tooling": False,
+        "allow_provider_routing": False,
+        "provider_allowlist": ["local"],
+        "preferred_provider": "local",
+        "preferred_model": "fixture-model",
+        "mission_campaign_authority": {
+            "schema_version": "dharma.sadhana.campaign_task_authority.v4",
+            "campaign_id": MISSION_ID,
+            "mission_id": MISSION_ID,
+            "goal_id": "goal-one",
+            "portfolio_contract_sha256": portfolio,
+            "goal_contract_sha256": goal,
+            "manifest_digest": "sha256:" + "c" * 64,
+            "agent_roster_sha256": "d" * 64,
+            "effect_mode": "read_only",
+            "campaign_end": "2026-09-02T00:00:00+00:00",
+            "agent_name": "campaign-seat",
+            "claimed_principal": principal,
+            "dispatch_key": "default",
+            "request_id": "request-fixture",
+            "workspace_path": "workspaces/goal-one",
+            "allowed_files": ["workspaces/goal-one/**"],
+            "max_usd": 0.0,
+            "authority_ref": "lease-fixture",
+            "authority_digest": "sha256:" + "e" * 64,
+            "attempt_generation": 0,
+            "max_attempts": 3,
+            "observed_input_manifest_digest": observed_manifest,
+            "held_out_oracle_manifest_digest": "sha256:" + "7" * 64,
+            "operator_control_semantics_sha256": "sha256:" + "8" * 64,
+            "operator_control_authority_binding_sha256": "sha256:" + "9" * 64,
+            "deployment_authority_topology_sha256": "sha256:" + "0" * 64,
+            "deployment_authority_credential_clarification_sha256": (
+                "sha256:" + "1" * 64
+            ),
+            "observed_input_ref": observed_ref,
+        },
+    }
 DISPATCH_KEY = "default"
 
 
@@ -116,6 +197,15 @@ class _ManyDispatches:
             TaskDispatch(task_id=task.id, agent_id="agent-a", topology=topology),
             TaskDispatch(task_id=task.id, agent_id="agent-b", topology=topology),
         ]
+
+
+class _CapturingDispatch:
+    def __init__(self) -> None:
+        self.kwargs: dict[str, Any] | None = None
+
+    async def dispatch(self, task, topology, **kwargs):
+        self.kwargs = kwargs
+        return []
 
 
 async def _stack(tmp_path: Path):
@@ -462,6 +552,76 @@ async def test_exactly_one_dispatch_result_is_required(tmp_path: Path) -> None:
     with pytest.raises(MissionControlError, match="exactly one"):
         await adapter.dispatch(MISSION_ID, task.task_id)
     assert orchestrator.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_campaign_adapter_requires_verified_exact_principal_before_orchestrator(
+    tmp_path: Path,
+) -> None:
+    board, runtime, control, task_view = await _stack(tmp_path)
+    task = await board.get(task_view.task_id)
+    assert task is not None
+    metadata = {
+        **task.metadata,
+        **_typed_campaign_metadata("campaign-principal", task.id),
+    }
+    await board.update_task(task.id, metadata=metadata)
+    observer = OrchestratorMissionAdapter(
+        _NoDispatch(),  # type: ignore[arg-type]
+        control,
+        board,
+        runtime,
+    )
+    supervisor = CampaignSupervisor(
+        CampaignConfig(MISSION_ID),
+        control,
+        board,
+        runtime,
+        observer,
+    )
+    await supervisor.start()
+    orchestrator = _CapturingDispatch()
+    adapter = OrchestratorMissionAdapter(
+        orchestrator,  # type: ignore[arg-type]
+        control,
+        board,
+        runtime,
+    )
+
+    with pytest.raises(MissionControlError, match="exact authenticated principal"):
+        await adapter.dispatch(MISSION_ID, task.id)
+    assert orchestrator.kwargs is None
+
+    with pytest.raises(MissionControlError, match="exactly one"):
+        await adapter.dispatch(
+            MISSION_ID,
+            task.id,
+            authenticated_principal_id="campaign-principal",
+            attempt_generation=0,
+        )
+
+    assert orchestrator.kwargs is not None
+    assert orchestrator.kwargs["authenticated_principal_id"] == "campaign-principal"
+    fence = orchestrator.kwargs["campaign_effect_fence"]
+    assert callable(fence)
+    await fence()
+    request = SimpleNamespace(
+        action=SimpleNamespace(value="pause"),
+        request_id="pause-request",
+        idempotency_key="pause-key",
+        issued_at="2026-08-23T00:00:00Z",
+        expires_at="2026-08-23T00:02:00Z",
+        reason="operator pause fixture",
+        validate_time_window=lambda *, now=None: None,
+    )
+    result = await supervisor.apply_operator_control_result(
+        request,
+        "operator@example.test",
+        "sha256:" + "a" * 64,
+    )
+    assert result.status == "applied"
+    with pytest.raises(MissionControlError, match="control position changed"):
+        await fence()
 
 
 @pytest.mark.asyncio

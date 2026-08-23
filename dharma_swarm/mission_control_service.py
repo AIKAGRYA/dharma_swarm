@@ -23,6 +23,10 @@ from dharma_swarm.mission_control_campaign import (
     CampaignSnapshot,
     CampaignSupervisor,
 )
+from dharma_swarm.mission_control_auto_verifier import (
+    AutomaticCandidateVerifier,
+    CandidateReconcileOutcome,
+)
 
 CAMPAIGN_PROJECTION_SCHEMA_VERSION = "dharma.mission_control.read_model.v1"
 CAMPAIGN_WRITER_IDENTITY_SCHEMA_VERSION = "dharma.mission_control.writer.v1"
@@ -35,6 +39,31 @@ class CampaignWriterBusy(RuntimeError):
 
 class CampaignProjectionError(RuntimeError):
     """Raised when the derived projection cannot be decoded safely."""
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignPaths:
+    """Pairwise-distinct filesystem surfaces for one campaign process."""
+
+    lock_path: Path
+    control_gate_path: Path
+    projection_path: Path
+    log_path: Path
+
+    def __post_init__(self) -> None:
+        resolved = {
+            path.expanduser().resolve(strict=False)
+            for path in (
+                self.lock_path,
+                self.control_gate_path,
+                self.projection_path,
+                self.log_path,
+            )
+        }
+        if len(resolved) != 4:
+            raise ValueError(
+                "campaign lock, control, projection, and log paths must differ"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,7 +239,11 @@ def read_writer_lock_identity(path: Path | str) -> dict[str, Any] | None:
     ):
         return None
     generation = payload.get("generation")
-    if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+    if (
+        isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 1
+    ):
         return None
     return payload
 
@@ -237,8 +270,7 @@ def _projection_payload(snapshot: CampaignSnapshot) -> dict[str, Any]:
     ):
         raise CampaignProjectionError("projection freshness must be from 0 to 3600")
     fresh_until = (
-        snapshot.latest_cycle_at
-        + timedelta(seconds=freshness)
+        snapshot.latest_cycle_at + timedelta(seconds=freshness)
         if snapshot.latest_cycle_at is not None
         else None
     )
@@ -276,7 +308,9 @@ def publish_campaign_projection(
         for field in ("mission_id", "config_digest", "generation", "cycle_sequence")
     ):
         if "mission_snapshot" not in previous:
-            raise CampaignProjectionError("equal-position projection has no mission snapshot")
+            raise CampaignProjectionError(
+                "equal-position projection has no mission snapshot"
+            )
         payload["mission_snapshot"] = previous["mission_snapshot"]
         payload["projection_content_digest"] = _projection_content_digest(payload)
     encoded = (
@@ -338,7 +372,9 @@ def read_campaign_projection(path: Path | str) -> dict[str, Any] | None:
     try:
         expected_digest = _projection_content_digest(payload)
     except (TypeError, ValueError) as exc:
-        raise CampaignProjectionError("campaign projection is not canonical JSON") from exc
+        raise CampaignProjectionError(
+            "campaign projection is not canonical JSON"
+        ) from exc
     if payload.get("projection_content_digest") != expected_digest:
         raise CampaignProjectionError("campaign projection content digest is invalid")
     return payload
@@ -435,8 +471,7 @@ def materialize_projection_liveness(
         == CAMPAIGN_WRITER_IDENTITY_SCHEMA_VERSION
         and writer_lock_identity.get("mission_id") == projection.get("mission_id")
         and writer_lock_identity.get("session_id") == projection.get("session_id")
-        and writer_lock_identity.get("config_digest")
-        == projection.get("config_digest")
+        and writer_lock_identity.get("config_digest") == projection.get("config_digest")
         and writer_lock_identity.get("generation") == projection.get("generation")
     )
     if not identity_matches:
@@ -487,6 +522,9 @@ class CampaignService:
         control_gate_path: Path | str | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         writer_lock: CampaignWriterLock | None = None,
+        candidate_verifier: AutomaticCandidateVerifier | None = None,
+        activation_barrier: Callable[[], Awaitable[None]] | None = None,
+        operator_control_reconciler: Any | None = None,
     ) -> None:
         self._supervisor = supervisor
         self.lock_path = Path(lock_path).expanduser()
@@ -499,13 +537,71 @@ class CampaignService:
             for path in (self.lock_path, self.control_gate_path, self.projection_path)
         }
         if len(resolved_paths) != 3:
-            raise ValueError("lock, control gate, and projection paths must be different")
+            raise ValueError(
+                "lock, control gate, and projection paths must be different"
+            )
         self._sleep = sleep
         self._control_gate = CampaignControlGate(self.control_gate_path)
         self._lock = writer_lock or CampaignWriterLock(self.lock_path)
+        self._candidate_verifier = candidate_verifier
+        self._activation_barrier = activation_barrier
+        self._operator_control_reconciler = operator_control_reconciler
         if self._lock.path.absolute() != self.lock_path.absolute():
             raise ValueError("writer_lock must own lock_path")
         self._running = False
+
+    async def _reconcile_operator_controls(self) -> None:
+        if self._operator_control_reconciler is None:
+            return
+        from dharma_swarm.mission_control_operator_control import (  # noqa: PLC0415
+            SupervisorControlCallbacks,
+        )
+
+        await self._operator_control_reconciler.reconcile_once(
+            SupervisorControlCallbacks(apply=self._supervisor.apply_operator_control)
+        )
+
+    async def _effects_enabled(self) -> bool:
+        probe = getattr(self._supervisor, "effects_enabled", None)
+        if probe is None:
+            return True
+        enabled = await probe()
+        if not isinstance(enabled, bool):
+            raise RuntimeError(
+                "campaign effects-enabled probe returned a foreign value"
+            )
+        return enabled
+
+    async def _begin_candidate_reconcile(
+        self,
+        snapshot: CampaignSnapshot,
+    ) -> tuple[
+        CandidateReconcileOutcome | None,
+        asyncio.Task[CandidateReconcileOutcome] | None,
+    ]:
+        """Reach durable verifier intent/effect submission while fenced by control."""
+        if self._candidate_verifier is None or not snapshot.candidate_task_ids:
+            return None, None
+        ready = asyncio.Event()
+        task = asyncio.create_task(
+            self._candidate_verifier.reconcile(snapshot, effect_ready=ready.set)
+        )
+        ready_waiter = asyncio.create_task(ready.wait())
+        try:
+            done, _ = await asyncio.wait(
+                (task, ready_waiter),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if task in done:
+                return task.result(), None
+            return None, task
+        finally:
+            if not ready_waiter.done():
+                ready_waiter.cancel()
+            try:
+                await ready_waiter
+            except asyncio.CancelledError:
+                pass
 
     @property
     def writer_lock_held(self) -> bool:
@@ -540,8 +636,42 @@ class CampaignService:
                 async with self._control_gate:
                     await self._supervisor.start()
             while max_cycles is None or completed_cycles < max_cycles:
+                outcome: CandidateReconcileOutcome | None = None
+                pending_verifier: asyncio.Task[CandidateReconcileOutcome] | None = None
                 async with self._control_gate:
+                    await self._reconcile_operator_controls()
+                    effects_enabled = await self._effects_enabled()
+                    if effects_enabled and self._activation_barrier is not None:
+                        await self._activation_barrier()
                     snapshot = await self._supervisor.cycle(writer_lock_held=True)
+                    if effects_enabled and snapshot.campaign_status == "active":
+                        (
+                            outcome,
+                            pending_verifier,
+                        ) = await self._begin_candidate_reconcile(snapshot)
+                if pending_verifier is not None:
+                    outcome = await pending_verifier
+                if outcome is not None:
+                    reconcile_errors = (
+                        snapshot.errors
+                        + (
+                            f"verify:{outcome.task_id}:{outcome.status}:{outcome.error}",
+                        )
+                        if outcome.error
+                        else snapshot.errors
+                    )
+                    if outcome.acceptance is not None:
+                        async with self._control_gate:
+                            try:
+                                await self._supervisor.accept(outcome.acceptance)
+                            except Exception as exc:
+                                reconcile_errors += (
+                                    f"accept:{outcome.task_id}:{type(exc).__name__}:{exc}",
+                                )
+                            snapshot = await self._supervisor.status(
+                                writer_lock_held=True
+                            )
+                    snapshot = replace(snapshot, errors=reconcile_errors)
                 self._lock.bind(snapshot)
                 publish_campaign_projection(snapshot, self.projection_path)
                 completed_cycles += 1
@@ -579,6 +709,7 @@ __all__ = [
     "CAMPAIGN_WRITER_IDENTITY_SCHEMA_VERSION",
     "MAX_CAMPAIGN_PROJECTION_BYTES",
     "CampaignProjectionError",
+    "CampaignPaths",
     "CampaignControlGate",
     "CampaignService",
     "CampaignServiceResult",

@@ -99,7 +99,7 @@ class _Executor:
     def __init__(self, ref: Any) -> None:
         self.ref = ref
         self.calls = 0
-        self.arguments: list[tuple[str, str, str]] = []
+        self.arguments: list[tuple[str, str, str, str]] = []
 
     async def dispatch(
         self,
@@ -107,9 +107,12 @@ class _Executor:
         task_id: str,
         *,
         dispatch_key: str = "default",
+        authenticated_principal_id: str = "",
     ) -> Any:
         self.calls += 1
-        self.arguments.append((mission_id, task_id, dispatch_key))
+        self.arguments.append(
+            (mission_id, task_id, dispatch_key, authenticated_principal_id)
+        )
         return self.ref
 
 
@@ -155,7 +158,7 @@ def _owner_ref(task_id: str) -> OwnerExecutionRef:
         dispatch_key=DISPATCH_KEY,
         run_id=stable_id("fixture_run", MISSION_ID, task_id, DISPATCH_KEY),
         claim_id=stable_id("fixture_claim", MISSION_ID, task_id, DISPATCH_KEY),
-        agent_id="fixture-agent",
+        agent_id=PRINCIPAL,
         idempotency_key=stable_id(
             "fixture_dispatch", MISSION_ID, task_id, DISPATCH_KEY
         ),
@@ -1086,8 +1089,8 @@ async def test_owner_retry_repeats_all_gates_without_membrane_cache(
     assert case.verifier.calls == 4
     assert case.executor.calls == 2
     assert case.executor.arguments == [
-        (MISSION_ID, case.request.task_id, DISPATCH_KEY),
-        (MISSION_ID, case.request.task_id, DISPATCH_KEY),
+        (MISSION_ID, case.request.task_id, DISPATCH_KEY, PRINCIPAL),
+        (MISSION_ID, case.request.task_id, DISPATCH_KEY, PRINCIPAL),
     ]
 
 
@@ -1148,6 +1151,24 @@ async def test_foreign_owner_reference_is_rejected_after_one_owner_call(
             case.admission,
             case.authority,
         )
+    assert case.executor.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_owner_agent_identity_substitution_is_rejected(
+    tmp_path: Path,
+) -> None:
+    case = await _case(tmp_path)
+    case.executor.ref = replace(case.executor.ref, agent_id="substitute-agent")
+
+    with pytest.raises(MissionControlError, match="authenticated principal"):
+        await case.dispatcher.dispatch(
+            case.request,
+            case.governed,
+            case.admission,
+            case.authority,
+        )
+
     assert case.executor.calls == 1
 
 

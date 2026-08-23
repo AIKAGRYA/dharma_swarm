@@ -186,40 +186,52 @@ def _utc_timestamp(value: object, label: str) -> datetime:
 def _secure_manifest_read(path: Path) -> bytes:
     if not path.is_absolute():
         raise CampaignRosterError("roster manifest path must be absolute")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if nofollow is None or directory is None:
+        raise CampaignRosterError(
+            "roster manifest requires O_NOFOLLOW and O_DIRECTORY support"
+        )
+    directory_flags = (
+        os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+    )
+    parent_descriptor = os.open(os.path.sep, directory_flags)
     try:
-        parent = path.parent.resolve(strict=True)
+        for component in path.parent.parts[1:]:
+            if component in {"", ".", ".."}:
+                raise CampaignRosterError("roster manifest path component is invalid")
+            child = os.open(component, directory_flags, dir_fd=parent_descriptor)
+            os.close(parent_descriptor)
+            parent_descriptor = child
+        parent_identity = os.fstat(parent_descriptor)
     except OSError as exc:
+        os.close(parent_descriptor)
         raise CampaignRosterError("roster manifest parent is unavailable") from exc
-    if parent != path.parent:
-        raise CampaignRosterError("roster manifest parent must not traverse symlinks")
-    try:
-        parent_identity = parent.stat()
-        entry = path.lstat()
-    except OSError as exc:
-        raise CampaignRosterError("roster manifest cannot be inspected") from exc
+    except BaseException:
+        os.close(parent_descriptor)
+        raise
     if (
         not stat.S_ISDIR(parent_identity.st_mode)
         or parent_identity.st_uid not in {0, os.geteuid()}
         or stat.S_IMODE(parent_identity.st_mode) & 0o022
     ):
+        os.close(parent_descriptor)
         raise CampaignRosterError("roster manifest parent lacks private custody")
-    if (
-        not stat.S_ISREG(entry.st_mode)
-        or entry.st_uid != os.geteuid()
-        or stat.S_IMODE(entry.st_mode) != 0o600
-        or entry.st_nlink != 1
-        or not 0 < entry.st_size <= _MAX_ROSTER_BYTES
-    ):
-        raise CampaignRosterError(
-            "roster manifest must be one bounded same-uid mode-0600 regular file"
-        )
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | nofollow
     descriptor: int | None = None
     try:
-        descriptor = os.open(path, flags)
+        descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
         before = os.fstat(descriptor)
-        if (before.st_dev, before.st_ino) != (entry.st_dev, entry.st_ino):
-            raise CampaignRosterError("roster manifest identity changed before read")
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.geteuid()
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_nlink != 1
+            or not 0 < before.st_size <= _MAX_ROSTER_BYTES
+        ):
+            raise CampaignRosterError(
+                "roster manifest must be one bounded same-uid mode-0600 regular file"
+            )
         chunks: list[bytes] = []
         remaining = _MAX_ROSTER_BYTES + 1
         while remaining:
@@ -254,6 +266,7 @@ def _secure_manifest_read(path: Path) -> bytes:
     finally:
         if descriptor is not None:
             os.close(descriptor)
+        os.close(parent_descriptor)
 
 
 def load_campaign_agent_roster(

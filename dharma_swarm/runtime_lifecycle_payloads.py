@@ -68,6 +68,13 @@ def runtime_metadata(
         "max_retries": td.metadata.get("max_retries", 0),
         "claim_timeout_seconds": td.metadata.get("claim_timeout_seconds", 0),
     }
+    generation = td.metadata.get("attempt_generation")
+    if (
+        isinstance(generation, int)
+        and not isinstance(generation, bool)
+        and generation >= 0
+    ):
+        metadata["attempt_generation"] = generation
     if failure_code:
         metadata["failure_code"] = failure_code
     if error:

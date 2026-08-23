@@ -16,6 +16,8 @@ from dharma_swarm.operator_core.governed_work_admission import GovernedWorkAdmis
 from dharma_swarm.operator_core.reversibility_gate import ActionClass, classify_action
 from dharma_swarm.task_board import TaskBoard
 DISPATCH_SCHEMA_VERSION = "dharma.mission_control.dispatch.v1"
+CAMPAIGN_DISPATCH_SCHEMA_VERSION = "dharma.mission_control.dispatch.v2"
+CAMPAIGN_LEASE_SCHEMA_VERSION = "dharma.sadhana.campaign_execution_lease.v4"
 LEASE_DISPATCH_ACTION = "mission_control_dispatch"
 LEASE_WORKSPACE_ACTION = "mission_control_workspace"
 GOVERNANCE_METADATA_KEY = "mission_control_governance"
@@ -29,13 +31,35 @@ class MissionDispatchRequest:
     task_id: str
     dispatch_key: str
     claimed_principal: str
+    attempt_generation: int | None = None
     @classmethod
-    def new(cls, mission_id: str, task_id: str, *, dispatch_key: str = "default", claimed_principal: str) -> MissionDispatchRequest:
+    def new(cls, mission_id: str, task_id: str, *, dispatch_key: str = "default",
+            claimed_principal: str,
+            attempt_generation: int | None = None) -> MissionDispatchRequest:
         mission_id = clean_identifier(mission_id, "mission_id")
         task_id = clean_identifier(task_id, "task_id")
         dispatch_key = clean_identifier(dispatch_key, "dispatch_key")
         principal = clean_identifier(claimed_principal, "claimed_principal")
-        return cls(stable_id("mission_dispatch", mission_id, task_id, dispatch_key), mission_id, task_id, dispatch_key, principal)
+        _need(
+            attempt_generation is None
+            or (
+                isinstance(attempt_generation, int)
+                and not isinstance(attempt_generation, bool)
+                and attempt_generation >= 0
+            ),
+            "attempt_generation must be absent or a nonnegative integer",
+        )
+        identity_parts = ["mission_dispatch", mission_id, task_id, dispatch_key]
+        if attempt_generation is not None:
+            identity_parts.append(str(attempt_generation))
+        return cls(
+            stable_id(*identity_parts),
+            mission_id,
+            task_id,
+            dispatch_key,
+            principal,
+            attempt_generation,
+        )
 @dataclass(frozen=True, slots=True)
 class GovernanceAdmission:
     subject_id: str
@@ -54,6 +78,7 @@ class DispatchAuthorityEnvelope:
     dispatch_key: str
     authority_ref: str
     authority_digest: str
+    attempt_generation: int | None = None
 @dataclass(frozen=True, slots=True)
 class VerifiedDispatchAuthority:
     authenticated_principal: str
@@ -64,6 +89,7 @@ class VerifiedDispatchAuthority:
     authority_digest: str
     execution_lease: Mapping[str, Any]
     revoked_lease_ids: tuple[str, ...] = ()
+    attempt_generation: int | None = None
 @dataclass(frozen=True, slots=True)
 class AuthorizedDispatch:
     request: MissionDispatchRequest
@@ -77,7 +103,15 @@ class AuthorizedDispatch:
 class AuthorityVerifier(Protocol):
     async def verify(self, envelope: DispatchAuthorityEnvelope, *, request: MissionDispatchRequest, admission: GovernanceAdmission) -> VerifiedDispatchAuthority: ...
 class DispatchExecutor(Protocol):
-    async def dispatch(self, mission_id: str, task_id: str, *, dispatch_key: str = "default") -> OwnerExecutionRef: ...
+    async def dispatch(
+        self,
+        mission_id: str,
+        task_id: str,
+        *,
+        dispatch_key: str = "default",
+        authenticated_principal_id: str = "",
+        attempt_generation: int | None = None,
+    ) -> OwnerExecutionRef: ...
 AdmissionEvaluator = Callable[[GovernedWorkRequest], GovernedWorkAdmission]
 @dataclass(frozen=True, slots=True)
 class _DispatchBinding:
@@ -128,7 +162,17 @@ def _contract_paths(contract: Mapping[str, Any], stem: str) -> list[str]:
     return checked_files if checked_files is not None else (checked_paths or [])
 def _work_kind(encoded: str, metadata: Mapping[str, Any], contract: Mapping[str, Any]) -> WorkKind:
     words = set(re.findall(r"[a-z_]+", encoded.lower()))
-    inferred = WorkKind.LONG_RUNNING
+    sarathi = metadata.get("mission_control_sarathi")
+    candidates = (
+        contract.get("work_kind"),
+        metadata.get("work_kind"),
+        sarathi.get("work_kind") if isinstance(sarathi, Mapping) else None,
+    )
+    inferred = (
+        WorkKind.READ_ONLY
+        if WorkKind.READ_ONLY.value in candidates
+        else WorkKind.LONG_RUNNING
+    )
     if {"self_evolution", "selfevolution"} & words or {"self", "evolution"} <= words:
         inferred = WorkKind.SELF_EVOLUTION
     elif {"promotion", "merge"} & words:
@@ -136,12 +180,6 @@ def _work_kind(encoded: str, metadata: Mapping[str, Any], contract: Mapping[str,
     elif _CODE_WORDS & words:
         inferred = WorkKind.CODE_WRITE
     declared: list[WorkKind] = [inferred]
-    sarathi = metadata.get("mission_control_sarathi")
-    candidates = (
-        contract.get("work_kind"),
-        metadata.get("work_kind"),
-        sarathi.get("work_kind") if isinstance(sarathi, Mapping) else None,
-    )
     for raw in candidates:
         if raw not in (None, ""):
             try:
@@ -182,10 +220,28 @@ def _task_payload(request: MissionDispatchRequest, task: Task) -> dict[str, Any]
     creation_hash = metadata.get("mission_task_creation_hash")
     _need(isinstance(creation_hash, str) and re.fullmatch(r"[0-9a-f]{64}", creation_hash) is not None,
           "task has an invalid canonical creation hash")
-    semantics = {key: metadata[key] for key in
-                 (GOVERNANCE_METADATA_KEY, "mission_control_sarathi") if key in metadata}
-    return {
-        "schema_version": DISPATCH_SCHEMA_VERSION,
+    semantics = {
+        key: metadata[key]
+        for key in (
+            GOVERNANCE_METADATA_KEY,
+            "mission_control_sarathi",
+            "mission_campaign_authority",
+            "mission_observed_input",
+            "campaign_effect_mode",
+            "requires_tooling",
+            "allow_provider_routing",
+            "provider_allowlist",
+            "preferred_provider",
+            "preferred_model",
+        )
+        if key in metadata
+    }
+    payload = {
+        "schema_version": (
+            DISPATCH_SCHEMA_VERSION
+            if request.attempt_generation is None
+            else CAMPAIGN_DISPATCH_SCHEMA_VERSION
+        ),
         "mission_id": request.mission_id,
         "task_id": request.task_id,
         "dispatch_key": request.dispatch_key,
@@ -195,6 +251,31 @@ def _task_payload(request: MissionDispatchRequest, task: Task) -> dict[str, Any]
                  "creation_hash": creation_hash,
                  "semantics": semantics},
     }
+    if request.attempt_generation is not None:
+        payload["attempt_generation"] = request.attempt_generation
+    return payload
+
+
+def _gate_input(
+    request: MissionDispatchRequest,
+    task: Task,
+    payload: Mapping[str, Any],
+) -> str:
+    """Classify campaign work content without treating TCB field names as actions."""
+    if request.attempt_generation is None:
+        return _canonical_json(payload, "canonical dispatch payload")
+    observed = task.metadata.get("mission_observed_input")
+    observed_content = observed.get("content", "") if isinstance(observed, Mapping) else ""
+    return _canonical_json(
+        {
+            "title": task.title,
+            "description": task.description,
+            "observed_content": observed_content,
+        },
+        "campaign action content",
+    )
+
+
 def _governed_request(request: MissionDispatchRequest, payload: Mapping[str, Any], encoded: str, gate_risk: str,
                       workspace: Mapping[str, Any] | None = None) -> GovernedWorkRequest:
     metadata = payload["task"]["semantics"]
@@ -203,10 +284,12 @@ def _governed_request(request: MissionDispatchRequest, payload: Mapping[str, Any
     contract = _copy(dict(raw or {}), "canonical governance contract")
     allowed, forbidden = _contract_paths(contract, "allowed"), _contract_paths(contract, "forbidden")
     task_digest = _digest(payload, "canonical dispatch payload")
-    evidence = {"schema_version": DISPATCH_SCHEMA_VERSION,
+    evidence = {"schema_version": payload["schema_version"],
                 "mission_id": request.mission_id, "task_id": request.task_id,
                 "dispatch_key": request.dispatch_key, "subject_digest": task_digest,
                 "governance_contract_digest": _digest(contract, "governance contract")}
+    if request.attempt_generation is not None:
+        evidence["attempt_generation"] = request.attempt_generation
     if workspace is not None:
         evidence["authenticated_workspace"] = dict(workspace)
     return GovernedWorkRequest(
@@ -275,14 +358,36 @@ class GovernedMissionDispatcher:
         expected = self._admission_from(
             current_final, request, self._evaluate(current_final, require_allow=True))
         _need(final_admission == expected, "final governance admission changed before dispatch")
+        executor_args: dict[str, Any] = {
+            "dispatch_key": request.dispatch_key,
+            "authenticated_principal_id": verified.authenticated_principal,
+        }
+        if request.attempt_generation is not None:
+            executor_args["attempt_generation"] = request.attempt_generation
         execution = await self._executor.dispatch(
-            request.mission_id, request.task_id, dispatch_key=request.dispatch_key
+            request.mission_id,
+            request.task_id,
+            **executor_args,
         )
         _need(type(execution) is OwnerExecutionRef, "owner executor returned an invalid reference type")
         _need(
-            (execution.mission_id, execution.task_id, execution.dispatch_key)
-            == (request.mission_id, request.task_id, request.dispatch_key),
+            (
+                execution.mission_id,
+                execution.task_id,
+                execution.dispatch_key,
+                execution.attempt_generation,
+            )
+            == (
+                request.mission_id,
+                request.task_id,
+                request.dispatch_key,
+                request.attempt_generation,
+            ),
             "owner executor returned a foreign reference",
+        )
+        _need(
+            execution.agent_id == verified.authenticated_principal,
+            "owner executor returned a foreign authenticated principal",
         )
         return AuthorizedDispatch(request, final_admission, verified.authority_ref,
                                   verified.authority_digest, execution)
@@ -350,12 +455,20 @@ class GovernedMissionDispatcher:
         _need(task.metadata.get("schema_version") == SCHEMA_VERSION, "task has a foreign Mission Control schema")
         payload = _task_payload(request, task)
         encoded = _canonical_json(payload, "canonical dispatch payload")
-        gate = classify_action(encoded)
+        gate = classify_action(_gate_input(request, task, payload))
         _need(
             not gate.never_auto_hit and gate.action_class not in {ActionClass.IRREVERSIBLE, ActionClass.OPERATOR_ONLY},
             "canonical dispatch payload is not eligible for autonomous execution",
         )
-        subject_id = stable_id("mission_dispatch_subject", request.mission_id, request.task_id, request.dispatch_key)
+        subject_parts = [
+            "mission_dispatch_subject",
+            request.mission_id,
+            request.task_id,
+            request.dispatch_key,
+        ]
+        if request.attempt_generation is not None:
+            subject_parts.append(str(request.attempt_generation))
+        subject_id = stable_id(*subject_parts)
         canonical = _governed_request(request, payload, encoded, gate.risk.value)
         subject_digest = _digest(payload, "canonical dispatch payload")
         if verified is not None:
@@ -419,16 +532,44 @@ class GovernedMissionDispatcher:
         task_id = _exact_id(request.task_id, "task_id")
         key = _exact_id(request.dispatch_key, "dispatch_key")
         _exact_id(request.claimed_principal, "claimed_principal")
+        generation = request.attempt_generation
+        _need(
+            generation is None
+            or (
+                isinstance(generation, int)
+                and not isinstance(generation, bool)
+                and generation >= 0
+            ),
+            "attempt_generation must be absent or a nonnegative integer",
+        )
         request_id = _exact_id(request.request_id, "request_id")
-        _need(request_id == stable_id("mission_dispatch", mission_id, task_id, key), "request_id is not the stable dispatch identity")
+        identity_parts = ["mission_dispatch", mission_id, task_id, key]
+        if generation is not None:
+            identity_parts.append(str(generation))
+        _need(
+            request_id == stable_id(*identity_parts),
+            "request_id is not the stable dispatch identity",
+        )
     @staticmethod
     def _require_envelope(request: MissionDispatchRequest, authority: DispatchAuthorityEnvelope) -> None:
         _need(type(authority) is DispatchAuthorityEnvelope, "authority has an invalid evidence type")
         _lease_id(authority.authority_ref, "authority_ref")
         _exact_id(authority.authority_digest, "authority_digest")
         _need(
-            (authority.claimed_principal, authority.mission_id, authority.task_id, authority.dispatch_key)
-            == (request.claimed_principal, request.mission_id, request.task_id, request.dispatch_key),
+            (
+                authority.claimed_principal,
+                authority.mission_id,
+                authority.task_id,
+                authority.dispatch_key,
+                authority.attempt_generation,
+            )
+            == (
+                request.claimed_principal,
+                request.mission_id,
+                request.task_id,
+                request.dispatch_key,
+                request.attempt_generation,
+            ),
             "authority envelope conflicts with dispatch identity",
         )
     @staticmethod
@@ -442,6 +583,12 @@ class GovernedMissionDispatcher:
             == (request.claimed_principal, request.mission_id, request.task_id,
                 request.dispatch_key, authority.authority_ref, authority.authority_digest),
             "verified dispatch authority conflicts with the presented envelope",
+        )
+        _need(
+            verified.attempt_generation
+            == authority.attempt_generation
+            == request.attempt_generation,
+            "verified dispatch authority has a foreign attempt generation",
         )
     @staticmethod
     def _workspace_evidence(request: GovernedWorkRequest, verified: VerifiedDispatchAuthority) -> dict[str, Any]:
@@ -472,6 +619,10 @@ class GovernedMissionDispatcher:
         _need(lease.get("issued_to") == request.claimed_principal, "verified execution lease principal conflicts")
         _need(lease.get("task_id") == request.task_id, "verified execution lease task conflicts")
         _need(lease.get("correlation_id") == request.request_id, "verified execution lease correlation conflicts")
+        _need(
+            lease.get("attempt_generation") == request.attempt_generation,
+            "verified execution lease attempt generation conflicts",
+        )
         allowed, forbidden = lease.get("allowed_actions"), lease.get("forbidden_actions")
         _need(not isinstance(allowed, (str, bytes)) and isinstance(allowed, Sequence), "verified execution lease actions are invalid")
         _need(not isinstance(forbidden, (str, bytes)) and isinstance(forbidden, Sequence), "verified execution lease prohibitions are invalid")
@@ -496,3 +647,34 @@ class GovernedMissionDispatcher:
         )
         issued_at = parse_time(lease.get("issued_at"))
         _need(issued_at is not None and issued_at <= utc_now(), "verified execution lease is not yet valid")
+        if lease.get("campaign_authority_schema") == CAMPAIGN_LEASE_SCHEMA_VERSION:
+            _need(
+                lease.get("effect_mode") == "read_only",
+                "write-capable campaign execution lacks an enforced workspace sandbox",
+            )
+            _need(
+                list(allowed) == [LEASE_DISPATCH_ACTION, LEASE_WORKSPACE_ACTION],
+                "campaign execution lease actions are not exact",
+            )
+            budget = lease.get("budget")
+            _need(isinstance(budget, Mapping), "campaign execution lease budget is invalid")
+            max_usd = budget.get("max_usd")
+            _need(
+                not isinstance(max_usd, bool)
+                and isinstance(max_usd, (int, float))
+                and max_usd == 0,
+                "campaign execution lease must be zero-dollar",
+            )
+            _need(
+                lease.get("campaign_id") == request.mission_id
+                and lease.get("mission_id") == request.mission_id,
+                "campaign execution lease identity is foreign",
+            )
+            campaign_end = parse_time(lease.get("campaign_end"))
+            expires_at = parse_time(lease.get("expires_at"))
+            _need(
+                campaign_end is not None
+                and expires_at is not None
+                and expires_at <= campaign_end,
+                "campaign execution lease exceeds the campaign end",
+            )

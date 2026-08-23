@@ -17,18 +17,14 @@ from dharma_swarm.mission_control_contract import (
     MissionSnapshot,
     TaskView,
     clean_identifier,
-    receipt_matches_identity,
     stable_id,
     utc_now,
 )
 from dharma_swarm.mission_control_evidence import (
     ACCEPTANCE_RECEIPT_TYPE,
-    VERIFIER_RESULT_RECEIPT_TYPE,
     IndependentAcceptance,
     canonical_served_models as _canonical_served_models,
     candidate_output_digest,
-    first_text as _first_text,
-    has_text as _has_text,
     json_value as _json_value,
 )
 from dharma_swarm.mission_control_execution import (
@@ -37,6 +33,16 @@ from dharma_swarm.mission_control_execution import (
     OwnerExecutionObservation,
     OwnerExecutionRef,
 )
+from dharma_swarm.mission_control_operator_authority import (
+    CampaignOperatorApplication,
+    CampaignOperatorAuthority,
+    OperatorControlRequestLike,
+)
+from dharma_swarm.mission_control_operator_state import (
+    initial_operator_control_state,
+    validate_operator_control_state,
+)
+from dharma_swarm.mission_control_verifier import CampaignAcceptanceEvidenceVerifier
 from dharma_swarm.models import TaskStatus
 from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore, SessionState
 from dharma_swarm.task_board import TaskBoard
@@ -84,11 +90,16 @@ class CampaignConfig:
         if clean_identifier(self.operator_id, "operator_id") != self.operator_id:
             raise ValueError("operator_id must be canonical")
         if self.canary_task_id and (
-            clean_identifier(self.canary_task_id, "canary_task_id") != self.canary_task_id
+            clean_identifier(self.canary_task_id, "canary_task_id")
+            != self.canary_task_id
         ):
             raise ValueError("canary_task_id must be canonical")
         dispatch_limit = self.max_dispatch_per_cycle
-        if not isinstance(dispatch_limit, int) or isinstance(dispatch_limit, bool) or not 1 <= dispatch_limit <= 100:
+        if (
+            not isinstance(dispatch_limit, int)
+            or isinstance(dispatch_limit, bool)
+            or not 1 <= dispatch_limit <= 100
+        ):
             raise ValueError("max_dispatch_per_cycle must be from 1 to 100")
         for field, value in (
             ("cycle_interval_seconds", self.cycle_interval_seconds),
@@ -141,6 +152,7 @@ class CampaignSnapshot:
     conflicting_acceptance_task_ids: tuple[str, ...]
     canary_acceptance: str
     invalid_acceptance_receipts: int
+    operator_control_state: dict[str, Any]
     errors: tuple[str, ...]
     observed_at: datetime
     authority: str = "TaskBoard+RuntimeStateStore+owner execution projection"
@@ -171,20 +183,61 @@ class CampaignSupervisor:
         self._runtime = runtime_state
         self._owner_reader = owner_reader
         self._dispatcher = dispatcher
+        self._operator_authority = CampaignOperatorAuthority(
+            runtime_state,
+            mission_id=config.mission_id,
+            session_id=config.session_id,
+            config_digest=config.digest,
+        )
+        self._acceptance_evidence = CampaignAcceptanceEvidenceVerifier(
+            runtime_state,
+            mission_id=config.mission_id,
+            session_id=config.session_id,
+            held_out_oracle_digest=config.held_out_oracle_digest,
+        )
 
     async def start(self) -> SessionState:
         if await self._control.get_mission(self.config.mission_id) is None:
-            raise MissionControlError(f"mission {self.config.mission_id!r} was not found")
+            raise MissionControlError(
+                f"mission {self.config.mission_id!r} was not found"
+            )
         now = utc_now()
         existing = await self._runtime.get_session(self.config.session_id)
         if existing is not None:
             recorded = str(existing.metadata.get("config_digest") or "")
-            if recorded and recorded != self.config.digest:
-                raise MissionControlError("campaign already exists with conflicting config")
-            generation = self._session_generation(existing) + 1
-            created_at = existing.created_at
-            if now <= existing.updated_at:
-                now = existing.updated_at + timedelta(microseconds=1)
+            if recorded != self.config.digest:
+                raise MissionControlError(
+                    "campaign already exists with conflicting config"
+                )
+            self._session_generation(existing)
+            if (
+                existing.status in {"active", "paused"}
+                and existing.metadata.get("stop_requested") is False
+            ):
+                if existing.status == "paused":
+                    raw_state = existing.metadata.get("operator_control_state")
+                    try:
+                        state = validate_operator_control_state(
+                            raw_state,
+                            expected_generation=self._session_generation(existing),
+                        )
+                    except ValueError as exc:
+                        raise MissionControlError(
+                            "paused campaign has invalid control-state evidence"
+                        ) from exc
+                    if state["control_state"] != "PAUSED":
+                        raise MissionControlError(
+                            "paused campaign has conflicting control-state evidence"
+                        )
+                return existing
+            if (
+                existing.status == "stopped"
+                or existing.metadata.get("stop_requested") is True
+            ):
+                raise MissionControlError(
+                    "stopped campaign restart requires separately admitted authority"
+                )
+            raise MissionControlError("campaign session status is invalid")
         else:
             generation = 1
             created_at = now
@@ -202,6 +255,7 @@ class CampaignSupervisor:
                 "last_cycle_receipt_id": "",
                 "stop_requested": False,
                 "started_at": now.isoformat(),
+                "operator_control_state": initial_operator_control_state(generation),
             },
             created_at=created_at,
             updated_at=now,
@@ -226,7 +280,10 @@ class CampaignSupervisor:
 
     async def stop(self) -> SessionState:
         existing = await self._require_campaign_session()
-        if existing.status == "stopped" and existing.metadata.get("stop_requested") is True:
+        if (
+            existing.status == "stopped"
+            and existing.metadata.get("stop_requested") is True
+        ):
             return existing
         now = utc_now()
         if now <= existing.updated_at:
@@ -257,8 +314,13 @@ class CampaignSupervisor:
 
     async def cycle(self, *, writer_lock_held: bool = True) -> CampaignSnapshot:
         session = await self._require_campaign_session()
-        if session.status != "active" or session.metadata.get("stop_requested") is True:
+        if (
+            session.status == "stopped"
+            or session.metadata.get("stop_requested") is True
+        ):
             return await self.status(writer_lock_held=writer_lock_held)
+        if session.status not in {"active", "paused"}:
+            raise MissionControlError("campaign session status is invalid")
         snapshot = await self._require_snapshot()
         errors: list[str] = []
         refs = await self._recover_owner_refs(snapshot, errors)
@@ -268,7 +330,7 @@ class CampaignSupervisor:
         )
         accepted_dependencies = accepted_rows - rejected_rows
         dispatched = 0
-        if self._dispatcher is not None:
+        if self._dispatcher is not None and session.status == "active":
             for task in snapshot.tasks:
                 if dispatched >= self.config.max_dispatch_per_cycle:
                     break
@@ -299,6 +361,41 @@ class CampaignSupervisor:
             errors=tuple(errors),
         )
 
+    async def effects_enabled(self) -> bool:
+        """Return exact dispatch/verifier eligibility for the current generation."""
+        session = await self._require_campaign_session()
+        return bool(
+            session.status == "active"
+            and session.metadata.get("stop_requested") is False
+        )
+
+    async def apply_operator_control_result(
+        self,
+        request: OperatorControlRequestLike,
+        operator_login: str,
+        source_envelope_sha256: str,
+    ) -> CampaignOperatorApplication:
+        """Apply the mobile adapter's verified request without importing transport."""
+        return await self._operator_authority.apply(
+            request,
+            operator_login,
+            source_envelope_sha256,
+        )
+
+    async def apply_operator_control(
+        self,
+        request: OperatorControlRequestLike,
+        operator_login: str,
+        source_envelope_sha256: str,
+    ) -> Any:
+        """Exact three-argument callback consumed by the mobile reconciler."""
+        result = await self.apply_operator_control_result(
+            request,
+            operator_login,
+            source_envelope_sha256,
+        )
+        return result.as_mobile_application()
+
     async def status(self, *, writer_lock_held: bool = False) -> CampaignSnapshot:
         snapshot = await self._require_snapshot()
         errors: list[str] = []
@@ -314,9 +411,17 @@ class CampaignSupervisor:
     async def accept(self, acceptance: IndependentAcceptance) -> RuntimeReceipt:
         if acceptance.mission_id != self.config.mission_id:
             raise MissionControlError("acceptance names a foreign mission")
+        session = await self._require_campaign_session()
+        if session.status != "active" or session.metadata.get("stop_requested") is True:
+            raise MissionControlError("campaign stopped before acceptance promotion")
         task = await self._board.get(acceptance.task_id)
         if task is None or task.metadata.get("mission_id") != self.config.mission_id:
             raise MissionControlError("acceptance task was not found in the mission")
+        if acceptance.accepted and task.metadata.get("goal_id") == "G10_SAFETY_TCB":
+            if acceptance.oracle_kind != "deterministic_held_out":
+                raise MissionControlError(
+                    "G10 acceptance requires held-out oracle evidence"
+                )
         marker = task.metadata.get(EXECUTION_METADATA_KEY)
         if not isinstance(marker, dict):
             raise MissionControlError("acceptance task has no owner execution marker")
@@ -341,15 +446,21 @@ class CampaignSupervisor:
             acceptance.producer_agent_id,
         ) != (ref.run_id, ref.agent_id):
             raise MissionControlError("acceptance names a foreign producer")
-        if candidate_output_digest(observation.result) != acceptance.producer_output_digest:
+        if (
+            candidate_output_digest(observation.result)
+            != acceptance.producer_output_digest
+        ):
             raise MissionControlError("acceptance does not bind the candidate output")
-        producer_started_at, producer_completed_at = await self._producer_times(ref)
-        verifier_receipts = await self._require_verifier_evidence(
+        (
+            producer_started_at,
+            producer_completed_at,
+        ) = await self._acceptance_evidence.producer_times(ref)
+        verifier_receipts = await self._acceptance_evidence.require_verifier_evidence(
             acceptance,
             producer_started_at=producer_started_at,
             producer_completed_at=producer_completed_at,
         )
-        await self._require_model_family_evidence(
+        await self._acceptance_evidence.require_model_family_evidence(
             acceptance,
             ref,
             verifier_receipts,
@@ -380,7 +491,9 @@ class CampaignSupervisor:
         matches = [item for item in previous if item.receipt_id == receipt.receipt_id]
         if matches:
             if len(matches) != 1 or matches[0] != receipt:
-                raise MissionControlError("acceptance identity already has conflicting evidence")
+                raise MissionControlError(
+                    "acceptance identity already has conflicting evidence"
+                )
             return matches[0]
         return await self._runtime.insert_runtime_receipt_exact(receipt)
 
@@ -393,6 +506,24 @@ class CampaignSupervisor:
         errors: tuple[str, ...],
     ) -> CampaignSnapshot:
         session = await self._require_campaign_session()
+        generation = self._session_generation(session)
+        raw_operator_state = session.metadata.get("operator_control_state")
+        if raw_operator_state is None:
+            if session.status == "paused":
+                raise MissionControlError(
+                    "paused campaign has no control-state evidence"
+                )
+            operator_control_state = initial_operator_control_state(generation)
+        else:
+            try:
+                operator_control_state = validate_operator_control_state(
+                    raw_operator_state,
+                    expected_generation=generation,
+                )
+            except ValueError as exc:
+                raise MissionControlError(
+                    "campaign operator control state is invalid"
+                ) from exc
         latest_cycle = await self._latest_cycle()
         latest_cycle_at = latest_cycle.created_at if latest_cycle is not None else None
         now = utc_now()
@@ -418,7 +549,9 @@ class CampaignSupervisor:
             sorted(
                 observation.ref.task_id
                 for observation in observations
-                if observation.succeeded and observation.ref.task_id not in accepted
+                if observation.succeeded
+                and observation.ref.task_id not in accepted_rows
+                and observation.ref.task_id not in rejected_rows
             )
         )
         transport_observed = any(
@@ -454,7 +587,7 @@ class CampaignSupervisor:
             mission_id=self.config.mission_id,
             session_id=self.config.session_id,
             config_digest=self.config.digest,
-            generation=self._session_generation(session),
+            generation=generation,
             cycle_sequence=latest_cycle.payload["sequence"] if latest_cycle else 0,
             freshness_seconds=self.config.freshness_seconds,
             mission_snapshot=snapshot,
@@ -472,6 +605,7 @@ class CampaignSupervisor:
             conflicting_acceptance_task_ids=tuple(sorted(conflicting)),
             canary_acceptance=canary_acceptance,
             invalid_acceptance_receipts=invalid,
+            operator_control_state=operator_control_state,
             errors=errors,
             observed_at=now,
             proves_process_liveness=supervisor_state == "running",
@@ -632,15 +766,18 @@ class CampaignSupervisor:
                     != verdict.producer_output_digest
                 ):
                     raise MissionControlError("acceptance output digest is invalid")
-                producer_started_at, producer_completed_at = await self._producer_times(
-                    producer.ref
+                (
+                    producer_started_at,
+                    producer_completed_at,
+                ) = await self._acceptance_evidence.producer_times(producer.ref)
+                verifier_receipts = (
+                    await self._acceptance_evidence.require_verifier_evidence(
+                        verdict,
+                        producer_started_at=producer_started_at,
+                        producer_completed_at=producer_completed_at,
+                    )
                 )
-                verifier_receipts = await self._require_verifier_evidence(
-                    verdict,
-                    producer_started_at=producer_started_at,
-                    producer_completed_at=producer_completed_at,
-                )
-                await self._require_model_family_evidence(
+                await self._acceptance_evidence.require_model_family_evidence(
                     verdict,
                     producer.ref,
                     verifier_receipts,
@@ -657,166 +794,6 @@ class CampaignSupervisor:
             except (KeyError, TypeError, ValueError, MissionControlError):
                 invalid += 1
         return accepted, rejected, invalid
-
-    async def _require_verifier_evidence(
-        self,
-        acceptance: IndependentAcceptance,
-        *,
-        producer_started_at: datetime,
-        producer_completed_at: datetime,
-    ) -> list[RuntimeReceipt]:
-        identity = await self._runtime.get_execution_identity(
-            acceptance.verifier_run_id
-        )
-        if identity is None or (
-            identity.agent_id != acceptance.verifier_agent_id
-            or identity.task_id != acceptance.task_id
-        ):
-            raise MissionControlError("acceptance verifier identity is not durable")
-        now = utc_now()
-        if not producer_completed_at <= acceptance.observed_at <= now + timedelta(seconds=5):
-            raise MissionControlError("acceptance verdict is not causally fresh")
-        receipts = await self._runtime.list_runtime_receipts(
-            run_id=acceptance.verifier_run_id,
-            limit=_RECEIPT_SCAN_LIMIT,
-        )
-        if len(receipts) >= _RECEIPT_SCAN_LIMIT:
-            raise MissionControlError("verifier receipt scan saturated")
-        indexed = {receipt.receipt_id: receipt for receipt in receipts}
-        cited_receipts: list[RuntimeReceipt] = []
-        for receipt_id in acceptance.evidence_receipt_ids:
-            receipt = indexed.get(receipt_id)
-            if (
-                receipt is None
-                or not receipt_matches_identity(receipt, identity)
-                or receipt.receipt_type != VERIFIER_RESULT_RECEIPT_TYPE
-                or receipt.status != "completed"
-                or not producer_completed_at
-                <= receipt.created_at
-                <= acceptance.observed_at
-            ):
-                raise MissionControlError("acceptance cites foreign verifier receipt")
-            cited_receipts.append(receipt)
-        cited_artifacts = []
-        for artifact_id in acceptance.evidence_artifact_ids:
-            artifact = await self._runtime.get_artifact(artifact_id)
-            if artifact is None or (
-                artifact.run_id != acceptance.verifier_run_id
-                or artifact.task_id != acceptance.task_id
-                or artifact.session_id != identity.session_id
-                or not producer_completed_at
-                <= artifact.created_at
-                <= acceptance.observed_at
-            ):
-                raise MissionControlError("acceptance cites foreign verifier artifact")
-            cited_artifacts.append(artifact)
-        expected_binding: dict[str, Any] = {
-            "producer_output_digest": acceptance.producer_output_digest,
-            "accepted": acceptance.accepted,
-        }
-        if acceptance.oracle_kind == "model":
-            if not any(
-                all(receipt.payload.get(key) == value for key, value in expected_binding.items())
-                and _has_text(
-                    receipt.payload,
-                    ("actual_served_provider", "served_provider"),
-                )
-                and _first_text(
-                    receipt.payload,
-                    ("actual_served_model", "served_model"),
-                )
-                == acceptance.verifier_model_family
-                for receipt in cited_receipts
-            ):
-                raise MissionControlError("model verifier evidence does not bind output")
-        else:
-            if (
-                not self.config.held_out_oracle_digest
-                or acceptance.oracle_digest != self.config.held_out_oracle_digest
-            ):
-                raise MissionControlError("held-out oracle was not campaign-precommitted")
-            session = await self._require_campaign_session()
-            if session.created_at > producer_started_at:
-                raise MissionControlError("held-out oracle was committed after production")
-            expected_binding["oracle_manifest_digest"] = acceptance.oracle_digest
-            receipt_bound = any(
-                all(receipt.payload.get(key) == value for key, value in expected_binding.items())
-                and _has_text(receipt.payload, ("oracle_evaluator",))
-                and _has_text(receipt.payload, ("oracle_version",))
-                for receipt in cited_receipts
-            )
-            if not any(
-                artifact.artifact_kind == "mission_held_out_oracle_verdict"
-                and _SHA256_RE.fullmatch(artifact.checksum)
-                and all(
-                    artifact.metadata.get(key) == value
-                    for key, value in expected_binding.items()
-                )
-                and _has_text(artifact.metadata, ("oracle_evaluator",))
-                and _has_text(artifact.metadata, ("oracle_version",))
-                for artifact in cited_artifacts
-            ) or not receipt_bound:
-                raise MissionControlError("held-out oracle artifact does not bind verdict")
-        return [
-            receipt
-            for receipt in receipts
-            if producer_completed_at <= receipt.created_at <= acceptance.observed_at
-        ]
-
-    async def _producer_times(
-        self,
-        ref: OwnerExecutionRef,
-    ) -> tuple[datetime, datetime]:
-        run = await self._runtime.get_delegation_run(ref.run_id)
-        if run is None or run.completed_at is None or run.status.lower() != "completed":
-            raise MissionControlError("producer completion time is not durable")
-        if run.started_at.tzinfo is None or run.completed_at.tzinfo is None:
-            raise MissionControlError("producer lifecycle timestamps are invalid")
-        if run.completed_at < run.started_at:
-            raise MissionControlError("producer lifecycle timestamps are inverted")
-        return run.started_at, run.completed_at
-
-    async def _require_model_family_evidence(
-        self,
-        acceptance: IndependentAcceptance,
-        producer_ref: OwnerExecutionRef,
-        verifier_receipts: list[RuntimeReceipt],
-        *,
-        producer_started_at: datetime,
-        producer_completed_at: datetime,
-    ) -> None:
-        if acceptance.oracle_kind != "model":
-            return
-        producer_receipts = await self._runtime.list_runtime_receipts(
-            run_id=producer_ref.run_id,
-            limit=_RECEIPT_SCAN_LIMIT,
-        )
-        if len(producer_receipts) >= _RECEIPT_SCAN_LIMIT:
-            raise MissionControlError("producer receipt scan saturated")
-        producer_identity = await self._runtime.get_execution_identity(
-            producer_ref.run_id
-        )
-        verifier_identity = await self._runtime.get_execution_identity(
-            acceptance.verifier_run_id
-        )
-        if producer_identity is None or verifier_identity is None:
-            raise MissionControlError("model family evidence has no durable identity")
-        producer_receipts = [
-            receipt for receipt in producer_receipts
-            if producer_started_at <= receipt.created_at <= producer_completed_at
-        ]
-        producer_models = _canonical_served_models(
-            producer_receipts,
-            identity=producer_identity,
-        )
-        verifier_models = _canonical_served_models(
-            verifier_receipts,
-            identity=verifier_identity,
-        )
-        if acceptance.producer_model_family not in producer_models:
-            raise MissionControlError("producer model family is not evidenced")
-        if acceptance.verifier_model_family not in verifier_models:
-            raise MissionControlError("verifier model family is not evidenced")
 
     async def _latest_cycle(self) -> RuntimeReceipt | None:
         session = await self._require_campaign_session()
@@ -835,7 +812,10 @@ class CampaignSupervisor:
         generation = self._session_generation(session)
         row = await self._runtime.get_runtime_receipt(receipt_id)
         expected_id = stable_id(
-            "mission_campaign_cycle", self.config.mission_id, str(generation), str(sequence)
+            "mission_campaign_cycle",
+            self.config.mission_id,
+            str(generation),
+            str(sequence),
         )
         if row is None or (
             row.receipt_id != expected_id
@@ -857,8 +837,13 @@ class CampaignSupervisor:
         errors: list[str],
     ) -> None:
         session = await self._require_campaign_session()
-        if session.status != "active" or session.metadata.get("stop_requested") is True:
-            raise MissionControlError("campaign stopped before cycle evidence committed")
+        if (
+            session.status not in {"active", "paused"}
+            or session.metadata.get("stop_requested") is True
+        ):
+            raise MissionControlError(
+                "campaign stopped before cycle evidence committed"
+            )
         generation = self._session_generation(session)
         previous = session.metadata.get("last_cycle_sequence", 0)
         if isinstance(previous, bool) or not isinstance(previous, int) or previous < 0:
@@ -914,11 +899,14 @@ class CampaignSupervisor:
             created_at=session.created_at,
             updated_at=now,
         )
-        if await self._runtime.compare_and_swap_session(
-            session,
-            updated,
-            atomic_receipt=receipt,
-        ) is None:
+        if (
+            await self._runtime.compare_and_swap_session(
+                session,
+                updated,
+                atomic_receipt=receipt,
+            )
+            is None
+        ):
             raise MissionControlError("campaign cycle lost its session fence")
 
     def _control_receipt(
@@ -928,31 +916,33 @@ class CampaignSupervisor:
         now: datetime,
     ) -> RuntimeReceipt:
         return RuntimeReceipt(
-                receipt_id=stable_id(
-                    "mission_campaign_control",
-                    self.config.mission_id,
-                    action,
-                    str(generation),
-                ),
-                receipt_type=CAMPAIGN_CONTROL_RECEIPT_TYPE,
-                status=action,
-                run_id=stable_id("mission_campaign_run", self.config.mission_id),
-                correlation_id=self.config.session_id,
-                agent_id=self.config.operator_id,
-                payload={
-                    "schema_version": CAMPAIGN_SCHEMA_VERSION,
-                    "mission_id": self.config.mission_id,
-                    "action": action,
-                    "generation": generation,
-                    "preserves_queued_work": True,
-                },
-                created_at=now,
+            receipt_id=stable_id(
+                "mission_campaign_control",
+                self.config.mission_id,
+                action,
+                str(generation),
+            ),
+            receipt_type=CAMPAIGN_CONTROL_RECEIPT_TYPE,
+            status=action,
+            run_id=stable_id("mission_campaign_run", self.config.mission_id),
+            correlation_id=self.config.session_id,
+            agent_id=self.config.operator_id,
+            payload={
+                "schema_version": CAMPAIGN_SCHEMA_VERSION,
+                "mission_id": self.config.mission_id,
+                "action": action,
+                "generation": generation,
+                "preserves_queued_work": True,
+            },
+            created_at=now,
         )
 
     async def _require_snapshot(self) -> MissionSnapshot:
         snapshot = await self._control.get_snapshot(self.config.mission_id)
         if snapshot is None:
-            raise MissionControlError(f"mission {self.config.mission_id!r} was not found")
+            raise MissionControlError(
+                f"mission {self.config.mission_id!r} was not found"
+            )
         if any(row.mission_id != self.config.mission_id for row in snapshot.receipts):
             raise MissionControlError("mission snapshot contains a foreign receipt")
         return snapshot
@@ -995,5 +985,11 @@ def observer_only_adapter(
 
 
 __all__ = [
-    "CAMPAIGN_CONTROL_RECEIPT_TYPE", "CAMPAIGN_CYCLE_RECEIPT_TYPE", "CAMPAIGN_SCHEMA_VERSION", "CampaignConfig", "CampaignSnapshot", "CampaignSupervisor", "observer_only_adapter",
+    "CAMPAIGN_CONTROL_RECEIPT_TYPE",
+    "CAMPAIGN_CYCLE_RECEIPT_TYPE",
+    "CAMPAIGN_SCHEMA_VERSION",
+    "CampaignConfig",
+    "CampaignSnapshot",
+    "CampaignSupervisor",
+    "observer_only_adapter",
 ]

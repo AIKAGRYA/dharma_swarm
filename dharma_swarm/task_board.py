@@ -9,7 +9,7 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 import aiosqlite
 
@@ -66,7 +66,6 @@ ORDER BY CASE t.priority
     WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
     WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
   t.created_at ASC"""
-
 
 class TaskBoardError(Exception):
     """Raised on invalid task operations."""
@@ -604,6 +603,177 @@ class TaskBoard:
                     f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", params,
                 )
                 await db.commit()
+
+    async def compare_and_swap_campaign_status(
+        self,
+        expected: Task,
+        *,
+        new_status: TaskStatus,
+        assigned_to: str | None,
+        metadata: dict[str, Any],
+    ) -> Task | None:
+        """Transition one exact campaign row under an immediate transaction."""
+        authority = expected.metadata.get("mission_campaign_authority")
+        replacement_authority = metadata.get("mission_campaign_authority")
+        if (
+            not isinstance(authority, dict)
+            or replacement_authority != authority
+            or authority.get("claimed_principal") != assigned_to
+            or new_status
+            not in {
+                TaskStatus.ASSIGNED,
+                TaskStatus.RUNNING,
+            }
+            or new_status not in _TRANSITIONS.get(expected.status, set())
+        ):
+            raise TaskBoardError("campaign status CAS authority is invalid")
+        async with self._open() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute("SELECT * FROM tasks WHERE id = ?", (expected.id,))
+            ).fetchone()
+            deps = await self._fetch_deps(db, expected.id)
+            current = self._row_to_task(row, deps) if row is not None else None
+            if current != expected:
+                await db.rollback()
+                return None
+            cursor = await db.execute(
+                "UPDATE tasks SET status = ?, assigned_to = ?, metadata = ?,"
+                " updated_at = ? WHERE id = ? AND status = ? AND assigned_to IS ?"
+                " AND result IS ? AND metadata = ? AND updated_at = ?",
+                (
+                    new_status.value,
+                    assigned_to,
+                    self._coerce_db_value("metadata", metadata),
+                    _utc_now().isoformat(),
+                    expected.id,
+                    expected.status.value,
+                    expected.assigned_to,
+                    expected.result,
+                    self._coerce_db_value("metadata", expected.metadata),
+                    expected.updated_at.isoformat(),
+                ),
+            )
+            if cursor.rowcount != 1:
+                await db.rollback()
+                return None
+            await db.commit()
+            updated_row = await (
+                await db.execute("SELECT * FROM tasks WHERE id = ?", (expected.id,))
+            ).fetchone()
+            assert updated_row is not None
+            return self._row_to_task(updated_row, deps)
+
+    async def compare_and_swap_campaign_metadata(
+        self,
+        expected: Task,
+        *,
+        metadata: dict[str, Any],
+    ) -> Task | None:
+        """Replace only one exact pending campaign row's authority metadata."""
+        if (
+            expected.status is not TaskStatus.PENDING
+            or expected.assigned_to is not None
+            or expected.result is not None
+            or expected.metadata.get("sadhana_bootstrap_schema")
+            != "dharma.sadhana.mission_bootstrap.v1"
+            or metadata.get("mission_campaign_authority") is None
+            or metadata.get("campaign_id") != expected.metadata.get("campaign_id")
+            or metadata.get("goal_id") != expected.metadata.get("goal_id")
+            or metadata.get("mission_task_creation_hash")
+            != expected.metadata.get("mission_task_creation_hash")
+        ):
+            raise TaskBoardError("campaign metadata CAS boundary is invalid")
+        async with self._open() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute("SELECT * FROM tasks WHERE id = ?", (expected.id,))
+            ).fetchone()
+            deps = await self._fetch_deps(db, expected.id)
+            current = self._row_to_task(row, deps) if row is not None else None
+            if current != expected:
+                await db.rollback()
+                return None
+            cursor = await db.execute(
+                "UPDATE tasks SET metadata = ?, updated_at = ?"
+                " WHERE id = ? AND status = ? AND assigned_to IS NULL"
+                " AND result IS NULL AND metadata = ? AND updated_at = ?",
+                (
+                    self._coerce_db_value("metadata", metadata),
+                    _utc_now().isoformat(),
+                    expected.id,
+                    TaskStatus.PENDING.value,
+                    self._coerce_db_value("metadata", expected.metadata),
+                    expected.updated_at.isoformat(),
+                ),
+            )
+            if cursor.rowcount != 1:
+                await db.rollback()
+                return None
+            await db.commit()
+            updated_row = await (
+                await db.execute("SELECT * FROM tasks WHERE id = ?", (expected.id,))
+            ).fetchone()
+            assert updated_row is not None
+            return self._row_to_task(updated_row, deps)
+
+    async def resolve_campaign_pre_effect_failure(
+        self,
+        task_id: str,
+        *,
+        expected_status: TaskStatus,
+        expected_agent_id: str | None,
+        expected_metadata: dict[str, Any],
+        authenticated_principal: str,
+        provider_task_scheduled: bool = False,
+    ) -> Literal["pending", "indeterminate", "conflict"]:
+        from dharma_swarm.mission_control_task_attempts import (
+            CampaignTaskAttemptError,
+            resolve_campaign_pre_effect_failure,
+        )
+
+        try:
+            return await resolve_campaign_pre_effect_failure(
+                self,
+                task_id,
+                expected_status=expected_status,
+                expected_agent_id=expected_agent_id,
+                expected_metadata=expected_metadata,
+                authenticated_principal=authenticated_principal,
+                provider_task_scheduled=provider_task_scheduled,
+            )
+        except CampaignTaskAttemptError as exc:
+            raise TaskBoardError(str(exc)) from exc
+
+    async def advance_campaign_dispatch_attempt(
+        self,
+        task_id: str,
+        *,
+        expected_status: TaskStatus,
+        expected_agent_id: str,
+        expected_metadata: dict[str, Any],
+        next_authority: dict[str, Any],
+        next_governance: dict[str, Any],
+        next_routing: dict[str, Any],
+    ) -> Literal["advanced", "exhausted", "conflict"]:
+        from dharma_swarm.mission_control_task_attempts import (
+            CampaignTaskAttemptError,
+            advance_campaign_dispatch_attempt,
+        )
+
+        try:
+            return await advance_campaign_dispatch_attempt(
+                self,
+                task_id,
+                expected_status=expected_status,
+                expected_agent_id=expected_agent_id,
+                expected_metadata=expected_metadata,
+                next_authority=next_authority,
+                next_governance=next_governance,
+                next_routing=next_routing,
+            )
+        except CampaignTaskAttemptError as exc:
+            raise TaskBoardError(str(exc)) from exc
 
     # -- status transitions -------------------------------------------------
 

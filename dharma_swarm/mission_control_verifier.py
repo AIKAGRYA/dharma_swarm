@@ -16,13 +16,14 @@ import re
 import stat
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
 from dharma_swarm.mission_control_contract import (
     MissionControlError,
     clean_identifier,
+    receipt_matches_identity,
     stable_id,
     utc_now,
 )
@@ -31,8 +32,13 @@ from dharma_swarm.mission_control_evidence import (
     IndependentAcceptance,
     candidate_output_digest,
     canonical_served_models,
+    first_text,
+    has_text,
 )
-from dharma_swarm.mission_control_execution import OwnerExecutionObservation
+from dharma_swarm.mission_control_execution import (
+    OwnerExecutionObservation,
+    OwnerExecutionRef,
+)
 from dharma_swarm.mission_control_roster import (
     CampaignAgentRoster,
     CampaignAgentSeat,
@@ -52,6 +58,7 @@ _MAX_CANDIDATE_BYTES = 128 * 1024
 _MAX_RESPONSE_BYTES = 32 * 1024
 _MAX_RATIONALE_BYTES = 8 * 1024
 _RECEIPT_SCAN_LIMIT = 1_000
+_ACCEPTANCE_RECEIPT_SCAN_LIMIT = 10_000
 
 
 class ModelVerifierError(MissionControlError):
@@ -148,12 +155,10 @@ class VerifierRunLock:
             or stat.S_IMODE(parent_stat.st_mode) & 0o022
         ):
             raise ModelVerifierError("verifier lock parent lacks private custody")
-        flags = (
-            os.O_RDWR
-            | os.O_CREAT
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
-        )
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if nofollow is None:
+            raise ModelVerifierError("verifier lock requires O_NOFOLLOW support")
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0) | nofollow
         try:
             descriptor = os.open(self.path, flags, 0o600)
             entry = os.fstat(descriptor)
@@ -208,7 +213,11 @@ def _strict_json_object(raw: str) -> dict[str, Any]:
         )
     except json.JSONDecodeError as exc:
         raise ModelVerifierError("verifier response is not strict JSON") from exc
-    if not isinstance(value, dict) or set(value) != {"accepted", "rationale", "verdict"}:
+    if not isinstance(value, dict) or set(value) != {
+        "accepted",
+        "rationale",
+        "verdict",
+    }:
         raise ModelVerifierError("verifier response shape is not exact")
     accepted = value["accepted"]
     verdict = value["verdict"]
@@ -307,7 +316,11 @@ def _attempt(
     policy_digest: str,
     attempt: int,
 ) -> VerifierAttempt:
-    if isinstance(attempt, bool) or not isinstance(attempt, int) or not 1 <= attempt <= 5:
+    if (
+        isinstance(attempt, bool)
+        or not isinstance(attempt, int)
+        or not 1 <= attempt <= 5
+    ):
         raise ModelVerifierError("verifier attempt must be from 1 to 5")
     verifier_agent_id = stable_id(
         "campaign_verifier_agent",
@@ -404,7 +417,9 @@ async def _producer_model(
         or identity.task_id != candidate.ref.task_id
         or identity.agent_id != candidate.ref.agent_id
     ):
-        raise ModelVerifierError("producer lifecycle or execution identity is not durable")
+        raise ModelVerifierError(
+            "producer lifecycle or execution identity is not durable"
+        )
     receipts = await runtime.list_runtime_receipts(
         run_id=candidate.ref.run_id,
         limit=_RECEIPT_SCAN_LIMIT,
@@ -418,7 +433,9 @@ async def _producer_model(
     ]
     models = canonical_served_models(bounded, identity=identity)
     if len(models) != 1:
-        raise ModelVerifierError("producer served-model evidence is absent or ambiguous")
+        raise ModelVerifierError(
+            "producer served-model evidence is absent or ambiguous"
+        )
     model = next(iter(models))
     return model, _model_family(roster, model), run
 
@@ -450,6 +467,203 @@ def _acceptance(
     )
 
 
+class CampaignAcceptanceEvidenceVerifier:
+    """Validate durable acceptance carriers outside the campaign loop module."""
+
+    def __init__(
+        self,
+        runtime: RuntimeStateStore,
+        *,
+        mission_id: str,
+        session_id: str,
+        held_out_oracle_digest: str,
+    ) -> None:
+        self._runtime = runtime
+        self._mission_id = mission_id
+        self._session_id = session_id
+        self._held_out_oracle_digest = held_out_oracle_digest
+
+    async def producer_times(
+        self,
+        ref: OwnerExecutionRef,
+    ) -> tuple[datetime, datetime]:
+        run = await self._runtime.get_delegation_run(ref.run_id)
+        if run is None or run.completed_at is None or run.status.lower() != "completed":
+            raise MissionControlError("producer completion time is not durable")
+        if run.started_at.tzinfo is None or run.completed_at.tzinfo is None:
+            raise MissionControlError("producer lifecycle timestamps are invalid")
+        if run.completed_at < run.started_at:
+            raise MissionControlError("producer lifecycle timestamps are inverted")
+        return run.started_at, run.completed_at
+
+    async def require_verifier_evidence(
+        self,
+        acceptance: IndependentAcceptance,
+        *,
+        producer_started_at: datetime,
+        producer_completed_at: datetime,
+    ) -> list[RuntimeReceipt]:
+        identity = await self._runtime.get_execution_identity(
+            acceptance.verifier_run_id
+        )
+        if identity is None or (
+            identity.agent_id != acceptance.verifier_agent_id
+            or identity.task_id != acceptance.task_id
+        ):
+            raise MissionControlError("acceptance verifier identity is not durable")
+        now = utc_now()
+        if (
+            not producer_completed_at
+            <= acceptance.observed_at
+            <= now + timedelta(seconds=5)
+        ):
+            raise MissionControlError("acceptance verdict is not causally fresh")
+        receipts = await self._runtime.list_runtime_receipts(
+            run_id=acceptance.verifier_run_id,
+            limit=_ACCEPTANCE_RECEIPT_SCAN_LIMIT,
+        )
+        if len(receipts) >= _ACCEPTANCE_RECEIPT_SCAN_LIMIT:
+            raise MissionControlError("verifier receipt scan saturated")
+        indexed = {receipt.receipt_id: receipt for receipt in receipts}
+        cited_receipts: list[RuntimeReceipt] = []
+        for receipt_id in acceptance.evidence_receipt_ids:
+            receipt = indexed.get(receipt_id)
+            if (
+                receipt is None
+                or not receipt_matches_identity(receipt, identity)
+                or receipt.receipt_type != VERIFIER_RESULT_RECEIPT_TYPE
+                or receipt.status != "completed"
+                or not producer_completed_at
+                <= receipt.created_at
+                <= acceptance.observed_at
+            ):
+                raise MissionControlError("acceptance cites foreign verifier receipt")
+            cited_receipts.append(receipt)
+        cited_artifacts = []
+        for artifact_id in acceptance.evidence_artifact_ids:
+            artifact = await self._runtime.get_artifact(artifact_id)
+            if artifact is None or (
+                artifact.run_id != acceptance.verifier_run_id
+                or artifact.task_id != acceptance.task_id
+                or artifact.session_id != identity.session_id
+                or not producer_completed_at
+                <= artifact.created_at
+                <= acceptance.observed_at
+            ):
+                raise MissionControlError("acceptance cites foreign verifier artifact")
+            cited_artifacts.append(artifact)
+        expected_binding: dict[str, Any] = {
+            "producer_output_digest": acceptance.producer_output_digest,
+            "accepted": acceptance.accepted,
+        }
+        if acceptance.oracle_kind == "model":
+            if not any(
+                all(
+                    receipt.payload.get(key) == value
+                    for key, value in expected_binding.items()
+                )
+                and has_text(
+                    receipt.payload,
+                    ("actual_served_provider", "served_provider"),
+                )
+                and first_text(
+                    receipt.payload,
+                    ("actual_served_model", "served_model"),
+                )
+                == acceptance.verifier_model_family
+                for receipt in cited_receipts
+            ):
+                raise MissionControlError(
+                    "model verifier evidence does not bind output"
+                )
+        else:
+            if (
+                not self._held_out_oracle_digest
+                or acceptance.oracle_digest != self._held_out_oracle_digest
+            ):
+                raise MissionControlError(
+                    "held-out oracle was not campaign-precommitted"
+                )
+            session = await self._runtime.get_session(self._session_id)
+            if session is None or session.created_at > producer_started_at:
+                raise MissionControlError(
+                    "held-out oracle was committed after production"
+                )
+            expected_binding["oracle_manifest_digest"] = acceptance.oracle_digest
+            receipt_bound = any(
+                all(
+                    receipt.payload.get(key) == value
+                    for key, value in expected_binding.items()
+                )
+                and has_text(receipt.payload, ("oracle_evaluator",))
+                and has_text(receipt.payload, ("oracle_version",))
+                for receipt in cited_receipts
+            )
+            artifact_bound = any(
+                artifact.artifact_kind == "mission_held_out_oracle_verdict"
+                and _SHA256_RE.fullmatch(artifact.checksum)
+                and all(
+                    artifact.metadata.get(key) == value
+                    for key, value in expected_binding.items()
+                )
+                and has_text(artifact.metadata, ("oracle_evaluator",))
+                and has_text(artifact.metadata, ("oracle_version",))
+                for artifact in cited_artifacts
+            )
+            if not artifact_bound or not receipt_bound:
+                raise MissionControlError(
+                    "held-out oracle artifact does not bind verdict"
+                )
+        return [
+            receipt
+            for receipt in receipts
+            if producer_completed_at <= receipt.created_at <= acceptance.observed_at
+        ]
+
+    async def require_model_family_evidence(
+        self,
+        acceptance: IndependentAcceptance,
+        producer_ref: OwnerExecutionRef,
+        verifier_receipts: list[RuntimeReceipt],
+        *,
+        producer_started_at: datetime,
+        producer_completed_at: datetime,
+    ) -> None:
+        if acceptance.oracle_kind != "model":
+            return
+        producer_receipts = await self._runtime.list_runtime_receipts(
+            run_id=producer_ref.run_id,
+            limit=_ACCEPTANCE_RECEIPT_SCAN_LIMIT,
+        )
+        if len(producer_receipts) >= _ACCEPTANCE_RECEIPT_SCAN_LIMIT:
+            raise MissionControlError("producer receipt scan saturated")
+        producer_identity = await self._runtime.get_execution_identity(
+            producer_ref.run_id
+        )
+        verifier_identity = await self._runtime.get_execution_identity(
+            acceptance.verifier_run_id
+        )
+        if producer_identity is None or verifier_identity is None:
+            raise MissionControlError("model family evidence has no durable identity")
+        bounded_producer_receipts = [
+            receipt
+            for receipt in producer_receipts
+            if producer_started_at <= receipt.created_at <= producer_completed_at
+        ]
+        producer_models = canonical_served_models(
+            bounded_producer_receipts,
+            identity=producer_identity,
+        )
+        verifier_models = canonical_served_models(
+            verifier_receipts,
+            identity=verifier_identity,
+        )
+        if acceptance.producer_model_family not in producer_models:
+            raise MissionControlError("producer model family is not evidenced")
+        if acceptance.verifier_model_family not in verifier_models:
+            raise MissionControlError("verifier model family is not evidenced")
+
+
 async def _replay(
     runtime: RuntimeStateStore,
     roster: CampaignAgentRoster,
@@ -458,7 +672,7 @@ async def _replay(
     run = await runtime.get_delegation_run(attempt.run_id)
     if run is None:
         return None
-    if run.status.lower() != "completed" or run.completed_at is None:
+    if run.status.lower() not in {"running", "completed"}:
         raise ModelVerifierError(
             "verifier attempt is nonterminal or failed; use a new bounded attempt"
         )
@@ -471,7 +685,14 @@ async def _replay(
     provider_receipt = await runtime.get_runtime_receipt(provider_id)
     result_receipt = await runtime.get_runtime_receipt(result_id)
     if provider_receipt is None or result_receipt is None:
-        raise ModelVerifierError("completed verifier run lacks exact evidence receipts")
+        detail = (
+            "partial"
+            if provider_receipt is not None or result_receipt is not None
+            else "absent"
+        )
+        raise ModelVerifierError(
+            f"verifier effect evidence is {detail}; use a new bounded attempt"
+        )
     models = canonical_served_models([provider_receipt], identity=identity)
     if len(models) != 1:
         raise ModelVerifierError("stored verifier provider evidence is invalid")
@@ -490,8 +711,24 @@ async def _replay(
     ):
         raise ModelVerifierError("stored verifier result evidence is invalid")
     actual_family = _model_family(roster, actual_model)
-    if actual_family == attempt.producer_family:
-        raise ModelVerifierError("stored verifier model is not independent")
+    if (
+        _wire_model(actual_model) != _wire_model(attempt.verifier_model)
+        or actual_family != attempt.verifier_family
+        or actual_family == attempt.producer_family
+    ):
+        raise ModelVerifierError(
+            "stored verifier model is fallback, foreign, or non-independent"
+        )
+    if run.status.lower() == "running":
+        await runtime.finalize_delegation_run_evidence_exact(
+            expected_running=run,
+            completed=replace(
+                run, status="completed", completed_at=result_receipt.created_at
+            ),
+            receipts=(provider_receipt, result_receipt),
+        )
+    elif run.completed_at is None:
+        raise ModelVerifierError("completed verifier run lacks a completion timestamp")
     return _acceptance(
         attempt,
         actual_model=actual_model,
@@ -514,6 +751,7 @@ async def run_verifier(
     lock_path: Path | str,
     attempt_number: int = 1,
     now: Callable[[], datetime] = utc_now,
+    effect_ready: Callable[[], None] | None = None,
 ) -> IndependentAcceptance:
     """Create or replay one exact independent model acceptance candidate."""
     if not _SHA256_RE.fullmatch(policy_digest):
@@ -530,7 +768,9 @@ async def run_verifier(
         or not candidate.result
         or len(candidate.result.encode("utf-8")) > _MAX_CANDIDATE_BYTES
     ):
-        raise ModelVerifierError("candidate, task, roster, or policy binding is invalid")
+        raise ModelVerifierError(
+            "candidate, task, roster, or policy binding is invalid"
+        )
     clean_identifier(candidate.ref.mission_id, "mission_id")
     clean_identifier(candidate.ref.task_id, "task_id")
     seat = _seat(roster, verifier_seat_name)
@@ -562,7 +802,9 @@ async def run_verifier(
         existing_identity = await runtime.get_execution_identity(identity.run_id)
         if existing_identity is not None and existing_identity != identity:
             raise ModelVerifierError("verifier run identity already conflicts")
-        await runtime.record_execution_identity(identity, source="campaign-model-verifier")
+        await runtime.record_execution_identity(
+            identity, source="campaign-model-verifier"
+        )
         started_at = now().astimezone(timezone.utc)
         if started_at < producer_run.completed_at:
             raise ModelVerifierError("verifier clock precedes producer completion")
@@ -616,7 +858,10 @@ async def run_verifier(
         ).model_copy(update={"model": seat.model})
         provider_receipt_id = stable_id("campaign_verifier_provider", identity.run_id)
         result_receipt_id = stable_id("campaign_verifier_result", identity.run_id)
+        evidence_ready = False
         try:
+            if effect_ready is not None:
+                effect_ready()
             response = await provider.complete(request)
             completed_at = now().astimezone(timezone.utc)
             if completed_at < started_at:
@@ -624,17 +869,16 @@ async def run_verifier(
             actual_model = response.model.strip()
             if not actual_model or response.tool_calls:
                 raise ModelVerifierError("verifier provider returned tools or no model")
-            await runtime.insert_runtime_receipt_exact(
-                _receipt(
-                    identity,
-                    receipt_id=provider_receipt_id,
-                    receipt_type="side_effect_complete",
-                    status="completed",
-                    side_effect_key=f"model_verification:{identity.run_id}",
-                    payload=_provider_payload(identity, actual_model),
-                    created_at=completed_at,
-                )
+            provider_receipt = _receipt(
+                identity,
+                receipt_id=provider_receipt_id,
+                receipt_type="side_effect_complete",
+                status="completed",
+                side_effect_key=f"model_verification:{identity.run_id}",
+                payload=_provider_payload(identity, actual_model),
+                created_at=completed_at,
             )
+            await runtime.insert_runtime_receipt_exact(provider_receipt)
             actual_family = _model_family(roster, actual_model)
             if (
                 _wire_model(actual_model) != _wire_model(seat.model)
@@ -671,9 +915,11 @@ async def run_verifier(
                 },
                 created_at=completed_at,
             )
-            await runtime.insert_runtime_receipt_exact(result_receipt)
-            await runtime.record_delegation_run(
-                replace(run, status="completed", completed_at=completed_at)
+            evidence_ready = True
+            await runtime.finalize_delegation_run_evidence_exact(
+                expected_running=run,
+                completed=replace(run, status="completed", completed_at=completed_at),
+                receipts=(provider_receipt, result_receipt),
             )
             return _acceptance(
                 coordinates,
@@ -684,23 +930,33 @@ async def run_verifier(
                 evidence_receipt_id=result_receipt_id,
             )
         except Exception as exc:
+            if evidence_ready:
+                try:
+                    replay = await _replay(runtime, roster, coordinates)
+                except ModelVerifierError:
+                    replay = None
+                if replay is not None:
+                    return replay
             failed_at = now().astimezone(timezone.utc)
             failure_code = (
                 "verifier_evidence_invalid"
                 if isinstance(exc, ModelVerifierError)
                 else "verifier_provider_failure"
             )
-            await runtime.record_delegation_run(
+            await runtime.compare_and_swap_delegation_run_exact(
+                run,
                 replace(
                     run,
                     status="failed",
                     completed_at=max(failed_at, started_at),
                     failure_code=failure_code,
-                )
+                ),
             )
             if isinstance(exc, ModelVerifierError):
                 raise
-            raise ModelVerifierError("verifier provider failed before acceptance") from exc
+            raise ModelVerifierError(
+                "verifier provider failed before acceptance"
+            ) from exc
 
 
 __all__ = [

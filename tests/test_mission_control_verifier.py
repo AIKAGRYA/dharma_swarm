@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import pytest
@@ -390,6 +391,81 @@ async def test_successful_replay_reuses_evidence_without_provider_call(
     assert len(provider.calls) == 1
 
 
+async def test_result_evidence_repairs_running_lifecycle_without_provider_call(
+    tmp_path: Path,
+) -> None:
+    stack = await _stack(tmp_path)
+    provider = FakeProvider()
+    first = await _verify(stack, provider)
+    run = await stack.runtime.get_delegation_run(first.verifier_run_id)
+    assert run is not None
+    await stack.runtime.record_delegation_run(
+        replace(run, status="running", completed_at=None)
+    )
+
+    replay = await _verify(stack, provider)
+
+    repaired = await stack.runtime.get_delegation_run(first.verifier_run_id)
+    assert replay == first
+    assert repaired is not None and repaired.status == "completed"
+    assert len(provider.calls) == 1
+
+
+async def test_commit_then_raise_never_downgrades_completed_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stack = await _stack(tmp_path)
+    provider = FakeProvider()
+    original = stack.runtime.finalize_delegation_run_evidence_exact
+
+    async def commit_then_raise(**kwargs):
+        await original(**kwargs)
+        raise RuntimeError("fixture crash after commit")
+
+    monkeypatch.setattr(
+        stack.runtime,
+        "finalize_delegation_run_evidence_exact",
+        commit_then_raise,
+    )
+    acceptance = await _verify(stack, provider)
+
+    run = await stack.runtime.get_delegation_run(acceptance.verifier_run_id)
+    assert run is not None and run.status == "completed" and not run.failure_code
+    assert len(provider.calls) == 1
+
+
+async def test_replay_rejects_foreign_actual_verifier_model(tmp_path: Path) -> None:
+    stack = await _stack(tmp_path)
+    provider = FakeProvider()
+    acceptance = await _verify(stack, provider)
+    receipts = await stack.runtime.list_runtime_receipts(
+        run_id=acceptance.verifier_run_id,
+        limit=10,
+    )
+    provider_receipt = receipts[1]
+    result_receipt = receipts[2]
+    provider_payload = dict(provider_receipt.payload)
+    carrier = dict(provider_payload["receipt"])
+    attributes = dict(carrier["attributes"])
+    attributes["served_model"] = FALLBACK_MODEL
+    carrier["attributes"] = attributes
+    provider_payload["receipt"] = carrier
+    await stack.runtime.record_runtime_receipt(
+        replace(provider_receipt, payload=provider_payload)
+    )
+    await stack.runtime.record_runtime_receipt(
+        replace(
+            result_receipt,
+            payload={**result_receipt.payload, "actual_served_model": FALLBACK_MODEL},
+        )
+    )
+
+    with pytest.raises(ModelVerifierError, match="fallback, foreign, or non-independent"):
+        await _verify(stack, provider)
+    assert len(provider.calls) == 1
+
+
 async def test_same_roster_family_fails_before_provider(tmp_path: Path) -> None:
     stack = await _stack(tmp_path, roster=_roster(verifier_family="glm"))
     provider = FakeProvider()
@@ -516,6 +592,18 @@ async def test_busy_attempt_lock_fails_before_provider(tmp_path: Path) -> None:
             await _verify(stack, provider)
 
     assert provider.calls == []
+
+
+def test_verifier_lock_fails_closed_without_nofollow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lock_parent = tmp_path / "private-locks"
+    lock_parent.mkdir(mode=0o700)
+    monkeypatch.delattr(os, "O_NOFOLLOW")
+    with pytest.raises(ModelVerifierError, match="requires O_NOFOLLOW"):
+        with VerifierRunLock(lock_parent / "verifier.lock"):
+            pass
 
 
 async def test_same_agent_identity_fails_before_provider(tmp_path: Path) -> None:

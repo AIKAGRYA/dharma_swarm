@@ -14,7 +14,6 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,15 +23,22 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dharma_swarm.mission_control import MissionControl
+from dharma_swarm.mission_control_activation import activation_barrier_from_config
 from dharma_swarm.mission_control_authority import (
     FileExecutionLeaseAuthorityVerifier,
     GovernedCampaignTaskDispatcher,
 )
+from dharma_swarm.mission_control_auto_verifier import AutomaticCandidateVerifier
 from dharma_swarm.mission_control_campaign import (
     CAMPAIGN_SESSION_PREFIX,
+    CAMPAIGN_SCHEMA_VERSION,
     CampaignConfig,
     CampaignSupervisor,
     observer_only_adapter,
+)
+from dharma_swarm.mission_control_binding import bind_campaign_authority
+from dharma_swarm.mission_control_observed_input import (
+    ingest_observed_input_manifest,
 )
 from dharma_swarm.mission_control_contract import (
     MissionControlError,
@@ -42,14 +48,30 @@ from dharma_swarm.mission_control_contract import (
 from dharma_swarm.mission_control_dispatch import GovernedMissionDispatcher
 from dharma_swarm.mission_control_evidence import IndependentAcceptance
 from dharma_swarm.mission_control_execution import OrchestratorMissionAdapter
+from dharma_swarm.mission_control_held_out_oracle import (
+    HeldOutOracleManifest,
+    load_held_out_oracle_manifest,
+)
+from dharma_swarm.mission_control_oracle_launcher import (
+    FilesystemOracleSandboxLauncher,
+)
+from dharma_swarm.mission_control_operator_runtime import (
+    operator_control_reconciler_from_config,
+)
+from dharma_swarm.mission_control_runtime_manifests import (
+    add_campaign_runtime_arguments,
+)
 from dharma_swarm.mission_control_roster import (
+    CampaignAgentSeat,
     CampaignAgentRoster,
     CampaignRosterError,
     ensure_campaign_agent_roster,
     load_campaign_agent_roster,
 )
+from dharma_swarm.models import AgentRole, ProviderType
 from dharma_swarm.mission_control_service import (
     CampaignControlGate,
+    CampaignPaths,
     CampaignProjectionError,
     CampaignService,
     CampaignWriterBusy,
@@ -61,29 +83,9 @@ from dharma_swarm.mission_control_service import (
     writer_lock_is_held,
 )
 from dharma_swarm.operator_core.execution_lease import default_lease_root
+from dharma_swarm.providers import OllamaProvider
 from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.task_board import TaskBoard
-
-
-@dataclass(frozen=True, slots=True)
-class CampaignPaths:
-    lock_path: Path
-    control_gate_path: Path
-    projection_path: Path
-    log_path: Path
-
-    def __post_init__(self) -> None:
-        resolved = {
-            path.expanduser().resolve(strict=False)
-            for path in (
-                self.lock_path,
-                self.control_gate_path,
-                self.projection_path,
-                self.log_path,
-            )
-        }
-        if len(resolved) != 4:
-            raise ValueError("campaign lock, control, projection, and log paths must differ")
 
 
 def _positive_finite(value: float, label: str) -> float:
@@ -140,9 +142,7 @@ def _runtime_store(state_dir: Path | str) -> RuntimeStateStore:
 
 
 async def _board(state_dir: Path | str) -> TaskBoard:
-    db_path = (
-        Path(state_dir).expanduser().resolve(strict=False) / "db" / "tasks.db"
-    )
+    db_path = Path(state_dir).expanduser().resolve(strict=False) / "db" / "tasks.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     board = TaskBoard(db_path)
     await board.init_db()
@@ -161,7 +161,7 @@ def _requested_config(args: argparse.Namespace) -> CampaignConfig:
     )
 
 
-def _requested_roster(args: argparse.Namespace) -> CampaignAgentRoster | None:
+def _requested_roster(args: argparse.Namespace) -> CampaignAgentRoster:
     values = {
         "path": str(getattr(args, "agent_roster", "") or ""),
         "sha256": str(getattr(args, "agent_roster_sha256", "") or ""),
@@ -169,7 +169,7 @@ def _requested_roster(args: argparse.Namespace) -> CampaignAgentRoster | None:
     }
     configured = {key for key, value in values.items() if value}
     if not configured:
-        return None
+        raise CampaignRosterError("campaign roster configuration is required")
     if configured != set(values):
         missing = sorted(set(values) - configured)
         raise CampaignRosterError(
@@ -181,6 +181,37 @@ def _requested_roster(args: argparse.Namespace) -> CampaignAgentRoster | None:
         campaign_id=args.mission_id,
         objective_sha256=values["objective_sha256"],
     )
+
+
+def _requested_verifier_seat(
+    roster: CampaignAgentRoster,
+    name: str,
+) -> CampaignAgentSeat:
+    matches = [seat for seat in roster.seats if seat.name == name]
+    if len(matches) != 1:
+        raise CampaignRosterError("campaign verifier seat is absent or ambiguous")
+    seat = matches[0]
+    if seat.role is not AgentRole.VALIDATOR or seat.provider is not ProviderType.OLLAMA:
+        raise CampaignRosterError("campaign verifier seat is not an Ollama validator")
+    return seat
+
+
+def _requested_held_out_manifest(
+    args: argparse.Namespace,
+    config: CampaignConfig,
+) -> HeldOutOracleManifest:
+    if not config.held_out_oracle_digest:
+        raise MissionControlError("campaign held-out oracle digest is required")
+    manifest = load_held_out_oracle_manifest(
+        Path(args.held_out_oracle_manifest).expanduser().absolute(),
+        expected_digest=config.held_out_oracle_digest,
+    )
+    if (
+        manifest.campaign_id != config.mission_id
+        or manifest.mission_id != config.mission_id
+    ):
+        raise MissionControlError("held-out oracle manifest names a foreign campaign")
+    return manifest
 
 
 async def _recorded_config(
@@ -242,6 +273,74 @@ async def _initialize_campaign(
         return await supervisor.start()
 
 
+async def prepare_campaign(args: argparse.Namespace) -> dict[str, Any]:
+    """Create one campaign session without booting an executor or doing work."""
+    config = _requested_config(args)
+    state_dir = Path(args.state_dir).expanduser().resolve(strict=False)
+    paths = _paths(args)
+    writer_lock = CampaignWriterLock(paths.lock_path)
+    writer_lock.acquire()
+    try:
+        runtime = _runtime_store(state_dir)
+        await runtime.init_db()
+        board = await _board(state_dir)
+        control = MissionControl(board, runtime)
+        supervisor = CampaignSupervisor(
+            config,
+            control,
+            board,
+            runtime,
+            observer_only_adapter(control, board, runtime),
+        )
+        async with CampaignControlGate(paths.control_gate_path):
+            existing = await runtime.get_session(config.session_id)
+            initialized = existing is None
+            if initialized:
+                session = await supervisor.start()
+            else:
+                recorded = await _recorded_config(runtime, config.mission_id)
+                if recorded is None or recorded.digest != config.digest:
+                    raise MissionControlError(
+                        "requested prepare config conflicts with recorded campaign"
+                    )
+                if (
+                    existing.metadata.get("schema_version") != CAMPAIGN_SCHEMA_VERSION
+                    or existing.metadata.get("mission_id") != config.mission_id
+                    or existing.metadata.get("config_digest") != config.digest
+                ):
+                    raise MissionControlError(
+                        "prepared campaign session has a foreign identity"
+                    )
+                generation = existing.metadata.get("generation")
+                if (
+                    isinstance(generation, bool)
+                    or not isinstance(generation, int)
+                    or generation < 1
+                ):
+                    raise MissionControlError("prepared campaign generation is invalid")
+                session = existing
+        prepared = (
+            session.status in {"active", "paused"}
+            and session.metadata.get("stop_requested") is not True
+        )
+        return {
+            "status": "prepared" if prepared else "stopped",
+            "initialized": initialized,
+            "campaign_status": session.status,
+            "mission_id": config.mission_id,
+            "session_id": session.session_id,
+            "config_digest": config.digest,
+            "generation": session.metadata["generation"],
+            "provider_effect_performed": False,
+            "tool_effect_performed": False,
+            "work_performed": False,
+            "lock_path": str(paths.lock_path),
+            "control_gate_path": str(paths.control_gate_path),
+        }
+    finally:
+        writer_lock.release()
+
+
 def _acquire_writer_handoff(
     writer_lock: CampaignWriterLock,
     timeout: float,
@@ -269,30 +368,103 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
     state_dir = Path(args.state_dir).expanduser().resolve(strict=False)
     paths = _paths(args)
     requested_roster = _requested_roster(args)
+    requested = _requested_config(args)
+    activation_barrier = activation_barrier_from_config(
+        args.mission_id,
+        args.observer_health_receipt,
+        args.observer_health_receipt_sha256,
+    )
+    operator_control_reconciler = operator_control_reconciler_from_config(
+        args.mission_id,
+        normal_inbox=args.operator_control_normal_inbox,
+        inflight_inbox=args.operator_control_inflight_inbox,
+        applied_inbox=args.operator_control_applied_inbox,
+        rejected_inbox=args.operator_control_rejected_inbox,
+        hmac_credential_path=args.operator_control_hmac_credential,
+        hmac_credential_sha256=args.operator_control_hmac_sha256,
+        max_candidates_per_cycle=args.operator_control_max_candidates_per_cycle,
+    )
+    verifier_seat = _requested_verifier_seat(requested_roster, args.verifier_seat)
+    held_out_manifest = _requested_held_out_manifest(args, requested)
+    oracle_launcher = FilesystemOracleSandboxLauncher(
+        sandbox_evidence_sha256=args.oracle_sandbox_evidence_sha256,
+        request_root=Path(args.oracle_request_root).expanduser(),
+        terminal_root=Path(args.oracle_terminal_root).expanduser(),
+        timeout_seconds=args.oracle_timeout_seconds,
+        poll_interval_seconds=args.oracle_poll_interval_seconds,
+    )
+    oracle_launcher.preflight()
+    verifier_lock_root = (
+        Path(args.verifier_lock_root or state_dir / "leases" / "verifiers")
+        .expanduser()
+        .absolute()
+    )
+    oracle_work_root = (
+        Path(args.oracle_work_root or state_dir / "mission_control" / "oracle-work")
+        .expanduser()
+        .absolute()
+    )
     writer_lock = CampaignWriterLock(paths.lock_path)
     _acquire_writer_handoff(writer_lock, args.writer_handoff_timeout)
     swarm = SwarmManager(state_dir=state_dir)
     roster_receipt = None
+    verifier_provider: OllamaProvider | None = None
     try:
         await swarm.init()
-        if requested_roster is not None:
-            roster_receipt = await ensure_campaign_agent_roster(
-                swarm,
-                requested_roster,
-            )
+        roster_receipt = await ensure_campaign_agent_roster(
+            swarm,
+            requested_roster,
+        )
         board = swarm._task_board
         orchestrator = swarm._orchestrator
-        if board is None or orchestrator is None:
+        agent_pool = swarm._agent_pool
+        if board is None or orchestrator is None or agent_pool is None:
             raise RuntimeError("SwarmManager did not initialize its canonical executor")
         runtime = _runtime_store(state_dir)
         await runtime.init_db()
-        requested = _requested_config(args)
+        observed_inputs = await ingest_observed_input_manifest(
+            Path(args.observed_input_manifest).expanduser().absolute(),
+            board,
+            runtime,
+        )
         config = await _recorded_config(runtime, requested.mission_id)
         if config is None:
-            raise MissionControlError("campaign has not been started; use start first")
+            raise MissionControlError(
+                "campaign has not been prepared; use prepare first"
+            )
         if config.digest != requested.digest:
-            raise MissionControlError("requested run config conflicts with recorded campaign")
+            raise MissionControlError(
+                "requested run config conflicts with recorded campaign"
+            )
         control = MissionControl(board, runtime)
+        authority_binding = await bind_campaign_authority(
+            manifest_path=Path(args.authority_manifest).expanduser().absolute(),
+            mission_control=control,
+            board=board,
+            agent_pool=agent_pool,
+            campaign_roster=requested_roster,
+            observed_inputs=observed_inputs,
+            runtime_state=runtime,
+            lease_root=(
+                Path(args.lease_root).expanduser().resolve(strict=False)
+                if args.lease_root
+                else default_lease_root(state_dir)
+            ),
+            reserved_agent_names=(verifier_seat.name,),
+        )
+        held_task = await board.get(held_out_manifest.task_id)
+        if (
+            held_task is None
+            or held_task.metadata.get("mission_id") != config.mission_id
+            or held_task.metadata.get("goal_id") != held_out_manifest.goal_id
+            or held_task.metadata.get("mission_task_creation_hash")
+            != held_out_manifest.task_creation_hash
+            or held_out_manifest.task_id
+            not in {bound.task_id for bound in authority_binding.tasks}
+        ):
+            raise MissionControlError(
+                "held-out oracle task is not exactly authority-bound"
+            )
         owner = OrchestratorMissionAdapter(
             orchestrator,
             control,
@@ -309,7 +481,9 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
                 control,
                 board,
                 owner,
-                authority_verifier=FileExecutionLeaseAuthorityVerifier(lease_root),
+                authority_verifier=FileExecutionLeaseAuthorityVerifier(
+                    lease_root, board
+                ),
             ),
             board,
         )
@@ -321,12 +495,28 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
             owner,
             dispatcher=dispatcher,
         )
+        verifier_provider = OllamaProvider(model=verifier_seat.model)
+        candidate_verifier = AutomaticCandidateVerifier(
+            runtime=runtime,
+            board=board,
+            roster=requested_roster,
+            model_provider=verifier_provider,
+            verifier_seat_name=verifier_seat.name,
+            model_lock_root=verifier_lock_root,
+            held_out_manifest_path=held_out_manifest.manifest_path,
+            held_out_manifest_digest=held_out_manifest.manifest_digest,
+            oracle_work_root=oracle_work_root,
+            oracle_launcher=oracle_launcher,
+        )
         result = await CampaignService(
             supervisor,
             lock_path=paths.lock_path,
             control_gate_path=paths.control_gate_path,
             projection_path=paths.projection_path,
             writer_lock=writer_lock,
+            candidate_verifier=candidate_verifier,
+            activation_barrier=activation_barrier,
+            operator_control_reconciler=operator_control_reconciler,
         ).run(max_cycles=args.cycles, start_campaign=False)
         return {
             "status": result.status,
@@ -334,15 +524,18 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
             "lock_path": str(result.lock_path),
             "control_gate_path": str(result.control_gate_path),
             "projection_path": str(result.projection_path),
-            "roster_receipt": (
-                roster_receipt.to_dict() if roster_receipt is not None else None
-            ),
+            "roster_receipt": (roster_receipt.to_dict()),
+            "authority_binding": authority_binding.to_dict(),
             "snapshot": result.snapshot.to_dict(),
         }
     finally:
         try:
-            if swarm._running:
-                await swarm.shutdown(drain_timeout=args.shutdown_timeout)
+            try:
+                if verifier_provider is not None:
+                    await verifier_provider.close()
+            finally:
+                if swarm._running:
+                    await swarm.shutdown(drain_timeout=args.shutdown_timeout)
         finally:
             writer_lock.release()
 
@@ -368,6 +561,22 @@ def _cycle_is_fresh(
 
 def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[str]:
     state_dir = Path(args.state_dir).expanduser().resolve(strict=False)
+    _requested_roster(args)
+    activation_barrier_from_config(
+        args.mission_id,
+        args.observer_health_receipt,
+        args.observer_health_receipt_sha256,
+    )
+    operator_control_reconciler_from_config(
+        args.mission_id,
+        normal_inbox=args.operator_control_normal_inbox,
+        inflight_inbox=args.operator_control_inflight_inbox,
+        applied_inbox=args.operator_control_applied_inbox,
+        rejected_inbox=args.operator_control_rejected_inbox,
+        hmac_credential_path=args.operator_control_hmac_credential,
+        hmac_credential_sha256=args.operator_control_hmac_sha256,
+        max_candidates_per_cycle=args.operator_control_max_candidates_per_cycle,
+    )
     command = [
         sys.executable,
         str(Path(__file__).resolve()),
@@ -395,6 +604,58 @@ def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[s
     ]
     if args.canary_task_id:
         command.extend(["--canary-task-id", args.canary_task_id])
+    command.extend(
+        [
+            "--authority-manifest",
+            str(Path(args.authority_manifest).expanduser().absolute()),
+            "--observed-input-manifest",
+            str(Path(args.observed_input_manifest).expanduser().absolute()),
+            "--held-out-oracle-manifest",
+            str(Path(args.held_out_oracle_manifest).expanduser().absolute()),
+            "--verifier-seat",
+            args.verifier_seat,
+            "--oracle-request-root",
+            str(Path(args.oracle_request_root).expanduser().absolute()),
+            "--oracle-terminal-root",
+            str(Path(args.oracle_terminal_root).expanduser().absolute()),
+            "--oracle-sandbox-evidence-sha256",
+            args.oracle_sandbox_evidence_sha256,
+            "--oracle-timeout-seconds",
+            str(args.oracle_timeout_seconds),
+            "--oracle-poll-interval-seconds",
+            str(args.oracle_poll_interval_seconds),
+        ]
+    )
+    if args.observer_health_receipt:
+        command.extend(
+            [
+                "--observer-health-receipt",
+                str(Path(args.observer_health_receipt).expanduser().absolute()),
+                "--observer-health-receipt-sha256",
+                args.observer_health_receipt_sha256,
+            ]
+        )
+    if args.operator_control_hmac_credential:
+        command.extend(
+            [
+                "--operator-control-normal-inbox",
+                str(Path(args.operator_control_normal_inbox).expanduser().absolute()),
+                "--operator-control-inflight-inbox",
+                str(Path(args.operator_control_inflight_inbox).expanduser().absolute()),
+                "--operator-control-applied-inbox",
+                str(Path(args.operator_control_applied_inbox).expanduser().absolute()),
+                "--operator-control-rejected-inbox",
+                str(Path(args.operator_control_rejected_inbox).expanduser().absolute()),
+                "--operator-control-hmac-credential",
+                str(
+                    Path(args.operator_control_hmac_credential).expanduser().absolute()
+                ),
+                "--operator-control-hmac-sha256",
+                args.operator_control_hmac_sha256,
+                "--operator-control-max-candidates-per-cycle",
+                str(args.operator_control_max_candidates_per_cycle),
+            ]
+        )
     if args.lease_root:
         command.extend(
             [
@@ -403,8 +664,20 @@ def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[s
             ]
         )
     if args.held_out_oracle_digest:
+        command.extend(["--held-out-oracle-digest", args.held_out_oracle_digest])
+    if args.verifier_lock_root:
         command.extend(
-            ["--held-out-oracle-digest", args.held_out_oracle_digest]
+            [
+                "--verifier-lock-root",
+                str(Path(args.verifier_lock_root).expanduser().absolute()),
+            ]
+        )
+    if args.oracle_work_root:
+        command.extend(
+            [
+                "--oracle-work-root",
+                str(Path(args.oracle_work_root).expanduser().absolute()),
+            ]
         )
     roster_values = (
         str(getattr(args, "agent_roster", "") or ""),
@@ -632,20 +905,18 @@ def _add_paths(parser: argparse.ArgumentParser, *, log: bool = False) -> None:
         parser.add_argument("--log-path", default=None)
 
 
-def _add_run_config(parser: argparse.ArgumentParser) -> None:
+def _add_campaign_config(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--operator-id", default="operator")
     parser.add_argument("--canary-task-id", default="")
     parser.add_argument("--max-dispatch-per-cycle", type=int, default=4)
     parser.add_argument("--cycle-interval-seconds", type=float, default=5.0)
     parser.add_argument("--freshness-seconds", type=float, default=30.0)
     parser.add_argument("--held-out-oracle-digest", default="")
-    parser.add_argument("--lease-root", default=None)
-    parser.add_argument("--shutdown-timeout", type=float, default=15.0)
-    parser.add_argument("--writer-handoff-timeout", type=float, default=10.0)
-    parser.add_argument("--fast-boot", action="store_true")
-    parser.add_argument("--agent-roster", default="")
-    parser.add_argument("--agent-roster-sha256", default="")
-    parser.add_argument("--objective-sha256", default="")
+
+
+def _add_run_config(parser: argparse.ArgumentParser) -> None:
+    _add_campaign_config(parser)
+    add_campaign_runtime_arguments(parser)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -657,6 +928,12 @@ def build_parser() -> argparse.ArgumentParser:
     _add_run_config(start)
     start.add_argument("--start-timeout", type=float, default=120.0)
     start.add_argument("--poll-interval", type=float, default=0.25)
+
+    prepare = sub.add_parser(
+        "prepare", help="Idempotently create the durable campaign session."
+    )
+    _add_paths(prepare)
+    _add_campaign_config(prepare)
 
     run = sub.add_parser("run", help="Run the foreground supervisor service.")
     _add_paths(run)
@@ -681,6 +958,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "start":
             payload = start_campaign_process(args)
             code = 0 if payload["start_confirmed"] else 2
+        elif args.command == "prepare":
+            payload = asyncio.run(prepare_campaign(args))
+            code = 0 if payload["status"] == "prepared" else 2
         elif args.command == "run":
             payload = asyncio.run(run_campaign(args))
             code = 0

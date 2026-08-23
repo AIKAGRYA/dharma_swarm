@@ -25,6 +25,14 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
 )
+from dharma_swarm.mission_control_operator_state import (
+    OPERATOR_CONTROL_RECEIPT_REF_PREFIX,
+    OPERATOR_CONTROL_RECEIPT_SCHEMA,
+    OPERATOR_CONTROL_RECEIPT_TYPE,
+    canonical_utc_timestamp,
+    runtime_receipt_content_digest,
+    validate_operator_control_state,
+)
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
@@ -438,11 +446,127 @@ _IMMUTABLE_RUNTIME_RECEIPT_TYPES = frozenset(
         "mission_independent_acceptance",
         "mission_campaign_cycle",
         "mission_campaign_control",
+        OPERATOR_CONTROL_RECEIPT_TYPE,
+        "mission_dispatch_indeterminate",
+        "mission_observed_input",
     }
 )
 _IMMUTABLE_SESSION_SCHEMA_VALUES = frozenset(
     {"dharma.mission_control.campaign.v1"}
 )
+
+_CAMPAIGN_INDETERMINATE_SCHEMA = "dharma.sadhana.runtime_indeterminate.v1"
+_PROVIDER_EVIDENCE_KEYS = frozenset(
+    {
+        "actual_served_provider",
+        "actual_served_model",
+        "served_provider",
+        "served_model",
+        "provider_served",
+        "model_served",
+    }
+)
+
+
+def _campaign_indeterminate_payload(
+    *, mission_id: str, task_id: str, run_id: str, claim_id: str,
+    agent_id: str, attempt_generation: int,
+) -> dict[str, Any]:
+    return {
+        "schema_version": _CAMPAIGN_INDETERMINATE_SCHEMA,
+        "mission_id": mission_id,
+        "task_id": task_id,
+        "run_id": run_id,
+        "claim_id": claim_id,
+        "agent_id": agent_id,
+        "attempt_generation": attempt_generation,
+        "provider_task_scheduled": False,
+    }
+
+
+def _pre_effect_payload_is_exact(
+    payload: dict[str, Any], *, mission_id: str, attempt_generation: int,
+) -> bool:
+    return bool(
+        payload.get("mission_id") == mission_id
+        and payload.get("attempt_generation") == attempt_generation
+        and not any(payload.get(key) for key in _PROVIDER_EVIDENCE_KEYS)
+        and payload.get("provider_execution") is not True
+    )
+
+
+def _pre_effect_receipt_is_exact(
+    receipt: RuntimeReceipt,
+    identity: ExecutionIdentity,
+    *,
+    mission_id: str,
+    claim_id: str,
+    attempt_generation: int,
+    indeterminate_receipt_id: str,
+    indeterminate_payload: dict[str, Any],
+) -> bool:
+    carrier = (
+        receipt.run_id,
+        receipt.task_id,
+        receipt.trace_id,
+        receipt.correlation_id,
+        receipt.causation_id,
+        receipt.parent_run_id,
+        receipt.agent_id,
+        receipt.idempotency_key,
+    )
+    expected_carrier = (
+        identity.run_id,
+        identity.task_id,
+        identity.trace_id,
+        identity.correlation_id,
+        identity.causation_id,
+        identity.parent_run_id,
+        identity.agent_id,
+        identity.idempotency_key,
+    )
+    if carrier != expected_carrier:
+        return False
+    if receipt.receipt_id == indeterminate_receipt_id:
+        return bool(
+            receipt.receipt_type == "mission_dispatch_indeterminate"
+            and receipt.status == "failed"
+            and receipt.side_effect_key
+            == f"campaign_dispatch_indeterminate:{identity.run_id}"
+            and receipt.payload == indeterminate_payload
+        )
+    prefix = "task_claim" if receipt.side_effect_key.startswith("task_claim:") else (
+        "delegation_run"
+        if receipt.side_effect_key.startswith("delegation_run:")
+        else ""
+    )
+    status = receipt.side_effect_key.rsplit(":", 1)[-1]
+    target = claim_id if prefix == "task_claim" else identity.run_id
+    if (
+        prefix not in {"task_claim", "delegation_run"}
+        or status not in {"claimed", "running"}
+        or receipt.side_effect_key != f"{prefix}:{target}:{status}"
+        or not _pre_effect_payload_is_exact(
+            receipt.payload,
+            mission_id=mission_id,
+            attempt_generation=attempt_generation,
+        )
+    ):
+        return False
+    allowed = {
+        prefix: {status},
+        "idempotency_consumed": {"accepted"},
+        "side_effect_intent": {"started"},
+        "side_effect_complete": {"completed"},
+    }
+    if receipt.status not in allowed.get(receipt.receipt_type, set()):
+        return False
+    if prefix == "task_claim" and receipt.payload.get("claim_id") != claim_id:
+        return False
+    if receipt.receipt_type == "side_effect_complete":
+        expected = f"rr_{identity.run_id}_{status}_{'claim' if prefix == 'task_claim' else 'run'}"
+        return receipt.payload.get("result_receipt_id") == expected
+    return True
 
 
 def _stable_bound_id(prefix: str, *parts: str) -> str:
@@ -451,6 +575,9 @@ def _stable_bound_id(prefix: str, *parts: str) -> str:
 
 
 def _validate_campaign_cycle_receipt(receipt: RuntimeReceipt) -> None:
+    if receipt.receipt_type == OPERATOR_CONTROL_RECEIPT_TYPE:
+        _validate_campaign_operator_control_receipt(receipt)
+        return
     if receipt.receipt_type != "mission_campaign_cycle":
         return
     payload = receipt.payload
@@ -483,6 +610,72 @@ def _validate_campaign_cycle_receipt(receipt: RuntimeReceipt) -> None:
         or receipt.status not in {"completed", "partial"}
     ):
         raise ValueError("campaign cycle receipt carrier is invalid")
+
+
+def _validate_campaign_operator_control_receipt(receipt: RuntimeReceipt) -> None:
+    payload = receipt.payload
+    mission_id = payload.get("mission_id")
+    generation = payload.get("campaign_generation")
+    sequence = payload.get("transition_sequence")
+    idempotency_key = payload.get("idempotency_key")
+    status = payload.get("application_status")
+    expected_fields = {
+        "schema_version",
+        "campaign_schema_version",
+        "mission_id",
+        "config_digest",
+        "campaign_generation",
+        "transition_sequence",
+        "request_id",
+        "idempotency_key",
+        "action",
+        "issued_at",
+        "expires_at",
+        "reason",
+        "operator_login",
+        "source_envelope_sha256",
+        "prior_control_state",
+        "next_control_state",
+        "application_status",
+        "rejection_reason",
+        "authority_applied_at",
+        "preserves_queued_work",
+        "external_effect_performed",
+    }
+    if (
+        set(payload) != expected_fields
+        or payload.get("schema_version") != OPERATOR_CONTROL_RECEIPT_SCHEMA
+        or payload.get("campaign_schema_version")
+        != "dharma.mission_control.campaign.v1"
+        or not isinstance(mission_id, str)
+        or not mission_id
+        or isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 1
+        or isinstance(sequence, bool)
+        or not isinstance(sequence, int)
+        or sequence < 0
+        or not isinstance(idempotency_key, str)
+        or not idempotency_key
+        or status not in {"applied", "rejected"}
+        or receipt.status != status
+        or receipt.receipt_id
+        != _stable_bound_id(
+            "mission_campaign_operator_control", mission_id, idempotency_key
+        )
+        or receipt.run_id
+        != _stable_bound_id("mission_campaign_run", mission_id, str(generation))
+        or receipt.correlation_id != f"mission_campaign:{mission_id}"
+        or receipt.agent_id != "mission-control-supervisor"
+        or receipt.idempotency_key != idempotency_key
+        or receipt.side_effect_key
+        != f"mission_campaign_operator_control:{idempotency_key}"
+        or payload.get("authority_applied_at")
+        != canonical_utc_timestamp(receipt.created_at)
+        or payload.get("preserves_queued_work") is not True
+        or payload.get("external_effect_performed") is not False
+    ):
+        raise ValueError("campaign operator control receipt carrier is invalid")
 
 
 def _json_dump(value: Any) -> str:
@@ -1742,17 +1935,28 @@ class RuntimeStateStore:
                 or replacement.session_id != f"mission_campaign:{mission_id}"
             ):
                 raise ValueError("campaign session generation binding is invalid")
+            operator_receipt = (
+                atomic_receipt.receipt_type == OPERATOR_CONTROL_RECEIPT_TYPE
+            )
+            receipt_schema = atomic_receipt.payload.get(
+                "campaign_schema_version" if operator_receipt else "schema_version"
+            )
+            receipt_generation = atomic_receipt.payload.get(
+                "campaign_generation" if operator_receipt else "generation"
+            )
             if (
                 atomic_receipt.receipt_type
-                not in {"mission_campaign_control", "mission_campaign_cycle"}
+                not in {
+                    "mission_campaign_control",
+                    "mission_campaign_cycle",
+                    OPERATOR_CONTROL_RECEIPT_TYPE,
+                }
                 or atomic_receipt.correlation_id != replacement.session_id
                 or atomic_receipt.created_at != replacement.updated_at
-                or atomic_receipt.payload.get("schema_version")
-                not in _IMMUTABLE_SESSION_SCHEMA_VALUES
+                or receipt_schema not in _IMMUTABLE_SESSION_SCHEMA_VALUES
                 or atomic_receipt.payload.get("mission_id")
                 != mission_id
-                or atomic_receipt.payload.get("generation")
-                != replacement_generation
+                or receipt_generation != replacement_generation
                 or expected.metadata.get("mission_id") != mission_id
                 or expected.metadata.get("config_digest")
                 != replacement.metadata.get("config_digest")
@@ -1794,6 +1998,91 @@ class RuntimeStateStore:
                     or atomic_receipt.agent_id != replacement.operator_id
                 ):
                     raise ValueError("campaign control receipt transition is invalid")
+            elif atomic_receipt.receipt_type == OPERATOR_CONTROL_RECEIPT_TYPE:
+                action = atomic_receipt.payload.get("action")
+                expected_raw_state = expected.metadata.get("operator_control_state")
+                if expected_raw_state is None:
+                    if expected.status != "active":
+                        raise ValueError(
+                            "campaign operator control state is missing"
+                        )
+                    expected_state = {
+                        "schema_version": "dharma.sadhana.operator_control_state.v1",
+                        "control_state": "RUNNING",
+                        "campaign_generation": expected_generation,
+                        "transition_sequence": 0,
+                        "request_id": "",
+                        "idempotency_key": "",
+                        "action": "",
+                        "source_envelope_sha256": "",
+                        "authority_receipt_ref": "",
+                        "authority_receipt_sha256": "",
+                        "authority_applied_at": None,
+                        "effect_state": "unobserved",
+                        "effect_receipt_ref": "",
+                        "effect_receipt_sha256": "",
+                        "effect_observed_at": None,
+                    }
+                else:
+                    expected_state = validate_operator_control_state(
+                        expected_raw_state,
+                        expected_generation=expected_generation,
+                    )
+                replacement_state = validate_operator_control_state(
+                    replacement.metadata.get("operator_control_state"),
+                    expected_generation=replacement_generation,
+                )
+                expected_without_state = dict(expected.metadata)
+                replacement_without_state = dict(replacement.metadata)
+                expected_without_state.pop("operator_control_state", None)
+                replacement_without_state.pop("operator_control_state", None)
+                expected_status = {"active": "RUNNING", "paused": "PAUSED"}.get(
+                    expected.status
+                )
+                target_status = {"pause": ("paused", "PAUSED"), "resume": ("active", "RUNNING")}.get(
+                    action
+                )
+                if (
+                    target_status is None
+                    or expected_status != expected_state["control_state"]
+                    or replacement.status != target_status[0]
+                    or replacement_state["control_state"] != target_status[1]
+                    or replacement_generation != expected_generation
+                    or replacement.metadata.get("stop_requested") is not False
+                    or expected.metadata.get("stop_requested") is not False
+                    or replacement_without_state != expected_without_state
+                    or replacement_state["campaign_generation"]
+                    != replacement_generation
+                    or replacement_state["transition_sequence"]
+                    != expected_state["transition_sequence"] + 1
+                    or replacement_state["request_id"]
+                    != atomic_receipt.payload.get("request_id")
+                    or replacement_state["idempotency_key"]
+                    != atomic_receipt.payload.get("idempotency_key")
+                    or replacement_state["action"] != action
+                    or replacement_state["source_envelope_sha256"]
+                    != atomic_receipt.payload.get("source_envelope_sha256")
+                    or replacement_state["authority_receipt_ref"]
+                    != OPERATOR_CONTROL_RECEIPT_REF_PREFIX
+                    + atomic_receipt.receipt_id
+                    or replacement_state["authority_receipt_sha256"]
+                    != runtime_receipt_content_digest(atomic_receipt)
+                    or replacement_state["authority_applied_at"]
+                    != canonical_utc_timestamp(atomic_receipt.created_at)
+                    or replacement_state["effect_state"] != "unobserved"
+                    or atomic_receipt.status != "applied"
+                    or atomic_receipt.payload.get("prior_control_state")
+                    != expected_state["control_state"]
+                    or atomic_receipt.payload.get("next_control_state")
+                    != replacement_state["control_state"]
+                    or atomic_receipt.payload.get("transition_sequence")
+                    != replacement_state["transition_sequence"]
+                    or atomic_receipt.payload.get("config_digest")
+                    != replacement.metadata.get("config_digest")
+                ):
+                    raise ValueError(
+                        "campaign operator control receipt transition is invalid"
+                    )
             else:
                 sequence = replacement.metadata.get("last_cycle_sequence")
                 expected_sequence = expected.metadata.get("last_cycle_sequence")
@@ -1812,8 +2101,12 @@ class RuntimeStateStore:
                 )
                 if (
                     replacement_generation != expected_generation
-                    or replacement.status != "active"
-                    or expected.status != "active"
+                    or replacement.status != expected.status
+                    or expected.status not in {"active", "paused"}
+                    or (
+                        expected.status == "paused"
+                        and atomic_receipt.payload.get("dispatched") != 0
+                    )
                     or replacement.metadata.get("stop_requested") is not False
                     or sequence != expected_sequence + 1
                     or atomic_receipt.payload.get("sequence") != sequence
@@ -2657,6 +2950,266 @@ class RuntimeStateStore:
         assert loaded is not None
         return loaded
 
+    async def finalize_delegation_run_evidence_exact(
+        self,
+        *,
+        expected_running: DelegationRun,
+        completed: DelegationRun,
+        receipts: tuple[RuntimeReceipt, ...],
+        artifacts: tuple[ArtifactRecord, ...] = (),
+    ) -> DelegationRun:
+        """Atomically seal immutable evidence and one exact running run.
+
+        Exact existing carriers are replay-safe.  Conflicting, failed, or otherwise
+        foreign lifecycle rows fail closed; this method never resurrects a terminal
+        run.
+        """
+        if (
+            expected_running.status.lower() != "running"
+            or expected_running.completed_at is not None
+            or completed.status.lower() != "completed"
+            or completed.completed_at is None
+            or completed.failure_code
+            or replace(
+                completed,
+                status=expected_running.status,
+                completed_at=expected_running.completed_at,
+                failure_code=expected_running.failure_code,
+            )
+            != expected_running
+            or completed.completed_at < completed.started_at
+            or not receipts
+            or len({item.receipt_id for item in receipts}) != len(receipts)
+            or len({item.artifact_id for item in artifacts}) != len(artifacts)
+        ):
+            raise ValueError("delegation evidence finalization coordinates are invalid")
+        for receipt in receipts:
+            _validate_campaign_cycle_receipt(receipt)
+            if (
+                receipt.run_id != completed.run_id
+                or receipt.task_id != completed.task_id
+                or receipt.created_at > completed.completed_at
+            ):
+                raise ValueError("runtime receipt is foreign to delegation finalization")
+        for artifact in artifacts:
+            if (
+                artifact.run_id != completed.run_id
+                or artifact.task_id != completed.task_id
+                or artifact.created_at > completed.completed_at
+            ):
+                raise ValueError("artifact is foreign to delegation finalization")
+
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                row = await (
+                    await db.execute(
+                        "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                        " assigned_by, assigned_to, requested_output_json,"
+                        " current_artifact_id, status, started_at, completed_at,"
+                        " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                        (completed.run_id,),
+                    )
+                ).fetchone()
+                current = _row_to_run(row) if row is not None else None
+                if current != expected_running and current != completed:
+                    raise ValueError("delegation run does not match exact finalization state")
+
+                identity_row = await (
+                    await db.execute(
+                        self._identity_select_sql() + " WHERE run_id = ?",
+                        (completed.run_id,),
+                    )
+                ).fetchone()
+                identity = (
+                    _row_to_execution_identity(identity_row)
+                    if identity_row is not None
+                    else None
+                )
+                if identity is None or (
+                    identity.task_id != completed.task_id
+                    or identity.claim_id != completed.claim_id
+                    or identity.agent_id != completed.assigned_to
+                    or identity.session_id != completed.session_id
+                    or identity.parent_run_id != completed.parent_run_id
+                ):
+                    raise ValueError(
+                        "delegation finalization execution identity conflicts"
+                    )
+
+                for receipt in receipts:
+                    if (
+                        receipt.trace_id != identity.trace_id
+                        or receipt.correlation_id != identity.correlation_id
+                        or receipt.causation_id != identity.causation_id
+                        or receipt.parent_run_id != identity.parent_run_id
+                        or receipt.agent_id != identity.agent_id
+                        or receipt.idempotency_key != identity.idempotency_key
+                    ):
+                        raise ValueError(
+                            "delegation finalization receipt carrier is foreign"
+                        )
+                for artifact in artifacts:
+                    if (
+                        artifact.trace_id != identity.trace_id
+                        or artifact.session_id != identity.session_id
+                    ):
+                        raise ValueError(
+                            "delegation finalization artifact carrier is foreign"
+                        )
+
+                for receipt in receipts:
+                    row = await (
+                        await db.execute(
+                            "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                            " correlation_id, causation_id, parent_run_id, agent_id,"
+                            " idempotency_key, side_effect_key, status, payload_json,"
+                            " created_at FROM runtime_receipts WHERE receipt_id = ?",
+                            (receipt.receipt_id,),
+                        )
+                    ).fetchone()
+                    if row is not None:
+                        if _row_to_runtime_receipt(row) != receipt:
+                            raise ValueError("runtime receipt finalization evidence conflicts")
+                        continue
+                    await db.execute(
+                        "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id,"
+                        " task_id, trace_id, correlation_id, causation_id, parent_run_id,"
+                        " agent_id, idempotency_key, side_effect_key, status, payload_json,"
+                        " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            receipt.receipt_id,
+                            receipt.receipt_type,
+                            receipt.run_id,
+                            receipt.task_id,
+                            receipt.trace_id,
+                            receipt.correlation_id,
+                            receipt.causation_id,
+                            receipt.parent_run_id,
+                            receipt.agent_id,
+                            receipt.idempotency_key,
+                            receipt.side_effect_key,
+                            receipt.status,
+                            _json_dump(receipt.payload),
+                            receipt.created_at.isoformat(),
+                        ),
+                    )
+
+                for artifact in artifacts:
+                    row = await (
+                        await db.execute(
+                            "SELECT artifact_id, session_id, task_id, run_id, trace_id,"
+                            " artifact_kind, manifest_path, payload_path, checksum,"
+                            " parent_artifact_id, promotion_state, created_at, metadata_json"
+                            " FROM artifact_records WHERE artifact_id = ?",
+                            (artifact.artifact_id,),
+                        )
+                    ).fetchone()
+                    if row is not None:
+                        if _row_to_artifact(row) != artifact:
+                            raise ValueError("artifact finalization evidence conflicts")
+                        continue
+                    await db.execute(
+                        "INSERT INTO artifact_records (artifact_id, session_id, task_id,"
+                        " run_id, trace_id, artifact_kind, manifest_path, payload_path,"
+                        " checksum, parent_artifact_id, promotion_state, created_at,"
+                        " metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            artifact.artifact_id,
+                            artifact.session_id,
+                            artifact.task_id,
+                            artifact.run_id,
+                            artifact.trace_id,
+                            artifact.artifact_kind,
+                            artifact.manifest_path,
+                            artifact.payload_path,
+                            artifact.checksum,
+                            artifact.parent_artifact_id,
+                            artifact.promotion_state,
+                            artifact.created_at.isoformat(),
+                            _json_dump(artifact.metadata),
+                        ),
+                    )
+
+                if current == expected_running:
+                    cursor = await db.execute(
+                        "UPDATE delegation_runs SET status = ?, completed_at = ?,"
+                        " failure_code = ? WHERE run_id = ? AND status = ?"
+                        " AND completed_at IS NULL",
+                        (
+                            completed.status,
+                            completed.completed_at.isoformat(),
+                            completed.failure_code,
+                            completed.run_id,
+                            expected_running.status,
+                        ),
+                    )
+                    if cursor.rowcount != 1:
+                        raise ValueError("delegation run finalization CAS lost")
+                await db.commit()
+            except BaseException:
+                await db.rollback()
+                raise
+        return completed
+
+    async def compare_and_swap_delegation_run_exact(
+        self,
+        expected: DelegationRun,
+        replacement: DelegationRun,
+    ) -> bool:
+        """Replace only lifecycle fields of one byte-equivalent delegation row."""
+        if (
+            expected.run_id != replacement.run_id
+            or replace(
+                replacement,
+                status=expected.status,
+                completed_at=expected.completed_at,
+                failure_code=expected.failure_code,
+            )
+            != expected
+        ):
+            raise ValueError("delegation run CAS changes immutable coordinates")
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                row = await (
+                    await db.execute(
+                        "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                        " assigned_by, assigned_to, requested_output_json,"
+                        " current_artifact_id, status, started_at, completed_at,"
+                        " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                        (expected.run_id,),
+                    )
+                ).fetchone()
+                if row is None or _row_to_run(row) != expected:
+                    await db.commit()
+                    return False
+                cursor = await db.execute(
+                    "UPDATE delegation_runs SET status = ?, completed_at = ?,"
+                    " failure_code = ? WHERE run_id = ?",
+                    (
+                        replacement.status,
+                        replacement.completed_at.isoformat()
+                        if replacement.completed_at
+                        else None,
+                        replacement.failure_code,
+                        replacement.run_id,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError("delegation run CAS lost")
+                await db.commit()
+                return True
+            except BaseException:
+                await db.rollback()
+                raise
+
     async def get_delegation_run(self, run_id: str) -> DelegationRun | None:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
@@ -2703,6 +3256,313 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_run(row) for row in rows]
+
+    async def inspect_campaign_dispatch_indeterminate(
+        self,
+        *,
+        mission_id: str,
+        task_id: str,
+        run_id: str,
+        claim_id: str,
+        agent_id: str,
+        idempotency_key: str,
+        attempt_generation: int,
+    ) -> str:
+        """Classify one attempt without changing its durable runtime rows."""
+        return await self._campaign_dispatch_indeterminate(
+            mission_id=mission_id,
+            task_id=task_id,
+            run_id=run_id,
+            claim_id=claim_id,
+            agent_id=agent_id,
+            idempotency_key=idempotency_key,
+            attempt_generation=attempt_generation,
+            apply=False,
+        )
+
+    async def resolve_campaign_dispatch_indeterminate(
+        self,
+        *,
+        mission_id: str,
+        task_id: str,
+        run_id: str,
+        claim_id: str,
+        agent_id: str,
+        idempotency_key: str,
+        attempt_generation: int,
+    ) -> str:
+        """Atomically terminalize one exactly classified pre-provider attempt."""
+        return await self._campaign_dispatch_indeterminate(
+            mission_id=mission_id,
+            task_id=task_id,
+            run_id=run_id,
+            claim_id=claim_id,
+            agent_id=agent_id,
+            idempotency_key=idempotency_key,
+            attempt_generation=attempt_generation,
+            apply=True,
+        )
+
+    async def _campaign_dispatch_indeterminate(
+        self,
+        *,
+        mission_id: str,
+        task_id: str,
+        run_id: str,
+        claim_id: str,
+        agent_id: str,
+        idempotency_key: str,
+        attempt_generation: int,
+        apply: bool,
+    ) -> str:
+        """Terminalize only exact pre-provider runtime evidence for one attempt.
+
+        Returns ``absent``, ``terminalized``, ``already_terminal``,
+        ``effect_observed``, or ``conflict``.  The transaction fails closed on
+        any provider/invoker idempotency or receipt evidence.
+        """
+        identifiers = (mission_id, task_id, run_id, claim_id, agent_id, idempotency_key)
+        if any(not value or value != value.strip() for value in identifiers):
+            raise ValueError("campaign indeterminate identity is invalid")
+        if (
+            isinstance(attempt_generation, bool)
+            or not isinstance(attempt_generation, int)
+            or attempt_generation < 0
+        ):
+            raise ValueError("campaign indeterminate generation is invalid")
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            identity_row = await (
+                await db.execute(
+                    self._identity_select_sql() + " WHERE run_id = ?", (run_id,)
+                )
+            ).fetchone()
+            run_row = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                    " assigned_by, assigned_to, requested_output_json,"
+                    " current_artifact_id, status, started_at, completed_at,"
+                    " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                    (run_id,),
+                )
+            ).fetchone()
+            claim_row = await (
+                await db.execute(
+                    "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                    " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                    " metadata_json FROM task_claims WHERE claim_id = ?", (claim_id,),
+                )
+            ).fetchone()
+            receipt_rows = await (
+                await db.execute(
+                    "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                    " correlation_id, causation_id, parent_run_id, agent_id,"
+                    " idempotency_key, side_effect_key, status, payload_json, created_at"
+                    " FROM runtime_receipts WHERE run_id = ?", (run_id,),
+                )
+            ).fetchall()
+            idempotency_rows = await (
+                await db.execute(
+                    "SELECT idempotency_key, side_effect_key, run_id, task_id, trace_id,"
+                    " correlation_id, status, result_receipt_id, metadata_json,"
+                    " created_at, updated_at FROM idempotency_records WHERE run_id = ?",
+                    (run_id,),
+                )
+            ).fetchall()
+            identity = (
+                _row_to_execution_identity(identity_row)
+                if identity_row is not None else None
+            )
+            run = _row_to_run(run_row) if run_row is not None else None
+            claim = _row_to_claim(claim_row) if claim_row is not None else None
+            if identity is None and run is None and claim is None and not receipt_rows:
+                await db.commit()
+                return "absent"
+            if identity is None or (
+                identity.task_id != task_id
+                or identity.run_id != run_id
+                or identity.claim_id != claim_id
+                or identity.agent_id != agent_id
+                or identity.idempotency_key != idempotency_key
+                or identity.metadata.get("attempt_generation") != attempt_generation
+            ):
+                await db.rollback()
+                return "conflict"
+            receipt_id = "rr_" + hashlib.sha256(
+                f"campaign_dispatch_indeterminate:{run_id}".encode()
+            ).hexdigest()[:32]
+            payload = _campaign_indeterminate_payload(
+                mission_id=mission_id,
+                task_id=task_id,
+                run_id=run_id,
+                claim_id=claim_id,
+                agent_id=agent_id,
+                attempt_generation=attempt_generation,
+            )
+            receipts = [_row_to_runtime_receipt(row) for row in receipt_rows]
+            if any(
+                not _pre_effect_receipt_is_exact(
+                    receipt,
+                    identity,
+                    mission_id=mission_id,
+                    claim_id=claim_id,
+                    attempt_generation=attempt_generation,
+                    indeterminate_receipt_id=receipt_id,
+                    indeterminate_payload=payload,
+                )
+                for receipt in receipts
+            ):
+                await db.rollback()
+                return "effect_observed"
+            idempotencies = [
+                _row_to_idempotency_record(row) for row in idempotency_rows
+            ]
+            for record in idempotencies:
+                prefix = (
+                    "task_claim"
+                    if record.side_effect_key.startswith("task_claim:")
+                    else "delegation_run"
+                    if record.side_effect_key.startswith("delegation_run:")
+                    else ""
+                )
+                status = record.side_effect_key.rsplit(":", 1)[-1]
+                target = claim_id if prefix == "task_claim" else run_id
+                expected_receipt = (
+                    f"rr_{run_id}_{status}_{'claim' if prefix == 'task_claim' else 'run'}"
+                )
+                if (
+                    prefix not in {"task_claim", "delegation_run"}
+                    or status not in {"claimed", "running"}
+                    or record.side_effect_key != f"{prefix}:{target}:{status}"
+                    or record.idempotency_key != idempotency_key
+                    or record.run_id != run_id
+                    or record.task_id != task_id
+                    or record.trace_id != identity.trace_id
+                    or record.correlation_id != identity.correlation_id
+                    or record.status not in {"started", "completed"}
+                    or (
+                        record.result_receipt_id
+                        not in {"", expected_receipt}
+                    )
+                    or not _pre_effect_payload_is_exact(
+                        record.metadata,
+                        mission_id=mission_id,
+                        attempt_generation=attempt_generation,
+                    )
+                ):
+                    await db.rollback()
+                    return "effect_observed"
+            if run is not None and (
+                run.task_id != task_id
+                or run.claim_id != claim_id
+                or run.assigned_to != agent_id
+                or run.assigned_by != "orchestrator"
+                or run.metadata.get("mission_id") != mission_id
+                or run.metadata.get("attempt_generation") != attempt_generation
+            ):
+                await db.rollback()
+                return "conflict"
+            if claim is not None and (
+                claim.task_id != task_id
+                or claim.agent_id != agent_id
+                or claim.session_id != identity.session_id
+                or claim.metadata.get("mission_id") != mission_id
+                or claim.metadata.get("attempt_generation") != attempt_generation
+            ):
+                await db.rollback()
+                return "conflict"
+            if run is not None and run.status.lower() not in {
+                "claimed", "running", "failed"
+            }:
+                await db.rollback()
+                return "effect_observed"
+            if claim is not None and claim.status.lower() not in {
+                "claimed", "running", "failed"
+            }:
+                await db.rollback()
+                return "effect_observed"
+            if (
+                run is not None and run.status.lower() == "failed"
+                and run.failure_code != "dispatch_indeterminate"
+            ):
+                await db.rollback()
+                return "effect_observed"
+            already = bool(
+                (run is None or run.status.lower() == "failed")
+                and (claim is None or claim.status.lower() == "failed")
+            )
+            now = _utc_now().isoformat()
+            terminal = {
+                "attempt_generation": attempt_generation,
+                "failure_code": "dispatch_indeterminate",
+                "provider_task_scheduled": False,
+            }
+            if run is not None and run.status.lower() == "failed" and any(
+                run.metadata.get(key) != value for key, value in terminal.items()
+            ):
+                await db.rollback()
+                return "effect_observed"
+            if claim is not None and claim.status.lower() == "failed" and any(
+                claim.metadata.get(key) != value for key, value in terminal.items()
+            ):
+                await db.rollback()
+                return "effect_observed"
+            if not apply:
+                await db.rollback()
+                return "already_terminal" if already else "recoverable"
+            if run is not None and run.status.lower() != "failed":
+                cursor = await db.execute(
+                    "UPDATE delegation_runs SET status = 'failed', completed_at = ?,"
+                    " failure_code = 'dispatch_indeterminate', metadata_json = ?"
+                    " WHERE run_id = ? AND status = ? AND metadata_json = ?",
+                    (now, _json_dump({**run.metadata, **terminal}), run_id,
+                     run.status, _json_dump(run.metadata)),
+                )
+                if cursor.rowcount != 1:
+                    await db.rollback()
+                    return "conflict"
+            if claim is not None and claim.status.lower() != "failed":
+                cursor = await db.execute(
+                    "UPDATE task_claims SET status = 'failed', heartbeat_at = ?,"
+                    " recovered_at = ?, metadata_json = ? WHERE claim_id = ?"
+                    " AND status = ? AND metadata_json = ?",
+                    (now, now, _json_dump({**claim.metadata, **terminal}), claim_id,
+                     claim.status, _json_dump(claim.metadata)),
+                )
+                if cursor.rowcount != 1:
+                    await db.rollback()
+                    return "conflict"
+            existing_receipt = next(
+                (row for row in receipt_rows if row["receipt_id"] == receipt_id), None
+            )
+            if existing_receipt is None:
+                await db.execute(
+                    "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id,"
+                    " task_id, trace_id, correlation_id, causation_id, parent_run_id,"
+                    " agent_id, idempotency_key, side_effect_key, status, payload_json,"
+                    " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (receipt_id, "mission_dispatch_indeterminate", run_id, task_id,
+                     identity.trace_id, identity.correlation_id, identity.causation_id,
+                     identity.parent_run_id, agent_id, idempotency_key,
+                     f"campaign_dispatch_indeterminate:{run_id}", "failed",
+                     _json_dump(payload), now),
+                )
+            elif not _pre_effect_receipt_is_exact(
+                _row_to_runtime_receipt(existing_receipt),
+                identity,
+                mission_id=mission_id,
+                claim_id=claim_id,
+                attempt_generation=attempt_generation,
+                indeterminate_receipt_id=receipt_id,
+                indeterminate_payload=payload,
+            ):
+                await db.rollback()
+                return "conflict"
+            await db.commit()
+            return "already_terminal" if already else "terminalized"
 
     async def record_topology_state(
         self,
@@ -3287,6 +4147,53 @@ class RuntimeStateStore:
         loaded = await self.get_artifact(artifact.artifact_id)
         assert loaded is not None
         return loaded
+
+    async def insert_artifact_exact(self, artifact: ArtifactRecord) -> ArtifactRecord:
+        """Insert an immutable artifact carrier or return its exact existing row."""
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute(
+                    "SELECT artifact_id, session_id, task_id, run_id, trace_id,"
+                    " artifact_kind, manifest_path, payload_path, checksum,"
+                    " parent_artifact_id, promotion_state, created_at, metadata_json"
+                    " FROM artifact_records WHERE artifact_id = ?",
+                    (artifact.artifact_id,),
+                )
+            ).fetchone()
+            if row is not None:
+                existing = _row_to_artifact(row)
+                if existing != artifact:
+                    await db.rollback()
+                    raise ValueError("artifact identity already has conflicting evidence")
+                await db.commit()
+                return existing
+            await db.execute(
+                "INSERT INTO artifact_records (artifact_id, session_id, task_id, run_id,"
+                " trace_id, artifact_kind, manifest_path, payload_path, checksum,"
+                " parent_artifact_id, promotion_state, created_at, metadata_json)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    artifact.artifact_id,
+                    artifact.session_id,
+                    artifact.task_id,
+                    artifact.run_id,
+                    artifact.trace_id,
+                    artifact.artifact_kind,
+                    artifact.manifest_path,
+                    artifact.payload_path,
+                    artifact.checksum,
+                    artifact.parent_artifact_id,
+                    artifact.promotion_state,
+                    artifact.created_at.isoformat(),
+                    _json_dump(artifact.metadata),
+                ),
+            )
+            await db.commit()
+        return artifact
 
     async def get_artifact(self, artifact_id: str) -> ArtifactRecord | None:
         await self.init_db()

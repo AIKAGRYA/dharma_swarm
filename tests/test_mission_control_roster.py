@@ -10,6 +10,12 @@ from pathlib import Path
 
 import pytest
 
+import dharma_swarm.mission_control_roster as roster_module
+from dharma_swarm.mission_control_activation import (
+    OBSERVER_HEALTH_ENDPOINT,
+    OBSERVER_HEALTH_SCHEMA_VERSION,
+    OBSERVER_HEALTH_UNIT,
+)
 from dharma_swarm.mission_control_roster import (
     CampaignRosterError,
     ensure_campaign_agent_roster,
@@ -102,6 +108,61 @@ def _write_manifest(tmp_path: Path, payload: dict[str, object]) -> tuple[Path, s
     return path, hashlib.sha256(content).hexdigest()
 
 
+def _write_observer_health_receipt(tmp_path: Path) -> tuple[Path, str]:
+    release = "a" * 40
+    payload = {
+        "schema_version": OBSERVER_HEALTH_SCHEMA_VERSION,
+        "campaign_id": CAMPAIGN_ID,
+        "release_sha": release,
+        "service_unit_digest": "b" * 64,
+        "endpoint": OBSERVER_HEALTH_ENDPOINT,
+        "probe_started_at": "2026-08-23T01:00:00Z",
+        "probe_finished_at": "2026-08-23T01:00:01Z",
+        "consecutive_successes": 20,
+        "response_sha256_sequence": [f"{index:064x}" for index in range(20)],
+        "listener_process_identity": {
+            "unit": OBSERVER_HEALTH_UNIT,
+            "main_pid": 4242,
+            "proc_start_ticks": 12345,
+            "cmdline_sha256": "c" * 64,
+            "socket_inode": 555,
+            "uid": 991,
+            "gid": 991,
+            "forbidden_path_count": 9,
+            "canonical_path_visible": False,
+            "release_sha": release,
+        },
+        "dispatch_enabled_during_probe": False,
+        "observer_identity_separated": True,
+        "projection_source_separated": True,
+        "canonical_paths_inaccessible": True,
+        "health_is_work_evidence": False,
+        "verdict": "PASS",
+    }
+    unsigned = json.dumps(
+        payload,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
+    payload["receipt_digest"] = "sha256:" + hashlib.sha256(unsigned).hexdigest()
+    content = (
+        json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("ascii")
+        + b"\n"
+    )
+    path = tmp_path / "observer-health-acceptance.json"
+    path.write_bytes(content)
+    path.chmod(0o600)
+    return path, hashlib.sha256(content).hexdigest()
+
+
 def _load(path: Path, digest: str, *, now: datetime = NOW):
     return load_campaign_agent_roster(
         path,
@@ -110,6 +171,19 @@ def _load(path: Path, digest: str, *, now: datetime = NOW):
         objective_sha256=OBJECTIVE_SHA,
         now=now,
     )
+
+
+@pytest.mark.parametrize("flag", ["O_NOFOLLOW", "O_DIRECTORY"])
+def test_roster_manifest_requires_secure_open_flags(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    flag: str,
+) -> None:
+    path, digest = _write_manifest(tmp_path, _payload())
+    monkeypatch.delattr(roster_module.os, flag)
+
+    with pytest.raises(CampaignRosterError, match="O_NOFOLLOW and O_DIRECTORY"):
+        _load(path, digest)
 
 
 def _state(
@@ -196,7 +270,7 @@ def test_mode_and_symlink_custody_fail_closed(tmp_path: Path) -> None:
     path.chmod(0o600)
     link = tmp_path / "linked-roster.json"
     link.symlink_to(path)
-    with pytest.raises(CampaignRosterError, match="mode-0600"):
+    with pytest.raises(CampaignRosterError, match="opened securely"):
         _load(link, digest)
 
 
@@ -293,6 +367,12 @@ async def test_dead_exact_name_is_a_conflict_not_a_spawn_hint(tmp_path: Path) ->
 
 def test_campaign_child_command_forwards_exact_roster_triplet(tmp_path: Path) -> None:
     path, digest = _write_manifest(tmp_path, _payload())
+    observer_path, observer_digest = _write_observer_health_receipt(tmp_path)
+    control_secret = b"sadhana-operator-control-test-secret"
+    control_credential = tmp_path / "operator-control-hmac"
+    control_credential.write_bytes(control_secret)
+    control_credential.chmod(0o600)
+    control_digest = hashlib.sha256(control_secret).hexdigest()
     args = campaign_cli.build_parser().parse_args(
         [
             "start",
@@ -300,12 +380,26 @@ def test_campaign_child_command_forwards_exact_roster_triplet(tmp_path: Path) ->
             str(tmp_path / "state"),
             "--mission-id",
             CAMPAIGN_ID,
+            "--authority-manifest",
+            str(tmp_path / "authority.json"),
+            "--observed-input-manifest",
+            str(tmp_path / "observed-inputs.json"),
+            "--held-out-oracle-manifest",
+            str(tmp_path / "held-out-oracle.json"),
             "--agent-roster",
             str(path),
             "--agent-roster-sha256",
             digest,
             "--objective-sha256",
             OBJECTIVE_SHA,
+            "--observer-health-receipt",
+            str(observer_path),
+            "--observer-health-receipt-sha256",
+            observer_digest,
+            "--operator-control-hmac-credential",
+            str(control_credential),
+            "--operator-control-hmac-sha256",
+            control_digest,
         ]
     )
 
@@ -318,6 +412,12 @@ def test_campaign_child_command_forwards_exact_roster_triplet(tmp_path: Path) ->
     assert command[command.index("--agent-roster") + 1] == str(path.resolve())
     assert command[command.index("--agent-roster-sha256") + 1] == digest
     assert command[command.index("--objective-sha256") + 1] == OBJECTIVE_SHA
+    assert command[command.index("--operator-control-hmac-credential") + 1] == str(
+        control_credential
+    )
+    assert command[command.index("--operator-control-hmac-sha256") + 1] == (
+        control_digest
+    )
 
 
 def test_campaign_child_command_rejects_partial_roster_configuration(
@@ -330,6 +430,12 @@ def test_campaign_child_command_rejects_partial_roster_configuration(
             str(tmp_path / "state"),
             "--mission-id",
             CAMPAIGN_ID,
+            "--authority-manifest",
+            str(tmp_path / "authority.json"),
+            "--observed-input-manifest",
+            str(tmp_path / "observed-inputs.json"),
+            "--held-out-oracle-manifest",
+            str(tmp_path / "held-out-oracle.json"),
             "--agent-roster",
             str(tmp_path / "missing.json"),
         ]
