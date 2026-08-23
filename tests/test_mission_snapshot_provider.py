@@ -663,19 +663,22 @@ async def test_cycle_position_allows_envelope_rewrite_but_rejects_replay_or_equi
     _write(path, _redigest(terminal))
     assert (await provider.get_snapshot(MISSION_ID))["mission"]["title"] == "first"  # type: ignore[index]
 
-    control_equivocation = _operator_control_payload()
-    control_equivocation["mission_snapshot"]["mission"]["title"] = "first"
-    _write(path, _redigest(control_equivocation))
-    with pytest.raises(MissionSnapshotReadError, match="equivocated"):
-        await provider.get_snapshot(MISSION_ID)
+    control_transition = _operator_control_payload()
+    control_transition["mission_snapshot"]["mission"]["title"] = "first"
+    _write(path, _redigest(control_transition))
+    admitted = await provider.get_snapshot_with_operator_control(MISSION_ID)
+    assert admitted is not None
+    assert admitted[1]["transition_sequence"] == 1
+    assert admitted[1]["control_state"] == "PAUSED"
 
-    equivocation = copy.deepcopy(first)
+    equivocation = copy.deepcopy(control_transition)
     equivocation["mission_snapshot"]["mission"]["title"] = "equivocated"
     _write(path, _redigest(equivocation))
     with pytest.raises(MissionSnapshotReadError, match="equivocated"):
         await provider.get_snapshot(MISSION_ID)
 
-    newer = _payload(generation=3, cycle_sequence=8)
+    newer = copy.deepcopy(control_transition)
+    newer["cycle_sequence"] = 8
     newer["mission_snapshot"]["mission"]["title"] = "newer"
     _write(path, _redigest(newer))
     assert (await provider.get_snapshot(MISSION_ID))["mission"]["title"] == "newer"  # type: ignore[index]
@@ -684,6 +687,50 @@ async def test_cycle_position_allows_envelope_rewrite_but_rejects_replay_or_equi
     _write(path, _payload(generation=3, cycle_sequence=99))
     with pytest.raises(MissionSnapshotReadError, match="moved backwards"):
         await provider.get_snapshot(MISSION_ID)
+
+
+@pytest.mark.asyncio
+async def test_campaign_and_operator_positions_have_independent_high_water(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "campaign" / "status.json"
+    initial = _payload(generation=3, cycle_sequence=7)
+    _write(path, initial)
+    provider = _provider(path)
+    first = await provider.get_snapshot_with_operator_control(MISSION_ID)
+    assert first is not None
+    assert first[1]["transition_sequence"] == 0
+
+    pause = _operator_control_payload()
+    _write(path, pause)
+    second = await provider.get_snapshot_with_operator_control(MISSION_ID)
+    assert second is not None
+    assert second[1]["transition_sequence"] == 1
+    assert second[1]["control_state"] == "PAUSED"
+
+    later_cycle_replay = _payload(generation=3, cycle_sequence=8)
+    _write(path, later_cycle_replay)
+    with pytest.raises(MissionSnapshotReadError, match="operator control position"):
+        await provider.get_snapshot(MISSION_ID)
+
+    later_cycle = copy.deepcopy(pause)
+    later_cycle["cycle_sequence"] = 8
+    _write(path, _redigest(later_cycle))
+    assert await provider.get_snapshot(MISSION_ID) is not None
+
+    equal_transition_equivocation = copy.deepcopy(later_cycle)
+    equal_transition_equivocation["cycle_sequence"] = 9
+    equal_transition_equivocation["operator_control_state"][
+        "authority_receipt_ref"
+    ] = "runtime-receipt:pause-forged"
+    _write(path, _redigest(equal_transition_equivocation))
+    with pytest.raises(MissionSnapshotReadError, match="operator control evidence"):
+        await provider.get_snapshot(MISSION_ID)
+
+    valid_cycle_nine = copy.deepcopy(later_cycle)
+    valid_cycle_nine["cycle_sequence"] = 9
+    _write(path, _redigest(valid_cycle_nine))
+    assert await provider.get_snapshot(MISSION_ID) is not None
 
 
 @pytest.mark.asyncio

@@ -283,8 +283,10 @@ class ImmutableCampaignSnapshotProvider:
     ) -> None:
         self.config = config
         self._now = now or (lambda: datetime.now(timezone.utc))
-        self._highest_position = (0, 0)
-        self._highest_projection_digest = ""
+        self._highest_campaign_position = (0, 0)
+        self._highest_snapshot_digest = ""
+        self._highest_operator_position = (0, 0)
+        self._highest_operator_digest = ""
         self._lock = asyncio.Lock()
 
     async def admit(self) -> None:
@@ -292,7 +294,7 @@ class ImmutableCampaignSnapshotProvider:
         snapshot = await self.get_snapshot(self.config.mission_id)
         if snapshot is None:  # pragma: no cover - exact ID supplied above
             raise MissionSnapshotReadError("campaign projection admission was empty")
-        if self._highest_position[1] < 1:
+        if self._highest_campaign_position[1] < 1:
             raise MissionSnapshotReadError(
                 "campaign projection has no completed durable cycle"
             )
@@ -320,34 +322,59 @@ class ImmutableCampaignSnapshotProvider:
                     except Exception:
                         break
                 raise cancellation
-            snapshot, operator_evidence, generation, sequence, projection_digest = (
-                admitted
+            (
+                snapshot,
+                operator_evidence,
+                generation,
+                sequence,
+                snapshot_digest,
+                operator_digest,
+            ) = admitted
+            campaign_position = (generation, sequence)
+            operator_position = (
+                generation,
+                operator_evidence["transition_sequence"],
             )
-            position = (generation, sequence)
-            if position < self._highest_position:
+            if campaign_position < self._highest_campaign_position:
                 raise MissionSnapshotReadError(
                     "campaign projection position moved backwards"
                 )
             if (
-                position == self._highest_position
-                and projection_digest != self._highest_projection_digest
+                operator_position < self._highest_operator_position
+            ):
+                raise MissionSnapshotReadError(
+                    "operator control position moved backwards"
+                )
+            if (
+                campaign_position == self._highest_campaign_position
+                and snapshot_digest != self._highest_snapshot_digest
             ):
                 raise MissionSnapshotReadError(
                     "campaign projection equivocated at one cycle position"
                 )
-            if position > self._highest_position:
-                self._highest_position = position
-                self._highest_projection_digest = projection_digest
+            if (
+                operator_position == self._highest_operator_position
+                and operator_digest != self._highest_operator_digest
+            ):
+                raise MissionSnapshotReadError(
+                    "operator control evidence equivocated at one transition position"
+                )
+            if campaign_position > self._highest_campaign_position:
+                self._highest_campaign_position = campaign_position
+                self._highest_snapshot_digest = snapshot_digest
+            if operator_position > self._highest_operator_position:
+                self._highest_operator_position = operator_position
+                self._highest_operator_digest = operator_digest
             return snapshot, operator_evidence
 
     def _read_and_validate(
         self,
-    ) -> tuple[dict[str, Any], dict[str, Any], int, int, str]:
+    ) -> tuple[dict[str, Any], dict[str, Any], int, int, str, str]:
         return self._validate(_secure_read(self.config.path))
 
     def _validate(
         self, content: bytes
-    ) -> tuple[dict[str, Any], dict[str, Any], int, int, str]:
+    ) -> tuple[dict[str, Any], dict[str, Any], int, int, str, str]:
         try:
             return validate_campaign_projection(
                 content,

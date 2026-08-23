@@ -1,0 +1,103 @@
+{
+  "id": "titanium-WP-SADHANA-CONTROL-HIGHWATER-P0",
+  "base_ref": "9254ef5f010e78ef82f2b47df66e70a3738df74d",
+  "branch": "agent/sadhana-10-20260823",
+  "worktree": ".",
+  "intent": "Repair the immutable campaign provider so campaign-cycle and operator-transition monotonicity are enforced as independent coordinates: a later cycle cannot replay an older control state, and a legitimate later operator transition can be observed without inventing a new campaign cycle when the nested snapshot remains exact.",
+  "allowed_files": [
+    "api/mission_snapshot_provider.py",
+    "api/mission_snapshot_validation.py",
+    "tests/test_mission_snapshot_provider.py",
+    "reports/agentops/work_packets/titanium-WP-SADHANA-CONTROL-HIGHWATER-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "api/routers/control_surface.py",
+    "tests/test_control_surface_mission_sarathi.py",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "independent-control-highwater-contracts",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "independent-control-highwater-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check api/mission_snapshot_provider.py api/mission_snapshot_validation.py tests/test_mission_snapshot_provider.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "operator-transition-replay-counterexamples",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py -k 'independent_high_water or cycle_position'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(readmodel): fence operator transition replay"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-CONTROL-HIGHWATER-P0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "9254ef5f010e78ef82f2b47df66e70a3738df74d",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Campaign cycle_sequence and operator transition_sequence are distinct monotonic domains, but the provider currently binds both only through one campaign-position digest.",
+      "A campaign cycle may advance without an operator transition, while an operator transition may be projected before another campaign cycle; neither domain may roll back or equivocate.",
+      "The prior same-cycle evidence-equivocation test incorrectly rejects a legitimate higher operator transition and fails to test the dangerous later-cycle operator rollback."
+    ],
+    "closest_existing_implementation": [
+      "api/mission_snapshot_provider.py",
+      "api/mission_snapshot_validation.py",
+      "tests/test_mission_snapshot_provider.py"
+    ],
+    "honest_blockers": [
+      "Both monotonic high-water marks remain process-local; configured generation and freshness/custody checks bound but do not durably eliminate cross-process replay.",
+      "This repair changes read-model admission only and does not apply control authority or observe a provider-side effect.",
+      "Independent exact-commit rereview is required before the projection range is accepted."
+    ],
+    "rollback": "Revert the split campaign/operator digests and high-water checks, the two adversarial fixtures, and this packet. This reopens the demonstrated control-state replay and must not be used as an operational rollback while the campaign is live.",
+    "packet_digest": "b0aa2b1ccb79c62c7b5f1338e2e344c9d0586e63bf0f21f576630e4477bdec00"
+  }
+}

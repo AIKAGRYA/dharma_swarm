@@ -592,7 +592,7 @@ def validate_campaign_projection(
     minimum_generation: int,
     max_age_seconds: float,
     now: datetime,
-) -> tuple[dict[str, Any], dict[str, Any], int, int, str]:
+) -> tuple[dict[str, Any], dict[str, Any], int, int, str, str]:
     """Return nested views and their monotonic wire identity or fail closed."""
     try:
         decoded = content.decode("utf-8", errors="strict")
@@ -814,10 +814,6 @@ def validate_campaign_projection(
         operator_evidence,
         generation,
         cycle_sequence,
-        canonical_digest(
-            {
-                "mission_snapshot": projected,
-                "operator_control_evidence": operator_evidence,
-            }
-        ),
+        canonical_digest({"mission_snapshot": projected}),
+        canonical_digest({"operator_control_evidence": operator_evidence}),
     )
