@@ -1,0 +1,102 @@
+{
+  "id": "titanium-WP-SADHANA-CONTROL-EVIDENCE-P0",
+  "base_ref": "548a61a20e28d1ef4414622b6fe19ebf78e7a4ff",
+  "branch": "agent/sadhana-10-20260823",
+  "worktree": ".",
+  "intent": "Validate the exact outer SADHANA operator-control state from the immutable campaign projection and derive a privacy-preserving authority/effect evidence value in the existing read-only provider without changing the nested MissionSnapshot contract or creating a second control ledger.",
+  "allowed_files": [
+    "api/mission_snapshot_provider.py",
+    "api/mission_snapshot_validation.py",
+    "tests/test_mission_snapshot_provider.py",
+    "reports/agentops/work_packets/titanium-WP-SADHANA-CONTROL-EVIDENCE-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "operator-control-projection-contracts",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "operator-control-projection-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check api/mission_snapshot_provider.py api/mission_snapshot_validation.py tests/test_mission_snapshot_provider.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "operator-control-evidence-fails-closed",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_snapshot_provider.py -k 'operator_control'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(readmodel): validate operator authority evidence"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-CONTROL-EVIDENCE-P0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "548a61a20e28d1ef4414622b6fe19ebf78e7a4ff",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The campaign producer now owns an outer operator_control_state, while the immutable provider currently discards every outer field after validating the nested MissionSnapshot.",
+      "The mobile surface consumes operator_control_evidence as an API sibling, while the current control-surface endpoint returns only snapshot and runtime-projection fields.",
+      "Authority application and independently observed effect are distinct claim stages; the API must never infer effect from HTTP acceptance, a receipt reference, or control_state alone.",
+      "Stored timestamps may use an equivalent UTC offset, while the browser contract requires canonical Z timestamps."
+    ],
+    "closest_existing_implementation": [
+      "api/mission_snapshot_validation.py",
+      "api/mission_snapshot_provider.py",
+      "dashboard/src/lib/sadhanaOperatorControl.ts"
+    ],
+    "honest_blockers": [
+      "This packet derives and transports evidence only; it does not apply pause, resume, or emergency stop.",
+      "EffectObserved remains unavailable until the sole writer records a separate effect receipt bound to the authority receipt.",
+      "A real authenticated phone interaction and live projection remain downstream deployment gates."
+    ],
+    "rollback": "Revert the strict outer-state validator, immutable provider bundle method, focused provider tests, and this packet. The mobile surface remains evidence_unknown; canonical runtime control state is unchanged.",
+    "packet_digest": "ddf52ad42d9124509f10665c9983f9f3c49db6fe2382bb830aa1d1b87ceb704d"
+  }
+}

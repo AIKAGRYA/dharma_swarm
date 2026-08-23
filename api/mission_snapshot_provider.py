@@ -284,7 +284,7 @@ class ImmutableCampaignSnapshotProvider:
         self.config = config
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._highest_position = (0, 0)
-        self._highest_snapshot_digest = ""
+        self._highest_projection_digest = ""
         self._lock = asyncio.Lock()
 
     async def admit(self) -> None:
@@ -298,6 +298,13 @@ class ImmutableCampaignSnapshotProvider:
             )
 
     async def get_snapshot(self, mission_id: str) -> dict[str, Any] | None:
+        admitted = await self.get_snapshot_with_operator_control(mission_id)
+        return None if admitted is None else admitted[0]
+
+    async def get_snapshot_with_operator_control(
+        self, mission_id: str
+    ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        """Return one atomically validated snapshot/evidence pair."""
         if mission_id != self.config.mission_id:
             return None
         async with self._lock:
@@ -313,7 +320,9 @@ class ImmutableCampaignSnapshotProvider:
                     except Exception:
                         break
                 raise cancellation
-            snapshot, generation, sequence, snapshot_digest = admitted
+            snapshot, operator_evidence, generation, sequence, projection_digest = (
+                admitted
+            )
             position = (generation, sequence)
             if position < self._highest_position:
                 raise MissionSnapshotReadError(
@@ -321,20 +330,24 @@ class ImmutableCampaignSnapshotProvider:
                 )
             if (
                 position == self._highest_position
-                and snapshot_digest != self._highest_snapshot_digest
+                and projection_digest != self._highest_projection_digest
             ):
                 raise MissionSnapshotReadError(
                     "campaign projection equivocated at one cycle position"
                 )
             if position > self._highest_position:
                 self._highest_position = position
-                self._highest_snapshot_digest = snapshot_digest
-            return snapshot
+                self._highest_projection_digest = projection_digest
+            return snapshot, operator_evidence
 
-    def _read_and_validate(self) -> tuple[dict[str, Any], int, int, str]:
+    def _read_and_validate(
+        self,
+    ) -> tuple[dict[str, Any], dict[str, Any], int, int, str]:
         return self._validate(_secure_read(self.config.path))
 
-    def _validate(self, content: bytes) -> tuple[dict[str, Any], int, int, str]:
+    def _validate(
+        self, content: bytes
+    ) -> tuple[dict[str, Any], dict[str, Any], int, int, str]:
         try:
             return validate_campaign_projection(
                 content,

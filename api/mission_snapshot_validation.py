@@ -7,12 +7,14 @@ import hmac
 import json
 import math
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 CAMPAIGN_PROJECTION_SCHEMA_VERSION = "dharma.mission_control.read_model.v1"
 _SHA256_RE = re.compile(r"sha256:[0-9a-f]{64}")
 _MAX_CLOCK_SKEW = timedelta(seconds=5)
+_MAX_SAFE_INTEGER = (1 << 53) - 1
 _RECONCILIATION_STATES = frozenset(
     "coherent needs_task_projection missing_terminal_receipt "
     "conflicting_active_claims active_claim_without_run expired_lease "
@@ -73,6 +75,22 @@ _VIEW_TIME_FIELDS = {
     "receipts": ("created_at",),
 }
 CAMPAIGN_EVIDENCE_SCHEMA_VERSION = "dharma.mission_control.campaign_evidence.v1"
+OPERATOR_CONTROL_EVIDENCE_SCHEMA_VERSION = (
+    "dharma.sadhana.operator_control_evidence.v1"
+)
+_OPERATOR_CONTROL_STATE_SCHEMA_VERSION = "dharma.sadhana.operator_control_state.v1"
+_OPERATOR_CONTROL_STATE_FIELDS = frozenset(
+    "schema_version control_state campaign_generation transition_sequence request_id "
+    "idempotency_key action source_envelope_sha256 authority_receipt_ref "
+    "authority_receipt_sha256 authority_applied_at effect_state effect_receipt_ref "
+    "effect_receipt_sha256 effect_observed_at".split()
+)
+_OPERATOR_CONTROL_ACTION_STATES = {
+    "pause": "PAUSED",
+    "resume": "RUNNING",
+    "emergency_stop": "STOPPED_TERMINAL",
+}
+_OPERATOR_CONTROL_IDENTIFIER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 _CAMPAIGN_AUTHORITY = "TaskBoard+RuntimeStateStore+owner execution projection"
 _OWNER_EXECUTION_FIELDS = frozenset(
     "ref task_status run_status claim_status stale receipt_ids terminal succeeded "
@@ -400,6 +418,172 @@ def _campaign_evidence(
     }
 
 
+def _canonical_utc_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _bounded_receipt_ref(value: Any, field: str) -> str:
+    _require(
+        isinstance(value, str)
+        and len(value) <= 512
+        and value == value.strip()
+        and value == unicodedata.normalize("NFC", value)
+        and not any(unicodedata.category(character).startswith("C") for character in value),
+        f"campaign projection {field} is not a bounded canonical receipt ref",
+    )
+    return value
+
+
+def _operator_control_evidence(
+    payload: dict[str, Any],
+    *,
+    generation: int,
+    observed: datetime,
+    now: datetime,
+) -> dict[str, Any]:
+    _require(
+        "operator_login" not in payload,
+        "campaign projection contains private operator identity",
+    )
+    raw = payload.get("operator_control_state")
+    _require(
+        isinstance(raw, dict) and set(raw) == _OPERATOR_CONTROL_STATE_FIELDS,
+        "campaign projection operator control state fields are not exact",
+    )
+    state = dict(raw)
+    sequence = state.get("transition_sequence")
+    _require(
+        state.get("schema_version") == _OPERATOR_CONTROL_STATE_SCHEMA_VERSION
+        and state.get("control_state") in {"RUNNING", "PAUSED", "STOPPED_TERMINAL"}
+        and not isinstance(state.get("campaign_generation"), bool)
+        and isinstance(state.get("campaign_generation"), int)
+        and state.get("campaign_generation") == generation
+        and not isinstance(sequence, bool)
+        and isinstance(sequence, int)
+        and 0 <= sequence <= _MAX_SAFE_INTEGER
+        and state.get("action") in {"", *_OPERATOR_CONTROL_ACTION_STATES}
+        and state.get("effect_state") in {"unobserved", "observed", "violated"},
+        "campaign projection operator control coordinates are invalid",
+    )
+    text_fields = (
+        "request_id",
+        "idempotency_key",
+        "action",
+        "source_envelope_sha256",
+        "authority_receipt_ref",
+        "authority_receipt_sha256",
+        "effect_receipt_ref",
+        "effect_receipt_sha256",
+    )
+    _require(
+        all(isinstance(state.get(field), str) for field in text_fields),
+        "campaign projection operator control text fields are invalid",
+    )
+    authority_ref = _bounded_receipt_ref(
+        state["authority_receipt_ref"], "operator authority_receipt_ref"
+    )
+    effect_ref = _bounded_receipt_ref(
+        state["effect_receipt_ref"], "operator effect_receipt_ref"
+    )
+    authority_raw = state.get("authority_applied_at")
+    effect_raw = state.get("effect_observed_at")
+    _require(
+        authority_raw is None or isinstance(authority_raw, str),
+        "campaign projection operator authority_applied_at is invalid",
+    )
+    _require(
+        effect_raw is None or isinstance(effect_raw, str),
+        "campaign projection operator effect_observed_at is invalid",
+    )
+    authority_at = (
+        None
+        if authority_raw is None
+        else _parse_timestamp(authority_raw, "operator_control_state.authority_applied_at")
+    )
+    effect_at = (
+        None
+        if effect_raw is None
+        else _parse_timestamp(effect_raw, "operator_control_state.effect_observed_at")
+    )
+    if sequence == 0:
+        _require(
+            state["control_state"] == "RUNNING"
+            and state["request_id"] == ""
+            and state["idempotency_key"] == ""
+            and state["action"] == ""
+            and state["source_envelope_sha256"] == ""
+            and authority_ref == ""
+            and state["authority_receipt_sha256"] == ""
+            and authority_at is None
+            and state["effect_state"] == "unobserved"
+            and effect_ref == ""
+            and state["effect_receipt_sha256"] == ""
+            and effect_at is None,
+            "campaign projection initial operator control state is not exact",
+        )
+        claim_stage = "none"
+    else:
+        _require(
+            bool(_OPERATOR_CONTROL_IDENTIFIER_RE.fullmatch(state["request_id"]))
+            and bool(
+                _OPERATOR_CONTROL_IDENTIFIER_RE.fullmatch(state["idempotency_key"])
+            )
+            and state["action"] in _OPERATOR_CONTROL_ACTION_STATES
+            and state["control_state"]
+            == _OPERATOR_CONTROL_ACTION_STATES[state["action"]]
+            and bool(_SHA256_RE.fullmatch(state["source_envelope_sha256"]))
+            and bool(authority_ref)
+            and bool(_SHA256_RE.fullmatch(state["authority_receipt_sha256"]))
+            and authority_at is not None
+            and authority_at <= observed
+            and authority_at <= now + _MAX_CLOCK_SKEW,
+            "campaign projection applied operator control state is incomplete or causal",
+        )
+        effect_state = state["effect_state"]
+        if effect_state == "unobserved":
+            _require(
+                effect_ref == ""
+                and state["effect_receipt_sha256"] == ""
+                and effect_at is None,
+                "campaign projection unobserved operator effect claims evidence",
+            )
+            claim_stage = "authority_applied"
+        else:
+            _require(
+                bool(effect_ref)
+                and bool(_SHA256_RE.fullmatch(state["effect_receipt_sha256"]))
+                and effect_at is not None
+                and authority_at <= effect_at <= observed
+                and effect_at <= now + _MAX_CLOCK_SKEW,
+                "campaign projection operator effect evidence is incomplete or causal",
+            )
+            claim_stage = (
+                "effect_observed" if effect_state == "observed" else "effect_violated"
+            )
+    return {
+        "schema_version": OPERATOR_CONTROL_EVIDENCE_SCHEMA_VERSION,
+        "claim_stage": claim_stage,
+        "control_state": state["control_state"],
+        "campaign_generation": generation,
+        "transition_sequence": sequence,
+        "request_id": state["request_id"],
+        "idempotency_key": state["idempotency_key"],
+        "action": state["action"],
+        "source_envelope_sha256": state["source_envelope_sha256"],
+        "authority_receipt_ref": authority_ref,
+        "authority_receipt_sha256": state["authority_receipt_sha256"],
+        "authority_applied_at": (
+            None if authority_at is None else _canonical_utc_timestamp(authority_at)
+        ),
+        "effect_state": state["effect_state"],
+        "effect_receipt_ref": effect_ref,
+        "effect_receipt_sha256": state["effect_receipt_sha256"],
+        "effect_observed_at": (
+            None if effect_at is None else _canonical_utc_timestamp(effect_at)
+        ),
+    }
+
+
 def validate_campaign_projection(
     content: bytes,
     *,
@@ -408,8 +592,8 @@ def validate_campaign_projection(
     minimum_generation: int,
     max_age_seconds: float,
     now: datetime,
-) -> tuple[dict[str, Any], int, int, str]:
-    """Return the nested snapshot and monotonic wire identity or fail closed."""
+) -> tuple[dict[str, Any], dict[str, Any], int, int, str]:
+    """Return nested views and their monotonic wire identity or fail closed."""
     try:
         decoded = content.decode("utf-8", errors="strict")
     except UnicodeDecodeError as exc:
@@ -456,14 +640,14 @@ def validate_campaign_projection(
     _require(
         not isinstance(generation, bool)
         and isinstance(generation, int)
-        and generation >= minimum_generation,
+        and minimum_generation <= generation <= _MAX_SAFE_INTEGER,
         "campaign projection generation is below the admitted floor",
     )
     cycle_sequence = payload.get("cycle_sequence")
     _require(
         not isinstance(cycle_sequence, bool)
         and isinstance(cycle_sequence, int)
-        and cycle_sequence >= 0,
+        and 0 <= cycle_sequence <= _MAX_SAFE_INTEGER,
         "campaign projection cycle sequence is invalid",
     )
     freshness = payload.get("freshness_seconds")
@@ -618,10 +802,22 @@ def validate_campaign_projection(
         now=now,
         max_age=max_age,
     )
+    operator_evidence = _operator_control_evidence(
+        payload,
+        generation=generation,
+        observed=observed,
+        now=now,
+    )
     projected = {**snapshot, "campaign_evidence": evidence}
     return (
         projected,
+        operator_evidence,
         generation,
         cycle_sequence,
-        canonical_digest({"mission_snapshot": projected}),
+        canonical_digest(
+            {
+                "mission_snapshot": projected,
+                "operator_control_evidence": operator_evidence,
+            }
+        ),
     )

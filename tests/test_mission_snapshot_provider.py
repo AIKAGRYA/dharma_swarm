@@ -36,6 +36,26 @@ CONFIG_DIGEST = "sha256:" + "a" * 64
 NOW = datetime(2026, 8, 23, 3, 0, tzinfo=timezone.utc)
 
 
+def _initial_operator_control_state(generation: int) -> dict[str, Any]:
+    return {
+        "schema_version": "dharma.sadhana.operator_control_state.v1",
+        "control_state": "RUNNING",
+        "campaign_generation": generation,
+        "transition_sequence": 0,
+        "request_id": "",
+        "idempotency_key": "",
+        "action": "",
+        "source_envelope_sha256": "",
+        "authority_receipt_ref": "",
+        "authority_receipt_sha256": "",
+        "authority_applied_at": None,
+        "effect_state": "unobserved",
+        "effect_receipt_ref": "",
+        "effect_receipt_sha256": "",
+        "effect_observed_at": None,
+    }
+
+
 def _payload(
     *, generation: int = 3, cycle_sequence: int = 7, now: datetime = NOW
 ) -> dict[str, Any]:
@@ -66,6 +86,7 @@ def _payload(
         "rejected_task_ids": [],
         "conflicting_acceptance_task_ids": [],
         "invalid_acceptance_receipts": 0,
+        "operator_control_state": _initial_operator_control_state(generation),
         "authority": "TaskBoard+RuntimeStateStore+owner execution projection",
         "proves_semantic_acceptance": False,
         "mission_snapshot": {
@@ -258,6 +279,36 @@ def _accepted_payload() -> dict[str, Any]:
     return _redigest(payload)
 
 
+def _operator_control_payload(
+    *, effect_state: str = "unobserved"
+) -> dict[str, Any]:
+    payload = _payload()
+    state = payload["operator_control_state"]
+    state.update(
+        {
+            "control_state": "PAUSED",
+            "transition_sequence": 1,
+            "request_id": "pause-one",
+            "idempotency_key": "pause-idempotency-one",
+            "action": "pause",
+            "source_envelope_sha256": "sha256:" + "b" * 64,
+            "authority_receipt_ref": "runtime-receipt:pause-one",
+            "authority_receipt_sha256": "sha256:" + "c" * 64,
+            "authority_applied_at": (NOW - timedelta(seconds=4)).isoformat(),
+            "effect_state": effect_state,
+        }
+    )
+    if effect_state != "unobserved":
+        state.update(
+            {
+                "effect_receipt_ref": "campaign-effect:pause-one",
+                "effect_receipt_sha256": "sha256:" + "d" * 64,
+                "effect_observed_at": (NOW - timedelta(seconds=3)).isoformat(),
+            }
+        )
+    return _redigest(payload)
+
+
 def _isolate_api_lifespan(monkeypatch: pytest.MonkeyPatch) -> None:
     """Replace unrelated API subsystems without weakening lifespan composition."""
 
@@ -382,6 +433,130 @@ async def test_owner_execution_and_acceptance_projection_are_typed_and_copied(
 
 
 @pytest.mark.asyncio
+async def test_operator_control_evidence_is_exact_normalized_and_copied(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "campaign" / "status.json"
+    payload = _operator_control_payload(effect_state="observed")
+    _write(path, payload)
+    provider = _provider(path)
+
+    admitted = await provider.get_snapshot_with_operator_control(MISSION_ID)
+    assert admitted is not None
+    snapshot, evidence = admitted
+    assert "operator_control_evidence" not in snapshot
+    assert evidence == {
+        "schema_version": "dharma.sadhana.operator_control_evidence.v1",
+        "claim_stage": "effect_observed",
+        "control_state": "PAUSED",
+        "campaign_generation": 3,
+        "transition_sequence": 1,
+        "request_id": "pause-one",
+        "idempotency_key": "pause-idempotency-one",
+        "action": "pause",
+        "source_envelope_sha256": "sha256:" + "b" * 64,
+        "authority_receipt_ref": "runtime-receipt:pause-one",
+        "authority_receipt_sha256": "sha256:" + "c" * 64,
+        "authority_applied_at": "2026-08-23T02:59:56Z",
+        "effect_state": "observed",
+        "effect_receipt_ref": "campaign-effect:pause-one",
+        "effect_receipt_sha256": "sha256:" + "d" * 64,
+        "effect_observed_at": "2026-08-23T02:59:57Z",
+    }
+    evidence["request_id"] = "client-forgery"
+    second = await provider.get_snapshot_with_operator_control(MISSION_ID)
+    assert second is not None
+    assert second[1]["request_id"] == "pause-one"
+
+
+@pytest.mark.asyncio
+async def test_initial_operator_control_evidence_has_no_claim(tmp_path: Path) -> None:
+    path = tmp_path / "campaign" / "status.json"
+    _write(path, _payload())
+
+    admitted = await _provider(path).get_snapshot_with_operator_control(MISSION_ID)
+
+    assert admitted is not None
+    expected = _initial_operator_control_state(3)
+    expected["schema_version"] = "dharma.sadhana.operator_control_evidence.v1"
+    expected["claim_stage"] = "none"
+    assert admitted[1] == expected
+
+
+@pytest.mark.asyncio
+async def test_operator_control_mutations_fail_closed(tmp_path: Path) -> None:
+    path = tmp_path / "campaign" / "status.json"
+    cases: list[dict[str, Any]] = []
+
+    missing = _payload()
+    missing.pop("operator_control_state")
+    cases.append(missing)
+
+    private_state = _payload()
+    private_state["operator_control_state"]["operator_login"] = "private@example.com"
+    cases.append(private_state)
+
+    private_outer = _payload()
+    private_outer["operator_login"] = "private@example.com"
+    cases.append(private_outer)
+
+    generation_mismatch = _payload()
+    generation_mismatch["operator_control_state"]["campaign_generation"] = 4
+    cases.append(generation_mismatch)
+
+    boolean_generation = _payload(generation=1)
+    boolean_generation["operator_control_state"]["campaign_generation"] = True
+    cases.append(boolean_generation)
+
+    unsafe_sequence = _operator_control_payload()
+    unsafe_sequence["operator_control_state"]["transition_sequence"] = 1 << 53
+    cases.append(unsafe_sequence)
+
+    action_mismatch = _operator_control_payload()
+    action_mismatch["operator_control_state"]["control_state"] = "RUNNING"
+    cases.append(action_mismatch)
+
+    malformed_source = _operator_control_payload()
+    malformed_source["operator_control_state"]["source_envelope_sha256"] = "b" * 64
+    cases.append(malformed_source)
+
+    noncanonical_ref = _operator_control_payload()
+    noncanonical_ref["operator_control_state"]["authority_receipt_ref"] = " receipt "
+    cases.append(noncanonical_ref)
+
+    naive_authority = _operator_control_payload()
+    naive_authority["operator_control_state"][
+        "authority_applied_at"
+    ] = "2026-08-23T02:59:56"
+    cases.append(naive_authority)
+
+    missing_effect = _operator_control_payload(effect_state="observed")
+    missing_effect["operator_control_state"]["effect_receipt_sha256"] = ""
+    cases.append(missing_effect)
+
+    causal_effect = _operator_control_payload(effect_state="violated")
+    causal_effect["operator_control_state"]["effect_observed_at"] = (
+        NOW - timedelta(seconds=5)
+    ).isoformat()
+    cases.append(causal_effect)
+
+    future_authority = _operator_control_payload()
+    future_authority["operator_control_state"]["authority_applied_at"] = (
+        NOW + timedelta(seconds=1)
+    ).isoformat()
+    cases.append(future_authority)
+
+    inexact_initial = _payload()
+    inexact_initial["operator_control_state"]["request_id"] = "false-claim"
+    cases.append(inexact_initial)
+
+    for payload in cases:
+        _write(path, _redigest(payload))
+        with pytest.raises(MissionSnapshotReadError, match="operator"):
+            await _provider(path).get_snapshot(MISSION_ID)
+
+
+@pytest.mark.asyncio
 async def test_owner_execution_mutations_fail_closed(tmp_path: Path) -> None:
     path = tmp_path / "campaign" / "status.json"
 
@@ -487,6 +662,12 @@ async def test_cycle_position_allows_envelope_rewrite_but_rejects_replay_or_equi
     terminal["writer_lock_held"] = False
     _write(path, _redigest(terminal))
     assert (await provider.get_snapshot(MISSION_ID))["mission"]["title"] == "first"  # type: ignore[index]
+
+    control_equivocation = _operator_control_payload()
+    control_equivocation["mission_snapshot"]["mission"]["title"] = "first"
+    _write(path, _redigest(control_equivocation))
+    with pytest.raises(MissionSnapshotReadError, match="equivocated"):
+        await provider.get_snapshot(MISSION_ID)
 
     equivocation = copy.deepcopy(first)
     equivocation["mission_snapshot"]["mission"]["title"] = "equivocated"
