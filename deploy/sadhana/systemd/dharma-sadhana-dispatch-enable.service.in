@@ -1,0 +1,40 @@
+[Unit]
+Description=Authorize SADHANA dispatch after independently active observation gates
+Requires=dharma-sadhana.target dharma-sadhana-observer-health.service dharma-sadhana-dashboard.service dharma-sadhana-control.service
+After=dharma-sadhana.target dharma-sadhana-observer-health.service dharma-sadhana-dashboard.service dharma-sadhana-control.service
+Before=dharma-sadhana-supervisor.service
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py enable-dispatch --role writer --release-sha @RELEASE_SHA@
+RemainAfterExit=yes
+TimeoutStartSec=120s
+RuntimeMaxSec=120s
+TasksMax=32
+MemoryMax=256M
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SYS_PTRACE
+KeyringMode=private
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana /var/lib/dharma-sadhana/api-state /run/credentials/dharma-sadhana-dashboard.service/operator_bearer /run/credentials/dharma-sadhana-control.service/operator_bearer /run/dharma-sadhana/control/normal /run/dharma-sadhana/control/emergency
+ReadWritePaths=/etc/dharma-sadhana/receipts/preactivation
+InaccessiblePaths=/etc/dharma-sadhana/credentials/control_hmac_key /etc/dharma-sadhana/verifier.env /etc/dharma-sadhana/supervisor.env /etc/dharma-sadhana/api.env /etc/dharma-sadhana/replication.env /etc/dharma-sadhana/replication_ed25519 /etc/dharma-sadhana/known_hosts /run/credentials/dharma-sadhana-control.service/control_hmac_key /run/credentials/dharma-sadhana-control.service/tailscale_operator_login /var/lib/dharma-sadhana/state /var/lib/dharma-sadhana/workspace /var/lib/dharma-sadhana/leases /run/dharma-sadhana/control/inflight /run/dharma-sadhana/control/applied /run/dharma-sadhana/control/rejected /run/dharma-sadhana/oracle
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=~ptrace process_vm_readv process_vm_writev
+UMask=0077
