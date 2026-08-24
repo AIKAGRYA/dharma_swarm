@@ -119,7 +119,7 @@ Operational grounding: `dharma_swarm/ontology.py:1-30` declares "Palantir built 
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **525 files at its top level (45.3% of 1,160 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **37 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **29 adapter files** (V), and **19 router files** (V). Do not add more without deprecating an existing one.
@@ -167,10 +167,10 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **1,160** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **525 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Top-level (flat) modules | **525 (45.3%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
 | Total Python LOC | **420,791** | wc -l across dharma_swarm Python modules |
 | Test files | **1037** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **15,960 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **15,962 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,533** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
