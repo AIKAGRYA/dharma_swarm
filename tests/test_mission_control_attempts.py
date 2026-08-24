@@ -34,7 +34,13 @@ async def _indeterminate(case: _BindingCase, goal_id: str) -> object:
         attempt_generation=generation,
         expected=expected,
     )
-    assigned = await case.board.assign(task.id, authority["claimed_principal"], metadata=metadata)
+    assigned = await case.board.compare_and_swap_campaign_status(
+        task,
+        new_status=TaskStatus.ASSIGNED,
+        assigned_to=authority["claimed_principal"],
+        metadata=metadata,
+    )
+    assert assigned is not None
     assert await case.board.resolve_campaign_pre_effect_failure(
         task.id,
         expected_status=TaskStatus.ASSIGNED,
@@ -112,7 +118,26 @@ async def test_attempt_reconciler_validates_every_task_before_first_write(
     second = await _indeterminate(case, "goal-02")
     corrupted = copy.deepcopy(second.metadata)
     corrupted["campaign_dispatch_recovery"]["prior_status"] = "running"
-    await case.board.update_task(second.id, metadata=corrupted)
+    # Fixture-only pre-existing corruption. Generic TaskBoard mutation is not
+    # authorized to rewrite recovery authority; seed below that boundary to
+    # prove the reconciler still validates every row before its first write.
+    async with case.board._open() as db:
+        cursor = await db.execute(
+            "UPDATE tasks SET metadata = ? WHERE id = ? AND status = ?"
+            " AND assigned_to IS ? AND result IS ? AND metadata = ?"
+            " AND updated_at = ?",
+            (
+                case.board._coerce_db_value("metadata", corrupted),
+                second.id,
+                second.status.value,
+                second.assigned_to,
+                second.result,
+                case.board._coerce_db_value("metadata", second.metadata),
+                second.updated_at.isoformat(),
+            ),
+        )
+        assert cursor.rowcount == 1
+        await db.commit()
 
     result = await _reconciler(case).reconcile(now=case.now)
 

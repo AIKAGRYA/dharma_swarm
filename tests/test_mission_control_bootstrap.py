@@ -551,10 +551,18 @@ async def test_task_seed_readiness_mutation_fails_before_owner_writes(
     task_id = dict(result.goal_task_map)[bootstrap.CANARY_GOAL_ID]
     task = await board.get(task_id)
     assert task is not None
-    await board.update_task(
-        task_id,
-        metadata={**task.metadata, "dispatch_ready": True},
-    )
+    # Fixture-only corruption: the generic API correctly fences this
+    # authority-bearing readiness alias, while bootstrap still must detect a
+    # row left inconsistent by an older writer before making owner writes.
+    async with board._open() as db:
+        await db.execute(
+            "UPDATE tasks SET metadata = ? WHERE id = ?",
+            (
+                json.dumps({**task.metadata, "dispatch_ready": True}),
+                task_id,
+            ),
+        )
+        await db.commit()
     writes = 0
 
     async def forbidden_write(*args: Any, **kwargs: Any) -> Any:
@@ -682,16 +690,33 @@ async def test_additive_authority_metadata_is_preserved_without_proving_readines
     canary_id = dict(first.goal_task_map)[bootstrap.CANARY_GOAL_ID]
     canary = await board.get(canary_id)
     assert canary is not None
-    await board.update_task(
-        canary_id,
-        metadata={
-            **canary.metadata,
-            "mission_campaign_authority": {
-                "schema": "test.unverified_authority_annotation.v1",
-                "status": "not_evaluated",
-            },
+    unverified = {
+        **canary.metadata,
+        "mission_campaign_authority": {
+            "schema": "test.unverified_authority_annotation.v1",
+            "status": "not_evaluated",
         },
-    )
+    }
+    # Fixture-only pre-existing annotation. The public TaskBoard API cannot
+    # mint campaign authority; seed below that boundary to prove bootstrap
+    # preserves unknown additive data without treating it as readiness proof.
+    async with board._open() as db:
+        cursor = await db.execute(
+            "UPDATE tasks SET metadata = ? WHERE id = ? AND status = ?"
+            " AND assigned_to IS ? AND result IS ? AND metadata = ?"
+            " AND updated_at = ?",
+            (
+                board._coerce_db_value("metadata", unverified),
+                canary_id,
+                canary.status.value,
+                canary.assigned_to,
+                canary.result,
+                board._coerce_db_value("metadata", canary.metadata),
+                canary.updated_at.isoformat(),
+            ),
+        )
+        assert cursor.rowcount == 1
+        await db.commit()
 
     second = await _run_bootstrap(portfolio, control)
     rebound = await board.get(canary_id)

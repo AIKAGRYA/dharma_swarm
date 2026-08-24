@@ -100,6 +100,32 @@ class _BindingCase:
     now: datetime
 
 
+async def _corrupt_task_metadata_for_test(
+    board: TaskBoard,
+    expected: Task,
+    metadata: dict[str, Any],
+) -> None:
+    """Synthesize pre-existing storage corruption without granting API authority."""
+    async with board._open() as db:
+        await db.execute("BEGIN IMMEDIATE")
+        cursor = await db.execute(
+            "UPDATE tasks SET metadata = ? WHERE id = ? AND status = ?"
+            " AND assigned_to IS ? AND result IS ? AND metadata = ?"
+            " AND updated_at = ?",
+            (
+                board._coerce_db_value("metadata", metadata),
+                expected.id,
+                expected.status.value,
+                expected.assigned_to,
+                expected.result,
+                board._coerce_db_value("metadata", expected.metadata),
+                expected.updated_at.isoformat(),
+            ),
+        )
+        assert cursor.rowcount == 1
+        await db.commit()
+
+
 def _goal_digest(index: int) -> str:
     return f"sha256:{index + 1:064x}"
 
@@ -712,7 +738,9 @@ async def test_lease_first_and_missing_lease_partials_recover_without_duplicate_
     first_metadata = dict(first_task.metadata)
     first_metadata.pop(CAMPAIGN_AUTHORITY_METADATA_KEY)
     first_metadata.pop(GOVERNANCE_METADATA_KEY)
-    await case.board.update_task(first_task.id, metadata=first_metadata)
+    await _corrupt_task_metadata_for_test(
+        case.board, first_task, first_metadata
+    )
     lease_path(case.lease_root, second_bound.authority_ref).unlink()
 
     recovered = await bind_campaign_authority(
@@ -816,14 +844,20 @@ async def test_owner_execution_stamp_survives_fresh_process_rebind(
         case.board,
         runtime,
     )
-    expected = adapter._expected_identity(CAMPAIGN_ID, task.id, "default", 0)
+    authority = task.metadata["mission_campaign_authority"]
+    expected = adapter._expected_identity(
+        authority["mission_id"],
+        task.id,
+        authority["dispatch_key"],
+        authority["attempt_generation"],
+    )
     await case.board.update_task(
         task.id,
         metadata=adapter._stamp_metadata(
             task,
-            mission_id=CAMPAIGN_ID,
-            dispatch_key="default",
-            attempt_generation=0,
+            mission_id=authority["mission_id"],
+            dispatch_key=authority["dispatch_key"],
+            attempt_generation=authority["attempt_generation"],
             expected=expected,
         ),
     )
@@ -878,12 +912,16 @@ async def test_foreign_partial_state_is_rejected_before_any_write(
     assert early_task is not None and late_task is not None
     early_metadata = dict(early_task.metadata)
     early_metadata.pop(CAMPAIGN_AUTHORITY_METADATA_KEY)
-    await case.board.update_task(early.task_id, metadata=early_metadata)
+    await _corrupt_task_metadata_for_test(
+        case.board, early_task, early_metadata
+    )
     late_metadata = dict(late_task.metadata)
     late_authority = dict(late_metadata[CAMPAIGN_AUTHORITY_METADATA_KEY])
     late_authority["workspace_path"] = "foreign/workspace"
     late_metadata[CAMPAIGN_AUTHORITY_METADATA_KEY] = late_authority
-    await case.board.update_task(late.task_id, metadata=late_metadata)
+    await _corrupt_task_metadata_for_test(
+        case.board, late_task, late_metadata
+    )
     before_index = list(_index_lines(case))
 
     with pytest.raises(MissionControlError, match="foreign workspace_path"):
@@ -931,7 +969,7 @@ async def test_foreign_nested_route_lock_is_rejected_before_any_write(
         "allow_provider_routing": True,
     }
     metadata[CAMPAIGN_AUTHORITY_METADATA_KEY] = authority
-    await case.board.update_task(task.id, metadata=metadata)
+    await _corrupt_task_metadata_for_test(case.board, task, metadata)
     before_index = _index_lines(case)
 
     with pytest.raises(MissionControlError, match="foreign route_lock"):
@@ -1280,9 +1318,10 @@ async def test_file_verifier_rejects_every_foreign_campaign_lineage_field(
     assert task is not None
     authority = dict(task.metadata[CAMPAIGN_AUTHORITY_METADATA_KEY])
     authority["authority_digest"] = lease["content_hash"]
-    await case.board.update_task(
-        task.id,
-        metadata={**task.metadata, CAMPAIGN_AUTHORITY_METADATA_KEY: authority},
+    await _corrupt_task_metadata_for_test(
+        case.board,
+        task,
+        {**task.metadata, CAMPAIGN_AUTHORITY_METADATA_KEY: authority},
     )
     request = MissionDispatchRequest.new(
         case.manifest["mission_id"],

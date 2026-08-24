@@ -21,6 +21,11 @@ from dharma_swarm.spine.adapters import (
     identity_metadata,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
+from dharma_swarm.task_board_campaign_guard import (
+    CampaignTaskMutationError,
+    compare_and_swap_terminal_projection as _cas_terminal_projection,
+    validate_generic_campaign_mutation,
+)
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
 _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
@@ -174,15 +179,30 @@ class TaskBoard:
     async def _set_status(self, task_id: str, new: TaskStatus, **fields: Any) -> Task:
         """Validate and apply a status transition with optional field updates."""
         async with self._open() as db:
-            cur = await db.execute("SELECT status FROM tasks WHERE id = ?", (task_id,))
+            await db.execute("BEGIN IMMEDIATE")
+            cur = await db.execute(
+                "SELECT status, metadata FROM tasks WHERE id = ?", (task_id,)
+            )
             row = await cur.fetchone()
             if row is None:
+                await db.rollback()
                 raise TaskBoardError(f"Task {task_id!r} not found")
             current = TaskStatus(row[0])
             if new not in _TRANSITIONS.get(current, set()):
+                await db.rollback()
                 raise TaskBoardError(
                     f"Invalid transition: {current.value} -> {new.value}"
                 )
+            try:
+                validate_generic_campaign_mutation(
+                    row[1], task_id=task_id, new_status=new.value,
+                    replacement_raw=fields.get("metadata"),
+                    replacement_provided="metadata" in fields,
+                    assigned_to_provided="assigned_to" in fields, result_provided="result" in fields,
+                )
+            except CampaignTaskMutationError as exc:
+                await db.rollback()
+                raise TaskBoardError(str(exc)) from exc
             now = _utc_now().isoformat()
             sets = ["status = ?", "updated_at = ?"]
             params: list[Any] = [new.value, now]
@@ -591,10 +611,28 @@ class TaskBoard:
         elif fields:
             # Raw column update (no status change)
             async with self._open() as db:
+                await db.execute("BEGIN IMMEDIATE")
+                current_row = await (
+                    await db.execute(
+                        "SELECT metadata FROM tasks WHERE id = ?", (task_id,)
+                    )
+                ).fetchone()
+                if current_row is not None:
+                    try:
+                        validate_generic_campaign_mutation(
+                            current_row[0], task_id=task_id,
+                            replacement_raw=fields.get("metadata"),
+                            replacement_provided="metadata" in fields,
+                            assigned_to_provided="assigned_to" in fields, result_provided="result" in fields,
+                        )
+                    except CampaignTaskMutationError as exc:
+                        await db.rollback()
+                        raise TaskBoardError(str(exc)) from exc
                 sets = []
                 params: list[Any] = []
                 for col, val in fields.items():
                     if col not in self._ALLOWED_COLUMNS:
+                        await db.rollback()
                         raise TaskBoardError(f"Invalid column: {col!r}")
                     sets.append(f"{col} = ?")
                     params.append(self._coerce_db_value(col, val))
@@ -716,6 +754,20 @@ class TaskBoard:
             ).fetchone()
             assert updated_row is not None
             return self._row_to_task(updated_row, deps)
+
+    async def compare_and_swap_terminal_projection(
+        self, expected: Task, *, metadata: dict[str, Any], result: str | None = None,
+        expected_claim_id: str = "", expected_agent_id: str = "", runtime_state_store: Any = None,
+    ) -> Task | None:
+        """Apply a receipt-backed graph effect to one exact task attempt."""
+        try:
+            return await _cas_terminal_projection(
+                self, expected, metadata=metadata, result=result,
+                expected_claim_id=expected_claim_id, expected_agent_id=expected_agent_id,
+                runtime_state_store=runtime_state_store,
+            )
+        except CampaignTaskMutationError as exc:
+            raise TaskBoardError(str(exc)) from exc
 
     async def resolve_campaign_pre_effect_failure(
         self,
@@ -859,53 +911,51 @@ class TaskBoard:
         reason: str = "",
         metadata: dict[str, Any] | None = None,
     ) -> Task:
-        """Requeue a task back to pending with optional metadata merge."""
-        task = await self.get(task_id)
-        if task is None:
-            raise TaskBoardError(f"Task {task_id!r} not found")
-
-        merged_meta = dict(task.metadata or {})
-        if isinstance(metadata, dict):
-            merged_meta.update(metadata)
-
-        if task.status == TaskStatus.PENDING:
-            await self.update_task(
-                task_id,
-                assigned_to=None,
-                result=reason,
-                metadata=merged_meta,
+        """Atomically requeue ordinary work; campaign retry is a typed CAS."""
+        async with self._open() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            row = await (
+                await db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            ).fetchone()
+            if row is None:
+                await db.rollback()
+                raise TaskBoardError(f"Task {task_id!r} not found")
+            task = self._row_to_task(row, await self._fetch_deps(db, task_id))
+            if task.status not in {
+                TaskStatus.PENDING, TaskStatus.ASSIGNED, TaskStatus.RUNNING,
+                TaskStatus.FAILED, TaskStatus.CANCELLED,
+            }:
+                await db.rollback()
+                raise TaskBoardError(
+                    f"Cannot requeue task {task_id!r} from status {task.status.value}"
+                )
+            merged_meta = dict(task.metadata or {})
+            if isinstance(metadata, dict):
+                merged_meta.update(metadata)
+            try:
+                validate_generic_campaign_mutation(
+                    row[10],
+                    task_id=task_id,
+                    new_status=TaskStatus.PENDING.value,
+                    replacement_raw=merged_meta,
+                    replacement_provided=True,
+                )
+            except CampaignTaskMutationError as exc:
+                await db.rollback()
+                raise TaskBoardError(str(exc)) from exc
+            await db.execute(
+                "UPDATE tasks SET status = ?, assigned_to = NULL, result = ?,"
+                " metadata = ?, updated_at = ? WHERE id = ?",
+                (TaskStatus.PENDING.value, reason,
+                 self._coerce_db_value("metadata", merged_meta),
+                 _utc_now().isoformat(), task_id),
             )
-            refreshed = await self.get(task_id)
-            assert refreshed is not None
-            return refreshed
-
-        if task.status == TaskStatus.RUNNING:
-            await self._set_status(
-                task_id,
-                TaskStatus.FAILED,
-                result=reason,
-                metadata=merged_meta,
-            )
-            return await self._set_status(
-                task_id,
-                TaskStatus.PENDING,
-                assigned_to=None,
-                result=reason,
-                metadata=merged_meta,
-            )
-
-        if task.status in {TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.ASSIGNED}:
-            return await self._set_status(
-                task_id,
-                TaskStatus.PENDING,
-                assigned_to=None,
-                result=reason,
-                metadata=merged_meta,
-            )
-
-        raise TaskBoardError(
-            f"Cannot requeue task {task_id!r} from status {task.status.value}"
-        )
+            await db.commit()
+            updated = await (
+                await db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            ).fetchone()
+            assert updated is not None
+            return self._row_to_task(updated, await self._fetch_deps(db, task_id))
 
     # -- dependency management ----------------------------------------------
 

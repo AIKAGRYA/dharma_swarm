@@ -15,7 +15,7 @@ import sqlite3
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 from uuid import uuid4
 
 import aiosqlite
@@ -439,14 +439,22 @@ _IMMUTABLE_EXECUTION_METADATA_KEYS = frozenset(
 _RENEWABLE_TASK_CLAIM_STATUSES = frozenset(
     {"active", "claimed", "acknowledged", "running", "leased"}
 )
+_ABSORBING_RUNTIME_STATUSES = frozenset({"completed", "failed"})
+_MISSION_CONTROL_RUNTIME_SCHEMA = "dharma.mission_control.v1"
 _CLAIM_EVIDENCE_METADATA_KEY = "mission_control_evidence"
 _IMMUTABLE_RUNTIME_RECEIPT_TYPES = frozenset(
     {
+        "child_completed",
+        "delegation_run",
+        "mission_attempt_recovery",
+        "mission_attempt_terminal",
         "mission_evidence_delta",
         "mission_independent_acceptance",
         "mission_campaign_cycle",
         "mission_campaign_control",
+        "mission_verifier_result",
         OPERATOR_CONTROL_RECEIPT_TYPE,
+        "task_claim",
         "mission_dispatch_indeterminate",
         "mission_observed_input",
     }
@@ -1058,6 +1066,35 @@ def _row_to_run(row: sqlite3.Row | aiosqlite.Row) -> DelegationRun:
     )
 
 
+def _absorbing_claim_replay(existing: TaskClaim, candidate: TaskClaim) -> bool:
+    """Make terminal claim custody first-writer-wins."""
+    if not _is_absorbing_runtime_row(existing.status, existing.metadata):
+        return False
+    if candidate.status.lower() != existing.status.lower():
+        raise ValueError("terminal claim cannot be replaced by conflicting replay")
+    return True
+
+
+def _absorbing_run_replay(
+    existing: DelegationRun,
+    candidate: DelegationRun,
+) -> bool:
+    """Make terminal run custody first-writer-wins."""
+    if not _is_absorbing_runtime_row(existing.status, existing.metadata):
+        return False
+    if candidate.status.lower() != existing.status.lower():
+        raise ValueError("terminal run cannot be replaced by conflicting replay")
+    return True
+
+
+def _is_absorbing_runtime_row(status: str, metadata: dict[str, Any]) -> bool:
+    normalized = status.lower()
+    return normalized in _ABSORBING_RUNTIME_STATUSES or (
+        normalized == "stale_recovered"
+        and metadata.get("schema_version") == _MISSION_CONTROL_RUNTIME_SCHEMA
+    )
+
+
 def _row_to_topology_state(row: sqlite3.Row | aiosqlite.Row) -> TopologyStateRecord:
     child_run_ids = _json_load(row["child_run_ids_json"], [])
     if not isinstance(child_run_ids, list):
@@ -1248,13 +1285,276 @@ def _operation_hash(metadata: dict[str, Any] | None) -> str:
     return str((metadata or {}).get("operation_hash") or "")
 
 
+_IDEMPOTENCY_COMPLETION_STATUSES = frozenset({"completed", "failed"})
+_IDEMPOTENCY_OWNER_METADATA_KEY = "idempotency_owner_execution"
+_IDEMPOTENCY_OWNER_FIELDS = (
+    "trace_id",
+    "correlation_id",
+    "task_id",
+    "run_id",
+    "claim_id",
+    "idempotency_key",
+    "causation_id",
+    "parent_run_id",
+    "agent_id",
+    "session_id",
+    "external_a2a_task_id",
+)
+
+
+def _side_effect_complete_receipt_id(
+    identity: ExecutionIdentity,
+    side_effect_key: str,
+    *,
+    status: str,
+    result_receipt_id: str,
+    payload: dict[str, Any],
+) -> str:
+    """Name exact completion evidence so a post-commit retry can heal it."""
+    return _stable_bound_id(
+        "rr_side_effect_complete",
+        identity.run_id,
+        identity.idempotency_key,
+        side_effect_key,
+        status,
+        result_receipt_id,
+        _json_dump(payload),
+    )
+
+
+def _execution_identity_replay_matches_owner(
+    owner: ExecutionIdentity | None,
+    incoming: ExecutionIdentity,
+) -> bool:
+    if owner is None or owner.run_id != incoming.run_id:
+        return False
+    try:
+        owner.require_for_dispatch()
+        _merge_execution_identity_metadata(owner, incoming, None)
+    except MissingExecutionIdentity:
+        return False
+    except ValueError:
+        return False
+    return all(
+        not str(getattr(incoming, field_name, "") or "")
+        or getattr(incoming, field_name) == getattr(owner, field_name)
+        for field_name in _IDEMPOTENCY_OWNER_FIELDS
+    )
+
+
+def _idempotency_identity_from_canonical(
+    canonical: ExecutionIdentity | None,
+    incoming: ExecutionIdentity,
+) -> ExecutionIdentity:
+    """Bind one effect owner without conflating run and effect idempotency."""
+    if canonical is None:
+        return incoming
+    authority_fields = tuple(
+        field_name
+        for field_name in _IDEMPOTENCY_OWNER_FIELDS
+        if field_name != "idempotency_key"
+    )
+    if any(
+        str(getattr(incoming, field_name, "") or "")
+        and getattr(incoming, field_name) != getattr(canonical, field_name)
+        for field_name in authority_fields
+    ):
+        raise ValueError("idempotency execution identity conflicts with durable owner")
+    _merge_execution_identity_metadata(canonical, incoming, None)
+    return replace(
+        canonical,
+        idempotency_key=incoming.idempotency_key,
+        metadata=dict(canonical.metadata),
+    )
+
+
+def _idempotency_owner_payload(identity: ExecutionIdentity) -> dict[str, str]:
+    return {
+        field_name: str(getattr(identity, field_name, "") or "")
+        for field_name in _IDEMPOTENCY_OWNER_FIELDS
+    }
+
+
+def _idempotency_owner_from_metadata(
+    metadata: dict[str, Any] | None,
+) -> ExecutionIdentity | None:
+    raw = dict(metadata or {}).get(_IDEMPOTENCY_OWNER_METADATA_KEY)
+    if (
+        not isinstance(raw, dict)
+        or set(raw) != set(_IDEMPOTENCY_OWNER_FIELDS)
+        or any(not isinstance(raw.get(field_name), str) for field_name in raw)
+        or any(
+            not str(raw.get(field_name) or "").strip()
+            for field_name in (
+                "trace_id",
+                "correlation_id",
+                "task_id",
+                "run_id",
+                "claim_id",
+                "idempotency_key",
+            )
+        )
+    ):
+        return None
+    return ExecutionIdentity(
+        **raw,
+        message_id="",
+        event_id="",
+        artifact_id="",
+        proposal_id="",
+        metadata={},
+    )
+
+
+def _idempotency_owner_identity(
+    record: IdempotencyRecord,
+    durable: ExecutionIdentity | None,
+) -> ExecutionIdentity | None:
+    owner = _idempotency_owner_from_metadata(record.metadata)
+    if owner is None:
+        return (
+            replace(durable, idempotency_key=record.idempotency_key)
+            if durable is not None
+            else None
+        )
+    if durable is None:
+        return None
+    try:
+        return _idempotency_identity_from_canonical(durable, owner)
+    except ValueError:
+        return None
+
+
+def _idempotency_effect_rebind_allowed(
+    records: Iterable[IdempotencyRecord],
+    durable: ExecutionIdentity,
+    incoming: ExecutionIdentity,
+) -> bool:
+    """Authorize a per-effect alias only from its already-bound memo row."""
+    return any(
+        _idempotency_identity_matches(
+            record,
+            incoming,
+            _idempotency_owner_identity(record, durable),
+        )
+        for record in records
+    )
+
+
+def _metadata_with_idempotency_owner(
+    metadata: dict[str, Any] | None,
+    owner: ExecutionIdentity,
+) -> dict[str, Any]:
+    values = dict(metadata or {})
+    if _IDEMPOTENCY_OWNER_METADATA_KEY in values:
+        raise ValueError("idempotency owner metadata is reserved")
+    values[_IDEMPOTENCY_OWNER_METADATA_KEY] = _idempotency_owner_payload(owner)
+    return values
+
+
+def _idempotency_identity_matches(
+    record: IdempotencyRecord,
+    identity: ExecutionIdentity,
+    owner: ExecutionIdentity | None,
+) -> bool:
+    return _execution_identity_replay_matches_owner(owner, identity) and (
+        record.run_id,
+        record.task_id,
+        record.trace_id,
+        record.correlation_id,
+        record.idempotency_key,
+    ) == (
+        owner.run_id,
+        owner.task_id,
+        owner.trace_id,
+        owner.correlation_id,
+        owner.idempotency_key,
+    )
+
+
+def _replayable_idempotency_terminal(record: IdempotencyRecord) -> bool:
+    """A complete memoized provider result is absorbing dispatch authority."""
+    metadata = record.metadata
+    receipt = metadata.get("receipt") if isinstance(metadata, dict) else None
+    attributes = receipt.get("attributes") if isinstance(receipt, dict) else None
+    encoded = metadata.get("result_json") if isinstance(metadata, dict) else None
+    if not isinstance(encoded, str):
+        return False
+    try:
+        json.loads(encoded)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return False
+    return bool(
+        record.status == "completed"
+        and record.result_receipt_id
+        and isinstance(receipt, dict)
+        and isinstance(attributes, dict)
+        and metadata.get("operation_hash")
+        and receipt.get("receipt_id") == record.result_receipt_id
+        and receipt.get("status") == "ok"
+        and receipt.get("task_id") == record.task_id
+        and receipt.get("trace_id") == record.trace_id
+        and attributes.get("run_id") == record.run_id
+        and attributes.get("idempotency_key") == record.idempotency_key
+        and attributes.get("side_effect_key") == record.side_effect_key
+        and attributes.get("unprotected_dispatch") is not True
+    )
+
+
 def _merge_idempotency_metadata(
     existing: IdempotencyRecord,
     metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    incoming = dict(metadata or {})
+    current_owner = existing.metadata.get(_IDEMPOTENCY_OWNER_METADATA_KEY)
+    if (
+        _IDEMPOTENCY_OWNER_METADATA_KEY in incoming
+        and incoming[_IDEMPOTENCY_OWNER_METADATA_KEY] != current_owner
+    ):
+        raise ValueError("idempotency owner metadata conflicts with first writer")
     merged = dict(existing.metadata)
-    merged.update(metadata or {})
+    merged.update(incoming)
+    if current_owner is not None:
+        merged[_IDEMPOTENCY_OWNER_METADATA_KEY] = current_owner
     return merged
+
+
+def _merge_idempotency_completion_metadata(
+    existing: IdempotencyRecord,
+    metadata: dict[str, Any] | None,
+    *,
+    result_receipt_id: str,
+) -> dict[str, Any]:
+    """Preserve intent-time authority while adding terminal evidence."""
+    incoming = dict(metadata or {})
+    existing_hash = _operation_hash(existing.metadata)
+    if (
+        existing_hash
+        and "operation_hash" in incoming
+        and _operation_hash(incoming) != existing_hash
+    ):
+        raise ValueError("idempotency completion operation_hash conflicts with intent")
+    merged = _merge_idempotency_metadata(existing, incoming)
+    if (
+        "result_receipt_id" in merged
+        and merged["result_receipt_id"] != result_receipt_id
+    ):
+        raise ValueError("idempotency completion result_receipt_id conflicts with evidence")
+    return merged
+
+
+def _side_effect_completion_payload(
+    result_receipt_id: str,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    values = dict(payload or {})
+    if (
+        "result_receipt_id" in values
+        and values["result_receipt_id"] != result_receipt_id
+    ):
+        raise ValueError("side-effect completion result_receipt_id conflicts with evidence")
+    values["result_receipt_id"] = result_receipt_id
+    return values
 
 
 def _execution_identity_conflicts(
@@ -1318,6 +1618,27 @@ def _merge_execution_identity_metadata(
     return merged
 
 
+def _merge_execution_identity(
+    existing: ExecutionIdentity | None,
+    incoming: ExecutionIdentity,
+    metadata: dict[str, Any] | None,
+) -> ExecutionIdentity:
+    """Preserve every already-bound identity coordinate on sparse replay."""
+    _raise_on_execution_identity_conflict(existing, incoming)
+    coordinates = {
+        field_name: getattr(existing, field_name)
+        for field_name in _EXECUTION_IDENTITY_CONFLICT_FIELDS
+        if existing is not None
+        and str(getattr(existing, field_name, "") or "")
+        and not str(getattr(incoming, field_name, "") or "")
+    }
+    return replace(
+        incoming,
+        **coordinates,
+        metadata=_merge_execution_identity_metadata(existing, incoming, metadata),
+    )
+
+
 def _preserve_claim_evidence_metadata(
     existing: dict[str, Any] | None,
     incoming: dict[str, Any] | None,
@@ -1339,6 +1660,281 @@ def _preserve_claim_evidence_metadata(
     if current_evidence is not None:
         merged[_CLAIM_EVIDENCE_METADATA_KEY] = current_evidence
     return merged
+
+
+_EXECUTION_IDENTITY_ALIASES = (
+    ("task_id", "task_id"),
+    ("agent_id", "agent_id"),
+    ("session_id", "session_id"),
+    ("claim_id", "claim_id"),
+    ("run_id", "run_id"),
+    ("runtime_run_id", "run_id"),
+    ("trace_id", "trace_id"),
+    ("correlation_id", "correlation_id"),
+    ("idempotency_key", "idempotency_key"),
+    ("causation_id", "causation_id"),
+    ("parent_run_id", "parent_run_id"),
+    ("external_a2a_task_id", "external_a2a_task_id"),
+    ("message_id", "message_id"),
+    ("event_id", "event_id"),
+    ("artifact_id", "artifact_id"),
+    ("proposal_id", "proposal_id"),
+)
+
+
+def _complete_metadata_identity(
+    metadata: dict[str, Any] | None,
+    *,
+    carrier: str,
+) -> ExecutionIdentity | None:
+    values = dict(metadata or {})
+    nested = values.get("execution_identity")
+    if nested is None:
+        return None
+    if not isinstance(nested, dict):
+        raise ValueError(f"{carrier} ExecutionIdentity carrier is malformed")
+    try:
+        identity = ExecutionIdentity.from_metadata(values, require=True)
+    except (MissingExecutionIdentity, ValueError) as exc:
+        raise ValueError(f"{carrier} ExecutionIdentity carrier is incomplete") from exc
+    if identity is None:
+        raise ValueError(f"{carrier} ExecutionIdentity carrier is incomplete")
+    _require_identity_aliases(values, identity, carrier=carrier)
+    return identity.require_for_dispatch()
+
+
+def _require_identity_aliases(
+    metadata: dict[str, Any] | None,
+    identity: ExecutionIdentity,
+    *,
+    carrier: str,
+) -> None:
+    values = dict(metadata or {})
+    mismatches = [
+        alias
+        for alias, field in _EXECUTION_IDENTITY_ALIASES
+        if alias in values
+        and values.get(alias) != getattr(identity, field)
+    ]
+    if mismatches:
+        raise ValueError(
+            f"{carrier} ExecutionIdentity aliases conflict: {', '.join(mismatches)}"
+        )
+
+
+def _stable_coordinate(
+    current: str,
+    proposed: str,
+    *,
+    carrier: str,
+    field: str,
+) -> str:
+    if current and proposed and current != proposed:
+        raise ValueError(f"{carrier} immutable {field} conflicts")
+    return current or proposed
+
+
+def _validate_claim_identity_binding(
+    identity: ExecutionIdentity,
+    claim: TaskClaim,
+    *,
+    carrier: str,
+) -> None:
+    expected = {
+        "task_id": claim.task_id,
+        "claim_id": claim.claim_id,
+        "agent_id": claim.agent_id,
+        "session_id": claim.session_id,
+    }
+    mismatches = [
+        field
+        for field, value in expected.items()
+        if value and str(getattr(identity, field) or "") != value
+    ]
+    if mismatches:
+        raise ValueError(
+            f"{carrier} ExecutionIdentity claim binding conflicts: "
+            + ", ".join(mismatches)
+        )
+
+
+def _normalize_claim_replay(
+    existing: TaskClaim | None,
+    candidate: TaskClaim,
+) -> tuple[TaskClaim, ExecutionIdentity | None]:
+    if existing is not None:
+        if existing.task_id != candidate.task_id:
+            raise ValueError("task claim immutable task_id conflicts")
+        if existing.agent_id != candidate.agent_id:
+            raise ValueError("task claim immutable agent_id conflicts")
+        candidate = replace(
+            candidate,
+            session_id=_stable_coordinate(
+                existing.session_id,
+                candidate.session_id,
+                carrier="task claim",
+                field="session_id",
+            ),
+        )
+    current_identity = _complete_metadata_identity(
+        existing.metadata if existing is not None else None,
+        carrier="existing task claim",
+    )
+    incoming_identity = _complete_metadata_identity(
+        candidate.metadata,
+        carrier="incoming task claim",
+    )
+    if (
+        existing is not None
+        and _is_absorbing_runtime_row(existing.status, existing.metadata)
+        and current_identity is None
+        and incoming_identity is not None
+    ):
+        raise ValueError("terminal task claim cannot acquire an ExecutionIdentity")
+    if current_identity is not None:
+        _validate_claim_identity_binding(
+            current_identity,
+            existing or candidate,
+            carrier="existing task claim",
+        )
+        _require_identity_aliases(
+            candidate.metadata,
+            current_identity,
+            carrier="incoming task claim",
+        )
+    if current_identity is not None and incoming_identity is not None:
+        if current_identity.run_id != incoming_identity.run_id:
+            raise ValueError("task claim ExecutionIdentity cannot be rebound")
+        try:
+            identity = _merge_execution_identity(
+                current_identity, incoming_identity, None
+            )
+        except ValueError as exc:
+            raise ValueError("task claim ExecutionIdentity cannot be rebound") from exc
+    else:
+        identity = current_identity or incoming_identity
+    if incoming_identity is not None:
+        _validate_claim_identity_binding(
+            identity or incoming_identity,
+            candidate,
+            carrier="incoming task claim",
+        )
+    metadata = _preserve_claim_evidence_metadata(
+        existing.metadata if existing is not None else None,
+        candidate.metadata,
+        claim_id=candidate.claim_id,
+    )
+    if identity is not None:
+        metadata = _metadata_with_identity(metadata, identity)
+    return replace(candidate, metadata=metadata), identity
+
+
+def _validate_run_identity_binding(
+    identity: ExecutionIdentity,
+    run: DelegationRun,
+    *,
+    carrier: str,
+) -> None:
+    expected = {
+        "task_id": run.task_id,
+        "run_id": run.run_id,
+        "claim_id": run.claim_id,
+        "agent_id": run.assigned_to,
+        "session_id": run.session_id,
+        "parent_run_id": run.parent_run_id,
+    }
+    mismatches = [
+        field
+        for field, value in expected.items()
+        if str(getattr(identity, field) or "") != value
+    ]
+    if mismatches:
+        raise ValueError(
+            f"{carrier} ExecutionIdentity run binding conflicts: "
+            + ", ".join(mismatches)
+        )
+
+
+def _normalize_run_replay(
+    existing: DelegationRun | None,
+    candidate: DelegationRun,
+) -> tuple[DelegationRun, ExecutionIdentity | None]:
+    if existing is not None:
+        if existing.task_id != candidate.task_id:
+            raise ValueError("delegation run immutable task_id conflicts")
+        if existing.assigned_to != candidate.assigned_to:
+            raise ValueError("delegation run immutable assigned_to conflicts")
+        candidate = replace(
+            candidate,
+            session_id=_stable_coordinate(
+                existing.session_id,
+                candidate.session_id,
+                carrier="delegation run",
+                field="session_id",
+            ),
+            claim_id=_stable_coordinate(
+                existing.claim_id,
+                candidate.claim_id,
+                carrier="delegation run",
+                field="claim_id",
+            ),
+            parent_run_id=_stable_coordinate(
+                existing.parent_run_id,
+                candidate.parent_run_id,
+                carrier="delegation run",
+                field="parent_run_id",
+            ),
+        )
+    current_identity = _complete_metadata_identity(
+        existing.metadata if existing is not None else None,
+        carrier="existing delegation run",
+    )
+    incoming_identity = _complete_metadata_identity(
+        candidate.metadata,
+        carrier="incoming delegation run",
+    )
+    if (
+        existing is not None
+        and _is_absorbing_runtime_row(existing.status, existing.metadata)
+        and current_identity is None
+        and incoming_identity is not None
+    ):
+        raise ValueError("terminal delegation run cannot acquire an ExecutionIdentity")
+    if current_identity is not None:
+        _validate_run_identity_binding(
+            current_identity,
+            existing or candidate,
+            carrier="existing delegation run",
+        )
+        _require_identity_aliases(
+            candidate.metadata,
+            current_identity,
+            carrier="incoming delegation run",
+        )
+    if current_identity is not None and incoming_identity is not None:
+        if current_identity.run_id != incoming_identity.run_id:
+            raise ValueError("delegation run ExecutionIdentity cannot be rebound")
+        try:
+            identity = _merge_execution_identity(
+                current_identity, incoming_identity, None
+            )
+        except ValueError as exc:
+            raise ValueError("delegation run ExecutionIdentity cannot be rebound") from exc
+    else:
+        identity = current_identity or incoming_identity
+    if incoming_identity is not None:
+        _validate_run_identity_binding(
+            identity or incoming_identity,
+            candidate,
+            carrier="incoming delegation run",
+        )
+    metadata = {
+        **(existing.metadata if existing is not None else {}),
+        **candidate.metadata,
+    }
+    if identity is not None:
+        metadata = _metadata_with_identity(metadata, identity)
+    return replace(candidate, metadata=metadata), identity
 
 
 def _later_timestamp(
@@ -2391,6 +2987,33 @@ class RuntimeStateStore:
             events_scanned += self.index_ledger_session_sync(target)
         return sessions_scanned, events_scanned
 
+    async def _record_execution_identity_in_transaction(
+        self,
+        db: aiosqlite.Connection,
+        identity: ExecutionIdentity,
+        *,
+        source: str,
+    ) -> ExecutionIdentity:
+        """Validate and persist identity inside its async owner transaction."""
+        identity.require_for_dispatch()
+        row = await (
+            await db.execute(
+                self._identity_select_sql() + " WHERE run_id = ?",
+                (identity.run_id,),
+            )
+        ).fetchone()
+        existing = _row_to_execution_identity(row) if row is not None else None
+        identity = _merge_execution_identity(existing, identity, None)
+        await db.execute(
+            self._identity_upsert_sql(),
+            self._identity_params(
+                identity,
+                source=source,
+                now=_utc_now(),
+            ),
+        )
+        return identity
+
     async def record_task_claim(self, claim: TaskClaim) -> TaskClaim:
         await self.init_db()
         corr = get_correlation()
@@ -2409,11 +3032,25 @@ class RuntimeStateStore:
                 )
             ).fetchone()
             existing = _row_to_claim(existing_row) if existing_row is not None else None
-            metadata = _preserve_claim_evidence_metadata(
-                existing.metadata if existing is not None else None,
-                claim.metadata,
-                claim_id=claim.claim_id,
+            claim, bound_identity = _normalize_claim_replay(existing, claim)
+            if bound_identity is not None:
+                bound_identity = await self._record_execution_identity_in_transaction(
+                    db,
+                    bound_identity,
+                    source="runtime_state.record_task_claim",
+                )
+                claim = replace(
+                    claim,
+                    metadata=_metadata_with_identity(claim.metadata, bound_identity),
+                )
+            existing_terminal_replay = bool(
+                existing is not None and _absorbing_claim_replay(existing, claim)
             )
+            metadata = claim.metadata
+            if existing_terminal_replay:
+                assert existing is not None
+                await db.commit()
+                return existing
             heartbeat_at = _later_timestamp(
                 existing.heartbeat_at if existing is not None else None,
                 claim.heartbeat_at,
@@ -2527,11 +3164,21 @@ class RuntimeStateStore:
             existing = await self.get_task_claim(claim_id)
             if existing is None:
                 raise KeyError(f"claim {claim_id} not found")
+            if (
+                existing.status.lower() not in _RENEWABLE_TASK_CLAIM_STATUSES
+                or status.lower() not in _RENEWABLE_TASK_CLAIM_STATUSES
+            ):
+                raise ValueError("acknowledgement cannot update a terminal claim")
             merged_metadata = _preserve_claim_evidence_metadata(
                 existing.metadata,
                 {**existing.metadata, **(metadata or {})},
                 claim_id=claim_id,
             )
+            normalized, _identity = _normalize_claim_replay(
+                existing,
+                replace(existing, status=status, metadata=merged_metadata),
+            )
+            merged_metadata = normalized.metadata
             acked_at = acknowledged_at or _utc_now()
             heartbeat_at = existing.heartbeat_at or acked_at
             async with aiosqlite.connect(self.db_path) as db:
@@ -2616,6 +3263,16 @@ class RuntimeStateStore:
                 merged_metadata["mission_control_evidence"] = existing.metadata[
                     "mission_control_evidence"
                 ]
+            normalized, _identity = _normalize_claim_replay(
+                existing,
+                replace(
+                    existing,
+                    status=target_status,
+                    heartbeat_at=beat_at,
+                    metadata=merged_metadata,
+                ),
+            )
+            merged_metadata = normalized.metadata
             async with aiosqlite.connect(self.db_path) as db:
                 await _apply_connection_pragmas_async(db)
                 db.row_factory = aiosqlite.Row
@@ -2689,6 +3346,7 @@ class RuntimeStateStore:
             raise ValueError("require_unexpired_at must be timezone-aware")
         if require_open_run_id != str(require_open_run_id or "").strip():
             raise ValueError("require_open_run_id must be canonical")
+        replacement, _identity = _normalize_claim_replay(expected, replacement)
         if atomic_receipt is not None:
             if replacement.heartbeat_at is None:
                 raise ValueError("atomic receipt requires a replacement heartbeat")
@@ -2906,6 +3564,35 @@ class RuntimeStateStore:
             run.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            existing_row = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                    " assigned_by, assigned_to, requested_output_json,"
+                    " current_artifact_id, status, started_at, completed_at,"
+                    " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                    (run.run_id,),
+                )
+            ).fetchone()
+            existing = _row_to_run(existing_row) if existing_row is not None else None
+            run, bound_identity = _normalize_run_replay(existing, run)
+            if bound_identity is not None:
+                bound_identity = await self._record_execution_identity_in_transaction(
+                    db,
+                    bound_identity,
+                    source="runtime_state.record_delegation_run",
+                )
+                run = replace(
+                    run,
+                    parent_run_id=bound_identity.parent_run_id,
+                    metadata=_metadata_with_identity(run.metadata, bound_identity),
+                )
+            if existing is not None and (
+                existing == run or _absorbing_run_replay(existing, run)
+            ):
+                await db.commit()
+                return existing
             await db.execute(
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
                 " parent_run_id, assigned_by, assigned_to, requested_output_json,"
@@ -2945,6 +3632,24 @@ class RuntimeStateStore:
                     trace_id,
                 ),
             )
+            if (
+                run.status in {"completed", "failed"}
+                and "task_board_projection" in run.metadata
+            ):
+                # The projection authority is prepared in the SAME SQLite
+                # transaction that terminalizes the run.  A crash can expose
+                # neither a terminal row without its outbox proof nor a proof
+                # for a nonterminal row.
+                from dharma_swarm.graph.reconcile_board import (
+                    prepare_task_board_projection_snapshot,
+                )
+
+                if not await prepare_task_board_projection_snapshot(
+                    db, run_id=run.run_id
+                ):
+                    raise RuntimeError(
+                        "terminal delegation run projection prepare failed"
+                    )
             await db.commit()
         loaded = await self.get_delegation_run(run.run_id)
         assert loaded is not None
@@ -3172,6 +3877,16 @@ class RuntimeStateStore:
             != expected
         ):
             raise ValueError("delegation run CAS changes immutable coordinates")
+        expected_terminal = _is_absorbing_runtime_row(
+            expected.status, expected.metadata
+        )
+        replacement_terminal = _is_absorbing_runtime_row(
+            replacement.status, replacement.metadata
+        )
+        if expected_terminal and replacement != expected:
+            raise ValueError("terminal delegation run cannot be mutated")
+        if not expected_terminal and not replacement_terminal:
+            raise ValueError("delegation run CAS requires a terminal replacement")
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
@@ -3190,6 +3905,9 @@ class RuntimeStateStore:
                 if row is None or _row_to_run(row) != expected:
                     await db.commit()
                     return False
+                if replacement == expected:
+                    await db.commit()
+                    return True
                 cursor = await db.execute(
                     "UPDATE delegation_runs SET status = ?, completed_at = ?,"
                     " failure_code = ? WHERE run_id = ?",
@@ -3683,6 +4401,31 @@ class RuntimeStateStore:
 
     # ── Sync helpers (for non-async callers like OpportunityDispatcher) ──
 
+    def _record_execution_identity_in_transaction_sync(
+        self,
+        db: sqlite3.Connection,
+        identity: ExecutionIdentity,
+        *,
+        source: str,
+    ) -> ExecutionIdentity:
+        """Validate and persist identity inside its owner-row transaction."""
+        identity.require_for_dispatch()
+        row = db.execute(
+            self._identity_select_sql() + " WHERE run_id = ?",
+            (identity.run_id,),
+        ).fetchone()
+        existing = _row_to_execution_identity(row) if row is not None else None
+        identity = _merge_execution_identity(existing, identity, None)
+        db.execute(
+            self._identity_upsert_sql(),
+            self._identity_params(
+                identity,
+                source=source,
+                now=_utc_now(),
+            ),
+        )
+        return identity
+
     def create_task_claim_sync(
         self,
         claim: TaskClaim,
@@ -3724,10 +4467,6 @@ class RuntimeStateStore:
                 claim,
                 metadata=_metadata_with_identity(claim.metadata, identity),
             )
-            self.record_execution_identity_sync(
-                identity,
-                source="runtime_state.create_task_claim_sync",
-            )
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
@@ -3740,51 +4479,74 @@ class RuntimeStateStore:
                 (claim.claim_id,),
             ).fetchone()
             existing = _row_to_claim(existing_row) if existing_row is not None else None
-            metadata = _preserve_claim_evidence_metadata(
-                existing.metadata if existing is not None else None,
-                claim.metadata,
-                claim_id=claim.claim_id,
+            claim, bound_identity = _normalize_claim_replay(existing, claim)
+            identity = bound_identity or identity
+            if identity is not None:
+                identity = self._record_execution_identity_in_transaction_sync(
+                    db,
+                    identity,
+                    source="runtime_state.create_task_claim_sync",
+                )
+                claim = replace(
+                    claim,
+                    metadata=_metadata_with_identity(claim.metadata, identity),
+                )
+            existing_terminal_replay = bool(
+                existing is not None
+                and _absorbing_claim_replay(existing, claim)
             )
+            metadata = claim.metadata
+            if existing_terminal_replay:
+                assert existing is not None
+                claim = existing
+                metadata = existing.metadata
             heartbeat_at = _later_timestamp(
                 existing.heartbeat_at if existing is not None else None,
                 claim.heartbeat_at,
             )
             stale_after = claim.stale_after
-            trace_id = identity.trace_id if identity is not None else _trace_from_metadata(metadata)
-            db.execute(
-                "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
-                " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
-                " retry_count, metadata_json, trace_id)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                " ON CONFLICT(claim_id) DO UPDATE SET"
-                " task_id = excluded.task_id,"
-                " session_id = excluded.session_id,"
-                " agent_id = excluded.agent_id,"
-                " status = excluded.status,"
-                " claimed_at = excluded.claimed_at,"
-                " acked_at = excluded.acked_at,"
-                " heartbeat_at = excluded.heartbeat_at,"
-                " stale_after = excluded.stale_after,"
-                " recovered_at = excluded.recovered_at,"
-                " retry_count = excluded.retry_count,"
-                " metadata_json = excluded.metadata_json,"
-                " trace_id = excluded.trace_id",
-                (
-                    claim.claim_id,
-                    claim.task_id,
-                    claim.session_id,
-                    claim.agent_id,
-                    claim.status,
-                    claim.claimed_at.isoformat(),
-                    claim.acked_at.isoformat() if claim.acked_at else None,
-                    heartbeat_at.isoformat() if heartbeat_at else None,
-                    stale_after.isoformat() if stale_after else None,
-                    claim.recovered_at.isoformat() if claim.recovered_at else None,
-                    int(claim.retry_count),
-                    _json_dump(metadata),
-                    trace_id,
-                ),
+            trace_id = (
+                identity.trace_id
+                if identity is not None
+                else _trace_from_metadata(metadata)
             )
+            if not existing_terminal_replay:
+                db.execute(
+                    "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id,"
+                    " status, claimed_at, acked_at, heartbeat_at, stale_after,"
+                    " recovered_at, retry_count, metadata_json, trace_id)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    " ON CONFLICT(claim_id) DO UPDATE SET"
+                    " task_id = excluded.task_id,"
+                    " session_id = excluded.session_id,"
+                    " agent_id = excluded.agent_id,"
+                    " status = excluded.status,"
+                    " claimed_at = excluded.claimed_at,"
+                    " acked_at = excluded.acked_at,"
+                    " heartbeat_at = excluded.heartbeat_at,"
+                    " stale_after = excluded.stale_after,"
+                    " recovered_at = excluded.recovered_at,"
+                    " retry_count = excluded.retry_count,"
+                    " metadata_json = excluded.metadata_json,"
+                    " trace_id = excluded.trace_id",
+                    (
+                        claim.claim_id,
+                        claim.task_id,
+                        claim.session_id,
+                        claim.agent_id,
+                        claim.status,
+                        claim.claimed_at.isoformat(),
+                        claim.acked_at.isoformat() if claim.acked_at else None,
+                        heartbeat_at.isoformat() if heartbeat_at else None,
+                        stale_after.isoformat() if stale_after else None,
+                        claim.recovered_at.isoformat()
+                        if claim.recovered_at
+                        else None,
+                        int(claim.retry_count),
+                        _json_dump(metadata),
+                        trace_id,
+                    ),
+                )
             db.commit()
         if identity is not None:
             self.record_receipt_for_identity_sync(
@@ -3809,19 +4571,71 @@ class RuntimeStateStore:
             ).fetchone()
         return _row_to_claim(row) if row is not None else None
 
+    def get_task_claim_snapshot_sync(self, claim_id: str) -> TaskClaim | None:
+        """Read a committed claim without schema writes or a writer lock.
+
+        RuntimeLifecycle invokes this synchronous boundary from async execution.
+        Schema initialization here could wait on an async writer while blocking
+        the event loop that must release it. The runtime database is WAL-backed,
+        so a read-only connection can observe the last committed custody carrier
+        while a different connection owns the writer lock.
+        """
+        if not self.db_path.is_file():
+            return None
+        uri = f"{self.db_path.resolve().as_uri()}?mode=ro"
+        try:
+            with sqlite3.connect(uri, uri=True, timeout=1.0) as db:
+                db.execute("PRAGMA query_only=ON")
+                db.row_factory = sqlite3.Row
+                row = db.execute(
+                    "SELECT claim_id, task_id, session_id, agent_id, status,"
+                    " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
+                    " retry_count, metadata_json FROM task_claims WHERE claim_id = ?",
+                    (claim_id,),
+                ).fetchone()
+        except sqlite3.OperationalError as exc:
+            if "no such table: task_claims" in str(exc):
+                return None
+            raise
+        return _row_to_claim(row) if row is not None else None
+
     def heartbeat_claim_sync(self, claim_id: str) -> TaskClaim | None:
         """Update heartbeat_at timestamp for a claim (sync)."""
-        existing = self.get_task_claim_sync(claim_id)
-        if existing is None:
-            return None
-        now = _utc_now()
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
-                "UPDATE task_claims SET heartbeat_at = ? WHERE claim_id = ?",
-                (now.isoformat(), claim_id),
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                " metadata_json FROM task_claims WHERE claim_id = ?",
+                (claim_id,),
+            ).fetchone()
+            if row is None:
+                db.commit()
+                return None
+            existing = _row_to_claim(row)
+            if existing.status.lower() not in _RENEWABLE_TASK_CLAIM_STATUSES:
+                db.rollback()
+                raise ValueError("heartbeat cannot update a terminal claim")
+            now = _utc_now()
+            if existing.heartbeat_at is not None and now <= existing.heartbeat_at:
+                db.rollback()
+                raise ValueError("heartbeat_at must advance monotonically")
+            cursor = db.execute(
+                "UPDATE task_claims SET heartbeat_at = ? WHERE claim_id = ?"
+                " AND status = ? AND metadata_json = ?",
+                (
+                    now.isoformat(),
+                    claim_id,
+                    existing.status,
+                    _json_dump(existing.metadata),
+                ),
             )
+            if cursor.rowcount != 1:
+                db.rollback()
+                raise RuntimeError("claim heartbeat lost its exact fence")
             db.commit()
         return self.get_task_claim_sync(claim_id)
 
@@ -3833,17 +4647,53 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None = None,
     ) -> TaskClaim | None:
         """Close a claim with a terminal status (sync)."""
-        existing = self.get_task_claim_sync(claim_id)
-        if existing is None:
-            return None
-        merged = {**existing.metadata, **(metadata or {})}
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
-                "UPDATE task_claims SET status = ?, metadata_json = ? WHERE claim_id = ?",
-                (status, _json_dump(merged), claim_id),
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                " metadata_json FROM task_claims WHERE claim_id = ?",
+                (claim_id,),
+            ).fetchone()
+            if row is None:
+                db.commit()
+                return None
+            existing = _row_to_claim(row)
+            merged = _preserve_claim_evidence_metadata(
+                existing.metadata,
+                {**existing.metadata, **(metadata or {})},
+                claim_id=claim_id,
             )
+            candidate, _identity = _normalize_claim_replay(
+                existing,
+                replace(existing, status=status, metadata=merged),
+            )
+            if _is_absorbing_runtime_row(existing.status, existing.metadata):
+                if candidate != existing:
+                    db.rollback()
+                    raise ValueError("terminal claim replay must be exact")
+                db.commit()
+                return existing
+            if not _is_absorbing_runtime_row(candidate.status, candidate.metadata):
+                db.rollback()
+                raise ValueError("close_claim_sync requires a terminal status")
+            cursor = db.execute(
+                "UPDATE task_claims SET status = ?, metadata_json = ?"
+                " WHERE claim_id = ? AND status = ? AND metadata_json = ?",
+                (
+                    candidate.status,
+                    _json_dump(candidate.metadata),
+                    claim_id,
+                    existing.status,
+                    _json_dump(existing.metadata),
+                ),
+            )
+            if cursor.rowcount != 1:
+                db.rollback()
+                raise RuntimeError("claim close lost its exact fence")
             db.commit()
         return self.get_task_claim_sync(claim_id)
 
@@ -3885,58 +4735,92 @@ class RuntimeStateStore:
                 agent_id=run.assigned_to,
                 session_id=run.session_id,
             )
+            if run.parent_run_id != identity.parent_run_id:
+                if run.parent_run_id:
+                    raise MissingExecutionIdentity(
+                        "ExecutionIdentity parent_run_id does not match "
+                        "create_delegation_run_sync"
+                    )
             run = replace(
                 run,
-                parent_run_id=run.parent_run_id or identity.parent_run_id,
+                parent_run_id=identity.parent_run_id,
                 metadata=_metadata_with_identity(run.metadata, identity),
             )
-            self.record_execution_identity_sync(
-                identity,
-                source="runtime_state.create_delegation_run_sync",
-            )
-        trace_id = identity.trace_id if identity is not None else _trace_from_metadata(run.metadata)
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
-                "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
-                " parent_run_id, assigned_by, assigned_to, requested_output_json,"
-                " current_artifact_id, status, started_at, completed_at, failure_code,"
-                " metadata_json, trace_id)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                " ON CONFLICT(run_id) DO UPDATE SET"
-                " session_id = excluded.session_id,"
-                " task_id = excluded.task_id,"
-                " claim_id = excluded.claim_id,"
-                " parent_run_id = excluded.parent_run_id,"
-                " assigned_by = excluded.assigned_by,"
-                " assigned_to = excluded.assigned_to,"
-                " requested_output_json = excluded.requested_output_json,"
-                " current_artifact_id = excluded.current_artifact_id,"
-                " status = excluded.status,"
-                " started_at = excluded.started_at,"
-                " completed_at = excluded.completed_at,"
-                " failure_code = excluded.failure_code,"
-                " metadata_json = excluded.metadata_json,"
-                " trace_id = excluded.trace_id",
-                (
-                    run.run_id,
-                    run.session_id,
-                    run.task_id,
-                    run.claim_id,
-                    run.parent_run_id,
-                    run.assigned_by,
-                    run.assigned_to,
-                    _json_dump(run.requested_output),
-                    run.current_artifact_id,
-                    run.status,
-                    run.started_at.isoformat(),
-                    run.completed_at.isoformat() if run.completed_at else None,
-                    run.failure_code,
-                    _json_dump(run.metadata),
-                    trace_id,
-                ),
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            existing_row = db.execute(
+                "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                " assigned_by, assigned_to, requested_output_json,"
+                " current_artifact_id, status, started_at, completed_at,"
+                " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                (run.run_id,),
+            ).fetchone()
+            existing = _row_to_run(existing_row) if existing_row is not None else None
+            run, bound_identity = _normalize_run_replay(existing, run)
+            identity = bound_identity or identity
+            if identity is not None:
+                identity = self._record_execution_identity_in_transaction_sync(
+                    db,
+                    identity,
+                    source="runtime_state.create_delegation_run_sync",
+                )
+                run = replace(
+                    run,
+                    parent_run_id=identity.parent_run_id,
+                    metadata=_metadata_with_identity(run.metadata, identity),
+                )
+            trace_id = (
+                identity.trace_id
+                if identity is not None
+                else _trace_from_metadata(run.metadata)
             )
+            if existing is not None and (
+                existing == run or _absorbing_run_replay(existing, run)
+            ):
+                run = existing
+            else:
+                db.execute(
+                    "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
+                    " parent_run_id, assigned_by, assigned_to, requested_output_json,"
+                    " current_artifact_id, status, started_at, completed_at, failure_code,"
+                    " metadata_json, trace_id)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    " ON CONFLICT(run_id) DO UPDATE SET"
+                    " session_id = excluded.session_id,"
+                    " task_id = excluded.task_id,"
+                    " claim_id = excluded.claim_id,"
+                    " parent_run_id = excluded.parent_run_id,"
+                    " assigned_by = excluded.assigned_by,"
+                    " assigned_to = excluded.assigned_to,"
+                    " requested_output_json = excluded.requested_output_json,"
+                    " current_artifact_id = excluded.current_artifact_id,"
+                    " status = excluded.status,"
+                    " started_at = excluded.started_at,"
+                    " completed_at = excluded.completed_at,"
+                    " failure_code = excluded.failure_code,"
+                    " metadata_json = excluded.metadata_json,"
+                    " trace_id = excluded.trace_id",
+                    (
+                        run.run_id,
+                        run.session_id,
+                        run.task_id,
+                        run.claim_id,
+                        run.parent_run_id,
+                        run.assigned_by,
+                        run.assigned_to,
+                        _json_dump(run.requested_output),
+                        run.current_artifact_id,
+                        run.status,
+                        run.started_at.isoformat(),
+                        run.completed_at.isoformat() if run.completed_at else None,
+                        run.failure_code,
+                        _json_dump(run.metadata),
+                        trace_id,
+                    ),
+                )
             db.commit()
         if identity is not None:
             self.record_receipt_for_identity_sync(
@@ -3997,18 +4881,66 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None = None,
     ) -> DelegationRun | None:
         """Close a delegation run (sync)."""
-        existing = self.get_delegation_run_sync(run_id)
-        if existing is None:
-            return None
-        merged = {**existing.metadata, **(metadata or {})}
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
-                "UPDATE delegation_runs SET status = ?, completed_at = ?,"
-                " failure_code = ?, metadata_json = ? WHERE run_id = ?",
-                (status, _utc_now_iso(), failure_code, _json_dump(merged), run_id),
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                " assigned_by, assigned_to, requested_output_json,"
+                " current_artifact_id, status, started_at, completed_at,"
+                " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                db.commit()
+                return None
+            existing = _row_to_run(row)
+            merged = {**existing.metadata, **(metadata or {})}
+            existing_terminal = _is_absorbing_runtime_row(
+                existing.status, existing.metadata
             )
+            candidate, _identity = _normalize_run_replay(
+                existing,
+                replace(
+                    existing,
+                    status=status,
+                    completed_at=(
+                        existing.completed_at if existing_terminal else _utc_now()
+                    ),
+                    failure_code=failure_code,
+                    metadata=merged,
+                ),
+            )
+            if existing_terminal:
+                if candidate != existing:
+                    db.rollback()
+                    raise ValueError("terminal delegation run replay must be exact")
+                db.commit()
+                return existing
+            if not _is_absorbing_runtime_row(candidate.status, candidate.metadata):
+                db.rollback()
+                raise ValueError(
+                    "close_delegation_run_sync requires a terminal status"
+                )
+            cursor = db.execute(
+                "UPDATE delegation_runs SET status = ?, completed_at = ?,"
+                " failure_code = ?, metadata_json = ? WHERE run_id = ?"
+                " AND status = ? AND metadata_json = ?",
+                (
+                    candidate.status,
+                    candidate.completed_at.isoformat(),
+                    candidate.failure_code,
+                    _json_dump(candidate.metadata),
+                    run_id,
+                    existing.status,
+                    _json_dump(existing.metadata),
+                ),
+            )
+            if cursor.rowcount != 1:
+                db.rollback()
+                raise RuntimeError("delegation run close lost its exact fence")
             db.commit()
         return self.get_delegation_run_sync(run_id)
 
@@ -4359,15 +5291,41 @@ class RuntimeStateStore:
                     )
                 ).fetchone()
                 existing = _row_to_execution_identity(row) if row is not None else None
-                _raise_on_execution_identity_conflict(existing, identity)
-                merged = _merge_execution_identity_metadata(existing, identity, metadata)
+                try:
+                    identity = _merge_execution_identity(existing, identity, metadata)
+                except ValueError:
+                    if existing is None:
+                        raise
+                    effect_rows = await (
+                        await db.execute(
+                            "SELECT idempotency_key, side_effect_key, run_id,"
+                            " task_id, trace_id, correlation_id, status,"
+                            " result_receipt_id, metadata_json, created_at, updated_at"
+                            " FROM idempotency_records WHERE idempotency_key = ?"
+                            " AND run_id = ?",
+                            (identity.idempotency_key, identity.run_id),
+                        )
+                    ).fetchall()
+                    if not _idempotency_effect_rebind_allowed(
+                        (_row_to_idempotency_record(effect_row) for effect_row in effect_rows),
+                        existing,
+                        identity,
+                    ):
+                        raise
+                    identity = replace(
+                        existing,
+                        metadata=_merge_execution_identity_metadata(
+                            existing,
+                            identity,
+                            metadata,
+                        ),
+                    )
                 await db.execute(
                     self._identity_upsert_sql(),
                     self._identity_params(
                         identity,
                         source=source,
                         now=now,
-                        metadata=merged,
                     ),
                 )
                 loaded_row = await (
@@ -4402,15 +5360,38 @@ class RuntimeStateStore:
                 (identity.run_id,),
             ).fetchone()
             existing = _row_to_execution_identity(row) if row is not None else None
-            _raise_on_execution_identity_conflict(existing, identity)
-            merged = _merge_execution_identity_metadata(existing, identity, metadata)
+            try:
+                identity = _merge_execution_identity(existing, identity, metadata)
+            except ValueError:
+                if existing is None:
+                    raise
+                effect_rows = db.execute(
+                    "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                    " trace_id, correlation_id, status, result_receipt_id,"
+                    " metadata_json, created_at, updated_at FROM idempotency_records"
+                    " WHERE idempotency_key = ? AND run_id = ?",
+                    (identity.idempotency_key, identity.run_id),
+                ).fetchall()
+                if not _idempotency_effect_rebind_allowed(
+                    (_row_to_idempotency_record(effect_row) for effect_row in effect_rows),
+                    existing,
+                    identity,
+                ):
+                    raise
+                identity = replace(
+                    existing,
+                    metadata=_merge_execution_identity_metadata(
+                        existing,
+                        identity,
+                        metadata,
+                    ),
+                )
             db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(
                     identity,
                     source=source,
                     now=now,
-                    metadata=merged,
                 ),
             )
             loaded_row = db.execute(
@@ -4442,6 +5423,28 @@ class RuntimeStateStore:
                 self._identity_select_sql() + " WHERE run_id = ?",
                 (run_id,),
             ).fetchone()
+        return _row_to_execution_identity(row) if row is not None else None
+
+    def get_execution_identity_snapshot_sync(
+        self,
+        run_id: str,
+    ) -> ExecutionIdentity | None:
+        """Read a committed identity without schema writes or a writer lock."""
+        if not self.db_path.is_file():
+            return None
+        uri = f"{self.db_path.resolve().as_uri()}?mode=ro"
+        try:
+            with sqlite3.connect(uri, uri=True, timeout=1.0) as db:
+                db.execute("PRAGMA query_only=ON")
+                db.row_factory = sqlite3.Row
+                row = db.execute(
+                    self._identity_select_sql() + " WHERE run_id = ?",
+                    (run_id,),
+                ).fetchone()
+        except sqlite3.OperationalError as exc:
+            if "no such table: execution_identities" in str(exc):
+                return None
+            raise
         return _row_to_execution_identity(row) if row is not None else None
 
     async def get_execution_identity_by_external_a2a_task(
@@ -4627,15 +5630,28 @@ class RuntimeStateStore:
         result_receipt_id: str = "",
         payload: dict[str, Any] | None = None,
     ) -> RuntimeReceipt:
+        completion_payload = _side_effect_completion_payload(result_receipt_id, payload)
+        durable = await self.get_execution_identity(identity.run_id)
+        try:
+            owner = _idempotency_identity_from_canonical(durable, identity)
+        except ValueError as exc:
+            raise ValueError("side-effect completion identity conflicts with owner") from exc
+        if durable is None:
+            raise ValueError("side-effect completion identity conflicts with owner")
+        identity = owner
         return await self.record_receipt_for_identity(
             identity,
             receipt_type="side_effect_complete",
             status=status,
             side_effect_key=side_effect_key,
-            payload={
-                "result_receipt_id": result_receipt_id,
-                **dict(payload or {}),
-            },
+            payload=completion_payload,
+            receipt_id=_side_effect_complete_receipt_id(
+                identity,
+                side_effect_key,
+                status=status,
+                result_receipt_id=result_receipt_id,
+                payload=completion_payload,
+            ),
         )
 
     def record_side_effect_complete_sync(
@@ -4647,15 +5663,28 @@ class RuntimeStateStore:
         result_receipt_id: str = "",
         payload: dict[str, Any] | None = None,
     ) -> RuntimeReceipt:
+        completion_payload = _side_effect_completion_payload(result_receipt_id, payload)
+        durable = self.get_execution_identity_sync(identity.run_id)
+        try:
+            owner = _idempotency_identity_from_canonical(durable, identity)
+        except ValueError as exc:
+            raise ValueError("side-effect completion identity conflicts with owner") from exc
+        if durable is None:
+            raise ValueError("side-effect completion identity conflicts with owner")
+        identity = owner
         return self.record_receipt_for_identity_sync(
             identity,
             receipt_type="side_effect_complete",
             status=status,
             side_effect_key=side_effect_key,
-            payload={
-                "result_receipt_id": result_receipt_id,
-                **dict(payload or {}),
-            },
+            payload=completion_payload,
+            receipt_id=_side_effect_complete_receipt_id(
+                identity,
+                side_effect_key,
+                status=status,
+                result_receipt_id=result_receipt_id,
+                payload=completion_payload,
+            ),
         )
 
     async def record_message_consumed(
@@ -5051,6 +6080,12 @@ class RuntimeStateStore:
             ).fetchone()
             existing = _row_to_runtime_receipt(row) if row is not None else None
             if (
+                existing is not None
+                and replace(receipt, created_at=existing.created_at) == existing
+            ):
+                await db.commit()
+                return existing
+            if (
                 receipt.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
                 or existing is not None
                 and existing.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
@@ -5174,6 +6209,12 @@ class RuntimeStateStore:
                 (receipt.receipt_id,),
             ).fetchone()
             existing = _row_to_runtime_receipt(row) if row is not None else None
+            if (
+                existing is not None
+                and replace(receipt, created_at=existing.created_at) == existing
+            ):
+                db.commit()
+                return existing
             if (
                 receipt.receipt_type in _IMMUTABLE_RUNTIME_RECEIPT_TYPES
                 or existing is not None
@@ -5323,6 +6364,12 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None,
         stale_after_seconds: float | None,
     ) -> None:
+        durable = await self.get_execution_identity(existing.run_id)
+        owner = _idempotency_owner_identity(existing, durable)
+        if not _idempotency_identity_matches(existing, identity, owner):
+            raise ValueError("idempotency duplicate identity conflicts with owner")
+        assert owner is not None
+        identity = owner
         existing_hash = _operation_hash(existing.metadata)
         incoming_hash = _operation_hash(metadata)
         if existing_hash and incoming_hash and existing_hash != incoming_hash:
@@ -5372,6 +6419,12 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None,
         stale_after_seconds: float | None,
     ) -> None:
+        durable = self.get_execution_identity_sync(existing.run_id)
+        owner = _idempotency_owner_identity(existing, durable)
+        if not _idempotency_identity_matches(existing, identity, owner):
+            raise ValueError("idempotency duplicate identity conflicts with owner")
+        assert owner is not None
+        identity = owner
         existing_hash = _operation_hash(existing.metadata)
         incoming_hash = _operation_hash(metadata)
         if existing_hash and incoming_hash and existing_hash != incoming_hash:
@@ -5428,25 +6481,68 @@ class RuntimeStateStore:
         await self.init_db()
         now = _next_idempotency_token(None, ownership_time)
         async with aiosqlite.connect(self.db_path) as db:
-            cur = await db.execute(
-                "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
-                " side_effect_key, run_id, task_id, trace_id, correlation_id,"
-                " status, result_receipt_id, metadata_json, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, 'started', '', ?, ?, ?)",
-                (
-                    identity.idempotency_key,
-                    side_effect_key,
-                    identity.run_id,
-                    identity.task_id,
-                    identity.trace_id,
-                    identity.correlation_id,
-                    _json_dump(metadata or {}),
-                    now,
-                    now,
-                ),
-            )
-            await db.commit()
-            inserted = int(cur.rowcount or 0) == 1
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                cur = await db.execute(
+                    "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
+                    " side_effect_key, run_id, task_id, trace_id, correlation_id,"
+                    " status, result_receipt_id, metadata_json, created_at, updated_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, 'started', '', ?, ?, ?)",
+                    (
+                        identity.idempotency_key,
+                        side_effect_key,
+                        identity.run_id,
+                        identity.task_id,
+                        identity.trace_id,
+                        identity.correlation_id,
+                        _json_dump(metadata or {}),
+                        now,
+                        now,
+                    ),
+                )
+                inserted = int(cur.rowcount or 0) == 1
+                if inserted:
+                    identity_row = await (
+                        await db.execute(
+                            self._identity_select_sql() + " WHERE run_id = ?",
+                            (identity.run_id,),
+                        )
+                    ).fetchone()
+                    canonical = (
+                        _row_to_execution_identity(identity_row)
+                        if identity_row is not None
+                        else await self._record_execution_identity_in_transaction(
+                            db,
+                            identity,
+                            source="idempotency_begin",
+                        )
+                    )
+                    identity = _idempotency_identity_from_canonical(
+                        canonical,
+                        identity,
+                    )
+                    owner_metadata = _metadata_with_idempotency_owner(
+                        metadata,
+                        identity,
+                    )
+                    await db.execute(
+                        "UPDATE idempotency_records SET metadata_json = ?"
+                        " WHERE idempotency_key = ? AND side_effect_key = ?"
+                        " AND status = 'started'",
+                        (
+                            _json_dump(owner_metadata),
+                            identity.idempotency_key,
+                            side_effect_key,
+                        ),
+                    )
+                    await db.commit()
+                else:
+                    await db.rollback()
+            except BaseException:
+                await db.rollback()
+                raise
         if not inserted:
             existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
             if existing is None:
@@ -5497,25 +6593,65 @@ class RuntimeStateStore:
         now = _utc_now_iso()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            cur = db.execute(
-                "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
-                " side_effect_key, run_id, task_id, trace_id, correlation_id,"
-                " status, result_receipt_id, metadata_json, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, 'started', '', ?, ?, ?)",
-                (
-                    identity.idempotency_key,
-                    side_effect_key,
-                    identity.run_id,
-                    identity.task_id,
-                    identity.trace_id,
-                    identity.correlation_id,
-                    _json_dump(metadata or {}),
-                    now,
-                    now,
-                ),
-            )
-            db.commit()
-            inserted = int(cur.rowcount or 0) == 1
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                cur = db.execute(
+                    "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
+                    " side_effect_key, run_id, task_id, trace_id, correlation_id,"
+                    " status, result_receipt_id, metadata_json, created_at, updated_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, 'started', '', ?, ?, ?)",
+                    (
+                        identity.idempotency_key,
+                        side_effect_key,
+                        identity.run_id,
+                        identity.task_id,
+                        identity.trace_id,
+                        identity.correlation_id,
+                        _json_dump(metadata or {}),
+                        now,
+                        now,
+                    ),
+                )
+                inserted = int(cur.rowcount or 0) == 1
+                if inserted:
+                    identity_row = db.execute(
+                        self._identity_select_sql() + " WHERE run_id = ?",
+                        (identity.run_id,),
+                    ).fetchone()
+                    canonical = (
+                        _row_to_execution_identity(identity_row)
+                        if identity_row is not None
+                        else self._record_execution_identity_in_transaction_sync(
+                            db,
+                            identity,
+                            source="idempotency_begin",
+                        )
+                    )
+                    identity = _idempotency_identity_from_canonical(
+                        canonical,
+                        identity,
+                    )
+                    owner_metadata = _metadata_with_idempotency_owner(
+                        metadata,
+                        identity,
+                    )
+                    db.execute(
+                        "UPDATE idempotency_records SET metadata_json = ?"
+                        " WHERE idempotency_key = ? AND side_effect_key = ?"
+                        " AND status = 'started'",
+                        (
+                            _json_dump(owner_metadata),
+                            identity.idempotency_key,
+                            side_effect_key,
+                        ),
+                    )
+                    db.commit()
+                else:
+                    db.rollback()
+            except BaseException:
+                db.rollback()
+                raise
         if not inserted:
             existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
             if existing is None:
@@ -5552,28 +6688,70 @@ class RuntimeStateStore:
         expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
+        if status not in _IDEMPOTENCY_COMPLETION_STATUSES:
+            raise ValueError("idempotency completion requires a terminal status")
         await self.init_db()
         existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
         if existing is None:
             raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
-        now = _next_idempotency_token(expected_updated_at or existing.updated_at)
-        merged_metadata = _merge_idempotency_metadata(existing, metadata)
+        durable = await self.get_execution_identity(existing.run_id)
+        owner = _idempotency_owner_identity(existing, durable)
+        if not _idempotency_identity_matches(existing, identity, owner):
+            raise ValueError("idempotency completion identity conflicts with owner")
+        assert owner is not None
+        identity = owner
+        merged_metadata = _merge_idempotency_completion_metadata(
+            existing,
+            metadata,
+            result_receipt_id=result_receipt_id,
+        )
+        if existing.status != "started":
+            if (
+                existing.status == status
+                and existing.result_receipt_id == result_receipt_id
+                and existing.metadata == merged_metadata
+            ):
+                await self.record_side_effect_complete(
+                    identity,
+                    side_effect_key,
+                    status=status,
+                    result_receipt_id=result_receipt_id,
+                    payload=merged_metadata,
+                )
+                return existing
+            raise ValueError("terminal idempotency evidence is immutable")
+        if expected_updated_at is not None and expected_updated_at != existing.updated_at:
+            raise RuntimeError(
+                f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}"
+            )
+        ownership_token = expected_updated_at or existing.updated_at
+        now = _next_idempotency_token(ownership_token)
         async with aiosqlite.connect(self.db_path) as db:
-            sql = (
+            cur = await db.execute(
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
                 " metadata_json = ?, updated_at = ?"
                 " WHERE idempotency_key = ? AND side_effect_key = ?"
+                " AND status = 'started' AND run_id = ? AND task_id = ?"
+                " AND trace_id = ? AND correlation_id = ? AND updated_at = ?",
+                (
+                    status,
+                    result_receipt_id,
+                    _json_dump(merged_metadata),
+                    now,
+                    identity.idempotency_key,
+                    side_effect_key,
+                    identity.run_id,
+                    identity.task_id,
+                    identity.trace_id,
+                    identity.correlation_id,
+                    ownership_token.isoformat(),
+                ),
             )
-            params: list[Any] = [status, result_receipt_id, _json_dump(merged_metadata), now,
-                                 identity.idempotency_key, side_effect_key]
-            if expected_updated_at is not None:
-                sql += " AND status = 'started' AND updated_at = ?"
-                params.append(expected_updated_at.isoformat())
-            cur = await db.execute(sql, tuple(params))
             await db.commit()
-        if expected_updated_at is not None and int(cur.rowcount or 0) != 1:
+        if int(cur.rowcount or 0) != 1:
             raise RuntimeError(f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}")
         record = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
+        assert record is not None
         await self.record_side_effect_complete(
             identity,
             side_effect_key,
@@ -5594,29 +6772,71 @@ class RuntimeStateStore:
         expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
+        if status not in _IDEMPOTENCY_COMPLETION_STATUSES:
+            raise ValueError("idempotency completion requires a terminal status")
         self.init_db_sync()
         existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
         if existing is None:
             raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
-        now = _next_idempotency_token(expected_updated_at or existing.updated_at)
-        merged_metadata = _merge_idempotency_metadata(existing, metadata)
+        durable = self.get_execution_identity_sync(existing.run_id)
+        owner = _idempotency_owner_identity(existing, durable)
+        if not _idempotency_identity_matches(existing, identity, owner):
+            raise ValueError("idempotency completion identity conflicts with owner")
+        assert owner is not None
+        identity = owner
+        merged_metadata = _merge_idempotency_completion_metadata(
+            existing,
+            metadata,
+            result_receipt_id=result_receipt_id,
+        )
+        if existing.status != "started":
+            if (
+                existing.status == status
+                and existing.result_receipt_id == result_receipt_id
+                and existing.metadata == merged_metadata
+            ):
+                self.record_side_effect_complete_sync(
+                    identity,
+                    side_effect_key,
+                    status=status,
+                    result_receipt_id=result_receipt_id,
+                    payload=merged_metadata,
+                )
+                return existing
+            raise ValueError("terminal idempotency evidence is immutable")
+        if expected_updated_at is not None and expected_updated_at != existing.updated_at:
+            raise RuntimeError(
+                f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}"
+            )
+        ownership_token = expected_updated_at or existing.updated_at
+        now = _next_idempotency_token(ownership_token)
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            sql = (
+            cur = db.execute(
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
                 " metadata_json = ?, updated_at = ?"
                 " WHERE idempotency_key = ? AND side_effect_key = ?"
+                " AND status = 'started' AND run_id = ? AND task_id = ?"
+                " AND trace_id = ? AND correlation_id = ? AND updated_at = ?",
+                (
+                    status,
+                    result_receipt_id,
+                    _json_dump(merged_metadata),
+                    now,
+                    identity.idempotency_key,
+                    side_effect_key,
+                    identity.run_id,
+                    identity.task_id,
+                    identity.trace_id,
+                    identity.correlation_id,
+                    ownership_token.isoformat(),
+                ),
             )
-            params: list[Any] = [status, result_receipt_id, _json_dump(merged_metadata), now,
-                                 identity.idempotency_key, side_effect_key]
-            if expected_updated_at is not None:
-                sql += " AND status = 'started' AND updated_at = ?"
-                params.append(expected_updated_at.isoformat())
-            cur = db.execute(sql, tuple(params))
             db.commit()
-        if expected_updated_at is not None and int(cur.rowcount or 0) != 1:
+        if int(cur.rowcount or 0) != 1:
             raise RuntimeError(f"idempotency lease lost for {identity.idempotency_key}:{side_effect_key}")
         record = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
+        assert record is not None
         self.record_side_effect_complete_sync(
             identity,
             side_effect_key,
@@ -5639,29 +6859,137 @@ class RuntimeStateStore:
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
         await self.init_db()
-        now = _next_idempotency_token(expected_updated_at, ownership_time)
-        sql = (
-            "UPDATE idempotency_records SET status = 'started', run_id = ?,"
-            " task_id = ?, trace_id = ?, correlation_id = ?, updated_at = ?"
-            " WHERE idempotency_key = ? AND side_effect_key = ? AND status = ?"
-        )
-        params: list[Any] = [
-            identity.run_id,
-            identity.task_id,
-            identity.trace_id,
-            identity.correlation_id,
-            now,
-            identity.idempotency_key,
-            side_effect_key,
-            expected_status,
-        ]
-        if expected_updated_at is not None:
-            sql += " AND updated_at = ?"
-            params.append(expected_updated_at.isoformat())
         async with aiosqlite.connect(self.db_path) as db:
-            cur = await db.execute(sql, tuple(params))
-            await db.commit()
-            reclaimed = int(cur.rowcount or 0) == 1
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                row = await (
+                    await db.execute(
+                        "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                        " trace_id, correlation_id, status, result_receipt_id,"
+                        " metadata_json, created_at, updated_at"
+                        " FROM idempotency_records WHERE idempotency_key = ?"
+                        " AND side_effect_key = ?",
+                        (identity.idempotency_key, side_effect_key),
+                    )
+                ).fetchone()
+                existing = (
+                    _row_to_idempotency_record(row) if row is not None else None
+                )
+                owner_row = (
+                    await (
+                        await db.execute(
+                            self._identity_select_sql() + " WHERE run_id = ?",
+                            (existing.run_id,),
+                        )
+                    ).fetchone()
+                    if existing is not None
+                    else None
+                )
+                durable_owner = (
+                    _row_to_execution_identity(owner_row)
+                    if owner_row is not None
+                    else None
+                )
+                owner = (
+                    _idempotency_owner_identity(existing, durable_owner)
+                    if existing is not None
+                    else None
+                )
+                if existing is not None and not _idempotency_identity_matches(
+                    existing,
+                    owner or identity,
+                    owner,
+                ):
+                    await db.rollback()
+                    raise ValueError("idempotency reclaim owner evidence conflicts")
+                if existing is not None and existing.task_id != identity.task_id:
+                    await db.rollback()
+                    raise ValueError("idempotency reclaim task identity conflicts")
+                if (
+                    existing is None
+                    or existing.status != expected_status
+                    or expected_updated_at is not None
+                    and existing.updated_at != expected_updated_at
+                    or expected_status == "completed"
+                    and _replayable_idempotency_terminal(existing)
+                ):
+                    await db.rollback()
+                    return None
+                assert owner is not None
+                if identity.run_id == existing.run_id:
+                    if not _idempotency_identity_matches(existing, identity, owner):
+                        await db.rollback()
+                        raise ValueError("idempotency reclaim identity conflicts with owner")
+                    identity = owner
+                else:
+                    authority_owner = replace(
+                        owner,
+                        metadata={
+                            key: value
+                            for key, value in owner.metadata.items()
+                            if key in _IMMUTABLE_EXECUTION_METADATA_KEYS
+                            and value not in (None, "")
+                        },
+                    )
+                    try:
+                        identity = replace(
+                            identity,
+                            metadata=_merge_execution_identity_metadata(
+                                authority_owner,
+                                identity,
+                                None,
+                            ),
+                        )
+                    except ValueError as exc:
+                        raise ValueError(
+                            "idempotency reclaim authority conflicts with owner"
+                        ) from exc
+                    canonical = await self._record_execution_identity_in_transaction(
+                        db,
+                        identity,
+                        source="idempotency_reclaim",
+                    )
+                    identity = _idempotency_identity_from_canonical(
+                        canonical,
+                        identity,
+                    )
+                    if (
+                        identity.task_id != existing.task_id
+                        or identity.idempotency_key != existing.idempotency_key
+                    ):
+                        await db.rollback()
+                        raise ValueError("idempotency reclaim identity conflicts with record")
+                reclaimed_metadata = dict(existing.metadata)
+                reclaimed_metadata[_IDEMPOTENCY_OWNER_METADATA_KEY] = (
+                    _idempotency_owner_payload(identity)
+                )
+                now = _next_idempotency_token(existing.updated_at, ownership_time)
+                cur = await db.execute(
+                    "UPDATE idempotency_records SET status = 'started', run_id = ?,"
+                    " task_id = ?, trace_id = ?, correlation_id = ?,"
+                    " metadata_json = ?, updated_at = ?"
+                    " WHERE idempotency_key = ? AND side_effect_key = ?"
+                    " AND status = ? AND updated_at = ?",
+                    (
+                        identity.run_id,
+                        identity.task_id,
+                        identity.trace_id,
+                        identity.correlation_id,
+                        _json_dump(reclaimed_metadata),
+                        now,
+                        identity.idempotency_key,
+                        side_effect_key,
+                        expected_status,
+                        existing.updated_at.isoformat(),
+                    ),
+                )
+                reclaimed = int(cur.rowcount or 0) == 1
+                await db.commit()
+            except BaseException:
+                await db.rollback()
+                raise
         if reclaimed:
             await self.record_idempotency_consumed(
                 identity,

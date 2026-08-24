@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass, replace
+import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import pytest
@@ -399,9 +401,43 @@ async def test_result_evidence_repairs_running_lifecycle_without_provider_call(
     first = await _verify(stack, provider)
     run = await stack.runtime.get_delegation_run(first.verifier_run_id)
     assert run is not None
-    await stack.runtime.record_delegation_run(
-        replace(run, status="running", completed_at=None)
-    )
+    assert run.status == "completed" and run.completed_at is not None
+    # Fixture-only persisted split state. Atomic finalization and public writers
+    # cannot create this downgrade; inject it below the API to test evidence repair.
+    with sqlite3.connect(stack.runtime.db_path) as db:
+        db.execute("BEGIN IMMEDIATE")
+        cursor = db.execute(
+            "UPDATE delegation_runs SET status = 'running', completed_at = NULL"
+            " WHERE run_id = ? AND session_id = ? AND task_id = ?"
+            " AND claim_id = ? AND parent_run_id = ? AND assigned_by = ?"
+            " AND assigned_to = ? AND requested_output_json = ?"
+            " AND current_artifact_id = ? AND status = ? AND started_at = ?"
+            " AND completed_at = ? AND failure_code = ? AND metadata_json = ?"
+            " AND trace_id = ? AND receipt_json IS NULL",
+            (
+                run.run_id,
+                run.session_id,
+                run.task_id,
+                run.claim_id,
+                run.parent_run_id,
+                run.assigned_by,
+                run.assigned_to,
+                json.dumps(run.requested_output, sort_keys=True, ensure_ascii=True),
+                run.current_artifact_id,
+                run.status,
+                run.started_at.isoformat(),
+                run.completed_at.isoformat(),
+                run.failure_code,
+                json.dumps(run.metadata, sort_keys=True, ensure_ascii=True),
+                str(
+                    run.metadata.get("trace_id")
+                    or run.metadata.get("execution_identity", {}).get("trace_id")
+                    or ""
+                ),
+            ),
+        )
+        assert cursor.rowcount == 1
+        db.commit()
 
     replay = await _verify(stack, provider)
 
@@ -451,15 +487,54 @@ async def test_replay_rejects_foreign_actual_verifier_model(tmp_path: Path) -> N
     attributes["served_model"] = FALLBACK_MODEL
     carrier["attributes"] = attributes
     provider_payload["receipt"] = carrier
-    await stack.runtime.record_runtime_receipt(
-        replace(provider_receipt, payload=provider_payload)
+    result_payload = {
+        **result_receipt.payload,
+        "actual_served_model": FALLBACK_MODEL,
+    }
+    exact_predicate = (
+        " receipt_id = ? AND receipt_type = ? AND run_id = ? AND task_id = ?"
+        " AND trace_id = ? AND correlation_id = ? AND causation_id = ?"
+        " AND parent_run_id = ? AND agent_id = ? AND idempotency_key = ?"
+        " AND side_effect_key = ? AND status = ? AND payload_json = ?"
+        " AND created_at = ?"
     )
-    await stack.runtime.record_runtime_receipt(
-        replace(
-            result_receipt,
-            payload={**result_receipt.payload, "actual_served_model": FALLBACK_MODEL},
+
+    def prior_row(receipt):
+        return (
+            receipt.receipt_id,
+            receipt.receipt_type,
+            receipt.run_id,
+            receipt.task_id,
+            receipt.trace_id,
+            receipt.correlation_id,
+            receipt.causation_id,
+            receipt.parent_run_id,
+            receipt.agent_id,
+            receipt.idempotency_key,
+            receipt.side_effect_key,
+            receipt.status,
+            json.dumps(receipt.payload, sort_keys=True, ensure_ascii=True),
+            receipt.created_at.isoformat(),
         )
-    )
+
+    with sqlite3.connect(stack.runtime.db_path) as db:
+        db.execute("BEGIN IMMEDIATE")
+        provider_cursor = db.execute(
+            "UPDATE runtime_receipts SET payload_json = ? WHERE" + exact_predicate,
+            (
+                json.dumps(provider_payload, sort_keys=True, ensure_ascii=True),
+                *prior_row(provider_receipt),
+            ),
+        )
+        result_cursor = db.execute(
+            "UPDATE runtime_receipts SET payload_json = ? WHERE" + exact_predicate,
+            (
+                json.dumps(result_payload, sort_keys=True, ensure_ascii=True),
+                *prior_row(result_receipt),
+            ),
+        )
+        assert provider_cursor.rowcount == result_cursor.rowcount == 1
+        db.commit()
 
     with pytest.raises(ModelVerifierError, match="fallback, foreign, or non-independent"):
         await _verify(stack, provider)

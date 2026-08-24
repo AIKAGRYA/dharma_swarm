@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
@@ -348,9 +348,43 @@ async def test_exact_eight_records_accept_and_crash_after_evidence_replays(
     assert first.status == "accept" and first.acceptance is not None
     run = await case.runtime.get_delegation_run(first.run_id)
     assert run is not None
-    await case.runtime.record_delegation_run(
-        replace(run, status="running", completed_at=None)
-    )
+    assert run.status == "completed" and run.completed_at is not None
+    # Fixture-only persisted split state. Atomic finalization and public writers
+    # cannot create this downgrade; inject it below the API to test evidence repair.
+    with sqlite3.connect(case.runtime.db_path) as db:
+        db.execute("BEGIN IMMEDIATE")
+        cursor = db.execute(
+            "UPDATE delegation_runs SET status = 'running', completed_at = NULL"
+            " WHERE run_id = ? AND session_id = ? AND task_id = ?"
+            " AND claim_id = ? AND parent_run_id = ? AND assigned_by = ?"
+            " AND assigned_to = ? AND requested_output_json = ?"
+            " AND current_artifact_id = ? AND status = ? AND started_at = ?"
+            " AND completed_at = ? AND failure_code = ? AND metadata_json = ?"
+            " AND trace_id = ? AND receipt_json IS NULL",
+            (
+                run.run_id,
+                run.session_id,
+                run.task_id,
+                run.claim_id,
+                run.parent_run_id,
+                run.assigned_by,
+                run.assigned_to,
+                json.dumps(run.requested_output, sort_keys=True, ensure_ascii=True),
+                run.current_artifact_id,
+                run.status,
+                run.started_at.isoformat(),
+                run.completed_at.isoformat(),
+                run.failure_code,
+                json.dumps(run.metadata, sort_keys=True, ensure_ascii=True),
+                str(
+                    run.metadata.get("trace_id")
+                    or run.metadata.get("execution_identity", {}).get("trace_id")
+                    or ""
+                ),
+            ),
+        )
+        assert cursor.rowcount == 1
+        db.commit()
     replay = await run_held_out_oracle(
         runtime=case.runtime,
         manifest_path=case.manifest_path,
@@ -638,9 +672,36 @@ async def test_stored_verdict_equivocation_is_rejected_without_relaunch(
     assert receipt is not None
     verdict = dict(receipt.payload["verdict_payload"])
     verdict["accepted"] = False
-    await case.runtime.record_runtime_receipt(
-        replace(receipt, payload={**receipt.payload, "verdict_payload": verdict})
-    )
+    forged_payload = {**receipt.payload, "verdict_payload": verdict}
+    with sqlite3.connect(case.runtime.db_path) as db:
+        db.execute("BEGIN IMMEDIATE")
+        cursor = db.execute(
+            "UPDATE runtime_receipts SET payload_json = ? WHERE receipt_id = ?"
+            " AND receipt_type = ? AND run_id = ? AND task_id = ?"
+            " AND trace_id = ? AND correlation_id = ? AND causation_id = ?"
+            " AND parent_run_id = ? AND agent_id = ? AND idempotency_key = ?"
+            " AND side_effect_key = ? AND status = ? AND payload_json = ?"
+            " AND created_at = ?",
+            (
+                json.dumps(forged_payload, sort_keys=True, ensure_ascii=True),
+                receipt.receipt_id,
+                receipt.receipt_type,
+                receipt.run_id,
+                receipt.task_id,
+                receipt.trace_id,
+                receipt.correlation_id,
+                receipt.causation_id,
+                receipt.parent_run_id,
+                receipt.agent_id,
+                receipt.idempotency_key,
+                receipt.side_effect_key,
+                receipt.status,
+                json.dumps(receipt.payload, sort_keys=True, ensure_ascii=True),
+                receipt.created_at.isoformat(),
+            ),
+        )
+        assert cursor.rowcount == 1
+        db.commit()
 
     with pytest.raises(HeldOutOracleError):
         await run_held_out_oracle(
