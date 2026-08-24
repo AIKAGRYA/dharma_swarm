@@ -1,0 +1,65 @@
+[Unit]
+Description=SADHANA exact-candidate sole-writer supervisor
+After=network-online.target dharma-sadhana-control.service dharma-sadhana-oracle-sandbox-probe.service dharma-sadhana-observer-health.service dharma-sadhana-dispatch-enable.service
+Wants=network-online.target
+Requires=dharma-sadhana-control.service dharma-sadhana-oracle-sandbox-probe.service dharma-sadhana-observer-health.service dharma-sadhana-dispatch-enable.service
+PartOf=dharma-sadhana.target dharma-sadhana-dispatch.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=/etc/dharma-sadhana/receipts/preactivation/dispatch-enabled.v1.json
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=simple
+User=dharma-sadhana
+Group=dharma-sadhana
+SupplementaryGroups=dharma-sadhana-control
+EnvironmentFile=/etc/dharma-sadhana/supervisor.env
+EnvironmentFile=/etc/dharma-sadhana/supervisor-runtime.env
+EnvironmentFile=/etc/dharma-sadhana/supervisor-activation.env
+EnvironmentFile=/etc/dharma-sadhana/verifier.env
+LoadCredential=control_hmac_key:/etc/dharma-sadhana/credentials/control_hmac_key
+LoadCredential=dispatch_activation_receipt:/etc/dharma-sadhana/receipts/preactivation/dispatch-enabled.v1.json
+LoadCredential=observer_health_receipt:/etc/dharma-sadhana/receipts/preactivation/observer-health-18420.v3.json
+LoadCredential=runtime_binding_activation:/etc/dharma-sadhana/receipts/runtime/sadhana-10-20260823/runtime-binding-activation.v2.json
+Environment=SADHANA_CONTROL_SEMANTICS_SHA256=69a0eb088277882e333ac41a6fb7014f6ed9d792e6d4a4b2b8510f20de15077c
+Environment=SADHANA_CONTROL_HTTP_BINDING_SHA256=9e1aec44c75cf6b24341389b8227f57fe4d4cf48328992f2125bffca34fcf3eb
+Environment=SADHANA_CONTROL_AUTHORITY_BINDING_SHA256=495f16964248948c68f97b5ec02b7e5d3e00e006979bf283ea783127e303d52d
+WorkingDirectory=/var/lib/dharma-sadhana/workspace
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStartPre=+/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-runtime-binding --role writer
+ExecStartPre=+/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-standby-capacity --role writer --release-sha @RELEASE_SHA@ --projection-path ${SADHANA_PROJECTION_PATH}
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/mission_control_campaign.py run --state-dir /var/lib/dharma-sadhana/state --mission-id sadhana-10-20260823 --lock-path ${SADHANA_WRITER_LOCK_PATH} --projection-path ${SADHANA_PROJECTION_PATH} --operator-id ${SADHANA_OPERATOR_ID} --canary-task-id ${SADHANA_CANARY_TASK_ID} --max-dispatch-per-cycle ${SADHANA_MAX_DISPATCH_PER_CYCLE} --cycle-interval-seconds ${SADHANA_CYCLE_INTERVAL_SECONDS} --freshness-seconds ${SADHANA_FRESHNESS_SECONDS} --lease-root ${SADHANA_LEASE_ROOT} --agent-roster ${SADHANA_AGENT_ROSTER_PATH} --agent-roster-sha256 ${SADHANA_AGENT_ROSTER_SHA256} --objective-sha256 ${SADHANA_OBJECTIVE_SHA256} --authority-manifest /etc/dharma-sadhana/inputs/runtime/sadhana-10-20260823/authority-manifest.json --observed-input-manifest /etc/dharma-sadhana/inputs/runtime/sadhana-10-20260823/observed-inputs.json --held-out-oracle-manifest /etc/dharma-sadhana/inputs/runtime/sadhana-10-20260823/held-out-oracle.json --held-out-oracle-digest ${SADHANA_HELD_OUT_ORACLE_DIGEST} --observer-health-receipt %d/observer_health_receipt --observer-health-receipt-sha256 ${SADHANA_OBSERVER_HEALTH_RECEIPT_SHA256} --oracle-sandbox-evidence-sha256 ${SADHANA_ORACLE_SANDBOX_EVIDENCE_SHA256}
+Restart=always
+RestartSec=5s
+TimeoutStopSec=45s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana /run/dharma-sadhana/oracle/terminals
+ReadWritePaths=/var/lib/dharma-sadhana/state /var/lib/dharma-sadhana/workspace /var/lib/dharma-sadhana/leases /var/lib/dharma-sadhana/oracle-inputs /run/dharma-sadhana/oracle/requests /run/dharma-sadhana/control/normal /run/dharma-sadhana/control/inflight /run/dharma-sadhana/control/applied /run/dharma-sadhana/control/rejected
+InaccessiblePaths=/etc/dharma-sadhana/inputs/runtime/sadhana-10-20260823/held-out/g10-evaluator.py /etc/dharma-sadhana/inputs/runtime/sadhana-10-20260823/held-out/g10-policy.json
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=dharma-sadhana-dispatch.target

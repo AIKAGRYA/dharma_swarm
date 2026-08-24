@@ -1,0 +1,13 @@
+[Unit]
+Description=Watch for service-owned SADHANA snapshot candidates
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Path]
+PathExistsGlob=/var/lib/dharma-sadhana/snapshot-staging/????????T??????Z-????????????
+Unit=dharma-sadhana-snapshot-finalize.service
+
+[Install]
+WantedBy=dharma-sadhana.target

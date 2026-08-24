@@ -1,0 +1,15 @@
+[Unit]
+Description=Wake the isolated SADHANA oracle worker for new requests
+After=dharma-sadhana-oracle-directories.service dharma-sadhana-oracle-sandbox-probe.service
+Requires=dharma-sadhana-oracle-directories.service dharma-sadhana-oracle-sandbox-probe.service
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Path]
+PathChanged=/run/dharma-sadhana/oracle/requests
+Unit=dharma-sadhana-oracle-sandbox.service
+
+[Install]
+WantedBy=dharma-sadhana.target

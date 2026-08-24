@@ -1,0 +1,11 @@
+[Unit]
+Description=SADHANA time-bounded private constellation
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+Requires=dharma-sadhana-control-directories.service dharma-sadhana-control.service dharma-sadhana-oracle-directories.service dharma-sadhana-oracle-sandbox-probe.service dharma-sadhana-api.service dharma-sadhana-dashboard.service dharma-sadhana-private-serve.service dharma-sadhana-observer-health.service
+Wants=dharma-sadhana-control-emergency.path dharma-sadhana-oracle-sandbox.path dharma-sadhana-oracle-sandbox.timer dharma-sadhana-projection-sync.timer dharma-sadhana-snapshot.timer dharma-sadhana-snapshot-finalize.path dharma-sadhana-snapshot-retry.timer dharma-sadhana-snapshot-finalize.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
