@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -170,6 +171,7 @@ async def render_runtime_manifests(
     pins: RuntimeManifestPins,
     operator_id: str,
     lock: CampaignBootstrapLock,
+    checkpoint: Callable[[str], None] | None = None,
 ) -> RuntimeManifestRenderResult:
     """Render/ingest the exact runtime files while the core owner lock is held."""
     _validate_pins(pins)
@@ -199,6 +201,8 @@ async def render_runtime_manifests(
     )
     write_exact(observed_path, observed_bytes, canonical_json_on_replay=False)
     observed = await ingest_observed_input_manifest(observed_path, board, runtime)
+    if checkpoint is not None:
+        checkpoint("observed_manifest")
 
     held_bytes = await render_held_out_oracle_manifest(
         bootstrap,
@@ -210,6 +214,8 @@ async def render_runtime_manifests(
     )
     write_exact(held_path, held_bytes, canonical_json_on_replay=False)
     held = load_held_out_oracle_manifest(held_path)
+    if checkpoint is not None:
+        checkpoint("held_out_manifest")
 
     policies = deterministic_read_only_policies(
         bootstrap,
@@ -237,6 +243,8 @@ async def render_runtime_manifests(
     )
     write_exact(authority_path, authority_bytes, canonical_json_on_replay=False)
     authority = load_campaign_authority_manifest(authority_path)
+    if checkpoint is not None:
+        checkpoint("authority_manifest")
     _need(
         authority.observed_input_manifest_digest == observed.manifest_digest
         and authority.held_out_oracle_manifest_digest == held.manifest_digest,
