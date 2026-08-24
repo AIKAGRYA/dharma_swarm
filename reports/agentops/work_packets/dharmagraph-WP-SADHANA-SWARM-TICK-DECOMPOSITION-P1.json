@@ -1,0 +1,147 @@
+{
+  "id": "dharmagraph-WP-SADHANA-SWARM-TICK-DECOMPOSITION-P1",
+  "base_ref": "e491dc39503e4c5b34abb50ae89391714f0e3e24",
+  "branch": "agent/sadhana-vps-mobile-release-20260825",
+  "worktree": ".",
+  "intent": "Restore the enforced SwarmManager module budget without changing lifecycle behavior. Move the existing _tick_effects body verbatim into one import-leaf run_tick_effects helper while retaining the public tick lock boundary and same-signature SwarmManager._tick_effects delegator. Pass the existing module logger and SwarmCoordinationState factory explicitly so logging identity, public class identity, Graph census invalidation, startup holds, organism heartbeat, dispatch, settlement, recovery, synthesis, and contribution accounting keep their exact ordering and effects. This packet performs no provider, transport, deployment, service, VPS, public-route, or other external effect.",
+  "allowed_files": [
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/swarm_tick_effects.py",
+    "tests/test_swarm.py",
+    "reports/agentops/work_packets/dharmagraph-WP-SADHANA-SWARM-TICK-DECOMPOSITION-P1.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "scripts/**",
+    "terminal/**",
+    "uv.lock",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/mission_control_*.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/orchestrator_bsp.py",
+    "dharma_swarm/orchestrator_dispatch_guard.py",
+    "dharma_swarm/orchestrator_execution.py",
+    "dharma_swarm/task_board.py",
+    "tests/test_agent_runner.py",
+    "tests/test_graph_*.py",
+    "tests/test_mission_control_*.py",
+    "tests/test_orchestrator.py",
+    "tests/test_orphan_reaper.py",
+    "tests/test_task_board.py"
+  ],
+  "gates": [
+    {
+      "name": "swarm-tick-decomposition-focused",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_swarm.py tests/test_orphan_reaper.py tests/test_graph_board_only_recovery.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "swarm-tick-decomposition-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/swarm.py dharma_swarm/swarm_tick_effects.py tests/test_swarm.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "swarm-tick-decomposition-module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "swarm-tick-decomposition-diff-check",
+      "command": "git diff --check -- dharma_swarm/swarm.py dharma_swarm/swarm_tick_effects.py tests/test_swarm.py reports/agentops/work_packets/dharmagraph-WP-SADHANA-SWARM-TICK-DECOMPOSITION-P1.json",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "removing-thin-tick-delegation-is-detected",
+      "command": "python3 -c \"import sys; from pathlib import Path; t=Path('dharma_swarm/swarm.py').read_text(); needle='return await run_tick_effects('; n=t.replace(needle,'return {}  # delegated tick removed',1); sys.exit(0 if t.count(needle) == 1 and n.count(needle) == 0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    },
+    {
+      "name": "removing-fresh-graph-census-invalidation-is-detected",
+      "command": "python3 -c \"import sys; from pathlib import Path; t=Path('dharma_swarm/swarm_tick_effects.py').read_text(); needle='graph_reconciler.invalidate_boot_census()'; n=t.replace(needle,'pass  # census invalidation removed',1); sys.exit(0 if t.count(needle) >= 2 and n.count(needle) == t.count(needle)-1 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    },
+    {
+      "name": "removing-startup-dispatch-hold-is-detected",
+      "command": "python3 -c \"import sys; from pathlib import Path; t=Path('dharma_swarm/swarm_tick_effects.py').read_text(); needle='result[\\\"startup_dispatch_hold\\\"] = \\\"startup_backfill_pending\\\"'; n=t.replace(needle,'pass  # startup hold removed',1); sys.exit(0 if t.count(needle) == 1 and n.count(needle) == 0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "refactor(swarm): extract tick effects"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-SWARM-TICK-DECOMPOSITION-P1",
+    "active_track": "dharmagraph-engine-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "e491dc39503e4c5b34abb50ae89391714f0e3e24",
+      "details": []
+    },
+    "cross_packet_interface": {
+      "provider_packets": [
+        "dharmagraph-WP-SADHANA-CRASH-REPLAY-P1"
+      ],
+      "this_packet_provides": [
+        "thin same-signature SwarmManager._tick_effects delegation",
+        "import-leaf run_tick_effects body with explicit logger and coordination-state dependencies",
+        "swarm.py restored below its grandfathered module ceiling"
+      ],
+      "shared_proof": "The refactor changes code ownership location only: the effect mutex remains in SwarmManager.tick and the delegated lifecycle body preserves the exact await and mutation order."
+    },
+    "interface_mismatches": [
+      "Once the Graph consumer commit becomes HEAD, swarm.py has 3786 lines and exceeds its enforced 3577-line ceiling even though its staged pre-commit check could not attribute the future HEAD delta."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/swarm.py",
+      "dharma_swarm/orchestrator_execution.py"
+    ],
+    "honest_blockers": [
+      "This is a behavior-preserving structural repair and does not by itself prove campaign deployment, provider authenticity, VPS byte identity, mobile authentication, or campaign completion.",
+      "The prior Graph and Dispatch gates remain the semantic authority; this packet must keep their focused recovery and lifecycle tests green.",
+      "Generated DocOps count drift remains owned by the post-merge single-writer workflow and must not be hand-committed here.",
+      "Exact-head CI, independent review, merge authority, release sealing, and deployment proof remain separately required."
+    ],
+    "rollback": "Keep campaign dispatch stopped and revert the helper, thin delegator, source-inspection tests, and packet together. The prior monolithic body remains available in the parent commit for forensic comparison.",
+    "packet_digest": "b02a90ab3cc674721d31f2beb7c8c8935d585131e0b018b97dee0c334843fba3"
+  }
+}

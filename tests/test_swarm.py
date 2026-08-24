@@ -25,6 +25,7 @@ from dharma_swarm.models import (
 )
 from dharma_swarm.orchestrator import Orchestrator
 from dharma_swarm.swarm import SwarmCoordinationState, SwarmManager
+from dharma_swarm.swarm_tick_effects import run_tick_effects
 from dharma_swarm.telemetry_plane import (
     AgentIdentityRecord,
     TeamRosterRecord,
@@ -504,7 +505,8 @@ def test_tick_graph_readiness_fences_recovery_generation_and_dispatch_source():
     import inspect
 
     wrapper_src = inspect.getsource(SwarmManager.tick)
-    src = inspect.getsource(SwarmManager._tick_effects)
+    effects_wrapper_src = inspect.getsource(SwarmManager._tick_effects)
+    src = inspect.getsource(run_tick_effects)
     boot_retry = src.index(
         "stale_only=graph_reconciler.boot_recovery_completed"
     )
@@ -519,6 +521,12 @@ def test_tick_graph_readiness_fences_recovery_generation_and_dispatch_source():
 
     assert "async with self._effect_tick_lock" in wrapper_src
     assert "return await self._tick_effects()" in wrapper_src
+    assert "return await run_tick_effects(" in effects_wrapper_src
+    assert "logger=logger" in effects_wrapper_src
+    assert (
+        "coordination_state_factory=SwarmCoordinationState"
+        in effects_wrapper_src
+    )
     assert boot_retry < heartbeat < startup_backfill < rescue < orphan
     assert orphan < generation < dispatch < settle_only
     assert "if graph_ready and" in src[heartbeat:rescue]
@@ -548,7 +556,7 @@ def test_tick_graph_readiness_fences_recovery_generation_and_dispatch_source():
 def test_tick_never_repeats_completed_destructive_boot_sweep_source():
     import inspect
 
-    src = inspect.getsource(SwarmManager._tick_effects)
+    src = inspect.getsource(run_tick_effects)
     retry_call = src.index("self.reconcile_graph_runs(")
     retry_end = src.index("timeout=10.0", retry_call)
 
