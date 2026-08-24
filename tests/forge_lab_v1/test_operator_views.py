@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -191,3 +192,40 @@ def test_state_anchor_refuses_divergent_dharma_home(
     status = operator_views.state_anchor_status()
     assert status["ready"] is False
     assert status["reasons"] == ["DHARMA_HOME_not_anchored_under_RSI_LAB_STATE"]
+
+
+def test_taskbed_readiness_is_read_only_and_state_anchored(
+    anchored_state: tuple[Path, Path],
+) -> None:
+    _root, state = anchored_state
+    missing = operator_views.taskbed_readiness()
+    assert missing["ready"] is False
+    assert missing["reasons"] == ["anchored_taskbed_missing_or_unsafe"]
+
+    path = state / ".dharma" / "forge_v1" / "taskbed.db"
+    path.parent.mkdir(parents=True)
+    with sqlite3.connect(path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE taskbed_tasks (
+              task_id TEXT PRIMARY KEY,
+              active INTEGER NOT NULL,
+              created_at TEXT NOT NULL,
+              first_seen_at REAL NOT NULL
+            );
+            CREATE TABLE taskbed_allocations (
+              task_id TEXT NOT NULL,
+              split TEXT NOT NULL
+            );
+            INSERT INTO taskbed_tasks(task_id, active, created_at, first_seen_at)
+            VALUES ('fixture-task', 1, '2026-08-25T00:00:00Z', 1.0);
+            INSERT INTO taskbed_tasks(task_id, active, created_at, first_seen_at)
+            VALUES ('pr::host-unsafe', 1, '2026-08-24T00:00:00Z', 0.5);
+            """
+        )
+
+    ready = operator_views.taskbed_readiness()
+    assert ready["ready"] is True
+    assert ready["eligible_explore_tasks"] == 1
+    assert ready["next_explore_task_id"] == "fixture-task"
+    assert ready["read_only"] is True

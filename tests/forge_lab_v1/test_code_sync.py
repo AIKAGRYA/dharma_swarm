@@ -167,6 +167,13 @@ def test_activation_is_atomic_idempotent_and_preserves_host_state(
         / "forge_lab"
         / "rsi-provider-refresh-install"
     )
+    assert (root / "bin" / "rsi-unattended-explore").resolve() == (
+        release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-unattended-explore"
+    )
 
     second = sync.activate_release(
         plan,

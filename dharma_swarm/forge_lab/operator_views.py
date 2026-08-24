@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -289,12 +290,59 @@ def grader_readiness() -> dict[str, Any]:
     }
 
 
+def taskbed_readiness() -> dict[str, Any]:
+    """Read-only proof that the anchored ledger can supply one EXPLORE task."""
+
+    from dharma_swarm.forge_v1.forge_v2.pr_suite_grader import is_pr_suite_task_id
+
+    path = dharma_home() / "forge_v1" / "taskbed.db"
+    reasons: list[str] = []
+    eligible_ids: list[str] = []
+    if path.is_symlink() or not path.is_file():
+        reasons.append("anchored_taskbed_missing_or_unsafe")
+    else:
+        try:
+            uri = f"{path.resolve().as_uri()}?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=2) as connection:
+                rows = connection.execute(
+                    """
+                    SELECT task.task_id FROM taskbed_tasks task
+                     WHERE task.active=1
+                       AND NOT EXISTS (
+                         SELECT 1 FROM taskbed_allocations prior
+                          WHERE prior.task_id=task.task_id
+                            AND prior.split='confirm'
+                       )
+                     ORDER BY task.created_at ASC,
+                              task.first_seen_at ASC,
+                              task.task_id ASC
+                    """
+                ).fetchall()
+                eligible_ids = [
+                    str(row[0]) for row in rows if not is_pr_suite_task_id(str(row[0]))
+                ]
+        except (OSError, sqlite3.Error, TypeError, ValueError):
+            reasons.append("anchored_taskbed_unreadable_or_schema_invalid")
+    if not reasons and not eligible_ids:
+        reasons.append("zero_eligible_isolated_swebench_tasks")
+    return {
+        "ready": not reasons,
+        "path": str(path),
+        "eligible_explore_tasks": len(eligible_ids),
+        "next_explore_task_id": eligible_ids[0] if eligible_ids else None,
+        "required": 1,
+        "read_only": True,
+        "reasons": reasons,
+    }
+
+
 def doctor() -> dict[str, Any]:
     checks = {
         "source": execution_source_status(),
         "state_anchor": state_anchor_status(),
         "providers": provider_readiness(),
         "grader": grader_readiness(),
+        "taskbed": taskbed_readiness(),
         "legacy_controls": legacy_control_status(),
     }
     return {
@@ -407,4 +455,5 @@ __all__ = [
     "provider_readiness",
     "reconcile",
     "state_anchor_status",
+    "taskbed_readiness",
 ]

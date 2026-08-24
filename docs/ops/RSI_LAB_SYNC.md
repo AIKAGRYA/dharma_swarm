@@ -89,6 +89,7 @@ Mac:
 ~/.dharma/bin/rsi-lab-env -> .../current/repo/scripts/forge_lab/rsi-env
 ~/.dharma/bin/rsi-provider-refresh -> .../current/repo/scripts/forge_lab/rsi-provider-refresh
 ~/.dharma/bin/rsi-provider-refresh-install -> .../current/repo/scripts/forge_lab/rsi-provider-refresh-install
+~/.dharma/bin/rsi-unattended-explore -> .../current/repo/scripts/forge_lab/rsi-unattended-explore
 ```
 
 Meghadharma:
@@ -108,6 +109,7 @@ Meghadharma:
   bin/rsi-lab-env -> .../current/repo/scripts/forge_lab/rsi-env
   bin/rsi-provider-refresh -> .../current/repo/scripts/forge_lab/rsi-provider-refresh
   bin/rsi-provider-refresh-install -> .../current/repo/scripts/forge_lab/rsi-provider-refresh-install
+  bin/rsi-unattended-explore -> .../current/repo/scripts/forge_lab/rsi-unattended-explore
 ```
 
 The original chassis and `current-main` recovery worktree are retained. The
@@ -192,6 +194,47 @@ Cooldown reuse is valid only when the receipt digest and its source/config/probe
 policy digest validate exactly; a receipt from a different release, staged
 model list, timeout, call ceiling, route requirement, or alias policy is not a
 cache hit.
+
+## Install the bounded systemd oneshot
+
+The sync activation installs the immutable `rsi-unattended-explore` wrapper,
+but it deliberately does not mutate `/etc/systemd/system` or enable a timer.
+After release activation, legacy-provider retirement, one fresh two-provider
+selftest, and an operator-supervised oneshot, install the versioned unit bytes:
+
+```bash
+install -o root -g root -m 0644 \
+  /root/rsi-lab/current/repo/scripts/forge_lab/systemd/rsi-lab-explore.service \
+  /etc/systemd/system/rsi-lab-explore.service
+install -o root -g root -m 0644 \
+  /root/rsi-lab/current/repo/scripts/forge_lab/systemd/rsi-lab-explore.timer \
+  /etc/systemd/system/rsi-lab-explore.timer
+systemctl daemon-reload
+systemctl enable --now rsi-lab-explore.timer
+systemd-analyze verify /etc/systemd/system/rsi-lab-explore.service \
+  /etc/systemd/system/rsi-lab-explore.timer
+systemctl status rsi-lab-explore.timer --no-pager
+```
+
+The service is `Type=oneshot`, drops its capability and ambient-capability
+sets, makes home and the immutable release read-only, writes only
+`/root/rsi-lab/state`, forbids namespace creation, and applies systemd process
+hardening plus an external timeout. Docker remains a daemon-mediated Unix
+socket client; candidate containers never receive that socket. Verify both the
+unit syntax and Docker reachability through `rsi doctor --json` before enabling
+the timer. The timer fires after the hourly provider-refresh window; the runner's
+daily/monthly reservation ledger remains the authoritative admission fuse.
+Create the following file to stop new runs without editing code or units:
+
+```bash
+install -o root -g root -m 0600 /dev/null \
+  /root/rsi-lab/state/.dharma/forge_lab/HALT
+```
+
+Removing `HALT` is an operator action. Before doing so, inspect doctor,
+receipts, alerts, Docker health, and the hash-chained budget ledger. This timer
+is a bounded EXPLORE collector, not the missing general campaign supervisor and
+not evidence that RSI is scientifically humming.
 
 Do not repair drift with `rsync`, `scp` of a working tree, a force-push, or by
 copying state directories. Preserve evidence, fix the canonical branch, create

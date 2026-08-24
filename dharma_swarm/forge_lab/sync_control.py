@@ -313,6 +313,11 @@ def _install_wrappers(root: Path, release: Path, *, node: str) -> dict[str, str]
         / "scripts"
         / "forge_lab"
         / "rsi-provider-refresh-install",
+        "rsi-unattended-explore": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-unattended-explore",
     }
     if node != "meghadharma":
         targets["rsi-env"] = targets["rsi-lab-env"]

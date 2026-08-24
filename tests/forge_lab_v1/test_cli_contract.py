@@ -453,6 +453,7 @@ def test_doctor_json_is_truthful_and_versioned() -> None:
         "state_anchor",
         "providers",
         "grader",
+        "taskbed",
         "legacy_controls",
     }
 

@@ -1577,6 +1577,16 @@ adapter cannot mint a v1 signature, validity state, or selectable candidate.
 - add allocation leases, terminal states, and reconciliation;
 - replace tmux-only lifecycle authority.
 
+The versioned bounded-unattended bridge may schedule only the fixed 1x1x1
+EXPLORE shape. Admission MUST bind a clean immutable release, explicit state
+root, HALT/host lock, fresh two-provider receipt, ready Docker grader, external
+timeout, and conservative daily/monthly dollar plus logical-call reservations.
+Reservation and closeout rows MUST be hash chained and MUST state that reserved
+dollars are not provider billing telemetry. This bridge has EXPLORE authority
+only: it MUST NOT emit positive lift, promotion, recursive-improvement, or
+general-supervisor claims, and it does not satisfy Packet C's complete raw usage
+accounting requirement.
+
 ### Packet D: containment and workers
 
 - build the untrusted evaluation image and launcher;

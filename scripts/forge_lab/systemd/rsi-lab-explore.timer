@@ -1,0 +1,13 @@
+[Unit]
+Description=Schedule bounded RSI Lab EXPLORE after hourly provider refresh
+Documentation=file:/root/rsi-lab/current/repo/docs/ops/FORGE_LAB_V0_1_RUNBOOK.md
+
+[Timer]
+OnCalendar=*-*-* *:35:00
+RandomizedDelaySec=10m
+AccuracySec=1m
+Persistent=true
+Unit=rsi-lab-explore.service
+
+[Install]
+WantedBy=timers.target

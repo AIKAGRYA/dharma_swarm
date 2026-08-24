@@ -70,6 +70,11 @@ class ExperimentConfig:
     benchmark: str = "taskbed-explore-fresh-pr-suite"
     dry_run: bool = False
     keep_worktree: bool = False
+    # The bounded unattended lane owns a fixed logical-call proof and therefore
+    # cannot allow the RNG to silently replace its one mutation-model call with
+    # a parametric or crossover operator. Interactive EXPLORE keeps the wild
+    # stochastic policy by default.
+    force_single_llm_mutation: bool = False
     source_repo: Path = field(default_factory=lambda: Path.home() / "dharma_swarm")
     state_root: Path = field(default_factory=lambda: Path.home() / ".dharma" / "evolution_archive")
 
@@ -470,9 +475,13 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             ]
             # operator draw: wild by default
             roll = rng.random()
-            if cfg.dry_run or roll < 0.2:
+            if cfg.dry_run or (not cfg.force_single_llm_mutation and roll < 0.2):
                 result = mutation.parametric_mutation(parent_genome, rng=rng)
-            elif roll < 0.4 and len(graded) >= 2:
+            elif (
+                not cfg.force_single_llm_mutation
+                and roll < 0.4
+                and len(graded) >= 2
+            ):
                 other = rng.choice([e for e in graded if e.id != parent.id] or graded)
                 result = await asyncio.to_thread(
                     mutation.llm_propose_genome, parent_genome,

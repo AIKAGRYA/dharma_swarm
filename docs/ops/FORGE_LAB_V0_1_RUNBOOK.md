@@ -45,14 +45,17 @@ connect to NATS, launch a campaign, or start a persistent process.
 
 ## Bounded operator-control slice
 
-The current development release implements finite, receipt-backed inspection
-and a hermetic control-plane pilot. It does **not** implement an unattended live
-`explore-open` campaign, promotion, backup mutation, or a persistent
-supervisor. Those commands remain nonzero and fail closed.
+The current development release implements finite, receipt-backed inspection,
+a hermetic control-plane pilot, and one narrowly bounded unattended EXPLORE
+oneshot. It does **not** implement an unattended `explore-open` campaign,
+promotion, backup mutation, a general persistent supervisor, or a scientific
+recursive-improvement claim. Those broader commands remain nonzero and fail
+closed.
 
 Start with the truthful doctor. A nonzero exit is expected until immutable
 source, anchored state, a fresh two-provider live receipt, the isolated Docker
-grader, the managed provider cron, and retirement of legacy controls all pass:
+grader, at least one eligible task in the anchored taskbed, the managed
+provider cron, and retirement of legacy controls all pass:
 
 ```bash
 rsi doctor --json
@@ -150,6 +153,62 @@ python -m dharma_swarm.forge_lab.confirm_swebench \
 
 The availability receipt grants no judge authority. A confirm control run
 (`--control`) uses gold/empty patches and needs no model provider.
+
+### Bounded unattended EXPLORE oneshot
+
+Do not schedule `python -m dharma_swarm.forge_lab.cli run` or `rsi newrun
+--execute` directly. Those interactive entry points enforce shadow mode and,
+for `newrun`, immutable source, but they do not own a host lock, HALT check,
+fresh doctor boundary, daily/monthly ledger, external watchdog, or systemd
+receipt chain. They are therefore **not unattended-ready**.
+
+The production-only `rsi-unattended-explore` wrapper admits one fixed run only
+when all of the following are simultaneously true:
+
+- `current` resolves to a clean full-SHA release from the canonical AIKAGRYA
+  remote and its release manifest binds that SHA;
+- `RSI_LAB_STATE`/`DHARMA_HOME` resolve to the explicit host state root;
+- the state-anchored `forge_v1/taskbed.db` is schema-valid and exposes at least
+  one eligible EXPLORE task without mutating the ledger during doctor;
+- the HALT file is absent and the nonblocking host lock is available;
+- `rsi doctor` is ready, including retirement of legacy provider controls;
+- a valid live provider receipt, no older than one hour, attests two distinct
+  callable provider entitlements for this exact release; and
+- the official SWE-bench Docker daemon is reachable. Candidate grading still
+  must emit a complete `rsi_lab.grader_isolation_proof.v1` to become comparable.
+
+The child shape is permanently `generations=1`, `children=1`, `tasks=1`. It
+uses only `freeform_single`, disables continuation calls, reserves four logical
+provider-call slots before launch, hard-caps each grade at 8,000 tokens and
+$0.25 accounting cost, and caps recorded experiment generation at 24,000
+tokens. The parent polls the HALT latch at most every two seconds and terminates
+the child process group when it appears, recording
+`InconclusiveOperatorHalt`. The parent also applies a 2,700-second subprocess
+timeout; systemd adds a second 2,800-second fuse. Scratch code is a standalone
+exact-commit clone under state, so execution never writes the immutable release
+Git dir.
+
+Reservations are conservative: $1/four logical call slots per run,
+$3/12 slots per UTC day, and $30/120 slots per UTC month. They are never
+refunded after a crash. These dollars are **not vendor billing telemetry**, and
+transport-level retries are not separately metered; absence of authoritative
+billing remains an explicit limitation. The budget ledger and run receipts are
+strict, fsync-backed hash chains. A truncated row, bad link, changed digest,
+fifth logical dispatch, stale receipt, dirty release, Docker failure, or HALT
+file refuses the run before additional spend.
+
+Run one operator-supervised smoke only after `rsi doctor --json` is green:
+
+```bash
+/root/rsi-lab/bin/rsi-unattended-explore --timeout-seconds 2700
+```
+
+The result modality is always `EXPLORE_ONLY`; `positive_rsi_claim` is always
+false. `inconclusive_low_power` and a genuinely executed comparable
+`measured_negative` are successful service closeouts. Infrastructure,
+generation, budget, timeout, or malformed-receipt outcomes fail the service so
+operations can alert. The versioned oneshot and timer units are documented in
+[`RSI_LAB_SYNC.md`](RSI_LAB_SYNC.md#install-the-bounded-systemd-oneshot).
 
 ## `current-main` recovery boundary
 
