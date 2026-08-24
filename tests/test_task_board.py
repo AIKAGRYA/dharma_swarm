@@ -21,9 +21,11 @@ from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.task_board import TaskBoard, TaskBoardError
 from dharma_swarm.task_board_campaign_guard import (
+    build_task_board_projection_intent,
     runtime_idempotency_authority_snapshot_sha256,
-    runtime_run_authority_snapshot_sha256,
+    runtime_run_projection_authority_snapshot_sha256,
 )
+from dharma_swarm.task_board_projection_intent import stable_sha256
 
 
 @pytest.fixture
@@ -1323,6 +1325,109 @@ def _projection_marker(
     }
 
 
+def _full_projection_identity(task_id: str) -> dict:
+    return {
+        "trace_id": "trace-0",
+        "correlation_id": "correlation-0",
+        "task_id": task_id,
+        "run_id": "run-0",
+        "claim_id": "claim-0",
+        "idempotency_key": "dispatch-idem-0",
+        "causation_id": "causation-0",
+        "parent_run_id": "parent-run-0",
+        "agent_id": "agent-exact",
+        "session_id": "session-0",
+        "external_a2a_task_id": "",
+        "message_id": "",
+        "event_id": "",
+        "artifact_id": "",
+        "proposal_id": "",
+        "metadata": {},
+    }
+
+
+def _projection_request_metadata(
+    current: dict,
+    marker: dict,
+    *,
+    completion_binding: dict | None,
+    metadata_set: dict | None = None,
+    metadata_remove: list[str] | None = None,
+) -> dict:
+    target = copy.deepcopy(current)
+    for key in metadata_remove or ["active_claim"]:
+        target.pop(key, None)
+    target.update(copy.deepcopy(metadata_set or {}))
+    if marker["action"] in {"receipt", "retry"}:
+        assert completion_binding is not None
+        target["task_board_completion_binding"] = copy.deepcopy(completion_binding)
+    history = dict(target.get("graph_reconcile_projection_history", {}))
+    prior = target.get("graph_reconcile_projection")
+    if isinstance(prior, dict):
+        history[prior["run_id"]] = copy.deepcopy(prior)
+    history[marker["run_id"]] = copy.deepcopy(marker)
+    target["graph_reconcile_projection"] = copy.deepcopy(marker)
+    target["graph_reconcile_projection_history"] = history
+    return target
+
+
+async def _attach_projection_intent(
+    store: RuntimeStateStore,
+    current: Task,
+    marker: dict,
+    result: str,
+    *,
+    completion_binding: dict | None,
+    metadata_set: dict | None = None,
+    metadata_remove: list[str] | None = None,
+) -> dict:
+    metadata_set = copy.deepcopy(metadata_set or {})
+    metadata_remove = sorted(set(metadata_remove or ["active_claim"]))
+    identity = copy.deepcopy(current.metadata["execution_identity"])
+    intent = build_task_board_projection_intent(
+        execution_identity=identity,
+        action=marker["action"],
+        run_status=marker["run_status"],
+        source_kind=(
+            "idempotency_record"
+            if marker["action"] in {"receipt", "retry"}
+            else "delegation_run"
+        ),
+        runtime_authority_snapshot_sha256=marker[
+            "runtime_authority_snapshot_sha256"
+        ],
+        result=result,
+        metadata_set=metadata_set,
+        metadata_remove=metadata_remove,
+        completion_binding=completion_binding,
+        prepared_at=marker["projected_at"],
+    )
+    async with aiosqlite.connect(store.db_path) as db:
+        row = await (
+            await db.execute(
+                "SELECT metadata_json FROM delegation_runs WHERE run_id = ?",
+                (identity["run_id"],),
+            )
+        ).fetchone()
+        assert row is not None
+        run_metadata = json.loads(row[0])
+        run_metadata["task_board_projection_intent"] = intent
+        cursor = await db.execute(
+            "UPDATE delegation_runs SET metadata_json = ?"
+            " WHERE run_id = ? AND metadata_json = ?",
+            (json.dumps(run_metadata), identity["run_id"], row[0]),
+        )
+        assert cursor.rowcount == 1
+        await db.commit()
+    return _projection_request_metadata(
+        current.metadata,
+        marker,
+        completion_binding=completion_binding,
+        metadata_set=metadata_set,
+        metadata_remove=metadata_remove,
+    )
+
+
 def _projection_completion_binding(task_id: str, result: str) -> dict:
     side_effect_key = f"invoke_agent:{task_id}:agent-exact"
     return {
@@ -1400,6 +1505,49 @@ async def _seed_runtime_projection_authority(
             "result_omitted_reason": None,
         },
     )
+    run_identity = _full_projection_identity(task_id)
+    run_metadata = {
+        "status": status,
+        "error": result if status == "failed" else "",
+        "result": result if status == "completed" else None,
+        "runtime_db_path": str(store.db_path),
+        "execution_identity": run_identity,
+        "trace_id": run_identity["trace_id"],
+        "correlation_id": run_identity["correlation_id"],
+        "idempotency_key": run_identity["idempotency_key"],
+        "task_id": run_identity["task_id"],
+        "run_id": run_identity["run_id"],
+        "claim_id": run_identity["claim_id"],
+        "agent_id": run_identity["agent_id"],
+        "session_id": run_identity["session_id"],
+        "parent_run_id": run_identity["parent_run_id"],
+        "causation_id": run_identity["causation_id"],
+    }
+    async with aiosqlite.connect(store.db_path) as db:
+        await db.execute(
+            "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
+            " parent_run_id, assigned_by, assigned_to, requested_output_json,"
+            " current_artifact_id, status, started_at, completed_at, failure_code,"
+            " metadata_json, trace_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                run_identity["run_id"],
+                run_identity["session_id"],
+                task_id,
+                run_identity["claim_id"],
+                run_identity["parent_run_id"],
+                "orchestrator",
+                run_identity["agent_id"],
+                "[]",
+                "",
+                status,
+                "2026-08-23T11:59:00+00:00",
+                "2026-08-23T12:00:00+00:00",
+                "" if status == "completed" else "provider_failed",
+                json.dumps(run_metadata),
+                run_identity["trace_id"],
+            ),
+        )
+        await db.commit()
     return binding, runtime_idempotency_authority_snapshot_sha256(record)
 
 
@@ -1411,23 +1559,9 @@ async def _seed_failed_run_projection_authority(
     causation_id: str = "causation-0",
     parent_run_id: str = "parent-run-0",
 ) -> str:
-    identity = {
-        "trace_id": "trace-0",
-        "correlation_id": "correlation-0",
-        "causation_id": causation_id,
-        "task_id": task_id,
-        "run_id": "run-0",
-        "claim_id": "claim-0",
-        "parent_run_id": parent_run_id,
-        "idempotency_key": "dispatch-idem-0",
-        "agent_id": "agent-exact",
-        "session_id": "session-0",
-        "external_a2a_task_id": "",
-        "message_id": "",
-        "event_id": "",
-        "artifact_id": "",
-        "proposal_id": "",
-    }
+    identity = _full_projection_identity(task_id)
+    identity["causation_id"] = causation_id
+    identity["parent_run_id"] = parent_run_id
     run = await store.record_delegation_run(
         DelegationRun(
             run_id=identity["run_id"],
@@ -1449,10 +1583,17 @@ async def _seed_failed_run_projection_authority(
                 "trace_id": identity["trace_id"],
                 "correlation_id": identity["correlation_id"],
                 "idempotency_key": identity["idempotency_key"],
+                "task_id": identity["task_id"],
+                "run_id": identity["run_id"],
+                "claim_id": identity["claim_id"],
+                "agent_id": identity["agent_id"],
+                "session_id": identity["session_id"],
+                "parent_run_id": identity["parent_run_id"],
+                "causation_id": identity["causation_id"],
             },
         )
     )
-    return runtime_run_authority_snapshot_sha256(run)
+    return runtime_run_projection_authority_snapshot_sha256(run)
 
 
 async def _seed_projection_history_for_test(
@@ -1498,18 +1639,7 @@ async def _running_campaign_projection_task(
     }
     task = await board.create("Campaign projection CAS", metadata=bootstrap)
     metadata = {**bootstrap, **_campaign_attempt_metadata(task.id)}
-    identity = {
-        "trace_id": "trace-0",
-        "correlation_id": "correlation-0",
-        "causation_id": "causation-0",
-        "task_id": task.id,
-        "run_id": "run-0",
-        "claim_id": "claim-0",
-        "parent_run_id": "parent-run-0",
-        "idempotency_key": "dispatch-idem-0",
-        "agent_id": "agent-exact",
-        "session_id": "session-0",
-    }
+    identity = _full_projection_identity(task.id)
     metadata["execution_identity"] = identity
     metadata["runtime_db_path"] = str(runtime_state_store.db_path)
     metadata["mission_control_owner_execution"].update(
@@ -1582,14 +1712,13 @@ async def test_terminal_projection_cas_preserves_campaign_authority_and_history(
         run_id="run-0",
         runtime_authority_sha256=authority_sha256,
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata.pop("active_claim")
-    metadata["task_board_completion_binding"] = binding
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
 
     projected = await board.compare_and_swap_terminal_projection(
         running,
@@ -1632,14 +1761,13 @@ async def test_failed_receipt_projection_requires_exact_runtime_failure(
         runtime_authority_sha256=authority_sha256,
         run_status="failed",
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata.pop("active_claim")
-    metadata["task_board_completion_binding"] = binding
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
 
     projected = await board.compare_and_swap_terminal_projection(
         running,
@@ -1651,6 +1779,227 @@ async def test_failed_receipt_projection_requires_exact_runtime_failure(
     assert projected is not None
     assert projected.status is TaskStatus.FAILED
     assert projected.result == result
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "attack",
+    ["action", "result", "metadata_set", "metadata_remove"],
+)
+async def test_projection_intent_binds_exact_action_result_and_metadata_delta(
+    board: TaskBoard,
+    projection_runtime: RuntimeStateStore,
+    attack: str,
+) -> None:
+    running, _ = await _running_campaign_projection_task(board, projection_runtime)
+    result = "provider failed"
+    binding, authority_sha256 = await _seed_runtime_projection_authority(
+        projection_runtime,
+        running.id,
+        result,
+        status="failed",
+    )
+    marker = _projection_marker(
+        running.id,
+        result,
+        run_id="run-0",
+        runtime_authority_sha256=authority_sha256,
+        run_status="failed",
+    )
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
+    requested_result = result
+    if attack == "action":
+        marker["action"] = "retry"
+        metadata["graph_reconcile_projection"] = marker
+        metadata["graph_reconcile_projection_history"]["run-0"] = marker
+    elif attack == "result":
+        requested_result = "substituted failure"
+        forged_binding = _projection_completion_binding(
+            running.id, requested_result
+        )
+        marker["board_result_sha256"] = hashlib.sha256(
+            requested_result.encode("utf-8")
+        ).hexdigest()
+        metadata["task_board_completion_binding"] = forged_binding
+        metadata["graph_reconcile_projection"] = marker
+        metadata["graph_reconcile_projection_history"]["run-0"] = marker
+    elif attack == "metadata_set":
+        metadata["projection_note"] = "caller-forged"
+    else:
+        metadata["active_claim"] = copy.deepcopy(running.metadata["active_claim"])
+
+    with pytest.raises(TaskBoardError, match="authority|boundary"):
+        await board.compare_and_swap_terminal_projection(
+            running,
+            metadata=metadata,
+            result=requested_result,
+            runtime_state_store=projection_runtime,
+        )
+    assert await board.get(running.id) == running
+
+
+@pytest.mark.asyncio
+async def test_projection_intent_rejects_failed_receipt_action_substitution(
+    board: TaskBoard,
+    projection_runtime: RuntimeStateStore,
+) -> None:
+    running, _ = await _running_campaign_projection_task(board, projection_runtime)
+    result = "provider failed"
+    binding, authority_sha256 = await _seed_runtime_projection_authority(
+        projection_runtime,
+        running.id,
+        result,
+        status="failed",
+    )
+    receipt_marker = _projection_marker(
+        running.id,
+        result,
+        run_id="run-0",
+        runtime_authority_sha256=authority_sha256,
+        run_status="failed",
+    )
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        receipt_marker,
+        result,
+        completion_binding=binding,
+    )
+    retry_marker = {**receipt_marker, "action": "retry"}
+    metadata["graph_reconcile_projection"] = retry_marker
+    metadata["graph_reconcile_projection_history"]["run-0"] = retry_marker
+
+    with pytest.raises(TaskBoardError, match="durable runtime authority"):
+        await board.compare_and_swap_terminal_projection(
+            running,
+            metadata=metadata,
+            result=result,
+            runtime_state_store=projection_runtime,
+        )
+    assert await board.get(running.id) == running
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("attack", ["source_kind", "execution_identity"])
+async def test_projection_intent_rejects_resealed_source_or_identity_forgery(
+    board: TaskBoard,
+    projection_runtime: RuntimeStateStore,
+    attack: str,
+) -> None:
+    running, _ = await _running_campaign_projection_task(board, projection_runtime)
+    result = "verified result"
+    binding, authority_sha256 = await _seed_runtime_projection_authority(
+        projection_runtime, running.id, result
+    )
+    marker = _projection_marker(
+        running.id,
+        result,
+        run_id="run-0",
+        runtime_authority_sha256=authority_sha256,
+    )
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
+    async with aiosqlite.connect(projection_runtime.db_path) as db:
+        row = await (
+            await db.execute(
+                "SELECT metadata_json FROM delegation_runs WHERE run_id = 'run-0'"
+            )
+        ).fetchone()
+        assert row is not None
+        run_metadata = json.loads(row[0])
+        intent = run_metadata["task_board_projection_intent"]
+        if attack == "source_kind":
+            intent["source_kind"] = "delegation_run"
+        else:
+            intent["execution_identity"]["external_a2a_task_id"] = "foreign-a2a"
+        intent["intent_sha256"] = stable_sha256(
+            {key: value for key, value in intent.items() if key != "intent_sha256"}
+        )
+        await db.execute(
+            "UPDATE delegation_runs SET metadata_json = ? WHERE run_id = 'run-0'",
+            (json.dumps(run_metadata),),
+        )
+        await db.commit()
+
+    with pytest.raises(TaskBoardError, match="durable runtime authority"):
+        await board.compare_and_swap_terminal_projection(
+            running,
+            metadata=metadata,
+            result=result,
+            runtime_state_store=projection_runtime,
+        )
+    assert await board.get(running.id) == running
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["completed", "failed"])
+async def test_projection_intent_rejects_malformed_terminal_run_outcome_carrier(
+    board: TaskBoard,
+    projection_runtime: RuntimeStateStore,
+    status: str,
+) -> None:
+    running, _ = await _running_campaign_projection_task(board, projection_runtime)
+    result = "verified result" if status == "completed" else "provider failed"
+    binding, authority_sha256 = await _seed_runtime_projection_authority(
+        projection_runtime,
+        running.id,
+        result,
+        status=status,
+    )
+    marker = _projection_marker(
+        running.id,
+        result,
+        run_id="run-0",
+        runtime_authority_sha256=authority_sha256,
+        run_status=status,
+    )
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
+    async with aiosqlite.connect(projection_runtime.db_path) as db:
+        if status == "completed":
+            await db.execute(
+                "UPDATE delegation_runs SET failure_code = 'forged_failure'"
+                " WHERE run_id = 'run-0'"
+            )
+        else:
+            row = await (
+                await db.execute(
+                    "SELECT metadata_json FROM delegation_runs WHERE run_id = 'run-0'"
+                )
+            ).fetchone()
+            assert row is not None
+            run_metadata = json.loads(row[0])
+            run_metadata["error"] = "different failure"
+            await db.execute(
+                "UPDATE delegation_runs SET metadata_json = ? WHERE run_id = 'run-0'",
+                (json.dumps(run_metadata),),
+            )
+        await db.commit()
+
+    with pytest.raises(TaskBoardError, match="durable runtime authority"):
+        await board.compare_and_swap_terminal_projection(
+            running,
+            metadata=metadata,
+            result=result,
+            runtime_state_store=projection_runtime,
+        )
+    assert await board.get(running.id) == running
 
 
 @pytest.mark.asyncio
@@ -1716,13 +2065,13 @@ async def test_requeue_projection_requires_exact_failed_runtime_run(
         action="requeue",
         run_status="failed",
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata.pop("active_claim")
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=None,
+    )
 
     projected = await board.compare_and_swap_terminal_projection(
         running,
@@ -1772,13 +2121,13 @@ async def test_requeue_projection_rejects_foreign_runtime_lineage(
         action="requeue",
         run_status="failed",
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata.pop("active_claim")
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=None,
+    )
 
     with pytest.raises(TaskBoardError, match="authority|boundary"):
         await board.compare_and_swap_terminal_projection(
@@ -1825,13 +2174,13 @@ async def test_recovery_projection_identical_replay_is_exact_noop(
         action=action,
         run_status="failed",
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata.pop("active_claim")
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=None,
+    )
     projected = await board.compare_and_swap_terminal_projection(
         running,
         metadata=metadata,
@@ -1908,15 +2257,13 @@ async def test_runtime_authority_writer_lock_is_held_through_board_commit(
         action=action,
         run_status="failed",
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata.pop("active_claim")
-    if binding is not None:
-        metadata["task_board_completion_binding"] = binding
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
     authority_checked = asyncio.Event()
     release_authorizer = asyncio.Event()
     mutation_started = asyncio.Event()
@@ -2325,13 +2672,13 @@ async def test_terminal_projection_identical_replay_is_exact_noop(
         run_id="run-0",
         runtime_authority_sha256=authority_sha256,
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata["task_board_completion_binding"] = binding
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
     projected = await board.compare_and_swap_terminal_projection(
         running,
         metadata=metadata,
@@ -2371,13 +2718,13 @@ async def test_generic_result_update_cannot_rewrite_projected_campaign_receipt(
         run_id="run-0",
         runtime_authority_sha256=authority_sha256,
     )
-    metadata = copy.deepcopy(running.metadata)
-    metadata["task_board_completion_binding"] = binding
-    metadata["graph_reconcile_projection"] = marker
-    metadata["graph_reconcile_projection_history"] = {
-        "run-prior": prior,
-        "run-0": marker,
-    }
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
     projected = await board.compare_and_swap_terminal_projection(
         running,
         metadata=metadata,

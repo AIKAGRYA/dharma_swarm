@@ -1,0 +1,154 @@
+{
+  "id": "organism-rewire-WP-SADHANA-PROJECTION-AUTHORITY-P0",
+  "base_ref": "c00905337bea45f596d38307d3bc377780bad91a",
+  "branch": "agent/sadhana-projection-authority-p0-20260824",
+  "worktree": ".",
+  "intent": "Strengthen Runtime V4's exact TaskBoard terminal projection authorizer before the DharmaGraph consumer lands. A terminal receipt or failed run proves an outcome but does not by itself choose retry versus terminal failure, or requeue versus quarantine. Require one immutable runtime-owned ProjectionIntent that exactly binds task/run/claim/agent identity, action, terminal run status, fixed Board result and digest, fixed Board metadata set/remove delta and digest, completion binding, runtime authority snapshot digest, source kind, and one durable timestamp. Under the existing Board-to-runtime dual lock, reject any requested marker, result, metadata delta, action, or identity that differs from the stored intent. Identical replay remains an exact no-op. This packet changes no scheduler, Graph reconciler, provider, transport, VPS, or external effect.",
+  "allowed_files": [
+    "dharma_swarm/task_board_campaign_guard.py",
+    "dharma_swarm/task_board_projection_intent.py",
+    "tests/test_task_board.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-PROJECTION-AUTHORITY-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/campaign_provider_guard.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/mission_control_*.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/orchestrator_execution.py",
+    "dharma_swarm/providers.py",
+    "dharma_swarm/runtime_lifecycle.py",
+    "dharma_swarm/runtime_lifecycle_identity.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/task_board.py",
+    "scripts/**",
+    "tests/test_graph_*.py",
+    "tests/test_mission_control_*.py",
+    "tests/test_orchestrator.py",
+    "tests/test_orphan_reaper.py",
+    "tests/test_providers.py",
+    "tests/test_runtime_*.py",
+    "tests/test_swarm.py"
+  ],
+  "gates": [
+    {
+      "name": "projection-intent-authority",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_task_board.py tests/test_runtime_state_claim_cas.py tests/test_runtime_lifecycle.py",
+      "expected_exit": 0,
+      "timeout_seconds": 420
+    },
+    {
+      "name": "projection-intent-mission-compatibility",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control.py tests/test_mission_control_attempts.py tests/test_mission_control_execution.py tests/test_mission_control_verifier.py",
+      "expected_exit": 0,
+      "timeout_seconds": 420
+    },
+    {
+      "name": "projection-intent-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/task_board_campaign_guard.py dharma_swarm/task_board_projection_intent.py tests/test_task_board.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "projection-action-result-and-delta-substitution",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_task_board.py::test_projection_intent_binds_exact_action_result_and_metadata_delta tests/test_task_board.py::test_projection_intent_rejects_failed_receipt_action_substitution tests/test_task_board.py::test_terminal_projection_cas_rejects_authority_or_history_forgery tests/test_task_board.py::test_recovery_projection_identical_replay_is_exact_noop",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): bind exact TaskBoard projection intent"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-PROJECTION-AUTHORITY-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "c00905337bea45f596d38307d3bc377780bad91a",
+      "details": []
+    },
+    "cross_packet_interface": {
+      "consumer_packet": "dharmagraph-WP-SADHANA-CRASH-REPLAY-P1",
+      "this_packet_provides": [
+        "locked validation of one exact immutable runtime ProjectionIntent",
+        "action choice authority distinct from terminal outcome evidence",
+        "exact Board result and metadata delta binding",
+        "replay-safe identical no-op after Board commit"
+      ],
+      "consumer_provides": [
+        "same-runtime-transaction preparation of the complete ProjectionIntent",
+        "exact TaskBoard CAS invocation and readback",
+        "runtime projection commit witness and replay",
+        "effect-indeterminate campaign recovery and graph readiness gating"
+      ],
+      "shared_proof": "A terminal outcome receipt cannot be relabeled into a different scheduling decision; only the exact runtime-owned typed intent authorizes the Board transition."
+    },
+    "interface_mismatches": [
+      "The current locked runtime authorizer validates terminal outcome evidence but accepts more than one Board action family for the same failed source.",
+      "A failed receipt can currently authorize either retry or terminal failure when caller-supplied marker and metadata are internally consistent.",
+      "A failed recovered run can currently authorize either requeue or quarantine without a durable runtime-owned action choice.",
+      "The future Graph outbox needs one explicit typed contract that TaskBoard can validate independently under the runtime lock."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/task_board_campaign_guard.py",
+      "dharma_swarm/task_board_projection_intent.py",
+      "tests/test_task_board.py"
+    ],
+    "honest_blockers": [
+      "The Graph consumer does not exist yet, so production outbox preparation and replay remain blocked after this packet.",
+      "The ProjectionIntent is immutable within runtime.db, but runtime.db and tasks.db remain separate stores; convergence is replayable rather than cross-database atomic.",
+      "This packet does not prove scheduler ordering, provider cessation, provider authenticity, useful output, deployment, VPS identity, mobile access, or campaign completion.",
+      "Campaign dispatch remains stopped until the Graph consumer, independent review, canonical CI, and VPS cutover are complete.",
+      "No external service, VPS, provider, public route, or Git remote may be mutated by this packet."
+    ],
+    "rollback": "Keep campaign dispatch stopped, preserve runtime.db and tasks.db for forensic reconciliation, and revert this authority-only commit before any Graph consumer is activated. Reverting restores outcome-only authorization that cannot distinguish retry from terminal failure or requeue from quarantine.",
+    "packet_digest": "ab49e8d1a28d8b2ac97ef4ef5190cce0dab2d594ca14b30d1c0061e0da76b89c"
+  }
+}

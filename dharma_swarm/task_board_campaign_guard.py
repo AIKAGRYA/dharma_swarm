@@ -11,6 +11,19 @@ from typing import Any
 import aiosqlite
 
 from dharma_swarm.runtime_lifecycle_identity import BOARD_CAMPAIGN_AUTHORITY_FIELDS, valid_board_campaign_authority, valid_initial_campaign_authority_promotion
+from dharma_swarm.task_board_projection_intent import (
+    CampaignTaskMutationError,
+    PROJECTION_RUN_STATUSES as _PROJECTION_RUN_STATUSES,
+    TASK_BOARD_PROJECTION_INTENT_KEY,
+    build_task_board_projection_intent as build_task_board_projection_intent,
+    is_aware_iso8601 as _is_aware_iso8601,
+    is_sha256_hex as _is_sha256_hex,
+    projection_intent_is_exact as _projection_intent_is_exact,
+    runtime_idempotency_authority_snapshot_sha256,
+    runtime_run_authority_snapshot_sha256 as runtime_run_authority_snapshot_sha256,
+    runtime_run_projection_authority_snapshot_sha256,
+    valid_completion_binding as _valid_completion_binding,
+)
 
 CAMPAIGN_AUTHORITY_KEY = "mission_campaign_authority"
 CAMPAIGN_BOOTSTRAP_SCHEMA = "dharma.sadhana.mission_bootstrap.v1"
@@ -45,16 +58,6 @@ _OWNER_STAMP_PROMOTION_FIELDS = frozenset(
     "mission_control_owner_execution runtime_run_id run_id claim_id idempotency_key "
     "trace_id correlation_id attempt_generation".split()
 )
-_COMPLETION_BINDING_FIELDS = frozenset(
-    "schema_version task_id run_id claim_id agent_id receipt_id side_effect_key "
-    "idempotency_key dispatch_idempotency_key result_sha256".split()
-)
-_PROJECTION_RUN_STATUSES = {
-    "receipt": frozenset({"completed", "failed"}),
-    "retry": frozenset({"failed"}),
-    "requeue": frozenset({"failed"}),
-    "quarantine": frozenset({"failed"}),
-}
 _PROJECTION_MARKER_FIELDS = frozenset(
     "schema_version task_id run_id action run_status "
     "runtime_authority_snapshot_sha256 board_result_sha256 projected_at".split()
@@ -63,134 +66,8 @@ _OWNER_EXECUTION_FIELDS = frozenset(
     "schema_version backend mission_id task_id dispatch_key attempt_generation run_id "
     "claim_id idempotency_key trace_id correlation_id".split()
 )
-
-
-class CampaignTaskMutationError(ValueError):
-    pass
-
-
-def _is_sha256_hex(value: Any) -> bool:
-    return bool(
-        isinstance(value, str)
-        and len(value) == 64
-        and all(character in "0123456789abcdef" for character in value)
-    )
-
-
-def _is_aware_iso8601(value: Any) -> bool:
-    if not isinstance(value, str) or not value.strip():
-        return False
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return False
-    return parsed.tzinfo is not None and parsed.utcoffset() is not None
-
-
 def _is_generation(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
-
-
-def _valid_completion_binding(
-    value: Any,
-    *,
-    task_id: str,
-    run_id: str,
-    claim_id: str,
-    agent_id: str,
-    dispatch_idempotency_key: str,
-    result: str,
-) -> bool:
-    if not isinstance(value, dict) or set(value) != _COMPLETION_BINDING_FIELDS:
-        return False
-    side_effect_key = value.get("side_effect_key")
-    required_strings = _COMPLETION_BINDING_FIELDS - {
-        "schema_version",
-        "task_id",
-        "run_id",
-        "result_sha256",
-    }
-    return bool(
-        value.get("schema_version")
-        == "dharma.graph.task_board_completion_binding.v1"
-        and value.get("task_id") == task_id
-        and value.get("run_id") == run_id
-        and value.get("claim_id") == claim_id
-        and value.get("agent_id") == agent_id
-        and value.get("side_effect_key") == f"invoke_agent:{task_id}:{agent_id}"
-        and value.get("dispatch_idempotency_key") == dispatch_idempotency_key
-        and value.get("result_sha256")
-        == hashlib.sha256(result.encode("utf-8")).hexdigest()
-        and all(
-            isinstance(value.get(key), str) and value.get(key)
-            for key in required_strings
-        )
-        and value.get("idempotency_key")
-        == "sek_" + hashlib.sha256(str(side_effect_key).encode()).hexdigest()
-    )
-
-
-def _stable_sha256(payload: Any) -> str:
-    canonical = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def runtime_idempotency_authority_snapshot_sha256(record: Any) -> str:
-    metadata = getattr(record, "metadata", None)
-    if not isinstance(metadata, dict):
-        return ""
-    return _stable_sha256(
-        {
-            key: getattr(record, key, None)
-            for key in (
-                "idempotency_key",
-                "side_effect_key",
-                "run_id",
-                "task_id",
-                "trace_id",
-                "correlation_id",
-                "status",
-                "result_receipt_id",
-            )
-        }
-        | {"metadata": metadata}
-    )
-
-
-def runtime_run_authority_snapshot_sha256(run: Any) -> str:
-    metadata = getattr(run, "metadata", None)
-    if not isinstance(metadata, dict):
-        return ""
-    completed_at = getattr(run, "completed_at", None)
-    return _stable_sha256(
-        {
-            key: getattr(run, key, None)
-            for key in (
-                "run_id",
-                "task_id",
-                "assigned_to",
-                "status",
-                "session_id",
-                "claim_id",
-                "parent_run_id",
-                "assigned_by",
-                "failure_code",
-            )
-        }
-        | {
-            "completed_at": (
-                completed_at.isoformat()
-                if isinstance(completed_at, datetime)
-                else None
-            ),
-            "metadata": metadata,
-        }
-    )
 
 
 def _exact_board_execution_attempt(
@@ -734,7 +611,7 @@ def _run_projection_is_exact(
         and metadata.get("correlation_id") == attempt["correlation_id"]
         and metadata.get("idempotency_key") == attempt["idempotency_key"]
         and marker["runtime_authority_snapshot_sha256"]
-        == runtime_run_authority_snapshot_sha256(run)
+        == runtime_run_projection_authority_snapshot_sha256(run)
     )
 
 
@@ -742,6 +619,7 @@ async def _runtime_projection_is_authorized(
     runtime_db: aiosqlite.Connection,
     *,
     current: dict[str, Any],
+    replacement: dict[str, Any],
     attempt: dict[str, str],
     binding: Any,
     marker: dict[str, Any],
@@ -753,7 +631,28 @@ async def _runtime_projection_is_authorized(
             _row_to_run,
         )
 
-        if marker["action"] in {"receipt", "retry"}:
+        run_row = await (
+            await runtime_db.execute(
+                "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                " assigned_by, assigned_to, requested_output_json,"
+                " current_artifact_id, status, started_at, completed_at,"
+                " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                (attempt["run_id"],),
+            )
+        ).fetchone()
+        run = _row_to_run(run_row) if run_row is not None else None
+        if run is None or not _projection_intent_is_exact(
+            run,
+            current=current,
+            replacement=replacement,
+            attempt=attempt,
+            binding=binding,
+            marker=marker,
+            result=result,
+        ):
+            return False
+        intent = run.metadata[TASK_BOARD_PROJECTION_INTENT_KEY]
+        if intent["source_kind"] == "idempotency_record":
             if not isinstance(binding, dict):
                 return False
             row = await (
@@ -773,17 +672,7 @@ async def _runtime_projection_is_authorized(
                 marker=marker,
                 result=result,
             )
-        row = await (
-            await runtime_db.execute(
-                "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
-                " assigned_by, assigned_to, requested_output_json,"
-                " current_artifact_id, status, started_at, completed_at,"
-                " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
-                (attempt["run_id"],),
-            )
-        ).fetchone()
-        run = _row_to_run(row) if row is not None else None
-        return run is not None and _run_projection_is_exact(
+        return _run_projection_is_exact(
             run,
             attempt=attempt,
             marker=marker,
@@ -942,6 +831,7 @@ async def compare_and_swap_terminal_projection(
                     authorized = await _runtime_projection_is_authorized(
                         runtime_db,
                         current=current,
+                        replacement=metadata,
                         attempt=board_attempt,
                         binding=binding,
                         marker=marker,
