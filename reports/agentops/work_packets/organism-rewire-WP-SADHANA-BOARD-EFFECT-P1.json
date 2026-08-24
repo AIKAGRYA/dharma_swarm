@@ -1,0 +1,135 @@
+{
+  "id": "organism-rewire-WP-SADHANA-BOARD-EFFECT-P1",
+  "base_ref": "ea16d297d11b9ea294718755e936ff8ba97bb7aa",
+  "branch": "agent/sadhana-vps-mobile-release-20260825",
+  "worktree": ".",
+  "intent": "Install the organism-owned TaskBoard side of exact crash-replay settlement: initialize an immutable Board-effect ledger, bind a terminal projection to its exact runtime intent, and commit the Task mutation plus its before/after provenance under one SQLite writer transaction. This is a fail-closed provider packet only. The Graph consumer is intentionally absent at this commit, campaign dispatch remains stopped, and no provider, transport, VPS, public route, or other external effect is authorized.",
+  "allowed_files": [
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/task_board_campaign_guard.py",
+    "dharma_swarm/task_board_effect_commit.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOARD-EFFECT-P1.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/mission_control_*.py",
+    "dharma_swarm/orchestrator*.py",
+    "dharma_swarm/providers.py",
+    "dharma_swarm/runtime_*.py",
+    "dharma_swarm/swarm.py",
+    "scripts/**",
+    "tests/**"
+  ],
+  "gates": [
+    {
+      "name": "board-effect-provider-import-and-foundation",
+      "command": "/Users/dhyana/ds_sadhana_crash_runtime_v2_20260823/.venv/bin/python -m pytest -q tests/test_task_board.py::test_create_task tests/test_task_board.py::test_campaign_attempt_advance_rejects_nested_history_forgery tests/test_task_board.py::test_invalid_transition tests/test_task_board.py::test_generic_requeue_cannot_mint_campaign_attempt",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "board-effect-provider-ruff",
+      "command": "/Users/dhyana/ds_sadhana_crash_runtime_v2_20260823/.venv/bin/python -m ruff check dharma_swarm/task_board.py dharma_swarm/task_board_campaign_guard.py dharma_swarm/task_board_effect_commit.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "removing-atomic-board-effect-call-is-detected",
+      "command": "python3 -c \"import ast,sys; from pathlib import Path; t=Path('dharma_swarm/task_board_campaign_guard.py').read_text(); n=t.replace('target = await commit_locked_task_effect(', 'target = await load_effect_commit(', 1); assert n != t; ok=lambda s: any(isinstance(node,ast.Await) and isinstance(node.value,ast.Call) and getattr(node.value.func,'id',None)=='commit_locked_task_effect' for fn in ast.parse(s).body if isinstance(fn,ast.AsyncFunctionDef) and fn.name=='compare_and_swap_terminal_projection' for node in ast.walk(fn)); sys.exit(0 if ok(t) and not ok(n) else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(board): add exact projection effect ledger"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-BOARD-EFFECT-P1",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "ea16d297d11b9ea294718755e936ff8ba97bb7aa",
+      "details": []
+    },
+    "cross_packet_interface": {
+      "consumer_packet": "dharmagraph-WP-SADHANA-CRASH-REPLAY-P1",
+      "this_packet_provides": [
+        "TaskBoard initialization of an immutable projection-effect ledger",
+        "one-transaction Task mutation plus before/after provenance",
+        "exact runtime-intent and Board-effect binding",
+        "idempotent exact replay with conflict rejection"
+      ],
+      "consumer_provides": [
+        "sealed projection-intent validation",
+        "Graph settlement, replay, imported witness, and ACK",
+        "Board-only crash census and runtime convergence"
+      ],
+      "shared_proof": "A Board projection is accepted only when its exact Task mutation and immutable before/after receipt were committed together under the Board writer fence."
+    },
+    "interface_mismatches": [
+      "The base TaskBoard mutates the Task row without an immutable Board-local effect receipt.",
+      "The base projection replay can infer settlement from matching fields without mutation provenance.",
+      "The Graph authority validator consumed by this provider arrives only in the next ownership packet."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/task_board.py",
+      "dharma_swarm/task_board_campaign_guard.py",
+      "dharma_swarm/task_board_projection_intent.py"
+    ],
+    "honest_blockers": [
+      "This provider commit is deliberately fail-closed and not deployable until the Graph consumer packet lands.",
+      "SQLite mutation provenance protects the in-process Board writer contract; a database owner able to remove triggers and forge every ledger remains outside this proof.",
+      "Runtime SQLite and TaskBoard SQLite remain separate stores, so convergence is replayable rather than cross-database atomic.",
+      "Campaign dispatch remains stopped; this packet proves no provider authenticity, output quality, VPS byte identity, mobile access, rollback, or campaign completion.",
+      "No external service, VPS, provider, public route, or Git remote may be mutated by this packet."
+    ],
+    "rollback": "Keep campaign dispatch stopped, preserve runtime.db and tasks.db for forensic reconciliation, and revert this provider commit before restoring the prior TaskBoard schema behavior.",
+    "packet_digest": "e8935054220613079d3cd4e2abf737a79230181f40d7738fb30f75f7fe82fecd"
+  }
+}

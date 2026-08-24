@@ -11,6 +11,14 @@ from typing import Any
 import aiosqlite
 
 from dharma_swarm.runtime_lifecycle_identity import BOARD_CAMPAIGN_AUTHORITY_FIELDS, valid_board_campaign_authority, valid_initial_campaign_authority_promotion
+from dharma_swarm.task_board_effect_commit import (
+    GRAPH_PROJECTION_EFFECT_KIND,
+    GRAPH_PROJECTION_PAYLOAD_SCHEMA,
+    commit_locked_task_effect,
+    graph_projection_effect_id,
+    load_effect_commit,
+    task_effect_snapshot,
+)
 from dharma_swarm.task_board_projection_intent import (
     CampaignTaskMutationError,
     PROJECTION_RUN_STATUSES as _PROJECTION_RUN_STATUSES,
@@ -66,6 +74,12 @@ _OWNER_EXECUTION_FIELDS = frozenset(
     "schema_version backend mission_id task_id dispatch_key attempt_generation run_id "
     "claim_id idempotency_key trace_id correlation_id".split()
 )
+_LEGACY_OWNER_EXECUTION_FIELDS = frozenset(
+    "schema_version backend mission_id task_id dispatch_key run_id "
+    "idempotency_key trace_id correlation_id".split()
+)
+
+
 def _is_generation(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
@@ -127,24 +141,43 @@ def _exact_board_execution_attempt(
     owner = current.get("mission_control_owner_execution")
     if campaign_bound and not isinstance(owner, dict):
         return None
-    if isinstance(owner, dict) and (
-        set(owner) != _OWNER_EXECUTION_FIELDS
-        or owner.get("schema_version")
-        != "dharma.mission_control.owner_execution.v2"
-        or owner.get("backend") != "orchestrator"
-        or owner.get("task_id") != task_id
-        or any(
-            owner.get(field) != attempt[field]
-            for field in (
-                "run_id",
-                "claim_id",
-                "idempotency_key",
-                "trace_id",
-                "correlation_id",
+    if isinstance(owner, dict):
+        common_owner_exact = bool(
+            owner.get("backend") == "orchestrator"
+            and owner.get("task_id") == task_id
+            and all(
+                isinstance(owner.get(field), str) and owner[field].strip()
+                for field in ("mission_id", "dispatch_key")
+            )
+            and all(
+                owner.get(field) == attempt[field]
+                for field in (
+                    "run_id",
+                    "idempotency_key",
+                    "trace_id",
+                    "correlation_id",
+                )
             )
         )
-    ):
-        return None
+        exact_v2_owner = bool(
+            common_owner_exact
+            and set(owner) == _OWNER_EXECUTION_FIELDS
+            and owner.get("schema_version")
+            == "dharma.mission_control.owner_execution.v2"
+            and owner.get("claim_id") == attempt["claim_id"]
+        )
+        # Mission Control's ordinary, generation-less owner lane deliberately
+        # retains the closed v1 marker.  It is not campaign authority, but it
+        # must remain byte-compatible with exact runtime/Board convergence.
+        exact_legacy_owner = bool(
+            not campaign_bound
+            and common_owner_exact
+            and set(owner) == _LEGACY_OWNER_EXECUTION_FIELDS
+            and owner.get("schema_version")
+            == "dharma.mission_control.owner_execution.v1"
+        )
+        if not (exact_v2_owner or exact_legacy_owner):
+            return None
     active_claim = current.get("active_claim")
     if active_claim is not None and (
         not isinstance(active_claim, dict)
@@ -652,6 +685,16 @@ async def _runtime_projection_is_authorized(
         ):
             return False
         intent = run.metadata[TASK_BOARD_PROJECTION_INTENT_KEY]
+        from dharma_swarm.graph.reconcile_board_intent import (
+            projection_intent_authority_is_exact,
+        )
+
+        if not await projection_intent_authority_is_exact(
+            runtime_db,
+            run_id=attempt["run_id"],
+            expected_intent=intent,
+        ):
+            return False
         if intent["source_kind"] == "idempotency_record":
             if not isinstance(binding, dict):
                 return False
@@ -842,6 +885,34 @@ async def compare_and_swap_terminal_projection(
                         raise CampaignTaskMutationError(
                             "Graph projection lacks exact durable runtime authority"
                         )
+                    intent_row = await (
+                        await runtime_db.execute(
+                            "SELECT metadata_json FROM delegation_runs WHERE run_id = ?",
+                            (board_attempt["run_id"],),
+                        )
+                    ).fetchone()
+                    intent = (
+                        metadata_mapping(intent_row["metadata_json"]).get(
+                            TASK_BOARD_PROJECTION_INTENT_KEY
+                        )
+                        if intent_row is not None
+                        else None
+                    )
+                    if not isinstance(intent, dict):
+                        await db.rollback()
+                        raise CampaignTaskMutationError(
+                            "Graph projection lost its locked ProjectionIntent"
+                        )
+                    effect_id = graph_projection_effect_id(board_attempt["run_id"])
+                    effect_payload = {
+                        "schema_version": GRAPH_PROJECTION_PAYLOAD_SCHEMA,
+                        "intent_sha256": intent["intent_sha256"],
+                        "marker": marker,
+                    }
+                    existing_commit = await load_effect_commit(
+                        db,
+                        effect_id=effect_id,
+                    )
                     assigned_to = (
                         None if target_status == "pending" else expected.assigned_to
                     )
@@ -851,35 +922,56 @@ async def compare_and_swap_terminal_projection(
                         and getattr(expected, "result", None) == result
                         and current == metadata
                     ):
+                        if not (
+                            existing_commit is not None
+                            and existing_commit["effect_kind"]
+                            == GRAPH_PROJECTION_EFFECT_KIND
+                            and existing_commit["authority_sha256"]
+                            == intent["intent_sha256"]
+                            and existing_commit["effect_payload"] == effect_payload
+                            and existing_commit["target_snapshot"]
+                            == task_effect_snapshot(observed)
+                        ):
+                            await db.rollback()
+                            raise CampaignTaskMutationError(
+                                "Graph projection lacks its atomic Board receipt"
+                            )
                         await db.rollback()
                         return observed
+                    if existing_commit is not None:
+                        await db.rollback()
+                        raise CampaignTaskMutationError(
+                            "Graph projection Board receipt conflicts"
+                        )
                     now = datetime.now(timezone.utc)
-                    cursor = await db.execute(
-                        "UPDATE tasks SET status = ?, assigned_to = ?, result = ?,"
-                        " metadata = ?, updated_at = ? WHERE id = ?",
-                        (
-                            target_status,
-                            assigned_to,
-                            result,
-                            board._coerce_db_value("metadata", metadata),
-                            now.isoformat(),
-                            expected.id,
-                        ),
+                    target = await commit_locked_task_effect(
+                        board,
+                        db,
+                        observed,
+                        status=target_status,
+                        assigned_to=assigned_to,
+                        result=result,
+                        metadata=metadata,
+                        effect_id=effect_id,
+                        effect_kind=GRAPH_PROJECTION_EFFECT_KIND,
+                        authority_sha256=intent["intent_sha256"],
+                        effect_payload=effect_payload,
+                        committed_at=now,
                     )
-                    if cursor.rowcount != 1:
+                    if target is None:
                         await db.rollback()
                         return None
                     await db.commit()
-                    row = await (
-                        await db.execute(
-                            "SELECT * FROM tasks WHERE id = ?", (expected.id,)
-                        )
-                    ).fetchone()
-                    return board._row_to_task(row, deps) if row is not None else None
+                    return target
                 finally:
                     await runtime_db.rollback()
         except aiosqlite.Error as exc:
             await db.rollback()
             raise CampaignTaskMutationError(
                 "Graph projection runtime authority lock is unavailable"
+            ) from exc
+        except (TypeError, ValueError) as exc:
+            await db.rollback()
+            raise CampaignTaskMutationError(
+                "Graph projection lacks exact durable runtime authority"
             ) from exc

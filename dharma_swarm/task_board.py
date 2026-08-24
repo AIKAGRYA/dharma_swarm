@@ -26,6 +26,7 @@ from dharma_swarm.task_board_campaign_guard import (
     compare_and_swap_terminal_projection as _cas_terminal_projection,
     validate_generic_campaign_mutation,
 )
+from dharma_swarm import task_board_effect_commit as _effect_commit
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
 _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
@@ -47,10 +48,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     result TEXT, metadata TEXT NOT NULL DEFAULT '{}',
     trace_id TEXT NOT NULL DEFAULT '')"""
 
-_MIGRATE_TRACE_ID = (
-    "ALTER TABLE tasks ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
-)
-
+_MIGRATE_TRACE_ID = "ALTER TABLE tasks ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
 _CREATE_DEPS = """
 CREATE TABLE IF NOT EXISTS task_dependencies (
     task_id TEXT NOT NULL, depends_on_id TEXT NOT NULL,
@@ -80,6 +78,7 @@ class TaskBoard:
     """Async task board backed by SQLite."""
 
     _BUSY_TIMEOUT_S = 30  # seconds — must survive contention with daemon + SwarmLens
+    projection_commit_mode = _effect_commit.AUTHORITATIVE_PROJECTION_COMMIT_MODE
 
     def __init__(
         self,
@@ -131,6 +130,7 @@ class TaskBoard:
             await db.execute("PRAGMA synchronous=NORMAL")
             await db.execute(_CREATE_TASKS)
             await db.execute(_CREATE_DEPS)
+            await _effect_commit.ensure_effect_commit_ledger(db)
             # Migrate: add trace_id column if missing (existing databases)
             try:
                 await db.execute(_MIGRATE_TRACE_ID)
@@ -688,7 +688,7 @@ class TaskBoard:
                     expected.status.value,
                     expected.assigned_to,
                     expected.result,
-                    self._coerce_db_value("metadata", expected.metadata),
+                    row[10],
                     expected.updated_at.isoformat(),
                 ),
             )
@@ -741,7 +741,7 @@ class TaskBoard:
                     _utc_now().isoformat(),
                     expected.id,
                     TaskStatus.PENDING.value,
-                    self._coerce_db_value("metadata", expected.metadata),
+                    row[10],
                     expected.updated_at.isoformat(),
                 ),
             )
