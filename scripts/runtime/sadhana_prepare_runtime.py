@@ -7,8 +7,10 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import re
 import sqlite3
+import stat
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -36,9 +38,9 @@ from dharma_swarm.mission_control_campaign import (  # noqa: E402
 )
 from dharma_swarm.mission_control_contract import MissionControlError  # noqa: E402
 from dharma_swarm.mission_control_oracle_custody import (  # noqa: E402
+    list_private_directory,
     private_directory,
     read_exact,
-    write_exact,
 )
 from dharma_swarm.mission_control_roster import (  # noqa: E402
     CampaignRosterError,
@@ -71,6 +73,7 @@ EFFECT_KINDS = (
 _SHA256_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _RAW_SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 _RELEASE_SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
+_PUBLICATION_TEMP_SUFFIX = ".sadhana-preparation.tmp"
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,6 +264,226 @@ def validate_supervisor_config_projection(
 def _need(condition: bool, message: str) -> None:
     if not condition:
         raise MissionControlError(message)
+
+
+def _private_directory_descriptor(path: Path, label: str) -> int:
+    directory = private_directory(path, label)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    _need(
+        nofollow is not None and directory_flag is not None,
+        "runtime preparation requires no-follow directory opens",
+    )
+    descriptor = os.open(directory, os.O_RDONLY | nofollow | directory_flag)
+    info = os.fstat(descriptor)
+    if not (
+        stat.S_ISDIR(info.st_mode)
+        and info.st_uid == os.geteuid()
+        and stat.S_IMODE(info.st_mode) == 0o700
+    ):
+        os.close(descriptor)
+        raise MissionControlError(f"{label} custody is invalid")
+    return descriptor
+
+
+def _publication_temp_name(final_name: str) -> str:
+    _need(
+        final_name not in {"", ".", ".."} and "/" not in final_name,
+        "atomic publication final name is invalid",
+    )
+    return f".{final_name}{_PUBLICATION_TEMP_SUFFIX}"
+
+
+def _cleanup_publication_temp(
+    directory_fd: int,
+    *,
+    final_name: str,
+    label: str,
+) -> None:
+    temp_name = _publication_temp_name(final_name)
+    try:
+        temp = os.stat(temp_name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    _need(
+        stat.S_ISREG(temp.st_mode)
+        and temp.st_uid == os.geteuid()
+        and stat.S_IMODE(temp.st_mode) == 0o600
+        and temp.st_nlink in {1, 2},
+        f"{label} atomic temp custody is invalid",
+    )
+    if temp.st_nlink == 2:
+        try:
+            final = os.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise MissionControlError(
+                f"{label} atomic temp has a foreign hard link"
+            ) from exc
+        _need(
+            stat.S_ISREG(final.st_mode)
+            and (final.st_dev, final.st_ino) == (temp.st_dev, temp.st_ino),
+            f"{label} atomic temp link identity conflicts",
+        )
+    os.unlink(temp_name, dir_fd=directory_fd)
+    os.fsync(directory_fd)
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    remaining = memoryview(payload)
+    while remaining:
+        written = os.write(descriptor, remaining)
+        _need(written > 0, "atomic publication write made no progress")
+        remaining = remaining[written:]
+
+
+def _read_published_exact(
+    path: Path,
+    payload: bytes,
+    *,
+    canonical_json: bool,
+    label: str,
+) -> None:
+    raw, _ = read_exact(path, label=label, canonical_json=canonical_json)
+    _need(raw == payload, f"{label} replay conflicts")
+
+
+def _atomic_publish_exact(
+    path: Path,
+    payload: bytes,
+    *,
+    canonical_json: bool,
+    label: str,
+    checkpoint: Callable[[str], None] | None,
+) -> None:
+    """Publish complete bytes with same-directory temp + atomic no-replace link."""
+    _need(bool(payload), f"{label} payload is empty")
+    directory_fd = _private_directory_descriptor(path.parent, f"{label} root")
+    final_name = path.name
+    temp_name = _publication_temp_name(final_name)
+    try:
+        _cleanup_publication_temp(
+            directory_fd,
+            final_name=final_name,
+            label=label,
+        )
+        try:
+            os.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            _read_published_exact(
+                path,
+                payload,
+                canonical_json=canonical_json,
+                label=label,
+            )
+            return
+
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        _need(nofollow is not None, "runtime preparation requires O_NOFOLLOW")
+        temp_fd = os.open(
+            temp_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow,
+            0o600,
+            dir_fd=directory_fd,
+        )
+        try:
+            midpoint = max(1, len(payload) // 2)
+            _write_all(temp_fd, payload[:midpoint])
+            if checkpoint is not None:
+                checkpoint(f"{label}_partial")
+            _write_all(temp_fd, payload[midpoint:])
+            os.fsync(temp_fd)
+            if checkpoint is not None:
+                checkpoint(f"{label}_fsynced")
+        finally:
+            os.close(temp_fd)
+
+        try:
+            os.link(
+                temp_name,
+                final_name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileExistsError:
+            os.unlink(temp_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
+            _read_published_exact(
+                path,
+                payload,
+                canonical_json=canonical_json,
+                label=label,
+            )
+            return
+        os.fsync(directory_fd)
+        if checkpoint is not None:
+            checkpoint(f"{label}_linked")
+        os.unlink(temp_name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+    _read_published_exact(
+        path,
+        payload,
+        canonical_json=canonical_json,
+        label=label,
+    )
+
+
+def _reset_manifest_scratch(root: Path) -> Path:
+    parent = private_directory(root.parent, "runtime preparation scratch root")
+    _need(root.parent == parent, "runtime preparation scratch root conflicts")
+    scratch = private_directory(root, "runtime preparation manifest scratch")
+    entries = set(
+        list_private_directory(scratch, "runtime preparation manifest scratch")
+    )
+    _need(
+        entries <= set(RUNTIME_MANIFEST_NAMES),
+        "runtime preparation scratch contains a foreign entry",
+    )
+    descriptor = _private_directory_descriptor(
+        scratch,
+        "runtime preparation manifest scratch",
+    )
+    try:
+        for name in sorted(entries):
+            info = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+            _need(
+                stat.S_ISREG(info.st_mode)
+                and info.st_uid == os.geteuid()
+                and stat.S_IMODE(info.st_mode) == 0o600
+                and info.st_nlink == 1,
+                "runtime preparation scratch file custody is invalid",
+            )
+            os.unlink(name, dir_fd=descriptor)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    return scratch
+
+
+def _validate_manifest_publication_root(root: Path, *, allow_temps: bool) -> None:
+    directory = private_directory(root, "runtime preparation manifest publication")
+    allowed = set(RUNTIME_MANIFEST_NAMES)
+    if allow_temps:
+        allowed.update(_publication_temp_name(name) for name in RUNTIME_MANIFEST_NAMES)
+    entries = set(
+        list_private_directory(
+            directory,
+            "runtime preparation manifest publication",
+        )
+    )
+    _need(
+        entries <= allowed,
+        "runtime preparation manifest publication contains a foreign entry",
+    )
+    if not allow_temps:
+        _need(
+            entries == set(RUNTIME_MANIFEST_NAMES),
+            "runtime preparation manifest publication is incomplete",
+        )
 
 
 def load_staged_release_admission(
@@ -815,6 +1038,9 @@ async def prepare_runtime(
         session_id = f"mission_campaign:{portfolio.campaign_id}"
         await _require_authority_unbound(board, dict(bootstrap.goal_task_map))
         before = await _effect_census(runtime, session_id)
+        manifest_scratch = _reset_manifest_scratch(
+            inputs.state_dir / "preparation-scratch" / "runtime-manifests"
+        )
         manifests = await render_runtime_manifests(
             portfolio,
             control,
@@ -822,13 +1048,39 @@ async def prepare_runtime(
             runtime,
             roster,
             observed_source_path=inputs.observed_source,
-            output_root=inputs.output_root,
+            output_root=manifest_scratch,
             verifier_seat_name=inputs.verifier_seat,
             pins=inputs.pins,
             operator_id=inputs.operator_id,
             lock=lock,
             checkpoint=checkpoint,
         )
+        expected_manifest_hashes = dict(manifests.files)
+        _validate_manifest_publication_root(inputs.output_root, allow_temps=True)
+        publication_labels = {
+            "observed-inputs.json": "publish_observed_manifest",
+            "held-out-oracle.json": "publish_held_out_manifest",
+            "authority-manifest.json": "publish_authority_manifest",
+        }
+        for name in RUNTIME_MANIFEST_NAMES:
+            raw, _ = read_exact(
+                manifest_scratch / name,
+                label=f"rendered {name}",
+                canonical_json=False,
+            )
+            _need(
+                hashlib.sha256(raw).hexdigest() == expected_manifest_hashes[name],
+                f"rendered {name} hash conflicts",
+            )
+            _atomic_publish_exact(
+                inputs.output_root / name,
+                raw,
+                canonical_json=True,
+                label=publication_labels[name],
+                checkpoint=checkpoint,
+            )
+        _validate_manifest_publication_root(inputs.output_root, allow_temps=False)
+        _reset_manifest_scratch(manifest_scratch)
 
         config = CampaignConfig(
             mission_id=portfolio.campaign_id,
@@ -923,7 +1175,13 @@ async def prepare_runtime(
             "runtime preparation receipt root",
         )
         receipt_path = receipt_root / PREPARATION_RECEIPT_NAME
-        write_exact(receipt_path, _canonical_bytes(payload))
+        _atomic_publish_exact(
+            receipt_path,
+            _canonical_bytes(payload),
+            canonical_json=True,
+            label="publish_receipt",
+            checkpoint=checkpoint,
+        )
         if checkpoint is not None:
             checkpoint("receipt_written")
         raw, stored = read_exact(

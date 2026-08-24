@@ -201,6 +201,122 @@ async def test_every_phase_crash_replays_to_identical_prepared_no_effect_proof(
         assert parameters["session_status"] == "paused"
 
 
+@pytest.mark.asyncio
+async def test_mid_write_crash_leaves_only_non_authoritative_temp_and_replays(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="mid-write")
+    manifest_name = preparation.RUNTIME_MANIFEST_NAMES[0]
+    final = inputs.output_root / manifest_name
+    temp = inputs.output_root / preparation._publication_temp_name(manifest_name)
+
+    def crash(phase: str) -> None:
+        if phase == "publish_observed_manifest_partial":
+            raise InjectedCrash(phase)
+
+    with pytest.raises(InjectedCrash, match="publish_observed_manifest_partial"):
+        await preparation.prepare_runtime(inputs, checkpoint=crash)
+
+    assert not final.exists()
+    assert temp.is_file()
+    assert temp.stat().st_size > 0
+    assert temp.stat().st_nlink == 1
+    assert not (
+        inputs.state_dir / "receipts" / preparation.PREPARATION_RECEIPT_NAME
+    ).exists()
+
+    replayed = await preparation.prepare_runtime(inputs)
+    assert not temp.exists()
+    assert final.is_file()
+    assert (
+        hashlib.sha256(final.read_bytes()).hexdigest()
+        == replayed["manifests"]["files"][manifest_name]
+    )
+
+
+@pytest.mark.asyncio
+async def test_crash_after_no_replace_link_replays_to_single_authoritative_link(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="linked")
+    manifest_name = preparation.RUNTIME_MANIFEST_NAMES[0]
+    final = inputs.output_root / manifest_name
+    temp = inputs.output_root / preparation._publication_temp_name(manifest_name)
+
+    def crash(phase: str) -> None:
+        if phase == "publish_observed_manifest_linked":
+            raise InjectedCrash(phase)
+
+    with pytest.raises(InjectedCrash, match="publish_observed_manifest_linked"):
+        await preparation.prepare_runtime(inputs, checkpoint=crash)
+
+    assert final.stat().st_ino == temp.stat().st_ino
+    assert final.stat().st_nlink == 2
+    replayed = await preparation.prepare_runtime(inputs)
+    assert not temp.exists()
+    assert final.stat().st_nlink == 1
+    assert (
+        hashlib.sha256(final.read_bytes()).hexdigest()
+        == replayed["manifests"]["files"][manifest_name]
+    )
+
+
+@pytest.mark.parametrize("boundary", ("partial", "fsynced", "linked"))
+def test_atomic_publication_replays_every_durability_boundary(
+    tmp_path: Path,
+    boundary: str,
+) -> None:
+    root = tmp_path / boundary
+    root.mkdir(mode=0o700)
+    final = root / "artifact.json"
+    temp = root / preparation._publication_temp_name(final.name)
+    payload = preparation._canonical_bytes({"boundary": boundary})
+
+    def crash(phase: str) -> None:
+        if phase == f"publish_test_{boundary}":
+            raise InjectedCrash(phase)
+
+    with pytest.raises(InjectedCrash, match=f"publish_test_{boundary}"):
+        preparation._atomic_publish_exact(
+            final,
+            payload,
+            canonical_json=True,
+            label="publish_test",
+            checkpoint=crash,
+        )
+
+    assert temp.exists()
+    assert final.exists() is (boundary == "linked")
+    preparation._atomic_publish_exact(
+        final,
+        payload,
+        canonical_json=True,
+        label="publish_test",
+        checkpoint=None,
+    )
+    assert final.read_bytes() == payload
+    assert final.stat().st_nlink == 1
+    assert not temp.exists()
+
+
+@pytest.mark.asyncio
+async def test_existing_mismatched_final_is_never_overwritten(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="mismatch")
+    await preparation.prepare_runtime(inputs)
+    final = inputs.output_root / preparation.RUNTIME_MANIFEST_NAMES[0]
+    mismatched = b"{}\n"
+    final.write_bytes(mismatched)
+
+    with pytest.raises(MissionControlError, match="replay conflicts"):
+        await preparation.prepare_runtime(inputs)
+    assert final.read_bytes() == mismatched
+
+
 def _valid_receipt() -> tuple[dict[str, object], dict[str, object]]:
     tasks = {
         goal_id: f"task-{index}"
