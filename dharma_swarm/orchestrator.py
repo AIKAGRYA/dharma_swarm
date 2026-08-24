@@ -25,7 +25,7 @@ import time
 from datetime import datetime, timezone
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Awaitable, Callable, NamedTuple, Protocol, runtime_checkable
+from typing import Any, Awaitable, Callable, Protocol, runtime_checkable
 
 from dharma_swarm.models import (
     AgentState,
@@ -34,11 +34,12 @@ from dharma_swarm.models import (
     TaskDispatch,
     TaskStatus,
     TopologyType,
-    _new_id,
 )
 from dharma_swarm import mission_control_executor_guard as _campaign_guard
+from dharma_swarm import orchestrator_dispatch_guard as _dispatch_guard
 from dharma_swarm import orchestrator_execution as _orchestrator_execution
 from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
+from dharma_swarm.spine.adapters import identity_metadata
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.runtime_admission import runtime_control_enabled
 from dharma_swarm.runtime_topology import (
@@ -75,12 +76,6 @@ _CAMPAIGN_OWNER_EXECUTION_FIELDS = frozenset(
         "correlation_id",
     }
 )
-
-
-class _CampaignRecoveryTicket(NamedTuple):
-    task_id: str
-    principal: str
-    generation: int
 
 
 @runtime_checkable
@@ -153,7 +148,14 @@ class Orchestrator:
         self._running = False
         self._superstep_id: int = 0
         self._active_dispatches: dict[str, TaskDispatch] = {}
+        self._legacy_dispatch_owners: dict[str, TaskDispatch] = {}
+        self._assignment_tasks: dict[str, asyncio.Task[Any]] = {}
+        self._stop_operation: asyncio.Task[dict[str, Any]] | None = None
+        self._stopping = False
         self._campaign_reservations: dict[tuple[str, str, int], dict[str, Any]] = {}
+        self._generic_recovery_owners: dict[int, list[Any]] = {}
+        self._campaign_recovery_owners: dict[int, list[Any]] = {}
+        self._recovery_tasks: dict[str, asyncio.Task[bool]] = {}
         # Track running asyncio tasks for actual LLM execution
         self._running_tasks: dict[str, asyncio.Task] = {}
         self._running_dispatch_owners: dict[
@@ -222,13 +224,14 @@ class Orchestrator:
             )
         if self._is_topology_genome(topology):
             return await self._dispatch_topology_genome(task, topology)
+        if topology in (TopologyType.FAN_OUT, TopologyType.BROADCAST):
+            raise NotImplementedError(
+                f"{topology.value} is unsupported until dispatch identity is "
+                "composite across task and agent"
+            )
         idle: list[AgentState] = await self._pool.get_idle_agents()
         if not idle:
             return []
-        if topology == TopologyType.FAN_OUT:
-            return await self.fan_out(task, idle)
-        if topology == TopologyType.BROADCAST:
-            return await self.fan_out(task, idle, topology=TopologyType.BROADCAST)
         if topology == TopologyType.SWARM:
             return await self._dispatch_swarm(task, idle)
         if topology == TopologyType.SUPERVISOR:
@@ -245,8 +248,7 @@ class Orchestrator:
             topology=topology,
             timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
         )
-        await self._assign_dispatch(td)
-        return [td]
+        return [td] if await self._assign_dispatch(td) else []
 
     @staticmethod
     def _is_topology_genome(topology: Any) -> bool:
@@ -256,9 +258,7 @@ class Orchestrator:
         )
 
     async def _dispatch_topology_genome(
-        self,
-        task: Task,
-        genome: Any,
+        self, task: Task, genome: Any
     ) -> list[TaskDispatch]:
         if self._pool is None:
             return []
@@ -269,7 +269,12 @@ class Orchestrator:
         available = list(idle)
         dispatches: list[TaskDispatch] = []
         entrypoints = list(genome.entrypoints)
-        topology_type = TopologyType.FAN_OUT if len(entrypoints) > 1 else TopologyType.PIPELINE
+        if len(entrypoints) > 1:
+            raise NotImplementedError(
+                "multi-entrypoint topology genomes are unsupported until dispatch "
+                "identity is composite across task and agent"
+            )
+        topology_type = TopologyType.PIPELINE
         for node_id in entrypoints or [genome.nodes[0].node_id]:
             agent = self._select_idle_agent(task, available)
             if agent is None:
@@ -289,8 +294,8 @@ class Orchestrator:
                     "topology_edge_ids": list(genome.incoming_edge_ids(node_id)),
                 },
             )
-            await self._assign_dispatch(td)
-            dispatches.append(td)
+            if await self._assign_dispatch(td):
+                dispatches.append(td)
         return dispatches
 
     async def fan_out(
@@ -300,22 +305,11 @@ class Orchestrator:
         *,
         topology: TopologyType = TopologyType.FAN_OUT,
     ) -> list[TaskDispatch]:
-        """Split task across multiple agents, one dispatch per agent."""
-        dispatches: list[TaskDispatch] = []
-        for agent in agents:
-            td = TaskDispatch(
-                task_id=task.id,
-                agent_id=agent.id,
-                topology=topology,
-                timeout_seconds=self._resolve_timeout_seconds(
-                    task,
-                    self._default_timeout_seconds,
-                ),
-                metadata={"sub_task_id": _new_id(), "parent_task": task.id},
-            )
-            await self._assign_dispatch(td)
-            dispatches.append(td)
-        return dispatches
+        """Reject parallel semantics until every branch has exact custody identity."""
+        raise NotImplementedError(
+            f"{topology.value} is unsupported until dispatch identity is composite "
+            "across task and agent"
+        )
 
     async def _dispatch_swarm(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
         """Dispatch to the current active swarm agent and persist handoff state."""
@@ -356,8 +350,7 @@ class Orchestrator:
                 topology_mode=TopologyType.SWARM.value,
             ),
         )
-        await self._assign_dispatch(td)
-        return [td]
+        return [td] if await self._assign_dispatch(td) else []
 
     async def _dispatch_supervisor(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
         """Dispatch through one supervisor while preserving delegated agents."""
@@ -388,8 +381,7 @@ class Orchestrator:
                 },
             },
         )
-        await self._assign_dispatch(td)
-        return [td]
+        return [td] if await self._assign_dispatch(td) else []
 
     async def _dispatch_subagents_as_tools(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
         """Dispatch parent graph run with child agents exposed as tools."""
@@ -411,8 +403,7 @@ class Orchestrator:
                 topology_mode=TopologyType.SUBAGENTS_AS_TOOLS.value,
             ),
         )
-        await self._assign_dispatch(td)
-        return [td]
+        return [td] if await self._assign_dispatch(td) else []
 
     def _select_topology_agent(
         self,
@@ -459,11 +450,62 @@ class Orchestrator:
                 )
         fragments: list[str] = []
         for td in dispatches:
-            result = await self._pool.get_result(td.agent_id)
-            if result is not None:
-                fragments.append(result)
-            await self._pool.release(td.agent_id)
-            self._active_dispatches.pop(td.task_id, None)
+            owner = self._running_dispatch_owners.get(td.task_id)
+            if owner is None or owner[1] is not td:
+                raise RuntimeError(
+                    f"fan_in lacks the registered background owner for {td.task_id}"
+                )
+            background = owner[0]
+            if self._running_tasks.get(td.task_id) is not background:
+                raise RuntimeError(
+                    f"fan_in background registry mismatch for {td.task_id}"
+                )
+            try:
+                await asyncio.shield(background)
+            except asyncio.CancelledError:
+                if not background.done():
+                    raise
+            except Exception:
+                # Completion may represent a bounded failure.  The Board and exact
+                # custody checks below, rather than the coroutine return, are the
+                # authoritative terminal proof.
+                pass
+            if not background.done():
+                raise RuntimeError(
+                    f"fan_in background execution is still live for {td.task_id}"
+                )
+            task = await self._safe_get_task(td.task_id)
+            if task is None or task.status not in {
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.CANCELLED,
+            }:
+                raise RuntimeError(
+                    f"fan_in lacks terminal Board proof for {td.task_id}"
+                )
+            if self._active_dispatches.get(td.task_id) is not None:
+                raise RuntimeError(
+                    f"fan_in retains active dispatch custody for {td.task_id}"
+                )
+            owns_reservation = getattr(self._pool, "owns_reservation", None)
+            if not callable(owns_reservation):
+                raise RuntimeError(
+                    f"fan_in lacks exact pool custody proof for {td.task_id}"
+                )
+            if owns_reservation(
+                td.agent_id,
+                td.task_id,
+                reservation_token=td,
+            ):
+                raise RuntimeError(
+                    f"fan_in retains exact pool custody for {td.task_id}"
+                )
+            if self._running_tasks.get(td.task_id) is background:
+                self._running_tasks.pop(td.task_id, None)
+            if self._running_dispatch_owners.get(td.task_id) is owner:
+                self._running_dispatch_owners.pop(td.task_id, None)
+            if task.status is TaskStatus.COMPLETED and task.result is not None:
+                fragments.append(str(task.result))
         return self._combine_results(fragments)
 
     async def route_next(self) -> list[TaskDispatch]:
@@ -514,7 +556,8 @@ class Orchestrator:
                 ),
             )
             _ad_t0 = _tt.monotonic()
-            await self._assign_dispatch(td)
+            if not await self._assign_dispatch(td):
+                continue
             logger.info("route_next: assign_dispatch took %.1fs (total %.1fs)", _tt.monotonic() - _ad_t0, _tt.monotonic() - _rn0)
             # Record dispatch in YogaNode usage tracker
             if self._yoga is not None:
@@ -636,50 +679,9 @@ class Orchestrator:
         """Signal the run loop to exit after the current tick."""
         self._running = False
 
-    async def graceful_stop(self, timeout: float = 30.0) -> dict[str, int]:
-        """Cancel all in-flight tasks, gather with timeout, then stop.
-
-        Varela's autopoiesis: clean death is part of the lifecycle.
-
-        Returns a summary of what was cancelled vs completed.
-        """
-        self._running = False
-        cancelled = 0
-        completed = 0
-        if not self._running_tasks:
-            return {"cancelled": 0, "completed": 0}
-        # First, cancel all running asyncio tasks
-        for task_id, atask in self._running_tasks.items():
-            if not atask.done():
-                atask.cancel()
-                cancelled += 1
-            else:
-                completed += 1
-        # Wait for cancellation to propagate (with timeout)
-        if self._running_tasks:
-            pending = [t for t in self._running_tasks.values() if not t.done()]
-            if pending:
-                done, timed_out = await asyncio.wait(
-                    pending, timeout=timeout,
-                    return_when=asyncio.ALL_COMPLETED,
-                )
-                # Suppress CancelledError from gathered tasks
-                for task in done:
-                    try:
-                        task.result()
-                    except (asyncio.CancelledError, Exception):
-                        pass
-                for task in timed_out:
-                    task.cancel()
-
-        self._running_tasks.clear()
-        self._running_dispatch_owners.clear()
-        self._active_dispatches.clear()
-        logger.info(
-            "Orchestrator graceful stop: %d cancelled, %d already completed",
-            cancelled, completed,
-        )
-        return {"cancelled": cancelled, "completed": completed}
+    async def graceful_stop(self, timeout: float = 30.0) -> dict[str, Any]:
+        """Cancel work without forgetting custody that remains live."""
+        return await _dispatch_guard.graceful_stop(self, timeout, logger=logger)
 
     async def __aenter__(self) -> "Orchestrator":
         """Async context manager support."""
@@ -1143,6 +1145,12 @@ class Orchestrator:
         td: TaskDispatch,
         meta: dict[str, Any],
     ) -> dict[str, Any]:
+        store = self._runtime_lifecycle._runtime_state_store()
+        if store is None or getattr(store, "db_path", None) is None:
+            raise RuntimeError("dispatch lacks a durable runtime state store")
+        runtime_db_path = str(Path(store.db_path).expanduser().resolve())
+        meta["runtime_db_path"] = runtime_db_path
+        td.metadata["runtime_db_path"] = runtime_db_path
         if str(os.environ.get("DHARMA_FAST_BOOT", "")).strip().lower() in {
             "1",
             "true",
@@ -1155,11 +1163,6 @@ class Orchestrator:
         if task is None:
             meta["context_bundle_status"] = "missing_task"
             td.metadata["context_bundle_status"] = "missing_task"
-            return meta
-        store = self._runtime_lifecycle._runtime_state_store()
-        if store is None:
-            meta["context_bundle_status"] = "missing_runtime_state"
-            td.metadata["context_bundle_status"] = "missing_runtime_state"
             return meta
         run_id = self._runtime_lifecycle.ensure_runtime_run_id(td)
         runtime_root = self._runtime_root()
@@ -1225,7 +1228,6 @@ class Orchestrator:
                 except Exception:
                     logger.debug("Memory lattice close failed", exc_info=True)
         bundle_id = bundle.bundle_id
-        runtime_db_path = str(store.db_path)
         state_dir = str(runtime_root)
         meta["context_bundle_id"] = bundle_id
         meta["context_bundle_status"] = "attached"
@@ -1295,6 +1297,9 @@ class Orchestrator:
         task: Task | None,
         idle_agents: list[AgentState],
     ) -> AgentState | None:
+        idle_agents = _orchestrator_execution.retry_execution_candidates(
+            task, idle_agents
+        )
         if not idle_agents:
             return None
         preferred_names = self._task_preferred_agent_names(task)
@@ -2003,17 +2008,38 @@ class Orchestrator:
             max_retries=max_retries,
             backoff=backoff,
         )
-        campaign_bound, _ = _campaign_guard.campaign_principal(task)
+        if "_campaign_failure_authority" in td.metadata:
+            campaign_bound = td.metadata["_campaign_failure_authority"] is True
+        else:
+            campaign_bound, _ = _campaign_guard.campaign_principal(task)
         if campaign_bound:
             max_retries, backoff = retry_count, 0.0
         meta.pop("active_claim", None)
-        meta["last_error"] = error
-        meta["last_failure_class"] = failure_class
+        receipt_error = str(td.metadata.get("evidence_receipt_error_detail") or "")
+        receipt_error_source = str(
+            td.metadata.get("evidence_receipt_error_source") or ""
+        )
+        receipt_bound = bool(
+            str(td.metadata.get("evidence_receipt_id") or "")
+            and td.metadata.get("evidence_receipt_status")
+            in {"failed", "dropped", "timeout", "cancelled"}
+            and receipt_error_source not in {"", "none"}
+            and receipt_error
+        )
+        projection_error = receipt_error if receipt_bound else error
+        projection_failure_code = (
+            receipt_error_source if receipt_bound else failure_class
+        )
+        meta["last_error"] = projection_error
+        meta["last_failure_class"] = projection_failure_code
+        if receipt_bound and projection_error != error:
+            meta["last_error_diagnostic"] = error
+        if receipt_bound and projection_failure_code != failure_class:
+            meta["last_failure_diagnostic_class"] = failure_class
         meta["last_failure_signature"] = failure_signature
         meta["last_failure_source"] = source
         meta["last_failed_agent"] = td.agent_id
         meta["last_failed_at"] = datetime.now(timezone.utc).isoformat()
-
         retry_scheduled = retry_count < max_retries
         if retry_scheduled:
             next_retry = retry_count + 1
@@ -2024,18 +2050,12 @@ class Orchestrator:
             else:
                 meta.pop("retry_not_before_epoch", None)
 
-            await self._safe_update_task(
-                td.task_id,
-                status=TaskStatus.FAILED,
-                result=error,
-                metadata=meta,
-            )
-            await self._safe_update_task(
-                td.task_id,
-                status=TaskStatus.PENDING,
-                result=error,
-                metadata=meta,
-                assigned_to=None,
+            await _orchestrator_execution.record_terminal_projection(
+                self, td, task, status="failed", board_result=projection_error,
+                board_metadata_set=meta,
+                board_metadata_remove=["active_claim", "retry_not_before_epoch"],
+                failure_code=projection_failure_code,
+                action="retry" if receipt_bound else "requeue", logger=logger,
             )
             self._record_task_event(
                 "task_requeued",
@@ -2068,28 +2088,16 @@ class Orchestrator:
                     "failure_class": failure_class,
                 },
             )
-            await self._runtime_lifecycle.record_task_claim(
-                td,
-                task=task,
-                status="failed",
-                failure_code=failure_class,
-                error=error,
-            )
-            await self._runtime_lifecycle.record_delegation_run(
-                td,
-                task=task,
-                status="failed",
-                failure_code=failure_class,
-                error=error,
-            )
             return
 
         meta["max_retries"] = max_retries
-        await self._safe_update_task(
-            td.task_id,
-            status=TaskStatus.FAILED,
-            result=error,
-            metadata=meta,
+        meta.pop("retry_not_before_epoch", None)
+        await _orchestrator_execution.record_terminal_projection(
+            self, td, task, status="failed", board_result=projection_error,
+            board_metadata_set=meta,
+            board_metadata_remove=["active_claim", "retry_not_before_epoch"],
+            failure_code=projection_failure_code,
+            action="receipt" if receipt_bound else "quarantine", logger=logger,
         )
         self._record_progress_event(
             "task_failed",
@@ -2158,20 +2166,6 @@ class Orchestrator:
             )
         except Exception:
             logger.debug("Algedonic signal emission failed", exc_info=True)
-        await self._runtime_lifecycle.record_task_claim(
-            td,
-            task=task,
-            status="failed",
-            failure_code=failure_class,
-            error=error,
-        )
-        await self._runtime_lifecycle.record_delegation_run(
-            td,
-            task=task,
-            status="failed",
-            failure_code=failure_class,
-            error=error,
-        )
 
     def _campaign_reservation_is_exact(
         self,
@@ -2210,7 +2204,7 @@ class Orchestrator:
         metadata = task.metadata if isinstance(task.metadata, dict) else {}
         authority = metadata.get("mission_campaign_authority")
         marker = metadata.get("mission_control_owner_execution")
-        return bool(
+        base_exact = bool(
             bound
             and nested_principal == principal
             and task.status
@@ -2219,7 +2213,16 @@ class Orchestrator:
             == (None if task.status is TaskStatus.PENDING else principal)
             and isinstance(authority, dict)
             and authority.get("attempt_generation") == generation
-            and isinstance(marker, dict)
+        )
+        if not base_exact:
+            return False
+        if task.status is TaskStatus.PENDING:
+            # A cancellation inside reserve() may acquire exact pool custody but
+            # occur before the Board owner marker is installed.  PENDING plus the
+            # exact campaign authority is the only marker-free recovery shape.
+            return marker is None
+        return bool(
+            isinstance(marker, dict)
             and set(marker) == _CAMPAIGN_OWNER_EXECUTION_FIELDS
             and marker.get("schema_version")
             == "dharma.mission_control.owner_execution.v2"
@@ -2247,93 +2250,19 @@ class Orchestrator:
         token: dict[str, Any],
         *,
         allow_uninstalled_active: bool,
-    ) -> _CampaignRecoveryTicket | None:
-        """Synchronously revoke local authority before any recovery await."""
-        matching_keys = [
-            key
-            for key, registered in self._campaign_reservations.items()
-            if registered is token
-        ]
-        key = matching_keys[0] if len(matching_keys) == 1 else None
-        key_shape_exact = bool(
-            isinstance(key, tuple)
-            and len(key) == 3
-            and isinstance(key[0], str)
-            and isinstance(key[1], str)
-            and type(key[2]) is int
-        )
-        task_id = key[0] if key_shape_exact else ""
-        registered_principal = key[1] if key_shape_exact else ""
-        generation = key[2] if key_shape_exact else -1
-        active = self._active_dispatches.get(task_id) if task_id else None
-        active_installed = bool(
-            td.metadata.get(_CAMPAIGN_ACTIVE_OWNER_INSTALLED_KEY)
-        )
-        for active_task_id, owner in tuple(self._active_dispatches.items()):
-            if owner is td:
-                self._active_dispatches.pop(active_task_id, None)
-        for matching_key in matching_keys:
-            if self._campaign_reservations.get(matching_key) is token:
-                self._campaign_reservations.pop(matching_key, None)
-        owns_reservation = getattr(self._pool, "owns_reservation", None)
-        try:
-            pool_exact = bool(
-                key_shape_exact
-                and callable(owns_reservation)
-                and owns_reservation(
-                    registered_principal,
-                    task_id,
-                    reservation_token=token,
-                )
-            )
-        except Exception:
-            pool_exact = False
-        active_exact = active is td or (
-            allow_uninstalled_active and not active_installed and active is None
-        )
-        token_exact = bool(
-            token.get("attempt_generation") == generation
-            and token.get("provider_task_scheduled") is False
-        )
-        td_exact = bool(
-            key_shape_exact
-            and td.task_id == task_id
-            and td.agent_id == registered_principal == principal
-            and td.metadata.get("attempt_generation") == generation
-        )
-        if not (td_exact and active_exact and pool_exact and token_exact):
-            return None
-        return _CampaignRecoveryTicket(task_id, principal, generation)
+    ) -> _dispatch_guard.CampaignRecoveryTicket | None:
+        return _dispatch_guard.prepare_campaign_before_effect_recovery(
+            self, td, principal, token,
+            allow_uninstalled_active=allow_uninstalled_active,
+            active_owner_key=_CAMPAIGN_ACTIVE_OWNER_INSTALLED_KEY)
 
     async def _finish_campaign_before_effect_recovery(
         self,
         token: dict[str, Any],
-        ticket: _CampaignRecoveryTicket,
+        ticket: _dispatch_guard.CampaignRecoveryTicket,
     ) -> bool:
-        release = getattr(self._pool, "release_reservation", None)
-        if not callable(release) or not await release(
-            ticket.principal,
-            ticket.task_id,
-            reservation_token=token,
-        ):
-            return False
-        task = await self._safe_get_task(ticket.task_id)
-        if not self._campaign_recovery_task_is_exact(
-            task,
-            ticket.task_id,
-            ticket.principal,
-            ticket.generation,
-        ):
-            return False
-        outcome = await self._board.resolve_campaign_pre_effect_failure(
-            ticket.task_id,
-            expected_status=task.status,
-            expected_agent_id=task.assigned_to,
-            expected_metadata=dict(task.metadata),
-            authenticated_principal=ticket.principal,
-            provider_task_scheduled=False,
-        )
-        return outcome in {"pending", "indeterminate"}
+        return await _dispatch_guard.finish_campaign_before_effect_recovery(
+            self, token, ticket)
 
     async def _assign_campaign_dispatch_guarded(
         self,
@@ -2351,7 +2280,7 @@ class Orchestrator:
                 reservation_token=reservation_token,
                 campaign_effect_fence=campaign_effect_fence,
             )
-        except BaseException as original:
+        except BaseException:
             if reservation_token is not None:
                 ticket = self._prepare_campaign_before_effect_recovery(
                     td,
@@ -2360,15 +2289,13 @@ class Orchestrator:
                     allow_uninstalled_active=True,
                 )
                 if ticket is not None:
-                    cleanup = self._finish_campaign_before_effect_recovery(
-                        reservation_token,
-                        ticket,
-                    )
                     try:
-                        if isinstance(original, asyncio.CancelledError):
-                            await asyncio.shield(cleanup)
-                        else:
-                            await cleanup
+                        await _dispatch_guard.shield_recovery(
+                            self,
+                            f"campaign\0{td.task_id}\0{id(reservation_token)}",
+                            lambda: self._finish_campaign_before_effect_recovery(
+                                reservation_token, ticket),
+                        )
                     except BaseException:
                         logger.exception(
                             "Campaign pre-effect cleanup failed for %s",
@@ -2379,10 +2306,22 @@ class Orchestrator:
     async def _assign_dispatch(
         self, td: TaskDispatch, *, authenticated_principal_id: str = "",
         reservation_token: dict[str, Any] | None = None,
-        campaign_effect_fence: Callable[[], Awaitable[None]] | None = None,
-    ) -> bool:
+        campaign_effect_fence: Callable[[], Awaitable[None]] | None = None) -> bool:
+        return await _dispatch_guard.assign_dispatch(
+            self, td, authenticated_principal_id=authenticated_principal_id,
+            reservation_token=reservation_token,
+            campaign_effect_fence=campaign_effect_fence, logger=logger)
+    async def _assign_dispatch_inner(
+        self, td: TaskDispatch, *, authenticated_principal_id: str = "",
+        reservation_token: dict[str, Any] | None = None,
+        campaign_effect_fence: Callable[[], Awaitable[None]] | None = None) -> bool:
         """Record dispatch, update board + pool, kick off execution, notify via bus."""
         import time as _adt; _ad0 = _adt.monotonic()  # noqa: E702
+        existing = self._running_tasks.get(td.task_id)
+        if td.task_id in self._active_dispatches or (
+            existing is not None and not existing.done()
+        ):
+            raise RuntimeError("task already has an exact tracked dispatch owner")
         if authenticated_principal_id:
             td.metadata[_CAMPAIGN_DISPATCH_PRINCIPAL_KEY] = authenticated_principal_id
         td.metadata["dispatch_started_monotonic"] = time.monotonic()
@@ -2482,7 +2421,13 @@ class Orchestrator:
         if gate.attempts:
             td.metadata["witness_reroutes"] = gate.attempts
         claim_meta = self._prepare_claim(task_for_gate, td)
-        self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)
+        identity_task = (
+            task_for_gate.model_copy(deep=True) if task_for_gate is not None else None
+        )
+        _orchestrator_execution.prepare_retry_execution_identity(identity_task, td)
+        execution_identity = self._runtime_lifecycle.ensure_execution_identity(
+            td, task=identity_task
+        )
         # Add timeout to context bundle compilation to prevent tick timeout
         try:
             claim_meta = await asyncio.wait_for(
@@ -2497,8 +2442,7 @@ class Orchestrator:
             claim_meta["context_bundle_status"] = "timeout"
             td.metadata["context_bundle_status"] = "timeout"
         claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
-        if task_for_gate is not None:
-            task_for_gate.metadata = dict(claim_meta)
+        claim_meta.update(identity_metadata(execution_identity, surface="orchestrator"))
         if proposal_id is not None:
             try:
                 if self._telic_seam is not None:
@@ -2511,32 +2455,59 @@ class Orchestrator:
         _pe_t0 = _adt.monotonic()
         campaign_runner = None
         if authenticated_principal_id:
-            campaign_runner, task_for_gate = await _campaign_guard.reserve_and_assign_campaign(
+            if reservation_token is None:
+                raise RuntimeError("campaign dispatch lacks its reservation token")
+            provisional_ticket = _dispatch_guard.CampaignRecoveryTicket(
+                td.task_id,
+                authenticated_principal_id,
+                int(td.metadata["attempt_generation"]),
+            )
+            provisional_owner = [td, reservation_token, provisional_ticket, False]
+            self._campaign_recovery_owners[id(reservation_token)] = provisional_owner
+            reserved, campaign_runner = await _campaign_guard.reserve_campaign_execution(
                 self._pool,
-                self._board,
-                self._campaign_reservations,
                 task_for_gate,
                 td,
                 authenticated_principal_id,
                 reservation_token,
-                claim_meta,
             )
-            if campaign_runner is None:
+            if not reserved or campaign_runner is None:
+                if self._campaign_recovery_owners.get(id(reservation_token)) is provisional_owner:
+                    self._campaign_recovery_owners.pop(id(reservation_token), None)
                 return False
-        elif self._pool is not None:
-            await self._pool.assign(td.agent_id, td.task_id)
-        logger.info("_assign_dispatch(%s): pool_assign=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t0)
-        _pe_t1 = _adt.monotonic()
-        if not authenticated_principal_id:
-            await self._safe_update_task(
-                td.task_id,
-                status=TaskStatus.ASSIGNED,
+            # reserve() is an arbitrary awaitable and may suppress cancellation.
+            # Fence shutdown before installing authority in the Board.
+            _dispatch_guard.require_admission(self)
+            generation = int(td.metadata["attempt_generation"])
+            self._campaign_reservations[
+                (td.task_id, authenticated_principal_id, generation)
+            ] = reservation_token
+            task_for_gate = await _campaign_guard.transition_campaign_status(
+                self._board,
+                task_for_gate,
+                new_status=TaskStatus.ASSIGNED,
                 assigned_to=td.agent_id,
                 metadata=claim_meta,
             )
+        elif self._pool is not None:
+            if not await _orchestrator_execution.reserve_generic_dispatch(self, td):
+                return False
+        _dispatch_guard.require_admission(self)
+        logger.info("_assign_dispatch(%s): pool_assign=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t0)
+        _pe_t1 = _adt.monotonic()
+        if not authenticated_principal_id:
+            assigned = await _orchestrator_execution.commit_generic_transition(
+                self, td, TaskStatus.ASSIGNED, claim_meta, assign=True
+            )
+            if assigned is None:
+                return False
+            task_for_gate = assigned
         logger.info("_assign_dispatch(%s): update_task=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t1)
         self._active_dispatches[td.task_id] = td
         if authenticated_principal_id:
+            recovery_owner = self._campaign_recovery_owners.get(id(reservation_token))
+            if recovery_owner is provisional_owner:
+                self._campaign_recovery_owners.pop(id(reservation_token), None)
             td.metadata[_CAMPAIGN_ACTIVE_OWNER_INSTALLED_KEY] = True
         await self._runtime_lifecycle.record_task_claim(
             td,
@@ -2547,6 +2518,7 @@ class Orchestrator:
         await self._runtime_lifecycle.record_delegation_run(
             td, task=task_for_gate, status="claimed",
             require_identity=bool(authenticated_principal_id))
+        _dispatch_guard.require_admission(self)
         _pe_t2 = _adt.monotonic()
         if self._bus is not None:
             await self._bus.send(Message(
@@ -2555,6 +2527,7 @@ class Orchestrator:
                 subject=f"Task assigned: {td.task_id}",
                 body=f"You have been assigned task {td.task_id}.",
             ))
+        _dispatch_guard.require_admission(self)
         logger.info("_assign_dispatch(%s): bus_send=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t2)
         self._record_task_event(
             "dispatch_assigned",
@@ -2619,6 +2592,7 @@ class Orchestrator:
             td.task_id[:8], bool(runner), bool(task),
             pool_agents_sample,
         )
+        _dispatch_guard.require_admission(self)
         if runner and task:
             if authenticated_principal_id and (
                 reservation_token is None or campaign_effect_fence is None
@@ -2635,11 +2609,11 @@ class Orchestrator:
                 )
                 task = task_for_gate
             else:
-                await self._safe_update_task(
-                    td.task_id,
-                    status=TaskStatus.RUNNING,
-                    metadata=run_meta,
+                task = await _orchestrator_execution.commit_generic_transition(
+                    self, td, TaskStatus.RUNNING, run_meta
                 )
+                if task is None:
+                    return False
             await self._runtime_lifecycle.record_task_claim(
                 td,
                 task=task,
@@ -2660,6 +2634,7 @@ class Orchestrator:
                 agent_id=td.agent_id,
                 extra={"timeout_seconds": td.timeout_seconds},
             )
+            _dispatch_guard.require_admission(self)
             if authenticated_principal_id:
                 runner = await pool_get(td.agent_id) if pool_get else None
             if authenticated_principal_id and (
@@ -2738,9 +2713,7 @@ class Orchestrator:
             )
             if authenticated_principal_id:
                 raise RuntimeError(reason)
-            if self._pool is not None:
-                await self._pool.release(td.agent_id)
-            self._active_dispatches.pop(td.task_id, None)
+            await _orchestrator_execution.release_generic_dispatch(self, td)
             await self._handle_task_failure(
                 td=td,
                 task=task_for_gate,
@@ -2761,6 +2734,7 @@ class Orchestrator:
         *,
         campaign_effect_fence: Callable[[], Awaitable[None]] | None = None,
         campaign_effect_ready: Callable[[], None] | None = None,
+        campaign_fail_closed: bool = False,
     ) -> Any:
         """WS3: execute ``runner.run_task(task)`` through the spine's one blessed
         path (``invoke_agent``), emitting exactly one ``EvidenceReceipt`` per
@@ -2801,10 +2775,13 @@ class Orchestrator:
         side_effect_key = f"invoke_agent:{td.task_id}:{td.agent_id}"
         started = datetime.now(timezone.utc)
         captured: dict[str, Any] = {}
+        campaign_fence_store = None
 
         async def _orch_invoker(
             task: dict[str, Any], agent_id: str, context_id: str, routing: RoutingDecision
         ) -> EvidenceReceipt:
+            if campaign_fence_store is not None:
+                campaign_fence_store.require_acquired()
             status, err_source, err_detail = "ok", "none", None
             in_tokens = out_tokens = None
             try:
@@ -2822,6 +2799,13 @@ class Orchestrator:
                     ),
                     timeout=timeout_seconds,
                 )
+                semantic_error = _orchestrator_execution.honors_checkpoint_error(
+                    captured["_task_obj"]
+                )
+                if semantic_error:
+                    captured["exc"] = RuntimeError(semantic_error)
+                    status = "failed"
+                    err_source, err_detail = "guardrail_blocked", semantic_error
             except asyncio.TimeoutError as exc:
                 captured["exc"] = exc
                 status, err_source, err_detail = "timeout", "timeout", "run_task timed out"
@@ -2877,13 +2861,16 @@ class Orchestrator:
         # Exactly-once dispatch (dharmagraph Phase 0b): memo-check + idempotency
         # begin/complete around the provider call, on the existing runtime_state
         # machinery — a replayed dispatch returns the prior receipt, zero
-        # provider calls. Fail-open passthrough when store/identity is missing.
+        # provider calls. Generic work remains fail-open; authenticated campaign
+        # work wraps the store so every fail-open branch stops before provider I/O.
         _store = getattr(
             getattr(self, "_runtime_lifecycle", None), "_runtime_state_store", lambda: None
         )()
+        if campaign_fail_closed or campaign_effect_fence is not None:
+            campaign_fence_store = _orchestrator_execution.CampaignFenceStore(_store)
         invoker = wrap_invoker(
             _orch_invoker,
-            store=_store,
+            store=campaign_fence_store or _store,
             identity=ident,
             side_effect_key=side_effect_key,
             stale_after_seconds=max(60.0, timeout_seconds * 2),
@@ -2899,13 +2886,26 @@ class Orchestrator:
         # Observable for the verifier + downstream truth packets (no new store).
         self._last_evidence_receipt = receipt
         td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
+        td.metadata["evidence_receipt_status"] = str(receipt.status)
+        td.metadata["evidence_receipt_error_source"] = str(
+            receipt.error_source or ""
+        )
+        td.metadata["evidence_receipt_error_detail"] = str(
+            receipt.error_detail or ""
+        )
         # Persist to delegation_runs.receipt_json — the operator-witnessable
         # record (GATE 1 watches this column). Fail-open semantics, same-store
         # discipline, and the SHORT lock budget were extracted verbatim to
         # graph.durable_invoker.persist_evidence_receipt (module line budget).
-        await persist_evidence_receipt(receipt, _store, task_id=td.task_id)
+        receipt_persisted = await persist_evidence_receipt(
+            receipt, _store, task_id=td.task_id
+        )
         if "exc" in captured:
             raise captured["exc"]
+        if campaign_fence_store is not None:
+            _orchestrator_execution.require_campaign_dispatch_durable(
+                receipt, invoker, receipt_persisted=receipt_persisted
+            )
         if invoker.memo_hit:
             return invoker.memo_result
         return captured["result"]
@@ -3160,9 +3160,11 @@ class Orchestrator:
             self._running_tasks.pop(task_id, None)
             owner = self._running_dispatch_owners.get(task_id)
             if owner is not None and owner[0] is atask:
-                self._running_dispatch_owners.pop(task_id, None)
-                if self._active_dispatches.get(task_id) is owner[1]:
-                    self._active_dispatches.pop(task_id, None)
+                active_is_owner = self._active_dispatches.get(task_id) is owner[1]
+                if self._pool is None or not active_is_owner:
+                    self._running_dispatch_owners.pop(task_id, None)
+                    if self._pool is None and active_is_owner:
+                        self._active_dispatches.pop(task_id, None)
 
         # Recover stale dispatch claims that never started execution.
         now_mono = time.monotonic()
@@ -3196,9 +3198,7 @@ class Orchestrator:
                 f"Dispatch claim expired before execution after "
                 f"{td.metadata.get('claim_timeout_seconds', 'unknown')}s"
             )
-            if self._pool is not None:
-                await self._pool.release(td.agent_id)
-            self._active_dispatches.pop(task_id, None)
+            await _orchestrator_execution.release_generic_dispatch(self, td)
             await self._handle_task_failure(
                 td=td,
                 task=task,

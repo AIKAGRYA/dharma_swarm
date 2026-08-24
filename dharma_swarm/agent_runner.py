@@ -27,8 +27,7 @@ from dharma_swarm.models import (
     LLMRequest,
     LLMResponse,
     ProviderType,
-    Task,
-    TaskPriority,
+    Task, TaskDispatch, TaskPriority,
 )
 from dharma_swarm.agent_memory import AgentMemoryBank
 from dharma_swarm.agent_memory_manager import AgentMemoryManager, Scope as MemoryScope
@@ -3997,9 +3996,12 @@ class AgentPool:
                 return False
             if owned is None and reservation_token is not None:
                 return False
-            if runner._state.status is not AgentStatus.BUSY:
-                return False
-            if runner._state.current_task != task_id:
+            state = runner._state
+            running_owner = (state.status, state.current_task) == (AgentStatus.BUSY, task_id)
+            generic_handoff = isinstance(reservation_token, TaskDispatch) and (
+                state.status in {AgentStatus.BUSY, AgentStatus.IDLE, AgentStatus.INACTIVE}
+                and state.current_task is None)
+            if not (running_owner or generic_handoff):
                 return False
             self._reservation_tokens.pop(agent_id, None)
             self._reservation_runners.pop(agent_id, None)

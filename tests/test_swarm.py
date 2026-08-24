@@ -1,15 +1,29 @@
 """Tests for dharma_swarm.swarm — integration tests."""
 
 import asyncio
+import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 from dharma_swarm.agent_constitution import AgentSpec, ConstitutionalLayer, DynamicRoster
 from dharma_swarm.engine.conversation_memory import ConversationMemoryStore
 from dharma_swarm.message_bus import MessageBus
-from dharma_swarm.models import AgentRole, AgentState, AgentStatus, Message, TaskPriority, TaskStatus, ProviderType
+from dharma_swarm.models import (
+    AgentRole,
+    AgentState,
+    AgentStatus,
+    Message,
+    ProviderType,
+    TaskDispatch,
+    TaskPriority,
+    TaskStatus,
+)
+from dharma_swarm.orchestrator import Orchestrator
 from dharma_swarm.swarm import SwarmCoordinationState, SwarmManager
 from dharma_swarm.telemetry_plane import (
     AgentIdentityRecord,
@@ -35,6 +49,12 @@ def _expected_seed_task_count() -> int:
 
 _AUTO_AGENTS = _expected_agent_count()
 _AUTO_TASKS = _expected_seed_task_count()
+
+
+def _publish_optional_test_doubles(swarm: SwarmManager) -> None:
+    """Model a successful aggregate optional-init attempt in focused tests."""
+    for name in swarm._OPTIONAL_SUBSYSTEMS:
+        setattr(swarm, f"_{name}", object())
 
 
 @pytest.fixture(autouse=True)
@@ -72,11 +92,1125 @@ async def swarm(tmp_path):
     await s.shutdown()
 
 
+async def _init_graph_red_fast_swarm(tmp_path, monkeypatch) -> SwarmManager:
+    import dharma_swarm.ecosystem_bridge as ecosystem_bridge
+    import dharma_swarm.gnani_lodestone as gnani_lodestone
+    import dharma_swarm.startup_crew as startup_crew
+    import dharma_swarm.telos_substrate as telos_substrate
+
+    state_dir = tmp_path / ".dharma"
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setattr(ecosystem_bridge, "update_manifest", lambda: {})
+
+    async def failed_census(self, *, stale_only=False):
+        raise RuntimeError("authority census unavailable")
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("startup generation must remain Graph-held")
+
+    monkeypatch.setattr(SwarmManager, "reconcile_graph_runs", failed_census)
+    monkeypatch.setattr(startup_crew, "spawn_cybernetics_crew", forbidden)
+    monkeypatch.setattr(startup_crew, "create_seed_tasks", forbidden)
+    monkeypatch.setattr(startup_crew, "spawn_default_crew", forbidden)
+    monkeypatch.setattr(telos_substrate.TelosSubstrate, "seed_all", forbidden)
+    monkeypatch.setattr(gnani_lodestone.GnaniLodestone, "seed_all", forbidden)
+
+    manager = SwarmManager(state_dir=state_dir)
+    await manager.init()
+    return manager
+
+
 @pytest.mark.asyncio
 async def test_init(swarm):
     state = await swarm.status()
     assert state.tasks_pending == _AUTO_TASKS
     assert len(state.agents) >= _AUTO_AGENTS
+
+
+def test_init_graph_census_gates_stale_reaper_source_order():
+    import inspect
+
+    src = inspect.getsource(SwarmManager.init)
+    reconcile = src.index("boot_report = await self.reconcile_graph_runs()")
+    readiness = src.index(
+        "if self._get_graph_reconciler().boot_census_succeeded"
+    )
+    stale_reaper = src.index("reaped = await self._reap_stale_running_tasks()")
+    startup_components = src.index("startup_components = {")
+    startup_backfill = src.index(
+        "startup_report = await self._backfill_graph_held_startup()"
+    )
+    deferred_startup = src.index("self._complete_deferred_startup()")
+
+    assert reconcile < readiness < stale_reaper
+    assert "graph_reconciler.invalidate_boot_census()" in src[
+        reconcile:readiness
+    ]
+    assert stale_reaper < startup_components < startup_backfill
+    assert src.rfind(
+        "if graph_reconciler.boot_census_succeeded:",
+        startup_components,
+        startup_backfill,
+    ) > startup_components
+    assert "seed_all(" not in src
+    assert "graph_reconciler.boot_census_succeeded" in src[
+        startup_backfill:deferred_startup
+    ]
+
+    backfill_src = inspect.getsource(SwarmManager._backfill_graph_held_startup)
+    graph_guard = backfill_src.index(
+        "if not graph_reconciler.boot_census_succeeded"
+    )
+    telos = backfill_src.index('("telos_substrate"')
+    gnani = backfill_src.index('("gnani_lodestone"')
+    assert graph_guard < telos < gnani
+
+
+@pytest.mark.asyncio
+async def test_init_failed_census_holds_crews_and_seed_generation(
+    tmp_path,
+    monkeypatch,
+):
+    swarm = await _init_graph_red_fast_swarm(tmp_path, monkeypatch)
+    try:
+        assert swarm._get_graph_reconciler().boot_census_succeeded is False
+        assert swarm._startup_background_task is None
+        assert swarm._startup_backfill_pending_components == {
+            "telos_substrate",
+            "gnani_lodestone",
+            "cybernetics_crew",
+            "seed_tasks",
+            "default_crew",
+            "optional_subsystems",
+        }
+        assert await swarm.list_agents() == []
+        assert (await swarm._task_board.stats()).get("pending", 0) == 0
+    finally:
+        await swarm.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_red_boot_green_concurrent_ticks_backfill_startup_exactly_once(
+    tmp_path,
+    monkeypatch,
+):
+    import dharma_swarm.gnani_lodestone as gnani_lodestone
+    import dharma_swarm.startup_crew as startup_crew
+    import dharma_swarm.telos_substrate as telos_substrate
+
+    swarm = await _init_graph_red_fast_swarm(tmp_path, monkeypatch)
+    graph_reconciler = swarm._get_graph_reconciler()
+    calls = {
+        "telos_substrate": 0,
+        "gnani_lodestone": 0,
+        "cybernetics_crew": 0,
+        "seed_tasks": 0,
+        "default_crew": 0,
+        "optional_subsystems": 0,
+    }
+
+    async def seed_telos(self):
+        calls["telos_substrate"] += 1
+        return {"seeded": True}
+
+    async def seed_gnani(self):
+        calls["gnani_lodestone"] += 1
+        return {"seeded": True}
+
+    def startup_effect(name):
+        async def run(_swarm):
+            calls[name] += 1
+            return []
+
+        return run
+
+    async def init_optional():
+        calls["optional_subsystems"] += 1
+        _publish_optional_test_doubles(swarm)
+
+    class EmptyReport:
+        total_reconciled = 0
+
+    async def green_reconcile(*, stale_only=False):
+        graph_reconciler._boot_census_succeeded = True
+        if not stale_only:
+            graph_reconciler._boot_recovery_completed = True
+        return EmptyReport()
+
+    async def no_tasks(*args, **kwargs):
+        return []
+
+    async def no_activity():
+        return {"dispatched": 0, "settled": 0}
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    monkeypatch.setattr(telos_substrate.TelosSubstrate, "seed_all", seed_telos)
+    monkeypatch.setattr(gnani_lodestone.GnaniLodestone, "seed_all", seed_gnani)
+    monkeypatch.setattr(
+        startup_crew,
+        "spawn_cybernetics_crew",
+        startup_effect("cybernetics_crew"),
+    )
+    monkeypatch.setattr(
+        startup_crew, "create_seed_tasks", startup_effect("seed_tasks")
+    )
+    monkeypatch.setattr(
+        startup_crew, "spawn_default_crew", startup_effect("default_crew")
+    )
+    monkeypatch.setattr(swarm, "_init_optional_subsystems", init_optional)
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", green_reconcile)
+    monkeypatch.setattr(graph_reconciler, "heartbeat_live_claims", lambda: 0)
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", no_tasks)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", no_tasks)
+    monkeypatch.setattr(swarm._orchestrator, "tick", no_activity)
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    monkeypatch.setattr(swarm, "_contribution_allowed", lambda: False)
+    swarm._last_auto_rescue_scan = datetime.now(timezone.utc)
+    swarm._auto_rescue_scan_interval_seconds = 10**9
+    swarm._organism = None
+    swarm._director = None
+    swarm._auto_proposer = None
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+
+    try:
+        first_results = await asyncio.gather(swarm.tick(), swarm.tick())
+        repeated_result = await swarm.tick()
+        if swarm._optional_startup_retry_task is not None:
+            await swarm._optional_startup_retry_task
+
+        assert all(
+            result["startup_backfill_ready"] is True
+            for result in first_results
+        )
+        assert repeated_result["startup_backfill_ready"] is True
+        assert swarm._startup_backfill_pending_components == set()
+        assert calls == {
+            "telos_substrate": 1,
+            "gnani_lodestone": 1,
+            "cybernetics_crew": 1,
+            "seed_tasks": 1,
+            "default_crew": 1,
+            "optional_subsystems": 1,
+        }
+    finally:
+        await swarm.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_fast_boot_critical_backfill_serializes_with_immediate_tick(
+    swarm,
+    monkeypatch,
+):
+    graph_reconciler = swarm._get_graph_reconciler()
+    backfill_entered = asyncio.Event()
+    release_backfill = asyncio.Event()
+    calls = {"backfill": 0, "census": 0, "dispatch": 0}
+
+    async def blocking_backfill():
+        calls["backfill"] += 1
+        backfill_entered.set()
+        await release_backfill.wait()
+        swarm._startup_backfill_pending_components.discard("default_crew")
+        return {
+            "attempted": ["default_crew"],
+            "completed": ["default_crew"],
+            "created": {"default_crew": 1},
+            "pending": [],
+        }
+
+    class EmptyReport:
+        total_reconciled = 0
+
+    async def green_census(*, stale_only=False):
+        assert stale_only is True
+        calls["census"] += 1
+        graph_reconciler._boot_census_succeeded = True
+        return EmptyReport()
+
+    async def no_tasks(*args, **kwargs):
+        return []
+
+    async def dispatch():
+        calls["dispatch"] += 1
+        return {"dispatched": 1, "settled": 0}
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    monkeypatch.setattr(
+        swarm, "_backfill_graph_held_startup", blocking_backfill
+    )
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", green_census)
+    monkeypatch.setattr(
+        graph_reconciler, "heartbeat_live_claims", lambda: 0
+    )
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", no_tasks)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", no_tasks)
+    monkeypatch.setattr(swarm._orchestrator, "tick", dispatch)
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    monkeypatch.setattr(swarm, "_contribution_allowed", lambda: False)
+    swarm._startup_backfill_pending_components.add("default_crew")
+    swarm._last_auto_rescue_scan = datetime.now(timezone.utc)
+    swarm._auto_rescue_scan_interval_seconds = 10**9
+    swarm._organism = None
+    swarm._director = None
+    swarm._auto_proposer = None
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+    swarm._telos_substrate_seeded = True
+
+    startup_task: asyncio.Task[None] | None = None
+    tick_task: asyncio.Task[dict] | None = None
+    try:
+        startup_task = asyncio.create_task(
+            swarm._complete_deferred_startup()
+        )
+        await asyncio.wait_for(backfill_entered.wait(), timeout=1.0)
+        assert swarm._effect_tick_lock.locked() is True
+
+        tick_task = asyncio.create_task(swarm.tick())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert calls == {"backfill": 1, "census": 1, "dispatch": 0}
+        assert tick_task.done() is False
+
+        release_backfill.set()
+        await asyncio.wait_for(startup_task, timeout=1.0)
+        result = await asyncio.wait_for(tick_task, timeout=1.0)
+
+        assert calls == {"backfill": 1, "census": 2, "dispatch": 1}
+        assert result["graph_boot_census_succeeded"] is True
+        assert result["startup_backfill_ready"] is True
+        assert result["dispatched"] == 1
+    finally:
+        release_backfill.set()
+        pending = [
+            task
+            for task in (startup_task, tick_task)
+            if task is not None and not task.done()
+        ]
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_startup_backfill_failure_preserves_precise_retry_state(
+    tmp_path,
+    monkeypatch,
+):
+    import dharma_swarm.gnani_lodestone as gnani_lodestone
+    import dharma_swarm.startup_crew as startup_crew
+    import dharma_swarm.telos_substrate as telos_substrate
+
+    swarm = await _init_graph_red_fast_swarm(tmp_path, monkeypatch)
+    graph_reconciler = swarm._get_graph_reconciler()
+    held = await swarm._backfill_graph_held_startup()
+    assert held["hold"] == "graph_census_not_succeeded"
+
+    graph_reconciler._boot_census_succeeded = True
+    calls = {
+        "telos_substrate": 0,
+        "gnani_lodestone": 0,
+        "cybernetics_crew": 0,
+        "seed_tasks": 0,
+        "default_crew": 0,
+        "optional_subsystems": 0,
+    }
+
+    async def seed_telos(self):
+        calls["telos_substrate"] += 1
+        return {}
+
+    async def seed_gnani(self):
+        calls["gnani_lodestone"] += 1
+        return {}
+
+    async def cyber(_swarm):
+        calls["cybernetics_crew"] += 1
+        return []
+
+    async def seeds(_swarm):
+        calls["seed_tasks"] += 1
+        if calls["seed_tasks"] == 1:
+            raise RuntimeError("seed store unavailable")
+        return []
+
+    async def default(_swarm):
+        calls["default_crew"] += 1
+        return []
+
+    async def optional():
+        calls["optional_subsystems"] += 1
+        _publish_optional_test_doubles(swarm)
+
+    async def fresh_green_census(*, stale_only=False):
+        graph_reconciler._boot_census_succeeded = True
+        return SimpleNamespace(total_reconciled=0)
+
+    monkeypatch.setattr(telos_substrate.TelosSubstrate, "seed_all", seed_telos)
+    monkeypatch.setattr(gnani_lodestone.GnaniLodestone, "seed_all", seed_gnani)
+    monkeypatch.setattr(startup_crew, "spawn_cybernetics_crew", cyber)
+    monkeypatch.setattr(startup_crew, "create_seed_tasks", seeds)
+    monkeypatch.setattr(startup_crew, "spawn_default_crew", default)
+    monkeypatch.setattr(swarm, "_init_optional_subsystems", optional)
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", fresh_green_census)
+
+    try:
+        failed = await swarm._backfill_graph_held_startup()
+
+        assert failed["completed"] == [
+            "telos_substrate",
+            "gnani_lodestone",
+            "cybernetics_crew",
+        ]
+        assert failed["error"] == (
+            "seed_tasks: RuntimeError: seed store unavailable"
+        )
+        assert failed["pending"] == ["default_crew", "seed_tasks"]
+        assert swarm._startup_backfill_last_error == failed["error"]
+
+        recovered = await swarm._backfill_graph_held_startup()
+        repeated = await swarm._backfill_graph_held_startup()
+        optional_scheduled = swarm._schedule_optional_startup_retry(
+            graph_ready=True
+        )
+        assert swarm._optional_startup_retry_task is not None
+        await swarm._optional_startup_retry_task
+
+        assert recovered["pending"] == []
+        assert repeated["attempted"] == []
+        assert optional_scheduled is True
+        assert swarm._startup_backfill_pending_components == set()
+        assert swarm._startup_backfill_last_error is None
+        assert calls == {
+            "telos_substrate": 1,
+            "gnani_lodestone": 1,
+            "cybernetics_crew": 1,
+            "seed_tasks": 2,
+            "default_crew": 1,
+            "optional_subsystems": 1,
+        }
+    finally:
+        await swarm.shutdown()
+
+
+def test_tick_graph_readiness_fences_recovery_generation_and_dispatch_source():
+    import inspect
+
+    wrapper_src = inspect.getsource(SwarmManager.tick)
+    src = inspect.getsource(SwarmManager._tick_effects)
+    boot_retry = src.index(
+        "stale_only=graph_reconciler.boot_recovery_completed"
+    )
+    heartbeat = src.index("graph_reconciler.heartbeat_live_claims()")
+    startup_backfill = src.index("await self._backfill_graph_held_startup()")
+    rescue = src.index("self.rescue_recent_failures()")
+    orphan = src.index("self.reap_orphaned_tasks()")
+    generation = src.index("if allow_autonomous_generation and not _has_real_tasks")
+    dispatch = src.index("if not gnani_holds and graph_ready")
+    settle_only = src.index("self._orchestrator.tick_settle_only()")
+    coordination = src.index("self.spawn_coordination_tasks(")
+
+    assert "async with self._effect_tick_lock" in wrapper_src
+    assert "return await self._tick_effects()" in wrapper_src
+    assert boot_retry < heartbeat < startup_backfill < rescue < orphan
+    assert orphan < generation < dispatch < settle_only
+    assert "if graph_ready and" in src[heartbeat:rescue]
+    assert "graph_ready" in src[src.rfind("if (", rescue, orphan):orphan]
+    assert "allow_autonomous_generation = False" in src[heartbeat:generation]
+    assert src.count("graph_reconciler.invalidate_boot_census()") >= 4
+    assert (
+        "if graph_ready and startup_ready and not self._telos_substrate_seeded"
+        in src
+    )
+    samvara_create = src.index("await self._task_board.create(")
+    assert "allow_autonomous_generation" in src[
+        src.rfind("if (", heartbeat, samvara_create):samvara_create
+    ]
+    assert "if not allow_autonomous_generation or _has_real_tasks" in src[
+        settle_only:coordination
+    ]
+    assert (
+        "if (allow_autonomous_generation and self._director is not None" in src
+    )
+    assert (
+        "if (allow_autonomous_generation and self._auto_proposer is not None"
+        in src
+    )
+
+
+def test_tick_never_repeats_completed_destructive_boot_sweep_source():
+    import inspect
+
+    src = inspect.getsource(SwarmManager._tick_effects)
+    retry_call = src.index("self.reconcile_graph_runs(")
+    retry_end = src.index("timeout=10.0", retry_call)
+
+    assert "stale_only=graph_reconciler.boot_recovery_completed" in src[
+        retry_call:retry_end
+    ]
+
+
+@pytest.mark.asyncio
+async def test_tick_reconcile_error_holds_recovery_generation_and_dispatch(
+    swarm,
+    monkeypatch,
+):
+    calls = {"settle_only": 0}
+    graph_reconciler = swarm._get_graph_reconciler()
+    assert graph_reconciler.boot_census_succeeded is True
+
+    async def failed_reconcile(*, stale_only=False):
+        assert stale_only is True
+        raise RuntimeError("census unavailable")
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("Graph-held path must not run")
+
+    def forbidden_heartbeat(*args, **kwargs):
+        raise AssertionError("Graph-held path must not heartbeat claims")
+
+    async def settle_only():
+        calls["settle_only"] += 1
+        return {"dispatched": 0, "settled": 0}
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    class ForbiddenAutoProposer:
+        async def cycle(self):
+            raise AssertionError("Graph-held path must not generate proposals")
+
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", failed_reconcile)
+    monkeypatch.setattr(
+        graph_reconciler, "heartbeat_live_claims", forbidden_heartbeat
+    )
+    monkeypatch.setattr(swarm, "rescue_recent_failures", forbidden)
+    monkeypatch.setattr(swarm, "reap_orphaned_tasks", forbidden)
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", forbidden)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", forbidden)
+    monkeypatch.setattr(swarm, "_director_pulse", forbidden)
+    monkeypatch.setattr(swarm._orchestrator, "tick", forbidden)
+    monkeypatch.setattr(swarm._orchestrator, "tick_settle_only", settle_only)
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    swarm._organism = None
+    swarm._director = object()
+    swarm._director_interval_ticks = 1
+    swarm._auto_proposer = ForbiddenAutoProposer()
+    swarm._auto_proposer_interval_ticks = 1
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+    swarm._telos_substrate_seeded = True
+
+    result = await swarm.tick()
+
+    assert result["graph_boot_census_succeeded"] is False
+    assert result["graph_dispatch_hold"] == "boot_census_not_succeeded"
+    assert result["claims_heartbeaten"] == 0
+    assert result["auto_rescue_hold"] == "graph_census_not_succeeded"
+    assert calls == {"settle_only": 0}
+
+
+@pytest.mark.asyncio
+async def test_concurrent_ticks_wait_for_fresh_failed_census_before_effects(
+    swarm,
+    monkeypatch,
+):
+    graph_reconciler = swarm._get_graph_reconciler()
+    graph_reconciler._boot_census_succeeded = True
+    graph_reconciler._boot_recovery_completed = True
+    census_entered = asyncio.Event()
+    release_census = asyncio.Event()
+    calls = {"census": 0, "settle_only": 0}
+
+    async def blocking_failed_census(*, stale_only=False):
+        assert stale_only is True
+        calls["census"] += 1
+        if calls["census"] == 1:
+            census_entered.set()
+            await release_census.wait()
+        raise RuntimeError("hostile census failure")
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("effect must remain behind fresh Graph census")
+
+    def forbidden_heartbeat(*args, **kwargs):
+        raise AssertionError("claim heartbeat must remain Graph-held")
+
+    async def settle_only():
+        calls["settle_only"] += 1
+        return {"dispatched": 0, "settled": 0}
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    monkeypatch.setattr(
+        swarm, "reconcile_graph_runs", blocking_failed_census
+    )
+    monkeypatch.setattr(
+        graph_reconciler, "heartbeat_live_claims", forbidden_heartbeat
+    )
+    monkeypatch.setattr(swarm, "_backfill_graph_held_startup", forbidden)
+    monkeypatch.setattr(swarm, "rescue_recent_failures", forbidden)
+    monkeypatch.setattr(swarm, "reap_orphaned_tasks", forbidden)
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", forbidden)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", forbidden)
+    monkeypatch.setattr(swarm, "_director_pulse", forbidden)
+    monkeypatch.setattr(swarm._orchestrator, "tick", forbidden)
+    monkeypatch.setattr(swarm._orchestrator, "tick_settle_only", settle_only)
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    swarm._startup_backfill_pending_components.add("default_crew")
+    swarm._last_auto_rescue_scan = None
+    swarm._organism = None
+    swarm._director = object()
+    swarm._director_interval_ticks = 1
+    swarm._auto_proposer = object()
+    swarm._auto_proposer_interval_ticks = 1
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+    swarm._telos_substrate_seeded = True
+
+    first: asyncio.Task[dict] | None = None
+    second: asyncio.Task[dict] | None = None
+    try:
+        first = asyncio.create_task(swarm.tick())
+        await asyncio.wait_for(census_entered.wait(), timeout=1.0)
+
+        assert graph_reconciler.boot_census_succeeded is False
+        second = asyncio.create_task(swarm.tick())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert calls == {"census": 1, "settle_only": 0}
+        assert second.done() is False
+
+        release_census.set()
+        results = await asyncio.wait_for(
+            asyncio.gather(first, second), timeout=2.0
+        )
+
+        assert calls == {"census": 2, "settle_only": 0}
+        assert all(
+            result["graph_boot_census_succeeded"] is False
+            for result in results
+        )
+        assert all(result["claims_heartbeaten"] == 0 for result in results)
+        assert all(result["dispatched"] == 0 for result in results)
+        assert graph_reconciler.boot_census_succeeded is False
+    finally:
+        release_census.set()
+        pending = [
+            task for task in (first, second) if task is not None and not task.done()
+        ]
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_deferred_critical_backfill_requires_fresh_green_census(
+    swarm,
+    monkeypatch,
+):
+    graph_reconciler = swarm._get_graph_reconciler()
+    graph_reconciler._boot_census_succeeded = True
+    swarm._startup_backfill_pending_components.add("default_crew")
+
+    async def failed_census(*, stale_only=False):
+        assert stale_only is True
+        raise RuntimeError("fresh startup census unavailable")
+
+    async def forbidden_backfill():
+        raise AssertionError("stale boot-green must not authorize backfill")
+
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", failed_census)
+    monkeypatch.setattr(
+        swarm,
+        "_backfill_graph_held_startup",
+        forbidden_backfill,
+    )
+
+    await swarm._complete_deferred_startup()
+
+    assert graph_reconciler.boot_census_succeeded is False
+    assert swarm._startup_backfill_pending_components == {"default_crew"}
+    assert swarm._startup_backfill_last_error is not None
+    assert "fresh startup census unavailable" in swarm._startup_backfill_last_error
+
+
+@pytest.mark.asyncio
+async def test_shutdown_joins_in_progress_effect_tick_before_teardown(
+    tmp_path,
+    monkeypatch,
+):
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    tick_entered = asyncio.Event()
+    release_tick = asyncio.Event()
+    events: list[str] = []
+
+    async def held_effect_tick():
+        async with swarm._effect_tick_lock:
+            events.append("tick_entered")
+            tick_entered.set()
+            await release_tick.wait()
+            events.append("tick_finished")
+
+    async def teardown(_timeout):
+        events.append("teardown")
+
+    monkeypatch.setattr(swarm, "_shutdown_under_effect_lock", teardown)
+    tick_task = asyncio.create_task(held_effect_tick())
+    await asyncio.wait_for(tick_entered.wait(), timeout=1.0)
+    shutdown_task = asyncio.create_task(swarm.shutdown(drain_timeout=0.01))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert shutdown_task.done() is False
+    assert events == ["tick_entered"]
+
+    release_tick.set()
+    await asyncio.wait_for(asyncio.gather(tick_task, shutdown_task), timeout=1.0)
+
+    assert events == ["tick_entered", "tick_finished", "teardown"]
+    held = await swarm.tick()
+    assert held["paused"] is True
+    assert held["shutdown"] is True
+
+
+@pytest.mark.asyncio
+async def test_shutdown_retains_dependencies_while_orchestrator_has_live_custody(
+    tmp_path,
+    monkeypatch,
+):
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    orchestrator = Orchestrator()
+    started = asyncio.Event()
+    cancellation_seen = asyncio.Event()
+    release_work = asyncio.Event()
+
+    async def stubborn_work():
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancellation_seen.set()
+            await release_work.wait()
+
+    background = asyncio.create_task(stubborn_work())
+    await started.wait()
+    dispatch = TaskDispatch(task_id="shutdown-live", agent_id="live-agent")
+    orchestrator._running_tasks[dispatch.task_id] = background
+    orchestrator._running_dispatch_owners[dispatch.task_id] = (
+        background,
+        dispatch,
+    )
+    orchestrator._active_dispatches[dispatch.task_id] = dispatch
+
+    class Pool:
+        shutdown_calls = 0
+
+        async def shutdown_all(self):
+            self.shutdown_calls += 1
+
+    pool = Pool()
+    swarm._orchestrator = orchestrator
+    swarm._agent_pool = pool
+    monkeypatch.setattr(swarm, "_persist_session_digest", AsyncMock())
+
+    try:
+        with pytest.raises(RuntimeError, match="retains 1 live owner"):
+            await swarm.shutdown(drain_timeout=0.01)
+        await cancellation_seen.wait()
+
+        assert swarm._shutdown_complete is False
+        assert pool.shutdown_calls == 0
+        assert orchestrator._running_tasks[dispatch.task_id] is background
+        assert orchestrator._active_dispatches[dispatch.task_id] is dispatch
+
+        release_work.set()
+        await background
+        await swarm.shutdown(drain_timeout=0.1)
+        assert swarm._shutdown_complete is True
+        assert pool.shutdown_calls == 1
+    finally:
+        release_work.set()
+        if not background.done():
+            background.cancel()
+        await asyncio.gather(background, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_optional_director_is_not_published_before_success(
+    tmp_path,
+    monkeypatch,
+):
+    import dharma_swarm.thinkodynamic_director as director_module
+
+    class FailingDirector:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def init(self):
+            raise RuntimeError("director store unavailable")
+
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    monkeypatch.setattr(
+        director_module,
+        "ThinkodynamicDirector",
+        FailingDirector,
+    )
+
+    with pytest.raises(RuntimeError, match="director store unavailable"):
+        await swarm._init_optional_director()
+
+    assert swarm._director is None
+
+
+@pytest.mark.asyncio
+async def test_optional_engine_bundle_is_not_published_before_init_success(
+    tmp_path,
+    monkeypatch,
+):
+    import dharma_swarm.evolution as evolution_module
+    import dharma_swarm.traces as traces_module
+
+    engine_entered = asyncio.Event()
+    engine_never_finishes = asyncio.Event()
+
+    class ReadyTraceStore:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def init(self):
+            return None
+
+    class BlockingEngine:
+        def __init__(self, **_kwargs):
+            self.archive = object()
+            self.predictor = object()
+
+        async def init(self):
+            engine_entered.set()
+            await engine_never_finishes.wait()
+
+    monkeypatch.setattr(traces_module, "TraceStore", ReadyTraceStore)
+    monkeypatch.setattr(evolution_module, "DarwinEngine", BlockingEngine)
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    init_task = asyncio.create_task(swarm._init_optional_subsystems())
+    try:
+        await asyncio.wait_for(engine_entered.wait(), timeout=1.0)
+        assert swarm._trace_store is None
+        assert swarm._engine is None
+        assert swarm._meta_engine is None
+        assert swarm._monitor is None
+    finally:
+        init_task.cancel()
+        engine_never_finishes.set()
+        await asyncio.gather(init_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_partial_optional_retry_remains_observable_and_pending(
+    tmp_path,
+    monkeypatch,
+):
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    swarm._startup_backfill_pending_components.add("optional_subsystems")
+
+    class GreenGraph:
+        boot_census_succeeded = True
+        boot_recovery_completed = True
+
+        def invalidate_boot_census(self):
+            self.boot_census_succeeded = False
+
+    swarm._graph_reconciler = GreenGraph()
+
+    async def green_census(*, stale_only=False):
+        assert stale_only is True
+        swarm._graph_reconciler.boot_census_succeeded = True
+        return SimpleNamespace(total_reconciled=0)
+
+    async def partial_init():
+        swarm._director = object()
+
+    monkeypatch.setattr(swarm, "_init_optional_subsystems", partial_init)
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", green_census)
+
+    await swarm._retry_optional_startup_once()
+
+    assert swarm._startup_backfill_pending_components == {
+        "optional_subsystems"
+    }
+    assert swarm._optional_startup_last_error is not None
+    assert "SubsystemNotReady" in swarm._optional_startup_last_error
+    assert "gateway" in swarm._optional_startup_last_error
+
+
+@pytest.mark.asyncio
+async def test_optional_retry_and_red_tick_are_effect_serialized(
+    swarm,
+    monkeypatch,
+):
+    graph_reconciler = swarm._get_graph_reconciler()
+    optional_entered = asyncio.Event()
+    release_optional = asyncio.Event()
+    calls = {"census": 0}
+
+    async def changing_census(*, stale_only=False):
+        assert stale_only is True
+        calls["census"] += 1
+        if calls["census"] == 1:
+            graph_reconciler._boot_census_succeeded = True
+            return SimpleNamespace(total_reconciled=0)
+        raise RuntimeError("Graph turned red")
+
+    async def blocked_optional_init():
+        optional_entered.set()
+        await release_optional.wait()
+        _publish_optional_test_doubles(swarm)
+
+    async def no_tasks(*args, **kwargs):
+        return []
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", changing_census)
+    monkeypatch.setattr(swarm, "_init_optional_subsystems", blocked_optional_init)
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", no_tasks)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", no_tasks)
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    swarm._startup_backfill_pending_components.add("optional_subsystems")
+    swarm._last_auto_rescue_scan = datetime.now(timezone.utc)
+    swarm._auto_rescue_scan_interval_seconds = 10**9
+    swarm._organism = None
+    swarm._director = None
+    swarm._auto_proposer = None
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+    swarm._telos_substrate_seeded = True
+
+    optional_task = asyncio.create_task(swarm._retry_optional_startup_once())
+    await asyncio.wait_for(optional_entered.wait(), timeout=1.0)
+    tick_task = asyncio.create_task(swarm.tick())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert tick_task.done() is False
+    assert calls == {"census": 1}
+
+    release_optional.set()
+    await asyncio.wait_for(optional_task, timeout=1.0)
+    result = await asyncio.wait_for(tick_task, timeout=1.0)
+
+    assert calls == {"census": 2}
+    assert result["graph_boot_census_succeeded"] is False
+    assert result["graph_dispatch_hold"] == "boot_census_not_succeeded"
+    assert result["dispatched"] == 0
+
+
+@pytest.mark.asyncio
+async def test_shutdown_stops_optional_resource_published_during_cancellation(
+    tmp_path,
+    monkeypatch,
+):
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    swarm._startup_backfill_pending_components.add("optional_subsystems")
+    init_entered = asyncio.Event()
+    stopped = asyncio.Event()
+
+    class GreenGraph:
+        boot_census_succeeded = True
+        boot_recovery_completed = True
+
+        def invalidate_boot_census(self):
+            self.boot_census_succeeded = False
+
+    class LateDirector:
+        async def stop(self):
+            stopped.set()
+
+    graph = GreenGraph()
+    swarm._graph_reconciler = graph
+
+    async def green_census(*, stale_only=False):
+        assert stale_only is True
+        graph.boot_census_succeeded = True
+        return SimpleNamespace(total_reconciled=0)
+
+    async def cancellation_delaying_init():
+        init_entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            swarm._director = LateDirector()
+
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", green_census)
+    monkeypatch.setattr(
+        swarm,
+        "_init_optional_subsystems",
+        cancellation_delaying_init,
+    )
+    retry = asyncio.create_task(swarm._retry_optional_startup_once())
+    swarm._optional_startup_retry_task = retry
+    await asyncio.wait_for(init_entered.wait(), timeout=1.0)
+
+    await asyncio.wait_for(swarm.shutdown(drain_timeout=0.01), timeout=1.0)
+
+    assert retry.done() is True
+    assert stopped.is_set() is True
+    assert swarm._shutdown_complete is True
+
+
+@pytest.mark.asyncio
+async def test_optional_startup_timeout_does_not_block_core_dispatch(
+    swarm,
+    monkeypatch,
+):
+    graph_reconciler = swarm._get_graph_reconciler()
+    calls = {"census": 0, "dispatch": 0, "optional": 0}
+    optional_entered = asyncio.Event()
+    optional_never_finishes = asyncio.Event()
+
+    class EmptyReport:
+        total_reconciled = 0
+
+    async def green_census(*, stale_only=False):
+        assert stale_only is True
+        calls["census"] += 1
+        graph_reconciler._boot_census_succeeded = True
+        return EmptyReport()
+
+    async def blocked_optional_init():
+        calls["optional"] += 1
+        optional_entered.set()
+        await optional_never_finishes.wait()
+
+    async def no_tasks(*args, **kwargs):
+        return []
+
+    async def dispatch():
+        calls["dispatch"] += 1
+        return {"dispatched": 1, "settled": 0}
+
+    async def forbidden_settle_only():
+        raise AssertionError("optional startup must not hold core dispatch")
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", green_census)
+    monkeypatch.setattr(
+        graph_reconciler, "heartbeat_live_claims", lambda: 0
+    )
+    monkeypatch.setattr(
+        swarm, "_init_optional_subsystems", blocked_optional_init
+    )
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", no_tasks)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", no_tasks)
+    monkeypatch.setattr(swarm._orchestrator, "tick", dispatch)
+    monkeypatch.setattr(
+        swarm._orchestrator, "tick_settle_only", forbidden_settle_only
+    )
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    monkeypatch.setattr(swarm, "_contribution_allowed", lambda: False)
+    swarm._startup_backfill_pending_components.add("optional_subsystems")
+    swarm._optional_startup_retry_timeout_seconds = 0.05
+    swarm._optional_startup_retry_interval_seconds = 3600.0
+    swarm._last_auto_rescue_scan = datetime.now(timezone.utc)
+    swarm._auto_rescue_scan_interval_seconds = 10**9
+    swarm._organism = None
+    swarm._director = None
+    swarm._auto_proposer = None
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+    swarm._telos_substrate_seeded = True
+
+    first = await asyncio.wait_for(swarm.tick(), timeout=1.0)
+    await asyncio.wait_for(optional_entered.wait(), timeout=1.0)
+
+    assert first["startup_backfill_ready"] is True
+    assert "startup_dispatch_hold" not in first
+    assert first["optional_startup_pending"] is True
+    assert first["optional_startup_retry_scheduled"] is True
+    assert first["optional_startup_retry_running"] is True
+    assert first["dispatched"] == 1
+    assert swarm._optional_startup_retry_task is not None
+    await asyncio.wait_for(swarm._optional_startup_retry_task, timeout=1.0)
+
+    assert swarm._optional_startup_last_error == (
+        "optional_subsystems: TimeoutError: exceeded 0.05s"
+    )
+    assert swarm._startup_backfill_pending_components == {
+        "optional_subsystems"
+    }
+
+    second = await asyncio.wait_for(swarm.tick(), timeout=1.0)
+
+    assert second["startup_backfill_ready"] is True
+    assert second["optional_startup_pending"] is True
+    assert second["optional_startup_retry_scheduled"] is False
+    assert second["optional_startup_retry_running"] is False
+    assert second["optional_startup_error"] == (
+        "optional_subsystems: TimeoutError: exceeded 0.05s"
+    )
+    assert second["dispatched"] == 1
+    assert calls == {"census": 3, "dispatch": 2, "optional": 1}
+
+
+@pytest.mark.asyncio
+async def test_tick_retries_only_stale_census_after_boot_recovery_completed(
+    swarm,
+    monkeypatch,
+):
+    stale_only_calls: list[bool] = []
+    graph_reconciler = swarm._get_graph_reconciler()
+    assert graph_reconciler.boot_recovery_completed is True
+    graph_reconciler.invalidate_boot_census()
+
+    class EmptyReport:
+        total_reconciled = 0
+
+    async def record_reconcile(*, stale_only=False):
+        stale_only_calls.append(stale_only)
+        graph_reconciler._boot_census_succeeded = True
+        return EmptyReport()
+
+    async def no_tasks(*args, **kwargs):
+        return []
+
+    async def no_activity():
+        return {"dispatched": 0, "settled": 0}
+
+    async def coordination_status(*, refresh=True):
+        return SwarmCoordinationState()
+
+    monkeypatch.setattr(swarm, "reconcile_graph_runs", record_reconcile)
+    monkeypatch.setattr(graph_reconciler, "heartbeat_live_claims", lambda: 0)
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", no_tasks)
+    monkeypatch.setattr(swarm, "spawn_coordination_tasks", no_tasks)
+    monkeypatch.setattr(swarm._orchestrator, "tick", no_activity)
+    monkeypatch.setattr(swarm, "coordination_status", coordination_status)
+    swarm._last_auto_rescue_scan = datetime.now(timezone.utc)
+    swarm._auto_rescue_scan_interval_seconds = 10**9
+    swarm._organism = None
+    swarm._director = None
+    swarm._auto_proposer = None
+    swarm._witness = None
+    swarm._living_interval_ticks = 10**9
+    swarm._telos_substrate_seeded = True
+
+    result = await swarm.tick()
+
+    assert stale_only_calls == [True]
+    assert result["graph_boot_census_succeeded"] is True
 
 
 @pytest.mark.asyncio
@@ -152,11 +1286,13 @@ async def test_init_fast_boot_defers_default_crew_and_optional_subsystems(
     await swarm.init()
     try:
         assert swarm._startup_background_task is not None
-        assert not swarm._startup_background_task.done()
+        await swarm._startup_background_task
+        assert swarm._optional_startup_retry_task is not None
+        assert not swarm._optional_startup_retry_task.done()
     finally:
         gate.set()
-        if swarm._startup_background_task is not None:
-            await swarm._startup_background_task
+        if swarm._optional_startup_retry_task is not None:
+            await swarm._optional_startup_retry_task
         await swarm.shutdown()
 
 
@@ -641,6 +1777,71 @@ async def test_rescue_recent_failures_skips_duplicate_active_title(swarm):
     refreshed = await swarm.get_task(failed.id)
     assert refreshed is not None
     assert refreshed.status == TaskStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_rescue_recent_failures_preserves_campaign_authority(swarm):
+    campaign_metadata = {"mission_campaign_authority": {}}
+    task = await swarm.create_task(
+        "Campaign rescue must remain typed",
+        metadata=campaign_metadata,
+    )
+    # Fixture-only prior-process state. Production campaign transitions require
+    # the typed authority CAS and generic recovery must not emulate it.
+    async with swarm._task_board._open() as db:
+        await db.execute(
+            "UPDATE tasks SET status = ?, assigned_to = ?, result = ?, metadata = ?"
+            " WHERE id = ?",
+            (
+                TaskStatus.FAILED.value,
+                "campaign-agent",
+                "Connection error.",
+                json.dumps(campaign_metadata),
+                task.id,
+            ),
+        )
+        await db.commit()
+
+    rescued = await swarm.rescue_recent_failures(limit=4)
+
+    assert rescued == []
+    preserved = await swarm.get_task(task.id)
+    assert preserved is not None
+    assert preserved.status == TaskStatus.FAILED
+    assert preserved.metadata == campaign_metadata
+
+
+@pytest.mark.asyncio
+async def test_stale_reaper_preserves_campaign_authority(swarm):
+    campaign_metadata = {"mission_campaign_authority": {}}
+    task = await swarm.create_task(
+        "Campaign stale recovery must remain typed",
+        metadata=campaign_metadata,
+    )
+    stale = datetime.now(timezone.utc) - timedelta(hours=7)
+    async with swarm._task_board._open() as db:
+        await db.execute(
+            "UPDATE tasks SET status = ?, assigned_to = ?, updated_at = ?, metadata = ?"
+            " WHERE id = ?",
+            (
+                TaskStatus.RUNNING.value,
+                "prior-campaign-agent",
+                stale.isoformat(),
+                json.dumps(campaign_metadata),
+                task.id,
+            ),
+        )
+        await db.commit()
+
+    reaped = await swarm._reap_stale_running_tasks(max_age_hours=6.0)
+
+    assert reaped == 0
+    preserved = await swarm.get_task(task.id)
+    assert preserved is not None
+    assert preserved.status == TaskStatus.RUNNING
+    assert preserved.assigned_to == "prior-campaign-agent"
+    assert preserved.result is None
+    assert preserved.metadata == campaign_metadata
 
 
 @pytest.mark.asyncio

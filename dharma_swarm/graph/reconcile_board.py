@@ -1,81 +1,68 @@
-"""Task-board settlement for graph reconcile passes."""
+"""Public TaskBoard projection API for graph/runtime consumers.
+
+Implementation is split by transaction boundary: ``*_intent`` is runtime
+phase one, while ``*_replay`` owns Board CAS plus append-only acknowledgement.
+"""
 
 from __future__ import annotations
 
-import logging
-from datetime import datetime
-from typing import Any
+from dharma_swarm.task_board_projection_intent import (
+    GRAPH_PROJECTION_HISTORY_KEY as BOARD_PROJECTION_HISTORY_KEY,
+    GRAPH_PROJECTION_KEY as BOARD_PROJECTION_RECEIPT_KEY,
+    TASK_BOARD_PROJECTION_INTENT_KEY,
+    TASK_BOARD_PROJECTION_WITNESS_KEY,
+)
 
-from dharma_swarm.runtime_state import RuntimeStateStore
+from .reconcile_board_intent import (
+    BOARD_COMPLETION_BINDING_KEY,
+    BOARD_COMPLETION_BINDING_SCHEMA,
+    PROJECTION_WITNESS_SCHEMA,
+    build_task_board_completion_binding,
+    prepare_task_board_projection_snapshot,
+    recovery_task_board_projection_metadata,
+    terminal_task_board_projection_metadata,
+)
+from .reconcile_board_replay import (
+    PROJECTION_ACK_SCHEMA,
+    ensure_projection_ack_ledger,
+    settle_task_board,
+)
 
 
-async def settle_task_board(
-    *,
-    runtime_state: RuntimeStateStore,
-    task_board: Any | None,
-    report: Any,
-    now: datetime,
-    logger: logging.Logger,
-) -> None:
-    """Project reconciled delegation runs back into the optional task board."""
-    if task_board is None:
-        return
-    settled = (
-        [(run_id, "requeue") for run_id in report.requeued_runs]
-        + [(run_id, "receipt") for run_id in report.completed_from_receipt]
-        + [(run_id, "quarantine") for run_id in report.quarantined_runs]
-    )
-    for run_id, action in settled:
-        run = await runtime_state.get_delegation_run(run_id)
-        if run is None or not run.task_id:
-            continue
+def has_reserved_task_board_projection(raw: object) -> bool:
+    """Whether raw runtime metadata claims either projection namespace."""
+    import json
+
+    if isinstance(raw, dict):
+        metadata = raw
+    elif isinstance(raw, str):
         try:
-            await _settle_one(task_board, run.task_id, run_id, action, run.status, now)
-        except KeyError:
-            logger.warning(
-                "reconciler: task %s for run %s not on board", run.task_id, run_id
-            )
-        except Exception as exc:
-            logger.error(
-                "reconciler: task board settle (%s) failed for %s: %s",
-                action,
-                run.task_id,
-                exc,
-                exc_info=True,
-            )
-            report.errors.append(f"task:{run.task_id}:{type(exc).__name__}")
-
-
-async def _settle_one(
-    task_board: Any,
-    task_id: str,
-    run_id: str,
-    action: str,
-    run_status: str,
-    now: datetime,
-) -> None:
-    metadata = {"reconciled_at": now.isoformat()}
-    short_run_id = run_id[:12]
-    if action == "requeue":
-        await task_board.requeue(
-            task_id,
-            reason=f"Graph reconciler: orphaned run {short_run_id} requeued",
-            metadata=metadata,
-        )
-    elif action == "receipt" and run_status == "completed":
-        await task_board.complete(
-            task_id,
-            result=f"Graph reconciler: run {short_run_id} completed from receipt",
-            metadata=metadata,
-        )
+            loaded = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            loaded = {}
+        metadata = loaded if isinstance(loaded, dict) else {}
     else:
-        detail = (
-            "quarantined (retry-exhausted)"
-            if action == "quarantine"
-            else "failed per receipt"
-        )
-        await task_board.fail(
-            task_id,
-            error=f"Graph reconciler: run {short_run_id} {detail}",
-            metadata=metadata,
-        )
+        metadata = {}
+    return bool(
+        TASK_BOARD_PROJECTION_WITNESS_KEY in metadata
+        or TASK_BOARD_PROJECTION_INTENT_KEY in metadata
+    )
+
+
+__all__ = [
+    "BOARD_COMPLETION_BINDING_KEY",
+    "BOARD_COMPLETION_BINDING_SCHEMA",
+    "BOARD_PROJECTION_HISTORY_KEY",
+    "BOARD_PROJECTION_RECEIPT_KEY",
+    "PROJECTION_ACK_SCHEMA",
+    "PROJECTION_WITNESS_SCHEMA",
+    "TASK_BOARD_PROJECTION_INTENT_KEY",
+    "TASK_BOARD_PROJECTION_WITNESS_KEY",
+    "build_task_board_completion_binding",
+    "ensure_projection_ack_ledger",
+    "has_reserved_task_board_projection",
+    "prepare_task_board_projection_snapshot",
+    "recovery_task_board_projection_metadata",
+    "settle_task_board",
+    "terminal_task_board_projection_metadata",
+]

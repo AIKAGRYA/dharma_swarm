@@ -11,7 +11,15 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from dharma_swarm.base_provider import ProviderCapabilities
-from dharma_swarm.models import AgentConfig, AgentRole, AgentStatus, LLMResponse, ProviderType, Task
+from dharma_swarm.models import (
+    AgentConfig,
+    AgentRole,
+    AgentStatus,
+    LLMResponse,
+    ProviderType,
+    Task,
+    TaskDispatch,
+)
 from dharma_swarm.agent_runner import AgentPool, AgentRunner, _build_prompt
 from dharma_swarm.lineage import LineageGraph
 from dharma_swarm.message_bus import MessageBus
@@ -962,6 +970,105 @@ async def test_pool_release_reservation_is_exact_owner_cas() -> None:
     assert runner.state.status is AgentStatus.IDLE
     assert runner.state.current_task is None
     assert await pool.release_reservation(config.id, "task-owner") is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(90)
+async def test_pool_releases_exact_generic_token_after_runner_self_clears(
+    config,
+    fast_gate,
+    tmp_path: Path,
+) -> None:
+    pool = AgentPool()
+    isolated = _with_state_dir(config, tmp_path)
+    runner = await pool.spawn(isolated, ontology_path=_ontology_path(tmp_path))
+    task = Task(title="Complete one exact generic reservation")
+    token = TaskDispatch(task_id=task.id, agent_id=isolated.id)
+
+    assert await pool.reserve(
+        isolated.id,
+        task.id,
+        reservation_token=token,
+    ) is True
+    await runner.run_task(task)
+
+    assert runner.state.status in {AgentStatus.IDLE, AgentStatus.INACTIVE}
+    assert runner.state.current_task is None
+    assert await pool.get_idle_agents() == []
+    assert await pool.release_reservation(
+        isolated.id,
+        task.id,
+        reservation_token=token,
+    ) is True
+    assert isolated.id not in pool._reservation_tokens
+    assert runner.state.status is AgentStatus.IDLE
+    assert [agent.id for agent in await pool.get_idle_agents()] == [isolated.id]
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(180)
+async def test_pool_releases_exact_generic_token_after_runner_failure(
+    config,
+    fast_gate,
+    tmp_path: Path,
+) -> None:
+    provider = AsyncMock()
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(content="ERROR: fixture failure", model="test")
+    )
+    pool = AgentPool()
+    isolated = _with_state_dir(config, tmp_path)
+    runner = await pool.spawn(
+        isolated,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    task = Task(title="Fail one exact generic reservation")
+    token = TaskDispatch(task_id=task.id, agent_id=isolated.id)
+
+    assert await pool.reserve(
+        isolated.id,
+        task.id,
+        reservation_token=token,
+    ) is True
+    with pytest.raises(RuntimeError, match="fixture failure"):
+        await runner.run_task(task)
+
+    assert runner.state.status in {AgentStatus.IDLE, AgentStatus.INACTIVE}
+    assert runner.state.current_task is None
+    assert await pool.release_reservation(
+        isolated.id,
+        task.id,
+        reservation_token=token,
+    ) is True
+    assert isolated.id not in pool._reservation_tokens
+    assert runner.state.status is AgentStatus.IDLE
+
+
+@pytest.mark.asyncio
+async def test_pool_releases_generic_token_during_busy_post_task_handoff() -> None:
+    pool = AgentPool()
+    config = AgentConfig(name="busy-post-task-handoff")
+    runner = await pool.spawn(config)
+    task_id = "busy-post-task"
+    token = TaskDispatch(task_id=task_id, agent_id=config.id)
+    assert await pool.reserve(
+        config.id,
+        task_id,
+        reservation_token=token,
+    ) is True
+    async with runner._lock:
+        runner._state.status = AgentStatus.BUSY
+        runner._state.current_task = None
+
+    assert await pool.release_reservation(
+        config.id,
+        task_id,
+        reservation_token=token,
+    ) is True
+    assert config.id not in pool._reservation_tokens
+    assert runner.state.status is AgentStatus.IDLE
+    assert runner.state.current_task is None
 
 
 @pytest.mark.asyncio

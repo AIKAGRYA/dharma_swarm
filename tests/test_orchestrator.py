@@ -43,6 +43,28 @@ from dharma_swarm.providers import ModelRouter, OllamaProvider, _ollama_cloud_wi
 from dharma_swarm.ollama_config import get_ollama_cloud_frontier_chain
 from dharma_swarm.resilience import RetryPolicy
 from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine import ExecutionIdentity, identity_metadata
+
+
+def _ensure_fixture_execution_identity(td, *, task=None, require=False):
+    raw = {**dict(getattr(task, "metadata", {}) or {}), **dict(td.metadata)}
+    identity = ExecutionIdentity.new(
+        task_id=td.task_id,
+        agent_id=td.agent_id,
+        session_id=str(raw.get("session_id") or "fixture-session"),
+        trace_id=str(raw.get("trace_id") or f"trace-{td.task_id}"),
+        correlation_id=str(raw.get("correlation_id") or f"corr-{td.task_id}"),
+        causation_id=str(raw.get("causation_id") or ""),
+        parent_run_id=str(raw.get("parent_run_id") or ""),
+        run_id=str(raw.get("run_id") or raw.get("runtime_run_id") or f"run-{td.task_id}"),
+        claim_id=str(raw.get("claim_id") or f"claim-{td.task_id}"),
+        idempotency_key=str(raw.get("idempotency_key") or f"idem-{td.task_id}"),
+    ).require_for_dispatch()
+    metadata = identity_metadata(identity, surface="fixture")
+    td.metadata.update(metadata)
+    if task is not None:
+        task.metadata = {**dict(task.metadata), **metadata}
+    return identity
 
 
 def test_orchestrator_execution_helper_import_leaf_both_orders() -> None:
@@ -202,12 +224,25 @@ def test_orchestrator_execution_helper_preserves_operation_order() -> None:
         calls["self._runtime_lifecycle.record_delegation_run"]
     )
     assert calls["asyncio.sleep"][0] < delegation_lines[0] < first_run
-    assert first_run < calls["self._safe_update_task"][0]
+    terminal_line = calls["record_terminal_projection"][0]
+    release_after_terminal = min(
+        line for line in calls["release_dispatch_owner"] if line > terminal_line
+    )
+    assert first_run < terminal_line < release_after_terminal
+    assert terminal_line < calls["self._persist_result"][0]
+    terminal = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef)
+        and node.name == "record_terminal_projection"
+    )
+    terminal_calls: dict[str, list[int]] = {}
+    for node in ast.walk(terminal):
+        if isinstance(node, ast.Call):
+            terminal_calls.setdefault(ast.unparse(node.func), []).append(node.lineno)
     assert (
-        calls["self._safe_update_task"][0]
-        < calls["self._runtime_lifecycle.record_task_claim"][0]
-        < delegation_lines[-1]
-        < calls["self._persist_result"][0]
+        max(terminal_calls["self._runtime_lifecycle.record_task_claim"])
+        < max(terminal_calls["self._runtime_lifecycle.record_delegation_run"])
+        < terminal_calls["settle_task_board"][0]
     )
     lifecycle_try = next(
         node
@@ -236,11 +271,20 @@ def test_orchestrator_execution_helper_preserves_operation_order() -> None:
         if handler.type is not None
         and ast.unparse(handler.type) == "asyncio.CancelledError"
     )
-    generic_cancel = cancelled_handler.body[0]
+    released_cancel = cancelled_handler.body[0]
+    assert isinstance(released_cancel, ast.If)
+    assert ast.unparse(released_cancel.test) == "dispatch_owner_released"
+    assert len(released_cancel.body) == 1
+    assert isinstance(released_cancel.body[0], ast.Raise)
+    generic_cancel = cancelled_handler.body[1]
     assert isinstance(generic_cancel, ast.If)
     assert ast.unparse(generic_cancel.test) == "not campaign_owner"
-    assert len(generic_cancel.body) == 1
-    assert isinstance(generic_cancel.body[0], ast.Raise)
+    assert len(generic_cancel.body) == 2
+    cleanup_source = ast.unparse(generic_cancel.body[0])
+    assert "await shield_recovery" in cleanup_source
+    assert "abort_generic_dispatch_setup(self, td, cause)" in cleanup_source
+    assert "release_generic_dispatch" not in cleanup_source
+    assert isinstance(generic_cancel.body[1], ast.Raise)
     assert lifecycle_try.finalbody
     spine_calls = [
         node
@@ -254,8 +298,8 @@ def test_orchestrator_execution_helper_preserves_operation_order() -> None:
         sorted(keyword.arg for keyword in node.keywords if keyword.arg is not None)
         for node in spine_calls
     ) == [
-        [],
-        ["campaign_effect_fence", "campaign_effect_ready"],
+        ["campaign_effect_fence", "campaign_effect_ready", "campaign_fail_closed"],
+        ["campaign_fail_closed"],
     ]
     sidecar_guards = [
         node
@@ -273,7 +317,7 @@ def test_orchestrator_execution_helper_preserves_operation_order() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generic_cancellation_reraises_without_recovery_or_mutation() -> None:
+async def test_generic_cancellation_quarantines_before_release() -> None:
     agent = AgentState(
         id="generic-cancel-agent",
         name="generic-cancel-seat",
@@ -312,9 +356,224 @@ async def test_generic_cancellation_reraises_without_recovery_or_mutation() -> N
 
     pool.release.assert_not_awaited()  # type: ignore[attr-defined]
     orchestrator._handle_task_failure.assert_not_awaited()  # type: ignore[attr-defined]
-    assert orchestrator._active_dispatches[task.id] is dispatch
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._generic_recovery_owners[id(dispatch)][0] is dispatch
+    assert "cleanup is indeterminate" in orchestrator._generic_recovery_owners[
+        id(dispatch)
+    ][1]
+    assert agent.status is AgentStatus.BUSY
+    assert agent.current_task == task.id
     assert task.status is TaskStatus.PENDING
     assert board.updates == []
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_retains_exact_owner_when_cancellation_times_out() -> None:
+    orchestrator = Orchestrator()
+    started = asyncio.Event()
+    cancellation_seen = asyncio.Event()
+    release_stubborn_task = asyncio.Event()
+
+    async def stubborn_work() -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancellation_seen.set()
+            await release_stubborn_task.wait()
+
+    background = asyncio.create_task(stubborn_work())
+    await started.wait()
+    dispatch = TaskDispatch(task_id="stubborn-task", agent_id="stubborn-agent")
+    orchestrator._running_tasks[dispatch.task_id] = background
+    orchestrator._running_dispatch_owners[dispatch.task_id] = (
+        background,
+        dispatch,
+    )
+    orchestrator._active_dispatches[dispatch.task_id] = dispatch
+
+    try:
+        summary = await orchestrator.graceful_stop(timeout=0.01)
+        await cancellation_seen.wait()
+
+        assert summary["cancelled"] == 1
+        assert summary["live_task_ids"] == [dispatch.task_id]
+        assert summary["live_owners"] == {dispatch.task_id: dispatch.agent_id}
+        assert orchestrator._running_tasks[dispatch.task_id] is background
+        assert orchestrator._running_dispatch_owners[dispatch.task_id] == (
+            background,
+            dispatch,
+        )
+        assert orchestrator._active_dispatches[dispatch.task_id] is dispatch
+        assert not background.done()
+
+        release_stubborn_task.set()
+        await background
+        await orchestrator._collect_completed()
+        assert dispatch.task_id not in orchestrator._running_tasks
+        assert dispatch.task_id not in orchestrator._running_dispatch_owners
+        assert dispatch.task_id not in orchestrator._active_dispatches
+    finally:
+        release_stubborn_task.set()
+        if not background.done():
+            background.cancel()
+        await asyncio.gather(background, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_releases_cooperatively_cancelled_generic_owner() -> None:
+    agent = AgentState(
+        id="cooperative-agent",
+        name="cooperative-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="cooperative-task", title="Cooperative cancellation")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    entered = asyncio.Event()
+
+    class _CooperativeRunner:
+        async def run_task(self, _task):
+            entered.set()
+            await asyncio.Event().wait()
+
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    runner = _CooperativeRunner()
+    pool.set_runner(agent.id, runner)
+    assert await pool.reserve(agent.id, task.id, reservation_token=dispatch)
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._active_dispatches[task.id] = dispatch
+    background = asyncio.create_task(
+        orchestrator._execute_task(runner, task, dispatch)
+    )
+    orchestrator._running_tasks[task.id] = background
+    orchestrator._running_dispatch_owners[task.id] = (background, dispatch)
+    await asyncio.wait_for(entered.wait(), timeout=2)
+
+    summary = await orchestrator.graceful_stop(timeout=1)
+
+    assert summary == {"cancelled": 1, "completed": 0, "recovered": 1}
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert agent.id not in pool._reservation_tokens
+    assert task.id not in orchestrator._active_dispatches
+    assert task.id not in orchestrator._running_tasks
+    assert task.id not in orchestrator._running_dispatch_owners
+    assert board.updates == []
+
+
+@pytest.mark.asyncio
+async def test_authenticated_campaign_cannot_use_legacy_direct_provider_path() -> None:
+    task = Task(id="campaign-spine-required", title="Campaign spine boundary")
+    runner = MagicMock()
+    runner.run_task = AsyncMock(return_value="must not execute")
+    dispatch = TaskDispatch(task_id=task.id, agent_id="campaign-agent")
+    token = {
+        "reservation_id": "campaign-spine-required-token",
+        "attempt_generation": 0,
+        "provider_task_scheduled": False,
+    }
+    orchestrator = Orchestrator(task_board=MockTaskBoard(), agent_pool=None)
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    recovery_ticket = object()
+    orchestrator._prepare_campaign_before_effect_recovery = MagicMock(  # type: ignore[method-assign]
+        return_value=recovery_ticket
+    )
+    orchestrator._finish_campaign_before_effect_recovery = AsyncMock(  # type: ignore[method-assign]
+        return_value=True
+    )
+
+    await orchestrator._execute_campaign_task(
+        runner,
+        task,
+        dispatch,
+        campaign_effect_fence=_allow_campaign_effect,
+        campaign_effect_ready=lambda: None,
+        campaign_principal="campaign-agent",
+        campaign_reservation_token=token,
+    )
+
+    runner.run_task.assert_not_awaited()
+    assert "evidence_receipt_id" not in dispatch.metadata
+    assert token["provider_task_scheduled"] is False
+    orchestrator._prepare_campaign_before_effect_recovery.assert_called_once_with(
+        dispatch,
+        "campaign-agent",
+        token,
+        allow_uninstalled_active=False,
+    )
+    orchestrator._finish_campaign_before_effect_recovery.assert_awaited_once_with(
+        token,
+        recovery_ticket,
+    )
+
+
+@pytest.mark.asyncio
+async def test_authenticated_campaign_idempotency_begin_failure_blocks_runner(
+    tmp_path: Path,
+) -> None:
+    task = Task(id="campaign-begin-failure", title="Campaign begin failure")
+    dispatch = TaskDispatch(task_id=task.id, agent_id="campaign-agent")
+    _ensure_fixture_execution_identity(dispatch, task=task, require=True)
+    dispatch.metadata.pop("evidence_receipt_id", None)
+    runner = MagicMock()
+    runner.run_task = AsyncMock(return_value="must not execute")
+    orchestrator = Orchestrator(runtime_db_path=tmp_path / "runtime.db")
+    store = orchestrator._runtime_lifecycle._runtime_state_store()
+    await store.init_db()
+    store.try_begin_idempotent_side_effect_with_token = AsyncMock(
+        side_effect=RuntimeError("durable begin unavailable")
+    )
+
+    with pytest.raises(RuntimeError, match="durable idempotency fence"):
+        await orchestrator._run_task_via_spine(
+            runner,
+            task,
+            dispatch,
+            1.0,
+            campaign_fail_closed=True,
+        )
+
+    runner.run_task.assert_not_awaited()
+    assert "evidence_receipt_id" not in dispatch.metadata
+
+
+@pytest.mark.asyncio
+async def test_authenticated_campaign_rejects_failed_receipt_persistence(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm.graph import durable_invoker
+
+    task = Task(id="campaign-receipt-failure", title="Campaign receipt failure")
+    dispatch = TaskDispatch(task_id=task.id, agent_id="campaign-agent")
+    _ensure_fixture_execution_identity(dispatch, task=task, require=True)
+    runner = SimpleNamespace(
+        _config=None,
+        run_task=AsyncMock(return_value="provider effect"),
+    )
+    orchestrator = Orchestrator(runtime_db_path=tmp_path / "runtime.db")
+    await orchestrator._runtime_lifecycle._runtime_state_store().init_db()
+    persist = AsyncMock(return_value=False)
+    monkeypatch.setattr(durable_invoker, "persist_evidence_receipt", persist)
+
+    with pytest.raises(RuntimeError, match="receipt persistence failed"):
+        await orchestrator._run_task_via_spine(
+            runner,
+            task,
+            dispatch,
+            1.0,
+            campaign_effect_fence=_allow_campaign_effect,
+            campaign_effect_ready=lambda: None,
+        )
+
+    runner.run_task.assert_awaited_once()
+    persist.assert_awaited_once()
+    assert dispatch.metadata["evidence_receipt_status"] == "ok"
 
 
 async def _allow_campaign_effect() -> None:
@@ -664,6 +923,8 @@ def _campaign_route_decision(
 
 
 class MockTaskBoard:
+    projection_commit_mode = "non_production_exact_readback.v1"
+
     def __init__(self):
         self.tasks = []
         self.updates = []
@@ -702,6 +963,37 @@ class MockTaskBoard:
             expected.id,
             status=new_status,
             assigned_to=assigned_to,
+            metadata=metadata,
+        )
+        return await self.get(expected.id)
+
+    async def compare_and_swap_terminal_projection(
+        self,
+        expected,
+        *,
+        metadata,
+        result,
+        expected_claim_id,
+        expected_agent_id,
+        runtime_state_store,
+    ):
+        current = await self.get(expected.id)
+        if current is None or current != expected:
+            return None
+        marker = metadata["graph_reconcile_projection"]
+        action = marker["action"]
+        status = (
+            TaskStatus.PENDING
+            if action in {"retry", "requeue"}
+            else TaskStatus.COMPLETED
+            if action == "receipt" and marker["run_status"] == "completed"
+            else TaskStatus.FAILED
+        )
+        await self.update_task(
+            expected.id,
+            status=status,
+            assigned_to=(None if action in {"retry", "requeue"} else expected_agent_id),
+            result=result,
             metadata=metadata,
         )
         return await self.get(expected.id)
@@ -792,6 +1084,8 @@ class MockAgentPool:
         if reservation_token is not None:
             self._reservation_tokens[agent_id] = (task_id, reservation_token)
             self._reservation_runners[agent_id] = self._runners.get(agent_id)
+            if isinstance(reservation_token, TaskDispatch):
+                self._assignments.append((agent_id, task_id))
         return True
 
     def owns_reservation(self, agent_id, task_id, *, reservation_token):
@@ -853,6 +1147,47 @@ class MockAgentPool:
 
     def set_runner(self, agent_id, runner):
         self._runners[agent_id] = runner
+
+
+class LegacyDispatchPool:
+    """Documented assign/release-only pool used by compatibility regressions."""
+
+    def __init__(self, agent, runner=None, *, block_assign=False):
+        self.agent = agent
+        self.runner = runner
+        self.assignments = []
+        self.releases = []
+        self.assign_entered = asyncio.Event()
+        self.assign_continue = asyncio.Event()
+        self.release_error: BaseException | None = None
+        if not block_assign:
+            self.assign_continue.set()
+
+    async def get_idle_agents(self):
+        return [self.agent] if self.agent.status is AgentStatus.IDLE else []
+
+    async def assign(self, agent_id, task_id):
+        self.assignments.append((agent_id, task_id))
+        self.assign_entered.set()
+        await self.assign_continue.wait()
+        self.agent.status = AgentStatus.BUSY
+        self.agent.current_task = task_id
+
+    async def release(self, agent_id):
+        self.releases.append(agent_id)
+        if self.release_error is not None:
+            raise self.release_error
+        self.agent.status = AgentStatus.IDLE
+        self.agent.current_task = None
+
+    async def get(self, agent_id):
+        return self.runner if agent_id == self.agent.id else None
+
+    async def list_agents(self):
+        return [self.agent]
+
+    async def get_result(self, agent_id):
+        return None
 
 
 def _installed_campaign_recovery_fixture():
@@ -946,21 +1281,55 @@ def tasks():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_fan_out(agents, tasks):
+@pytest.mark.parametrize("topology", [TopologyType.FAN_OUT, TopologyType.BROADCAST])
+async def test_parallel_public_topologies_fail_before_assignment(
+    agents, tasks, topology
+):
     pool = MockAgentPool(agents)
     orch = Orchestrator(agent_pool=pool)
-    dispatches = await orch.dispatch(tasks[0], topology=TopologyType.FAN_OUT)
-    assert len(dispatches) == 2
-    assert dispatches[0].agent_id == "a1"
-    assert dispatches[1].agent_id == "a2"
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+    with pytest.raises(NotImplementedError, match="composite across task and agent"):
+        await orch.dispatch(tasks[0], topology=topology)
+
+    orch._assign_dispatch.assert_not_awaited()  # type: ignore[attr-defined]
+    assert pool._assignments == []
+
+
+@pytest.mark.asyncio
+async def test_multi_entrypoint_genome_fails_before_any_assignment(
+    agents,
+) -> None:
+    pool = MockAgentPool(agents)
+    orchestrator = Orchestrator(agent_pool=pool)
+    orchestrator._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
+    genome = SimpleNamespace(
+        genome_id="parallel-genome",
+        entrypoints=["root-a", "root-b"],
+        nodes=[
+            SimpleNamespace(node_id="root-a"),
+            SimpleNamespace(node_id="root-b"),
+        ],
+        validate_structure=MagicMock(),
+        incoming_edge_ids=MagicMock(return_value=[]),
+    )
+
+    with pytest.raises(NotImplementedError, match="multi-entrypoint topology genomes"):
+        await orchestrator.dispatch(
+            Task(id="parallel-genome-task", title="Parallel genome"),
+            genome,
+        )
+
+    orchestrator._assign_dispatch.assert_not_awaited()  # type: ignore[attr-defined]
+    assert pool._assignments == []
 
 
 @pytest.mark.asyncio
 async def test_dispatch_no_agents():
     pool = MockAgentPool([])
     orch = Orchestrator(agent_pool=pool)
-    dispatches = await orch.dispatch(Task(title="test"))
-    assert len(dispatches) == 0
+    with pytest.raises(NotImplementedError, match="fan_out is unsupported"):
+        await orch.dispatch(Task(title="test"))
 
 
 @pytest.mark.asyncio
@@ -1227,7 +1596,9 @@ async def test_campaign_idle_snapshot_race_never_starts_owner_provider() -> None
 
 
 @pytest.mark.asyncio
-async def test_campaign_dispatch_does_not_release_before_provider_fence() -> None:
+async def test_campaign_dispatch_does_not_release_before_provider_fence(
+    tmp_path: Path,
+) -> None:
     exact = AgentState(
         id="campaign-agent",
         name="campaign-seat",
@@ -1239,9 +1610,9 @@ async def test_campaign_dispatch_does_not_release_before_provider_fence() -> Non
     task = Task(
         id="campaign-task",
         title="Read-only campaign task",
-        metadata=_campaign_metadata(
+        metadata=_owner_stamped_campaign_metadata(
             exact.id,
-            task_id="campaign-task",
+            "campaign-task",
             provider=exact.provider,
             model=exact.model,
         ),
@@ -1271,17 +1642,18 @@ async def test_campaign_dispatch_does_not_release_before_provider_fence() -> Non
             return "bounded campaign result"
 
     pool.set_runner(exact.id, _FencedRunner())
-    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / "campaign-fence-runtime.db",
+    )
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
-    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
-    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
     orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
     orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
-    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
     fence_calls = 0
 
     async def fence() -> None:
@@ -1313,6 +1685,7 @@ async def test_campaign_dispatch_does_not_release_before_provider_fence() -> Non
 @pytest.mark.parametrize("substitution", ["registry", "pool", "active", "runner"])
 async def test_campaign_foreign_reservation_substitution_stays_preeffect(
     substitution: str,
+    tmp_path: Path,
 ) -> None:
     exact = AgentState(
         id="campaign-agent",
@@ -1325,9 +1698,9 @@ async def test_campaign_foreign_reservation_substitution_stays_preeffect(
     task = Task(
         id="campaign-task",
         title="Read-only campaign task",
-        metadata=_campaign_metadata(
+        metadata=_owner_stamped_campaign_metadata(
             exact.id,
-            task_id="campaign-task",
+            "campaign-task",
             provider=exact.provider,
             model=exact.model,
         ),
@@ -1355,15 +1728,16 @@ async def test_campaign_foreign_reservation_substitution_stays_preeffect(
             return "must not execute"
 
     pool.set_runner(exact.id, _FencedRunner())
-    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / f"campaign-substitution-{substitution}.db",
+    )
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
-    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
-    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
-    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
 
     async def fence() -> None:
         fence_entered.set()
@@ -1429,7 +1803,9 @@ async def test_campaign_foreign_reservation_substitution_stays_preeffect(
 
 
 @pytest.mark.asyncio
-async def test_campaign_stale_completion_cannot_release_foreign_owner() -> None:
+async def test_campaign_stale_completion_cannot_release_foreign_owner(
+    tmp_path: Path,
+) -> None:
     exact = AgentState(
         id="campaign-agent",
         name="campaign-seat",
@@ -1441,9 +1817,9 @@ async def test_campaign_stale_completion_cannot_release_foreign_owner() -> None:
     task = Task(
         id="campaign-task",
         title="Read-only campaign task",
-        metadata=_campaign_metadata(
+        metadata=_owner_stamped_campaign_metadata(
             exact.id,
-            task_id="campaign-task",
+            "campaign-task",
             provider=exact.provider,
             model=exact.model,
         ),
@@ -1471,17 +1847,18 @@ async def test_campaign_stale_completion_cannot_release_foreign_owner() -> None:
             return "bounded campaign result"
 
     pool.set_runner(exact.id, _BlockedRunner())
-    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / "campaign-stale-runtime.db",
+    )
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
-    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
-    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
     orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
     orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
-    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
 
     dispatches = await orchestrator.dispatch(
         task,
@@ -1516,7 +1893,11 @@ async def test_campaign_stale_completion_cannot_release_foreign_owner() -> None:
     pool._reservation_tokens[exact.id] = (task.id, foreign_token)
     orchestrator._active_dispatches[task.id] = foreign_dispatch
     provider_release.set()
-    await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=2)
+    with pytest.raises(
+        RuntimeError,
+        match="terminal owner release is indeterminate",
+    ):
+        await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=2)
     settled, recovered = await orchestrator._collect_completed()
 
     assert (settled, recovered) == (1, 0)
@@ -1531,6 +1912,7 @@ async def test_campaign_stale_completion_cannot_release_foreign_owner() -> None:
 @pytest.mark.parametrize("foreign_substitution", [False, True])
 async def test_campaign_posteffect_cancellation_releases_only_exact_owner(
     foreign_substitution: bool,
+    tmp_path: Path,
 ) -> None:
     exact = AgentState(
         id="campaign-agent",
@@ -1543,9 +1925,9 @@ async def test_campaign_posteffect_cancellation_releases_only_exact_owner(
     task = Task(
         id="campaign-cancel-task",
         title="Read-only cancellable campaign task",
-        metadata=_campaign_metadata(
+        metadata=_owner_stamped_campaign_metadata(
             exact.id,
-            task_id="campaign-cancel-task",
+            "campaign-cancel-task",
             provider=exact.provider,
             model=exact.model,
         ),
@@ -1573,15 +1955,16 @@ async def test_campaign_posteffect_cancellation_releases_only_exact_owner(
             raise AssertionError("unreachable")
 
     pool.set_runner(exact.id, _BlockedRunner())
-    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / "campaign-cancel-runtime.db",
+    )
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
-    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
-    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
-    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
 
     dispatches = await orchestrator.dispatch(
         task,
@@ -1749,7 +2132,17 @@ async def test_real_orchestrator_runner_campaign_route_reaches_only_exact_provid
     tmp_path: Path,
 ) -> None:
     config = _campaign_config(tmp_path)
-    exact = _CampaignProviderSpy(content="bounded campaign evidence " * 20)
+    exact = _CampaignProviderSpy(
+        content=(
+            "Operator brief: The bounded campaign route completed on the exact "
+            "requested provider and model. Evidence: the request remained pinned "
+            "to the authenticated seat, the foreign provider received zero calls, "
+            "and the runtime receipt records the selected route. Findings: the "
+            "read-only boundary held and no output path was written. Next actions: "
+            "retain the same route lock, verify the durable receipt, and reject any "
+            "future fallback to an unlisted provider."
+        )
+    )
     foreign = _CampaignProviderSpy(provider="anthropic", model="foreign-model")
     router = ModelRouter(
         {ProviderType.OLLAMA: exact, ProviderType.ANTHROPIC: foreign},
@@ -1781,18 +2174,16 @@ async def test_real_orchestrator_runner_campaign_route_reaches_only_exact_provid
         task_board=board,
         agent_pool=pool,
         ledger_dir=tmp_path / "ledger",
+        runtime_db_path=tmp_path / "campaign-real-e2e-runtime.db",
     )
     orchestrator._telic_seam = None
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
-    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
-    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
     orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
     orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
-    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
     sidecar_constructor = MagicMock()
     monkeypatch.setattr(
         "dharma_swarm.sleep_time_agent.SleepTimeAgent",
@@ -2665,11 +3056,13 @@ async def test_generic_stale_idle_snapshot_cannot_overwrite_campaign_reservation
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
 
-    with pytest.raises(RuntimeError, match="opaque campaign reservation"):
-        await orchestrator.dispatch(generic_task, TopologyType.PIPELINE)
+    dispatches = await orchestrator.dispatch(generic_task, TopologyType.PIPELINE)
 
+    assert dispatches == []
     runner.run_task.assert_not_awaited()
     assert orchestrator._running_tasks == {}
     assert orchestrator._active_dispatches == {}
@@ -2723,7 +3116,9 @@ async def test_campaign_pre_provider_fault_is_terminally_cas_reconciled(
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
 
     async def record_claim(td, *, task, status, **kwargs):
         if status == fault_status:
@@ -2800,6 +3195,51 @@ async def test_campaign_recovery_rejects_noncanonical_owner_marker(
     assert agent.current_task is None
     assert orchestrator._campaign_reservations == {}
     assert orchestrator._active_dispatches == {}
+
+
+@pytest.mark.parametrize("status", [TaskStatus.ASSIGNED, TaskStatus.RUNNING])
+def test_campaign_recovery_requires_owner_marker_after_pending(status) -> None:
+    (
+        orchestrator,
+        _board,
+        _pool,
+        task,
+        agent,
+        _dispatch,
+        _token,
+        _,
+    ) = _installed_campaign_recovery_fixture()
+    task.status = status
+    task.metadata.pop("mission_control_owner_execution")
+
+    assert orchestrator._campaign_recovery_task_is_exact(
+        task,
+        task.id,
+        agent.id,
+        0,
+    ) is False
+
+
+def test_campaign_pending_recovery_rejects_any_installed_owner_marker() -> None:
+    (
+        orchestrator,
+        _board,
+        _pool,
+        task,
+        agent,
+        _dispatch,
+        _token,
+        _,
+    ) = _installed_campaign_recovery_fixture()
+    task.status = TaskStatus.PENDING
+    task.assigned_to = None
+
+    assert orchestrator._campaign_recovery_task_is_exact(
+        task,
+        task.id,
+        agent.id,
+        0,
+    ) is False
 
 
 @pytest.mark.asyncio
@@ -2933,6 +3373,12 @@ async def test_campaign_release_loss_precedes_and_prevents_board_recovery() -> N
     assert pool._reservation_tokens[agent.id] == (task.id, foreign_token)
     assert orchestrator._campaign_reservations == {}
     assert orchestrator._active_dispatches == {}
+    assert list(orchestrator._campaign_recovery_owners) == [id(token)]
+
+    summary = await orchestrator.graceful_stop(0.01)
+    assert summary["live_task_ids"] == [task.id]
+    assert summary["campaign_recovery_task_ids"] == [task.id]
+    assert orchestrator._campaign_recovery_owners[id(token)][1] is token
 
 
 @pytest.mark.asyncio
@@ -3136,7 +3582,9 @@ async def test_campaign_early_assign_failure_never_mutates_foreign_custody(
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
     foreign_token = {
         "reservation_id": "foreign-early-owner",
         "attempt_generation": 0,
@@ -3226,7 +3674,9 @@ async def test_campaign_assigned_cas_failure_preserves_preinstall_foreign_active
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
     foreign_dispatch = TaskDispatch(
         task_id=task.id,
         agent_id=exact.id,
@@ -3307,7 +3757,9 @@ async def test_campaign_final_prebackground_custody_recheck_blocks_substitution(
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
     orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
     orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     foreign_token = {
@@ -3381,7 +3833,9 @@ async def test_campaign_final_prebackground_custody_recheck_blocks_substitution(
 
 
 @pytest.mark.asyncio
-async def test_campaign_reacquires_runner_bound_by_reservation_before_execution() -> None:
+async def test_campaign_reacquires_runner_bound_by_reservation_before_execution(
+    tmp_path: Path,
+) -> None:
     exact = AgentState(
         id="campaign-agent",
         name="campaign-seat",
@@ -3408,6 +3862,7 @@ async def test_campaign_reacquires_runner_bound_by_reservation_before_execution(
     stale_runner.run_task = AsyncMock(return_value="stale must not run")
     bound_runner = MagicMock()
     bound_runner.state = exact
+    bound_runner._config = None
 
     async def run_bound(
         _task,
@@ -3437,17 +3892,18 @@ async def test_campaign_reacquires_runner_bound_by_reservation_before_execution(
         )
 
     pool.reserve = replace_after_guard_capture  # type: ignore[method-assign]
-    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / "campaign-runner-race-runtime.db",
+    )
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
-    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
-    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
     orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
     orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
-    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
 
     dispatches = await orchestrator.dispatch(
         task,
@@ -3512,7 +3968,9 @@ async def test_campaign_board_write_failure_never_schedules_provider(
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
     orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
     orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
 
@@ -3533,7 +3991,1100 @@ async def test_campaign_board_write_failure_never_schedules_provider(
 
 
 @pytest.mark.asyncio
-async def test_campaign_provider_failure_never_uses_generic_retry_requeue() -> None:
+async def test_campaign_board_identity_is_persisted_before_provider_effect(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm.task_board import TaskBoard
+
+    agent = AgentState(
+        id="campaign-identity-agent",
+        name="campaign-seat",
+        role=AgentRole.CODER,
+        status=AgentStatus.IDLE,
+        provider="ollama",
+        model="fixture-model:cloud",
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.task_board._new_id",
+        lambda: "campaign-identity-task",
+    )
+    board = TaskBoard(tmp_path / "campaign-tasks.db")
+    await board.init_db()
+    task = await board.create(
+        "Campaign identity fixture",
+        metadata=_owner_stamped_campaign_metadata(
+            agent.id,
+            "campaign-identity-task",
+            provider=agent.provider,
+            model=agent.model,
+        ),
+    )
+    pool = MockAgentPool([agent])
+    provider_effect_checked = asyncio.Event()
+
+    class _IdentityRunner:
+        state = agent
+
+        async def run_task(
+            self,
+            _task,
+            *,
+            campaign_effect_fence,
+            campaign_effect_ready,
+        ):
+            await campaign_effect_fence()
+            campaign_effect_ready()
+            provider_effect_checked.set()
+            return "identity-bound result"
+
+    pool.set_runner(agent.id, _IdentityRunner())
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / "campaign-identity-runtime.db",
+    )
+
+    async def enrich(_task, _td, metadata):
+        return {**metadata, "context_enriched_after_identity": True}
+
+    orchestrator._attach_context_bundle = enrich  # type: ignore[method-assign]
+    orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: True  # type: ignore[method-assign]
+
+    async def fence() -> None:
+        observed = await board.get(task.id)
+        assert observed is not None
+        assert observed.status is TaskStatus.RUNNING
+        assert observed.assigned_to == agent.id
+        identity = observed.metadata["execution_identity"]
+        assert set(identity) == {
+            "trace_id", "correlation_id", "task_id", "run_id", "claim_id",
+            "idempotency_key", "causation_id", "parent_run_id", "agent_id",
+            "session_id", "external_a2a_task_id", "message_id", "event_id",
+            "artifact_id", "proposal_id", "metadata",
+        }
+        assert observed.metadata["context_enriched_after_identity"] is True
+        assert observed.metadata["execution_identity_surface"] == "orchestrator"
+        for key in (
+            "trace_id", "correlation_id", "run_id", "claim_id",
+            "idempotency_key", "agent_id", "session_id",
+        ):
+            assert observed.metadata[key] == identity[key]
+
+    dispatches = await orchestrator.dispatch(
+        task,
+        TopologyType.PIPELINE,
+        authenticated_principal_id=agent.id,
+        campaign_effect_fence=fence,
+    )
+    await asyncio.wait_for(provider_effect_checked.wait(), timeout=2)
+    with pytest.raises(
+        RuntimeError,
+        match="completion projection is not durable on Board",
+    ):
+        await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=2)
+
+    assert [dispatch.agent_id for dispatch in dispatches] == [agent.id]
+    dispatch = dispatches[0]
+    token = pool._reservation_tokens[agent.id][1]
+    retained = await board.get(task.id)
+    assert retained is not None and retained.status is TaskStatus.RUNNING
+    assert agent.status is AgentStatus.BUSY and agent.current_task == task.id
+    assert orchestrator._active_dispatches[task.id] is dispatch
+    assert orchestrator._campaign_recovery_owners[id(token)] == [
+        dispatch,
+        token,
+        None,
+        False,
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault_status", [TaskStatus.ASSIGNED, TaskStatus.RUNNING])
+@pytest.mark.parametrize("fault_mode", ["write", "readback"])
+async def test_generic_board_failure_retains_owner_when_readback_is_unproven(
+    fault_status: TaskStatus,
+    fault_mode: str,
+) -> None:
+    agent = AgentState(
+        id="generic-exact-agent",
+        name="generic-exact-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="generic-exact-task", title="Generic exact Board fixture")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    original_update = board.update_task
+    original_get = board.get
+    faulted = False
+
+    async def faulting_update(task_id, **fields):
+        nonlocal faulted
+        if fields.get("status") is fault_status:
+            faulted = True
+            if fault_mode == "write":
+                raise RuntimeError(f"{fault_status.value} write failed")
+        await original_update(task_id, **fields)
+
+    async def faulting_get(task_id):
+        observed = await original_get(task_id)
+        if faulted and fault_mode == "readback":
+            return SimpleNamespace(
+                id=task_id,
+                status=fault_status,
+                assigned_to=agent.id,
+                metadata={"forged": True},
+            )
+        return observed
+
+    board.update_task = faulting_update  # type: ignore[method-assign]
+    board.get = faulting_get  # type: ignore[method-assign]
+    pool = MockAgentPool([agent])
+    runner = MagicMock()
+    runner.run_task = AsyncMock(return_value="must not run")
+    pool.set_runner(agent.id, runner)
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
+    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+
+    with pytest.raises(RuntimeError, match="write failed|lacks exact readback"):
+        await orchestrator.dispatch(task, TopologyType.PIPELINE)
+
+    if fault_mode == "write":
+        assert agent.status is AgentStatus.IDLE
+        assert agent.current_task is None
+        assert agent.id not in pool._reservation_tokens
+        assert orchestrator._active_dispatches == {}
+    else:
+        assert agent.status is AgentStatus.BUSY
+        assert agent.current_task == task.id
+        assert pool._reservation_tokens[agent.id][0] == task.id
+        assert orchestrator._active_dispatches[task.id].agent_id == agent.id
+    assert orchestrator._running_tasks == {}
+    runner.run_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_generic_assigned_failure_never_releases_substituted_pool_owner() -> None:
+    agent = AgentState(
+        id="generic-race-agent",
+        name="generic-race-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="generic-race-task", title="Generic custody race fixture")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    runner = MagicMock()
+    runner.run_task = AsyncMock(return_value="must not run")
+    pool.set_runner(agent.id, runner)
+    foreign = TaskDispatch(task_id=task.id, agent_id=agent.id)
+
+    async def substitute_then_fail(task_id, **fields):
+        if fields.get("status") is TaskStatus.ASSIGNED:
+            pool._reservation_tokens[agent.id] = (task.id, foreign)
+            raise RuntimeError("ASSIGNED write failed after owner substitution")
+
+    board.update_task = substitute_then_fail  # type: ignore[method-assign]
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+
+    with pytest.raises(RuntimeError, match="owner substitution"):
+        await orchestrator.dispatch(task, TopologyType.PIPELINE)
+
+    assert pool._reservation_tokens[agent.id] == (task.id, foreign)
+    assert agent.status is AgentStatus.BUSY
+    assert agent.current_task == task.id
+    assert orchestrator._active_dispatches == {}
+    assert len(orchestrator._generic_recovery_owners) == 1
+    recovery = next(iter(orchestrator._generic_recovery_owners.values()))
+    assert recovery[0].task_id == task.id
+    assert orchestrator._running_tasks == {}
+    runner.run_task.assert_not_awaited()
+
+    summary = await orchestrator.graceful_stop(0)
+    assert summary["live_task_ids"] == [task.id]
+    assert summary["indeterminate_custody_task_ids"] == [task.id]
+
+
+@pytest.mark.asyncio
+async def test_exact_release_completion_does_not_pop_interleaved_active_owner() -> None:
+    from dharma_swarm.orchestrator_execution import release_generic_dispatch
+
+    agent = AgentState(
+        id="exact-release-race-agent",
+        name="exact-release-race-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(agent_pool=pool)
+    stale = TaskDispatch(task_id="exact-release-race-task", agent_id=agent.id)
+    foreign = TaskDispatch(task_id=stale.task_id, agent_id=agent.id)
+    assert await pool.reserve(agent.id, stale.task_id, reservation_token=stale)
+    orchestrator._active_dispatches[stale.task_id] = stale
+    original_release = pool.release_reservation
+
+    async def release_then_reassign(agent_id, task_id, *, reservation_token=None):
+        assert await original_release(
+            agent_id, task_id, reservation_token=reservation_token
+        )
+        assert await pool.reserve(agent_id, task_id, reservation_token=foreign)
+        orchestrator._active_dispatches[task_id] = foreign
+        return True
+
+    pool.release_reservation = release_then_reassign  # type: ignore[method-assign]
+
+    assert await release_generic_dispatch(orchestrator, stale) is True
+    assert orchestrator._active_dispatches[stale.task_id] is foreign
+    assert pool._reservation_tokens[agent.id] == (stale.task_id, foreign)
+    assert agent.status is AgentStatus.BUSY and agent.current_task == stale.task_id
+
+
+@pytest.mark.asyncio
+async def test_legacy_pool_dispatch_lifecycle_uses_local_opaque_owner(
+    monkeypatch,
+) -> None:
+    agent = AgentState(
+        id="legacy-agent",
+        name="legacy-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="legacy-task", title="Legacy pool lifecycle")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = LegacyDispatchPool(agent, DummyRunner(result="legacy complete"))
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+
+    def exact_identity_without_receipt(td, *, task=None, require=False):
+        identity = _ensure_fixture_execution_identity(td, task=task, require=require)
+        td.metadata.pop("evidence_receipt_id", None)
+        return identity
+
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=exact_identity_without_receipt
+    )
+    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._spine_dispatch_enabled = lambda: False  # type: ignore[method-assign]
+    sidecar = MagicMock()
+    sidecar.consolidate_knowledge = AsyncMock(return_value=[])
+    monkeypatch.setattr(
+        "dharma_swarm.sleep_time_agent.SleepTimeAgent",
+        MagicMock(return_value=sidecar),
+    )
+
+    dispatches = await orchestrator.dispatch(task, TopologyType.PIPELINE)
+    dispatch = dispatches[0]
+    assert orchestrator._legacy_dispatch_owners[agent.id] is dispatch
+    await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=2)
+
+    assert pool.assignments == [(agent.id, task.id)]
+    assert pool.releases == [agent.id]
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert orchestrator._legacy_dispatch_owners == {}
+    assert orchestrator._active_dispatches == {}
+    assert (await board.get(task.id)).status is TaskStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_legacy_owner_is_installed_before_assign_can_yield() -> None:
+    from dharma_swarm.orchestrator_execution import reserve_generic_dispatch
+
+    agent = AgentState(
+        id="legacy-blocked-agent",
+        name="legacy-blocked-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    pool = LegacyDispatchPool(agent, block_assign=True)
+    orchestrator = Orchestrator(agent_pool=pool)
+    dispatch = TaskDispatch(task_id="legacy-blocked-task", agent_id=agent.id)
+    pending = asyncio.create_task(reserve_generic_dispatch(orchestrator, dispatch))
+    await asyncio.wait_for(pool.assign_entered.wait(), timeout=2)
+
+    assert orchestrator._legacy_dispatch_owners[agent.id] is dispatch
+    assert orchestrator._active_dispatches[dispatch.task_id] is dispatch
+
+    pool.assign_continue.set()
+    assert await asyncio.wait_for(pending, timeout=2) is True
+
+
+@pytest.mark.asyncio
+async def test_legacy_stale_dispatch_cannot_release_foreign_local_owner() -> None:
+    from dharma_swarm.orchestrator_execution import (
+        release_generic_dispatch,
+        reserve_generic_dispatch,
+    )
+
+    agent = AgentState(
+        id="legacy-stale-agent",
+        name="legacy-stale-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    pool = LegacyDispatchPool(agent)
+    orchestrator = Orchestrator(agent_pool=pool)
+    stale = TaskDispatch(task_id="legacy-stale-task", agent_id=agent.id)
+    foreign = TaskDispatch(task_id=stale.task_id, agent_id=agent.id)
+    assert await reserve_generic_dispatch(orchestrator, stale) is True
+    orchestrator._legacy_dispatch_owners[agent.id] = foreign
+    orchestrator._active_dispatches[stale.task_id] = foreign
+
+    assert await release_generic_dispatch(orchestrator, stale) is False
+    assert pool.releases == []
+    assert orchestrator._legacy_dispatch_owners[agent.id] is foreign
+    assert orchestrator._active_dispatches[stale.task_id] is foreign
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [RuntimeError, asyncio.CancelledError])
+async def test_legacy_release_failure_retains_opaque_owner(error_type) -> None:
+    from dharma_swarm.orchestrator_execution import (
+        release_generic_dispatch,
+        reserve_generic_dispatch,
+    )
+
+    agent = AgentState(
+        id="legacy-release-agent",
+        name="legacy-release-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    pool = LegacyDispatchPool(agent)
+    orchestrator = Orchestrator(agent_pool=pool)
+    dispatch = TaskDispatch(task_id="legacy-release-task", agent_id=agent.id)
+    assert await reserve_generic_dispatch(orchestrator, dispatch) is True
+    pool.release_error = error_type("release interrupted")
+
+    with pytest.raises(error_type, match="release interrupted"):
+        await release_generic_dispatch(orchestrator, dispatch)
+
+    assert orchestrator._legacy_dispatch_owners[agent.id] is dispatch
+    assert orchestrator._active_dispatches[dispatch.task_id] is dispatch
+
+
+@pytest.mark.asyncio
+async def test_generic_dispatch_cancellation_before_background_quarantines_and_releases() -> None:
+    agent = AgentState(
+        id="cancel-setup-agent",
+        name="cancel-setup-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="cancel-setup-task", title="Cancel before background")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    pool.set_runner(agent.id, DummyRunner(result="must not run"))
+    send_entered = asyncio.Event()
+
+    class _BlockingBus:
+        async def send(self, message):
+            send_entered.set()
+            await asyncio.Event().wait()
+
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        message_bus=_BlockingBus(),
+    )
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
+    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    pending = asyncio.create_task(
+        orchestrator.dispatch(task, TopologyType.PIPELINE)
+    )
+    await asyncio.wait_for(send_entered.wait(), timeout=2)
+    pending.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await pending
+
+    recovered = await board.get(task.id)
+    assert recovered.status is TaskStatus.FAILED
+    assert recovered.metadata["dispatch_setup_recovery"] == {
+        "schema_version": "dharma.dispatch_setup_recovery.v1",
+        "state": "quarantined",
+        "prior_status": "assigned",
+        "cause": "CancelledError",
+    }
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert agent.id not in pool._reservation_tokens
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._running_tasks == {}
+
+
+@pytest.mark.asyncio
+async def test_generic_dispatch_cancellation_from_running_board_quarantines_and_releases() -> None:
+    agent = AgentState(
+        id="cancel-running-agent",
+        name="cancel-running-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="cancel-running-task", title="Cancel from running Board")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    pool.set_runner(agent.id, DummyRunner(result="must not run"))
+    running_claim_entered = asyncio.Event()
+
+    async def block_running_claim(td, *, task=None, status, **kwargs):
+        if status == "running":
+            running_claim_entered.set()
+            await asyncio.Event().wait()
+
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
+    orchestrator._runtime_lifecycle.record_task_claim = block_running_claim
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    pending = asyncio.create_task(orchestrator.dispatch(task, TopologyType.PIPELINE))
+    await asyncio.wait_for(running_claim_entered.wait(), timeout=2)
+    pending.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await pending
+
+    recovered = await board.get(task.id)
+    assert recovered.status is TaskStatus.FAILED
+    assert recovered.metadata["dispatch_setup_recovery"]["prior_status"] == "running"
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert agent.id not in pool._reservation_tokens
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._running_tasks == {}
+
+
+@pytest.mark.asyncio
+async def test_legacy_assign_cancellation_shield_releases_local_owner() -> None:
+    agent = AgentState(
+        id="legacy-cancel-agent",
+        name="legacy-cancel-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="legacy-cancel-task", title="Cancel legacy assign")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = LegacyDispatchPool(agent, block_assign=True)
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
+    pending = asyncio.create_task(orchestrator.dispatch(task, TopologyType.PIPELINE))
+    await asyncio.wait_for(pool.assign_entered.wait(), timeout=2)
+    pending.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await pending
+
+    assert pool.releases == [agent.id]
+    assert orchestrator._legacy_dispatch_owners == {}
+    assert orchestrator._active_dispatches == {}
+    assert (await board.get(task.id)).status is TaskStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_recovers_exact_active_owner_without_running_task() -> None:
+    agent = AgentState(
+        id="orphan-setup-agent",
+        name="orphan-setup-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(
+        id="orphan-setup-task",
+        title="Orphaned pre-background owner",
+        status=TaskStatus.ASSIGNED,
+        assigned_to=agent.id,
+    )
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    assert await pool.reserve(agent.id, task.id, reservation_token=dispatch)
+    orchestrator._active_dispatches[task.id] = dispatch
+
+    summary = await orchestrator.graceful_stop(0)
+
+    assert summary == {"cancelled": 0, "completed": 0, "recovered": 1}
+    assert (await board.get(task.id)).status is TaskStatus.FAILED
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert agent.id not in pool._reservation_tokens
+    assert orchestrator._active_dispatches == {}
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_cancels_assignment_before_background_and_quarantines() -> None:
+    agent = AgentState(
+        id="stop-setup-agent",
+        name="stop-setup-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="stop-setup-task", title="Stop during assignment")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    runner = MagicMock()
+    runner.run_task = AsyncMock(return_value="must not run")
+    pool.set_runner(agent.id, runner)
+    send_entered = asyncio.Event()
+
+    class _BlockingBus:
+        async def send(self, message):
+            send_entered.set()
+            await asyncio.Event().wait()
+
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        message_bus=_BlockingBus(),
+    )
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
+    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    pending = asyncio.create_task(orchestrator.dispatch(task, TopologyType.PIPELINE))
+    await asyncio.wait_for(send_entered.wait(), timeout=2)
+
+    summary = await orchestrator.graceful_stop(timeout=1)
+    outcome = await asyncio.gather(pending, return_exceptions=True)
+
+    assert isinstance(outcome[0], asyncio.CancelledError)
+    assert summary == {
+        "cancelled": 0,
+        "completed": 0,
+        "assignment_cancelled": 1,
+    }
+    recovered = await board.get(task.id)
+    assert recovered.status is TaskStatus.FAILED
+    assert recovered.metadata["dispatch_setup_recovery"]["prior_status"] == "assigned"
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert orchestrator._assignment_tasks == {}
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._running_tasks == {}
+    runner.run_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_reports_cancellation_resistant_assignment_live() -> None:
+    agent = AgentState(
+        id="stubborn-setup-agent",
+        name="stubborn-setup-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="stubborn-setup-task", title="Stubborn assignment")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    provider_started = asyncio.Event()
+    provider_never_finishes = asyncio.Event()
+    cancellation_seen = asyncio.Event()
+    release_bus = asyncio.Event()
+
+    class _BlockedRunner:
+        async def run_task(self, _task):
+            provider_started.set()
+            await provider_never_finishes.wait()
+
+    class _CancellationResistantBus:
+        async def send(self, message):
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancellation_seen.set()
+                await release_bus.wait()
+
+    pool.set_runner(agent.id, _BlockedRunner())
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        message_bus=_CancellationResistantBus(),
+    )
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
+    orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
+    pending = asyncio.create_task(orchestrator.dispatch(task, TopologyType.PIPELINE))
+    while task.id not in orchestrator._assignment_tasks:
+        await asyncio.sleep(0)
+    while (await board.get(task.id)).status is not TaskStatus.ASSIGNED:
+        await asyncio.sleep(0)
+
+    summary = await orchestrator.graceful_stop(timeout=0.01)
+
+    await asyncio.wait_for(cancellation_seen.wait(), timeout=2)
+    assert summary["live"] == 1
+    assert summary["live_task_ids"] == [task.id]
+    assert summary["assignment_cancelled"] == 1
+    assert orchestrator._active_dispatches[task.id].agent_id == agent.id
+    assert pending.done() is False
+
+    release_bus.set()
+    await asyncio.gather(pending, return_exceptions=True)
+    assert provider_started.is_set() is False
+    cleanup = await orchestrator.graceful_stop(timeout=1)
+    assert cleanup.get("live", 0) == 0
+    assert (await board.get(task.id)).status is TaskStatus.FAILED
+    assert orchestrator._assignment_tasks == {}
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._running_tasks == {}
+    assert orchestrator._running_dispatch_owners == {}
+
+
+@pytest.mark.asyncio
+async def test_concurrent_graceful_stop_shares_one_legacy_release() -> None:
+    agent = AgentState(
+        id="legacy-stop-agent",
+        name="legacy-stop-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(
+        id="legacy-stop-task",
+        title="Concurrent stop",
+        status=TaskStatus.ASSIGNED,
+        assigned_to=agent.id,
+    )
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = LegacyDispatchPool(agent)
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    from dharma_swarm.orchestrator_execution import reserve_generic_dispatch
+
+    assert await reserve_generic_dispatch(orchestrator, dispatch) is True
+
+    first, second = await asyncio.gather(
+        orchestrator.graceful_stop(1),
+        orchestrator.graceful_stop(1),
+    )
+
+    assert first == second == {"cancelled": 0, "completed": 0, "recovered": 1}
+    assert pool.releases == [agent.id]
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._legacy_dispatch_owners == {}
+
+
+@pytest.mark.asyncio
+async def test_tracked_owner_cannot_synchronously_stop_itself() -> None:
+    orchestrator = Orchestrator()
+    current = asyncio.current_task()
+    assert current is not None
+    orchestrator._assignment_tasks["self-stop"] = current
+
+    with pytest.raises(RuntimeError, match="cannot synchronously stop itself"):
+        await orchestrator.graceful_stop(0)
+
+    assert orchestrator._stopping is False
+    assert orchestrator._stop_operation is None
+
+
+@pytest.mark.asyncio
+async def test_assignment_owner_cannot_nest_a_second_dispatch() -> None:
+    orchestrator = Orchestrator()
+    current = asyncio.current_task()
+    assert current is not None
+    orchestrator._assignment_tasks["outer-dispatch"] = current
+    nested = TaskDispatch(task_id="nested-dispatch", agent_id="nested-agent")
+
+    with pytest.raises(RuntimeError, match="already owns an in-progress assignment"):
+        await orchestrator._assign_dispatch(nested)
+
+    assert list(orchestrator._assignment_tasks) == ["outer-dispatch"]
+    assert orchestrator._active_dispatches == {}
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_clears_done_running_owner_after_exact_recovery() -> None:
+    agent = AgentState(
+        id="done-owner-agent",
+        name="done-owner-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(
+        id="done-owner-task",
+        title="Done owner recovery",
+        status=TaskStatus.ASSIGNED,
+        assigned_to=agent.id,
+    )
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    assert await pool.reserve(agent.id, task.id, reservation_token=dispatch)
+    completed = asyncio.create_task(asyncio.sleep(0))
+    await completed
+    orchestrator._active_dispatches[task.id] = dispatch
+    orchestrator._running_tasks[task.id] = completed
+    orchestrator._running_dispatch_owners[task.id] = (completed, dispatch)
+
+    summary = await orchestrator.graceful_stop(1)
+
+    assert summary == {"cancelled": 0, "completed": 1, "recovered": 1}
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._running_tasks == {}
+    assert orchestrator._running_dispatch_owners == {}
+
+
+@pytest.mark.asyncio
+async def test_graceful_stop_bounds_hung_orphan_recovery_and_keeps_it_live() -> None:
+    agent = AgentState(
+        id="hung-recovery-agent",
+        name="hung-recovery-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(
+        id="hung-recovery-task",
+        title="Hung recovery",
+        status=TaskStatus.ASSIGNED,
+        assigned_to=agent.id,
+    )
+    board = MockTaskBoard()
+    board.tasks = [task]
+    allow_read = asyncio.Event()
+    original_get = board.get
+
+    async def blocking_get(task_id):
+        await allow_read.wait()
+        return await original_get(task_id)
+
+    board.get = blocking_get  # type: ignore[method-assign]
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    assert await pool.reserve(agent.id, task.id, reservation_token=dispatch)
+    orchestrator._active_dispatches[task.id] = dispatch
+
+    summary = await asyncio.wait_for(orchestrator.graceful_stop(0.01), timeout=0.2)
+
+    assert summary["live_task_ids"] == [task.id]
+    assert summary["recovery_pending_task_ids"] == [task.id]
+    assert orchestrator._active_dispatches[task.id] is dispatch
+    assert any(not pending.done() for pending in orchestrator._recovery_tasks.values())
+
+    allow_read.set()
+    cleanup = await asyncio.wait_for(orchestrator.graceful_stop(1), timeout=2)
+    assert cleanup.get("live", 0) == 0
+    assert (await original_get(task.id)).status is TaskStatus.FAILED
+    assert orchestrator._recovery_tasks == {}
+    assert orchestrator._active_dispatches == {}
+
+
+@pytest.mark.asyncio
+async def test_generic_reserve_cancellation_keeps_provisional_owner_visible() -> None:
+    agent = AgentState(
+        id="opaque-reserve-agent",
+        name="opaque-reserve-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="opaque-reserve-task", title="Opaque reserve cancellation")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    pool.owns_reservation = None  # type: ignore[method-assign]
+    reserve_entered = asyncio.Event()
+    original_reserve = pool.reserve
+
+    async def acquire_then_block(agent_id, task_id, *, reservation_token=None):
+        assert await original_reserve(
+            agent_id, task_id, reservation_token=reservation_token
+        )
+        reserve_entered.set()
+        await asyncio.Event().wait()
+
+    pool.reserve = acquire_then_block  # type: ignore[method-assign]
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    pending = asyncio.create_task(orchestrator.dispatch(task, TopologyType.PIPELINE))
+    await asyncio.wait_for(reserve_entered.wait(), timeout=2)
+
+    summary = await orchestrator.graceful_stop(1)
+    outcome = await asyncio.gather(pending, return_exceptions=True)
+
+    assert isinstance(outcome[0], asyncio.CancelledError)
+    assert summary.get("live", 0) == 0
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert pool._reservation_tokens == {}
+    assert orchestrator._active_dispatches == {}
+    assert orchestrator._generic_recovery_owners == {}
+
+
+@pytest.mark.asyncio
+async def test_campaign_reserve_cancellation_recovers_provisional_tombstone(
+    tmp_path: Path,
+) -> None:
+    config = _campaign_config(tmp_path)
+    task = _campaign_task(config)
+    board = MockTaskBoard()
+    board.tasks = [task]
+    agent = AgentState(
+        id=config.id,
+        name=config.name,
+        role=config.role,
+        status=AgentStatus.IDLE,
+        provider=config.provider,
+        model=config.model,
+    )
+    pool = MockAgentPool([agent])
+    runner = MagicMock()
+    runner.state = agent
+    runner.run_task = AsyncMock(return_value="must not run")
+    pool.set_runner(agent.id, runner)
+    reserve_entered = asyncio.Event()
+    original_reserve = pool.reserve
+
+    async def acquire_then_block(agent_id, task_id, *, reservation_token=None):
+        assert await original_reserve(
+            agent_id, task_id, reservation_token=reservation_token
+        )
+        reserve_entered.set()
+        await asyncio.Event().wait()
+
+    pool.reserve = acquire_then_block  # type: ignore[method-assign]
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    pending = asyncio.create_task(
+        orchestrator.dispatch(
+            task,
+            TopologyType.PIPELINE,
+            authenticated_principal_id=agent.id,
+            campaign_effect_fence=_allow_campaign_effect,
+        )
+    )
+    await asyncio.wait_for(reserve_entered.wait(), timeout=2)
+
+    summary = await orchestrator.graceful_stop(1)
+    outcome = await asyncio.gather(pending, return_exceptions=True)
+
+    assert isinstance(outcome[0], asyncio.CancelledError)
+    assert summary.get("live", 0) == 0
+    assert summary["recovered"] == 1
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert orchestrator._campaign_recovery_owners == {}
+    assert orchestrator._campaign_reservations == {}
+    assert orchestrator._active_dispatches == {}
+    assert (await board.get(task.id)).status is TaskStatus.PENDING
+    runner.run_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_campaign_cancellation_resistant_reserve_hits_admission_fence(
+    tmp_path: Path,
+) -> None:
+    config = _campaign_config(tmp_path)
+    task = _campaign_task(config, task_id="campaign-stubborn-reserve")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    agent = AgentState(
+        id=config.id,
+        name=config.name,
+        role=config.role,
+        status=AgentStatus.IDLE,
+        provider=config.provider,
+        model=config.model,
+    )
+    pool = MockAgentPool([agent])
+    runner = MagicMock()
+    runner.state = agent
+    runner.run_task = AsyncMock(return_value="must not run")
+    pool.set_runner(agent.id, runner)
+    reserve_entered = asyncio.Event()
+    cancellation_seen = asyncio.Event()
+    finish_reserve = asyncio.Event()
+    original_reserve = pool.reserve
+
+    async def acquire_then_resist_cancel(
+        agent_id, task_id, *, reservation_token=None
+    ):
+        assert await original_reserve(
+            agent_id, task_id, reservation_token=reservation_token
+        )
+        reserve_entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancellation_seen.set()
+            await finish_reserve.wait()
+            return True
+
+    pool.reserve = acquire_then_resist_cancel  # type: ignore[method-assign]
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    orchestrator._telic_seam = None
+    orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda task, td, metadata: metadata
+    )
+    pending = asyncio.create_task(
+        orchestrator.dispatch(
+            task,
+            TopologyType.PIPELINE,
+            authenticated_principal_id=agent.id,
+            campaign_effect_fence=_allow_campaign_effect,
+        )
+    )
+    await asyncio.wait_for(reserve_entered.wait(), timeout=2)
+
+    first = await orchestrator.graceful_stop(0.01)
+
+    await asyncio.wait_for(cancellation_seen.wait(), timeout=2)
+    assert first["live_task_ids"] == [task.id]
+    assert first["assignment_cancelled"] == 1
+    assert (await board.get(task.id)).status is TaskStatus.PENDING
+    assert agent.status is AgentStatus.BUSY and agent.current_task == task.id
+    assert pending.done() is False
+
+    finish_reserve.set()
+    outcome = await asyncio.gather(pending, return_exceptions=True)
+    assert isinstance(outcome[0], asyncio.CancelledError)
+    cleanup = await orchestrator.graceful_stop(1)
+
+    assert cleanup.get("live", 0) == 0
+    assert (await board.get(task.id)).status is TaskStatus.PENDING
+    assert agent.status is AgentStatus.IDLE and agent.current_task is None
+    assert orchestrator._campaign_recovery_owners == {}
+    assert orchestrator._campaign_reservations == {}
+    assert orchestrator._active_dispatches == {}
+    runner.run_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_after_graceful_stop_has_no_pool_or_board_effects() -> None:
+    agent = AgentState(
+        id="fenced-agent",
+        name="fenced-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="fenced-task", title="Admission fenced")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    assert await orchestrator.graceful_stop(0) == {"cancelled": 0, "completed": 0}
+
+    assert await orchestrator.dispatch(task, TopologyType.PIPELINE) == []
+    assert board.updates == []
+    assert pool._assignments == []
+    assert orchestrator._active_dispatches == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "mode",
+    ["genome", "_dispatch_swarm", "_dispatch_supervisor", "_dispatch_subagents_as_tools"],
+)
+async def test_topology_helpers_do_not_report_rejected_dispatch(mode) -> None:
+    agent = AgentState(
+        id="rejected-topology-agent",
+        name="rejected-topology-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="rejected-topology-task", title="Rejected topology")
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(agent_pool=pool)
+    orchestrator._assign_dispatch = AsyncMock(return_value=False)  # type: ignore[method-assign]
+
+    if mode == "genome":
+        genome = SimpleNamespace(
+            genome_id="rejected-genome",
+            entrypoints=["root"],
+            nodes=[SimpleNamespace(node_id="root")],
+            validate_structure=MagicMock(),
+            incoming_edge_ids=MagicMock(return_value=[]),
+        )
+        result = await orchestrator._dispatch_topology_genome(task, genome)
+    else:
+        result = await getattr(orchestrator, mode)(task, [agent])
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_route_next_does_not_report_rejected_dispatch() -> None:
+    agent = AgentState(
+        id="rejected-route-agent",
+        name="rejected-route-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(id="rejected-route-task", title="Rejected route")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=MockAgentPool([agent]),
+    )
+    orchestrator._assign_dispatch = AsyncMock(return_value=False)  # type: ignore[method-assign]
+
+    assert await orchestrator.route_next() == []
+
+
+@pytest.mark.asyncio
+async def test_campaign_provider_failure_never_uses_generic_retry_requeue(
+    monkeypatch,
+) -> None:
     task = Task(
         id="campaign-provider-failure",
         title="Read-only campaign task",
@@ -3556,6 +5107,11 @@ async def test_campaign_provider_failure_never_uses_generic_retry_requeue() -> N
         agent_id="campaign-agent",
         topology=TopologyType.PIPELINE,
     )
+    project = AsyncMock()
+    monkeypatch.setattr(
+        "dharma_swarm.orchestrator_execution.record_terminal_projection",
+        project,
+    )
 
     await orchestrator._handle_task_failure(
         td=dispatch,
@@ -3564,9 +5120,104 @@ async def test_campaign_provider_failure_never_uses_generic_retry_requeue() -> N
         source="execution",
     )
 
-    statuses = [fields.get("status") for _, fields in board.updates]
-    assert TaskStatus.FAILED in statuses
-    assert TaskStatus.PENDING not in statuses
+    project.assert_awaited_once()
+    assert project.await_args.kwargs["status"] == "failed"
+    assert project.await_args.kwargs["action"] == "quarantine"
+    assert board.updates == []
+
+
+@pytest.mark.asyncio
+async def test_campaign_failure_authority_survives_runner_metadata_stripping(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm import orchestrator_execution
+
+    agent = AgentState(
+        id="campaign-strip-agent",
+        name="campaign-strip-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    task = Task(
+        id="campaign-strip-task",
+        title="Immutable campaign failure authority",
+        status=TaskStatus.RUNNING,
+        assigned_to=agent.id,
+        metadata={
+            **_campaign_metadata(agent.id, task_id="campaign-strip-task"),
+            "max_retries": 9,
+            "retry_count": 0,
+        },
+    )
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    _ensure_fixture_execution_identity(dispatch, task=task, require=True)
+    dispatch.metadata.pop("evidence_receipt_id", None)
+    token = {
+        "reservation_id": "campaign-strip-reservation",
+        "attempt_generation": 0,
+        "provider_task_scheduled": False,
+    }
+    fence = AsyncMock()
+    ready = MagicMock(
+        side_effect=lambda: token.__setitem__("provider_task_scheduled", True)
+    )
+
+    class _MetadataStrippingRunner:
+        _config = None
+
+        async def run_task(self, affected_task, **kwargs):
+            await kwargs["campaign_effect_fence"]()
+            kwargs["campaign_effect_ready"]()
+            affected_task.metadata.clear()
+            raise RuntimeError("provider failed after stripping campaign authority")
+
+    runner = _MetadataStrippingRunner()
+    pool = MockAgentPool([agent])
+    pool.set_runner(agent.id, runner)
+    assert await pool.reserve(agent.id, task.id, reservation_token=token)
+    board = MockTaskBoard()
+    board.tasks = [task]
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        runtime_db_path=tmp_path / "campaign-strip-runtime.db",
+    )
+    orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
+    orchestrator._active_dispatches[task.id] = dispatch
+    project = AsyncMock()
+    monkeypatch.setattr(orchestrator_execution, "record_terminal_projection", project)
+
+    with pytest.raises(
+        RuntimeError,
+        match="execution failure retained indeterminate custody",
+    ):
+        await orchestrator._execute_campaign_task(
+            runner,
+            task,
+            dispatch,
+            campaign_effect_fence=fence,
+            campaign_effect_ready=ready,
+            campaign_principal=agent.id,
+            campaign_reservation_token=token,
+        )
+
+    fence.assert_awaited_once()
+    ready.assert_called_once()
+    project.assert_awaited_once()
+    assert project.await_args.kwargs["status"] == "failed"
+    assert project.await_args.kwargs["action"] == "receipt"
+    assert task.metadata.get("retry_count", 0) == 0
+    assert task.status is TaskStatus.RUNNING
+    assert agent.status is AgentStatus.BUSY and agent.current_task == task.id
+    assert pool._reservation_tokens[agent.id] == (task.id, token)
+    assert orchestrator._active_dispatches[task.id] is dispatch
+    assert orchestrator._campaign_recovery_owners[id(token)] == [
+        dispatch,
+        token,
+        None,
+        False,
+    ]
 
 
 @pytest.mark.asyncio
@@ -3575,6 +5226,7 @@ async def test_route_next(agents, tasks):
     board.tasks = tasks
     pool = MockAgentPool(agents)
     orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     dispatches = await orch.route_next()
     assert len(dispatches) == 2
@@ -3588,6 +5240,7 @@ async def test_route_next_limited_agents(tasks):
         AgentState(id="a1", name="only-one", role=AgentRole.GENERAL, status=AgentStatus.IDLE),
     ])
     orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     dispatches = await orch.route_next()
     assert len(dispatches) == 1  # Only 1 agent for 2 tasks
@@ -3624,6 +5277,7 @@ async def test_route_next_prefers_reviewer_for_uncertain_coordination_task():
         ]
     )
     orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     dispatches = await orch.route_next()
 
@@ -3661,6 +5315,7 @@ async def test_route_next_prefers_director_named_agent_over_role_match():
         ]
     )
     orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     dispatches = await orch.route_next()
 
@@ -3671,18 +5326,100 @@ async def test_route_next_prefers_director_named_agent_over_role_match():
 @pytest.mark.asyncio
 async def test_fan_in(agents):
     pool = MockAgentPool(agents)
-    pool.set_result("a1", "result from agent 1")
-    pool.set_result("a2", "result from agent 2")
-    orch = Orchestrator(agent_pool=pool)
-
-    from dharma_swarm.models import TaskDispatch
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t1",
+            title="First fan-in branch",
+            status=TaskStatus.COMPLETED,
+            result="result from agent 1",
+        ),
+        Task(
+            id="t2",
+            title="Second fan-in branch",
+            status=TaskStatus.COMPLETED,
+            result="result from agent 2",
+        ),
+    ]
+    orch = Orchestrator(task_board=board, agent_pool=pool)
     dispatches = [
         TaskDispatch(task_id="t1", agent_id="a1"),
         TaskDispatch(task_id="t2", agent_id="a2"),
     ]
+    for dispatch in dispatches:
+        background = asyncio.create_task(asyncio.sleep(0))
+        await background
+        orch._running_tasks[dispatch.task_id] = background
+        orch._running_dispatch_owners[dispatch.task_id] = (background, dispatch)
+
     combined = await orch.fan_in(dispatches)
+
     assert "result from agent 1" in combined
     assert "result from agent 2" in combined
+
+
+@pytest.mark.asyncio
+async def test_fan_in_real_pool_none_result_never_releases_live_runner() -> None:
+    config = AgentConfig(
+        id="fan-in-live-agent",
+        name="fan-in-live-seat",
+        role=AgentRole.GENERAL,
+        provider=ProviderType.OLLAMA,
+        model="fixture-model",
+    )
+    runner = AgentRunner(config, advanced_memory=AsyncMock())
+    await runner.start()
+    pool = AgentPool()
+    pool._agents[config.id] = runner
+    task = Task(id="fan-in-live-task", title="Live fan-in branch")
+    board = MockTaskBoard()
+    board.tasks = [task]
+    orchestrator = Orchestrator(task_board=board, agent_pool=pool)
+    dispatch = TaskDispatch(task_id=task.id, agent_id=config.id)
+    assert await pool.reserve(
+        config.id, task.id, reservation_token=dispatch
+    ) is True
+    orchestrator._active_dispatches[task.id] = dispatch
+    execution_entered = asyncio.Event()
+    finish_execution = asyncio.Event()
+
+    async def exact_background_execution() -> None:
+        execution_entered.set()
+        await finish_execution.wait()
+        task.status = TaskStatus.COMPLETED
+        task.result = "terminal fan-in result"
+        assert await pool.release_reservation(
+            config.id,
+            task.id,
+            reservation_token=dispatch,
+        ) is True
+        orchestrator._active_dispatches.pop(task.id, None)
+
+    background = asyncio.create_task(exact_background_execution())
+    orchestrator._running_tasks[task.id] = background
+    orchestrator._running_dispatch_owners[task.id] = (background, dispatch)
+    await asyncio.wait_for(execution_entered.wait(), timeout=2)
+
+    fan_in = asyncio.create_task(orchestrator.fan_in([dispatch]))
+    await asyncio.sleep(0)
+
+    assert await pool.get_result(config.id) is None
+    assert fan_in.done() is False
+    assert runner.state.status is AgentStatus.BUSY
+    assert runner.state.current_task == task.id
+    assert await pool.reserve(
+        config.id,
+        "illicit-second-task",
+        reservation_token=TaskDispatch(
+            task_id="illicit-second-task",
+            agent_id=config.id,
+        ),
+    ) is False
+
+    finish_execution.set()
+    assert await asyncio.wait_for(fan_in, timeout=2) == "terminal fan-in result"
+    assert runner.state.status is AgentStatus.IDLE
+    assert runner.state.current_task is None
 
 
 @pytest.mark.asyncio
@@ -3718,6 +5455,12 @@ async def test_tick(agents, tasks):
     pool = MockAgentPool(agents)
     orch = Orchestrator(task_board=board, agent_pool=pool)
 
+    async def accept(td):
+        pool._assignments.append((td.agent_id, td.task_id))
+        return True
+
+    orch._assign_dispatch = accept  # type: ignore[method-assign]
+
     activity = await orch.tick()
     # Should have dispatched
     assert len(pool._assignments) > 0
@@ -3736,6 +5479,7 @@ async def test_tick_emits_runtime_event_with_coordination_summary(agents, tasks,
         event_memory=event_memory,
         session_id="sess-tick",
     )
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     async def fake_refresh():
         return {"global_truths": 3, "productive_disagreements": 1}
@@ -3871,6 +5615,287 @@ class DummyRunner:
         return self._result
 
 
+async def _build_outbox_orchestrator(
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    result: str = "outbox completion",
+    error: Exception | None = None,
+    max_retries: int = 0,
+):
+    from dharma_swarm.task_board import TaskBoard
+
+    runtime_path = tmp_path / "runtime.db"
+    board = TaskBoard(tmp_path / "tasks.db")
+    await board.init_db()
+    task = await board.create(
+        "Runtime-first outbox fixture",
+        metadata={"max_retries": max_retries, "retry_count": 0},
+    )
+    agent = AgentState(
+        id="outbox-agent",
+        name="outbox-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    retry_agent = AgentState(
+        id="outbox-retry-agent",
+        name="outbox-retry-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    runner = DummyRunner(result=result, error=error)
+    pool = MockAgentPool([agent, retry_agent])
+    pool.set_runner(agent.id, runner)
+    orchestrator = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_path,
+        shared_dir=tmp_path / "shared",
+        stigmergy_dir=tmp_path / "stigmergy",
+    )
+    await orchestrator._runtime_lifecycle._runtime_state_store().init_db()
+    orchestrator._telic_seam = None
+    orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._emit_completion_trace = AsyncMock()  # type: ignore[method-assign]
+    orchestrator._persist_result = AsyncMock()  # type: ignore[method-assign]
+    sidecar = MagicMock()
+    sidecar.consolidate_knowledge = AsyncMock(return_value=[])
+    monkeypatch.setattr(
+        "dharma_swarm.sleep_time_agent.SleepTimeAgent",
+        MagicMock(return_value=sidecar),
+    )
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.delenv("DHARMA_SPINE_DISPATCH", raising=False)
+    return orchestrator, board, pool, task, agent, runner
+
+
+@pytest.mark.asyncio
+async def test_swallowed_board_completion_replays_from_runtime_outbox(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm.graph import reconcile_board
+    from dharma_swarm.graph.reconciler import ReconcileReport
+
+    orchestrator, board, pool, task, agent, _runner = (
+        await _build_outbox_orchestrator(tmp_path, monkeypatch)
+    )
+    real_settle = reconcile_board.settle_task_board
+    swallowed = AsyncMock(return_value=None)
+    monkeypatch.setattr(reconcile_board, "settle_task_board", swallowed)
+
+    dispatches = await orchestrator.dispatch(task, TopologyType.PIPELINE)
+    dispatch = dispatches[0]
+    with pytest.raises(
+        RuntimeError,
+        match="completion projection is not durable on Board",
+    ):
+        await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=5)
+
+    pending = await board.get(task.id)
+    assert pending is not None and pending.status is TaskStatus.RUNNING
+    assert agent.status is AgentStatus.BUSY and agent.current_task == task.id
+    assert pool._reservation_tokens[agent.id] == (task.id, dispatch)
+    assert orchestrator._active_dispatches[task.id] is dispatch
+    assert orchestrator._generic_recovery_owners[id(dispatch)] == [
+        dispatch,
+        "terminal projection or release raised before proof",
+    ]
+    run_id = dispatch.metadata["execution_identity"]["run_id"]
+    store = orchestrator._runtime_lifecycle._runtime_state_store()
+    run = await store.get_delegation_run(run_id)
+    intent = run.metadata["task_board_projection_intent"]
+    assert (run.status, intent["action"], intent["result"]) == (
+        "completed", "receipt", "outbox completion"
+    )
+    swallowed.assert_awaited_once()
+
+    report = ReconcileReport()
+    await real_settle(
+        runtime_state=store,
+        task_board=board,
+        report=report,
+        now=datetime.now(timezone.utc),
+        logger=MagicMock(),
+        run_id=run_id,
+    )
+    replayed = await board.get(task.id)
+    assert report.errors == []
+    assert replayed is not None and replayed.status is TaskStatus.COMPLETED
+    assert replayed.result == "outbox completion"
+    assert replayed.metadata["graph_reconcile_projection"]["run_id"] == run_id
+
+
+@pytest.mark.asyncio
+async def test_swallowed_failure_projection_replays_exact_intent(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm.graph import reconcile_board
+    from dharma_swarm.graph.reconciler import ReconcileReport
+
+    error = RuntimeError("provider exploded exactly")
+    orchestrator, board, pool, task, agent, _runner = (
+        await _build_outbox_orchestrator(
+            tmp_path,
+            monkeypatch,
+            error=error,
+        )
+    )
+    real_settle = reconcile_board.settle_task_board
+    monkeypatch.setattr(reconcile_board, "settle_task_board", AsyncMock())
+
+    dispatch = (await orchestrator.dispatch(task, TopologyType.PIPELINE))[0]
+    with pytest.raises(
+        RuntimeError,
+        match="execution failure retained indeterminate custody",
+    ):
+        await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=5)
+
+    run_id = dispatch.metadata["execution_identity"]["run_id"]
+    store = orchestrator._runtime_lifecycle._runtime_state_store()
+    run = await store.get_delegation_run(run_id)
+    intent = run.metadata["task_board_projection_intent"]
+    assert run.metadata["error"] == "provider exploded exactly"
+    assert (intent["action"], intent["result"]) == (
+        "receipt", "provider exploded exactly"
+    )
+    assert dispatch.metadata["evidence_receipt_status"] == "failed"
+    assert dispatch.metadata["evidence_receipt_error_source"] == "internal_error"
+    assert dispatch.metadata["evidence_receipt_error_detail"] == intent["result"]
+    assert (await board.get(task.id)).status is TaskStatus.RUNNING
+    assert agent.status is AgentStatus.BUSY and agent.current_task == task.id
+    assert pool._reservation_tokens[agent.id] == (task.id, dispatch)
+    assert orchestrator._active_dispatches[task.id] is dispatch
+    assert orchestrator._generic_recovery_owners[id(dispatch)] == [
+        dispatch,
+        "execution_error projection is indeterminate",
+    ]
+
+    report = ReconcileReport()
+    await real_settle(
+        runtime_state=store,
+        task_board=board,
+        report=report,
+        now=datetime.now(timezone.utc),
+        logger=MagicMock(),
+        run_id=run_id,
+    )
+    replayed = await board.get(task.id)
+    assert report.errors == []
+    assert replayed is not None and replayed.status is TaskStatus.FAILED
+    assert replayed.result == "provider exploded exactly"
+
+
+@pytest.mark.asyncio
+async def test_honors_rejection_is_durable_before_release_crash_and_replay(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm.graph.durable_invoker import claim_idempotency_key
+    from dharma_swarm.graph.reconciler import GraphReconciler
+
+    orchestrator, board, _pool, task, agent, runner = (
+        await _build_outbox_orchestrator(tmp_path, monkeypatch)
+    )
+    task.metadata["completion_contract"] = {
+        "mode": "honors",
+        "minimum_file_references": 1,
+    }
+    dispatch = TaskDispatch(task_id=task.id, agent_id=agent.id)
+    identity = orchestrator._runtime_lifecycle.ensure_execution_identity(
+        dispatch, task=task
+    )
+    await board.update_task(
+        task.id,
+        status=TaskStatus.ASSIGNED,
+        assigned_to=agent.id,
+        metadata=task.metadata,
+    )
+    await board.update_task(task.id, status=TaskStatus.RUNNING, metadata=task.metadata)
+    task = await board.get(task.id)
+    assert task is not None
+    await orchestrator._runtime_lifecycle.record_task_claim(
+        dispatch, task=task, status="running", require_identity=True
+    )
+    await orchestrator._runtime_lifecycle.record_delegation_run(
+        dispatch, task=task, status="running", require_identity=True
+    )
+
+    with pytest.raises(RuntimeError, match="Honors checkpoint"):
+        await orchestrator._run_task_via_spine(runner, task, dispatch, 2)
+
+    run_id = identity.run_id
+    store = orchestrator._runtime_lifecycle._runtime_state_store()
+    run = await store.get_delegation_run(run_id)
+    side_effect_key = f"invoke_agent:{task.id}:{dispatch.agent_id}"
+    idempotency = await store.get_idempotency_record(
+        claim_idempotency_key(side_effect_key), side_effect_key
+    )
+    assert dispatch.metadata["evidence_receipt_status"] == "failed"
+    assert dispatch.metadata["evidence_receipt_error_source"] == "guardrail_blocked"
+    assert idempotency is not None and idempotency.status == "failed"
+    assert run is not None and run.status == "running"
+    assert (await board.get(task.id)).status is TaskStatus.RUNNING
+
+    replay_board = MockTaskBoard()
+    replay_board.tasks = [task.model_copy(deep=True)]
+    report = await GraphReconciler(store, task_board=replay_board).reconcile()
+    replayed = await replay_board.get(task.id)
+    assert report.errors == []
+    assert replayed is not None and replayed.status is TaskStatus.FAILED
+    assert replayed.status is not TaskStatus.COMPLETED
+    recovered_run = await store.get_delegation_run(run_id)
+    assert recovered_run is not None and recovered_run.status == "failed"
+    await orchestrator._collect_completed()
+
+
+@pytest.mark.asyncio
+async def test_chained_retry_history_closes_older_pending_projection(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    orchestrator, board, pool, task, agent, _runner = (
+        await _build_outbox_orchestrator(
+            tmp_path,
+            monkeypatch,
+            error=RuntimeError("first attempt failed"),
+            max_retries=1,
+        )
+    )
+    first = (await orchestrator.dispatch(task, TopologyType.PIPELINE))[0]
+    await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=5)
+    retry = await board.get(task.id)
+    assert retry is not None and retry.status is TaskStatus.PENDING
+    first_identity = first.metadata["execution_identity"]
+
+    pool.set_runner(
+        "outbox-retry-agent",
+        DummyRunner(result="second attempt completed"),
+    )
+    second = (await orchestrator.dispatch(retry, TopologyType.PIPELINE))[0]
+    await asyncio.wait_for(orchestrator._running_tasks[task.id], timeout=5)
+    completed = await board.get(task.id)
+    assert completed is not None and completed.status is TaskStatus.COMPLETED
+    second_identity = second.metadata["execution_identity"]
+    assert (first.agent_id, second.agent_id) == (
+        agent.id,
+        "outbox-retry-agent",
+    )
+    for field in ("run_id", "claim_id", "idempotency_key"):
+        assert first_identity[field] != second_identity[field]
+    assert second_identity["parent_run_id"] == first_identity["run_id"]
+    history = completed.metadata["graph_reconcile_projection_history"]
+    assert set(history) == {
+        first_identity["run_id"],
+        second_identity["run_id"],
+    }
+    assert history[first_identity["run_id"]]["action"] == "retry"
+    assert history[second_identity["run_id"]]["action"] == "receipt"
+
+
 @pytest.mark.asyncio
 async def test_generic_completion_still_schedules_sleep_time_sidecar(
     monkeypatch,
@@ -3901,7 +5926,9 @@ async def test_generic_completion_still_schedules_sleep_time_sidecar(
     orchestrator._attach_context_bundle = AsyncMock(  # type: ignore[method-assign]
         side_effect=lambda task, td, metadata: metadata
     )
-    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock()
+    orchestrator._runtime_lifecycle.ensure_execution_identity = MagicMock(
+        side_effect=_ensure_fixture_execution_identity
+    )
     orchestrator._runtime_lifecycle.record_task_claim = AsyncMock()
     orchestrator._runtime_lifecycle.record_delegation_run = AsyncMock()
     orchestrator._emit_lifecycle_event = AsyncMock()  # type: ignore[method-assign]
@@ -4193,7 +6220,10 @@ async def test_subagents_as_tools_persists_parent_and_child_runs(
 async def test_dispatch_pipeline_assigns_first_idle_only(agents, tasks):
     """PIPELINE topology should assign the task to exactly the first idle agent."""
     pool = MockAgentPool(agents)
-    orch = Orchestrator(agent_pool=pool)
+    pool.set_runner("a1", DummyRunner(result="pipeline result"))
+    board = MockTaskBoard()
+    board.tasks = tasks
+    orch = Orchestrator(task_board=board, agent_pool=pool)
 
     dispatches = await orch.dispatch(tasks[0], topology=TopologyType.PIPELINE)
 
@@ -4229,24 +6259,37 @@ async def test_fan_in_no_pool_returns_empty():
 
 @pytest.mark.asyncio
 async def test_fan_in_skips_none_results(agents):
-    """fan_in should collect only non-None results, skipping agents that returned None."""
-    from dharma_swarm.models import TaskDispatch
-
+    """fan_in should collect only successful terminal Board results."""
     pool = MockAgentPool(agents)
-    pool.set_result("a1", "good result")
-    # a2 has no result set -> get_result returns None
-    orch = Orchestrator(agent_pool=pool)
-
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t1",
+            title="Successful branch",
+            status=TaskStatus.COMPLETED,
+            result="good result",
+        ),
+        Task(
+            id="t2",
+            title="Failed branch",
+            status=TaskStatus.FAILED,
+            result="failure detail",
+        ),
+    ]
+    orch = Orchestrator(task_board=board, agent_pool=pool)
     dispatches = [
         TaskDispatch(task_id="t1", agent_id="a1"),
         TaskDispatch(task_id="t2", agent_id="a2"),
     ]
+    for dispatch in dispatches:
+        background = asyncio.create_task(asyncio.sleep(0))
+        await background
+        orch._running_tasks[dispatch.task_id] = background
+        orch._running_dispatch_owners[dispatch.task_id] = (background, dispatch)
+
     combined = await orch.fan_in(dispatches)
 
     assert "good result" in combined
-    # The combined string should NOT contain "None" as a literal
-    assert "None" not in combined
-    # Only one fragment was collected
     assert combined == "good result"
 
 
@@ -4286,8 +6329,10 @@ async def test_assign_dispatch_calls_message_bus(agents, tasks):
 
     pool = MockAgentPool(agents)
     board = MockTaskBoard()
+    board.tasks = [tasks[0]]
     bus = MockMessageBus()
     orch = Orchestrator(task_board=board, agent_pool=pool, message_bus=bus)
+    orch._handle_task_failure = AsyncMock()  # type: ignore[method-assign]
 
     td = TaskDispatch(task_id="t1", agent_id="a1")
     await orch._assign_dispatch(td)
@@ -4309,6 +6354,7 @@ async def test_route_next_skips_running_tasks(agents, tasks):
     board.tasks = tasks  # t1 and t2 both pending
     pool = MockAgentPool(agents)
     orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     # Simulate t1 already running by placing a dummy task in _running_tasks
     pending_future: asyncio.Future = asyncio.get_event_loop().create_future()
@@ -4634,8 +6680,11 @@ async def test_orchestrator_failure_records_signature(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_failure_progress_precedes_runtime_lifecycle(tmp_path, monkeypatch):
-    """Failure progress receipts should not wait on runtime-state persistence."""
+async def test_orchestrator_failure_runtime_precedes_progress_projection(
+    tmp_path,
+    monkeypatch,
+):
+    """Failure progress is emitted only after durable runtime terminalization."""
     board = MockTaskBoard()
     board.tasks = [Task(id="t-fail-fast-ledger", title="Fail task", description="safe")]
     pool = MockAgentPool(
@@ -4680,26 +6729,24 @@ async def test_orchestrator_failure_progress_precedes_runtime_lifecycle(tmp_path
     progress_path = tmp_path / "sess_fail_fast_ledger" / "progress_ledger.jsonl"
 
     try:
-        found = False
-        for _ in range(100):
-            await orch._collect_completed()
-            if progress_path.exists():
-                rows = [
-                    json.loads(line)
-                    for line in progress_path.read_text().splitlines()
-                    if line.strip()
-                ]
-                found = any(
-                    r.get("event") in {"task_failed", "task_retry_scheduled"}
-                    for r in rows
-                )
-                if found:
-                    break
-            await asyncio.sleep(0.01)
-
-        assert found, "Expected failure or retry event before runtime lifecycle finishes"
+        await asyncio.wait_for(runtime_write_started.wait(), timeout=2)
+        rows = (
+            [json.loads(line) for line in progress_path.read_text().splitlines()]
+            if progress_path.exists()
+            else []
+        )
+        assert not any(
+            row.get("event") in {"task_failed", "task_retry_scheduled"}
+            for row in rows
+        )
         assert orch._running_tasks
-        assert runtime_write_started.is_set()
+        runtime_block.set()
+        await _drain_running_tasks(orch)
+        rows = [json.loads(line) for line in progress_path.read_text().splitlines()]
+        assert any(
+            row.get("event") in {"task_failed", "task_retry_scheduled"}
+            for row in rows
+        )
     finally:
         runtime_block.set()
         for _ in range(100):
@@ -4778,7 +6825,7 @@ async def test_orchestrator_timeout_requeues_with_retry_budget(tmp_path):
         task_id == "t-timeout-retry" and fields.get("status") == TaskStatus.PENDING
         for task_id, fields in board.updates
     )
-    assert failed_seen
+    assert not failed_seen
     assert pending_seen
 
 
@@ -4815,7 +6862,8 @@ async def test_orchestrator_connection_error_auto_requeues_transient_failure(tmp
     assert task is not None
     assert task.metadata["retry_count"] == 1
     assert task.metadata["max_retries"] >= 2
-    assert task.metadata["last_failure_class"] == "connection_transient"
+    assert task.metadata["last_failure_class"] == "internal_error"
+    assert task.metadata["last_failure_diagnostic_class"] == "connection_transient"
     assert task.metadata["retry_backoff_seconds"] >= 30.0
 
 
@@ -4854,7 +6902,8 @@ async def test_orchestrator_long_timeout_auto_requeues_and_expands_timeout(tmp_p
     assert task is not None
     assert task.metadata["retry_count"] == 1
     assert task.metadata["max_retries"] >= 1
-    assert task.metadata["last_failure_class"] == "long_timeout"
+    assert task.metadata["last_failure_class"] == "timeout"
+    assert task.metadata["last_failure_diagnostic_class"] == "long_timeout"
     assert float(task.metadata["timeout_seconds"]) > 0.01
     assert task.metadata["retry_backoff_seconds"] >= 15.0
 
@@ -4986,6 +7035,7 @@ async def test_route_next_skips_retry_backoff_tasks(agents):
     ]
     pool = MockAgentPool(agents[:1])
     orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._assign_dispatch = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
     dispatches = await orch.route_next()
     assert len(dispatches) == 1
@@ -5110,13 +7160,24 @@ async def test_bsp_barrier_cancellation_releases_agent_and_requeues(tmp_path):
         session_id="sess_barrier_cancel",
     )
     orch._default_timeout_seconds = -60.0
-    dispatch = TaskDispatch(task_id="t-straggler", agent_id="a1")
+    dispatch = TaskDispatch(
+        task_id="t-straggler",
+        agent_id="a1",
+        metadata={"claim_id": "claim-straggler"},
+    )
+    _ensure_fixture_execution_identity(dispatch, task=board.tasks[0], require=True)
+    assert await pool.reserve(
+        "a1",
+        "t-straggler",
+        reservation_token=dispatch,
+    )
 
     async def never_finishes():
         await asyncio.sleep(3600)
 
     running = asyncio.create_task(never_finishes())
     orch._running_tasks["t-straggler"] = running
+    orch._running_dispatch_owners["t-straggler"] = (running, dispatch)
     orch._active_dispatches["t-straggler"] = dispatch
 
     settled, recovered = await orch._collect_completed_with_barrier()
@@ -5126,7 +7187,9 @@ async def test_bsp_barrier_cancellation_releases_agent_and_requeues(tmp_path):
     assert running.cancelled()
     assert "t-straggler" not in orch._running_tasks
     assert "t-straggler" not in orch._active_dispatches
-    assert pool.released == ["a1"]
+    assert pool.released == []
+    assert "a1" not in pool._reservation_tokens
+    assert pool._agents[0].status is AgentStatus.IDLE
     assert any(
         task_id == "t-straggler"
         and fields.get("status") == TaskStatus.PENDING
@@ -5134,3 +7197,66 @@ async def test_bsp_barrier_cancellation_releases_agent_and_requeues(tmp_path):
         and fields.get("metadata", {}).get("last_failure_source") == "bsp_barrier_timeout"
         for task_id, fields in board.updates
     )
+
+
+@pytest.mark.asyncio
+async def test_bsp_barrier_retains_cancellation_resistant_exact_owner() -> None:
+    from dharma_swarm.orchestrator_bsp import _settle_cancelled_straggler
+
+    agent = AgentState(
+        id="bsp-live-agent",
+        name="bsp-live-seat",
+        role=AgentRole.GENERAL,
+        status=AgentStatus.IDLE,
+    )
+    pool = MockAgentPool([agent])
+    orchestrator = Orchestrator(agent_pool=pool)
+    dispatch = TaskDispatch(task_id="bsp-live-task", agent_id=agent.id)
+    assert await pool.reserve(
+        agent.id,
+        dispatch.task_id,
+        reservation_token=dispatch,
+    )
+    cancellation_seen = asyncio.Event()
+    release_work = asyncio.Event()
+
+    async def stubborn_work():
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancellation_seen.set()
+            await release_work.wait()
+
+    running = asyncio.create_task(stubborn_work())
+    orchestrator._running_tasks[dispatch.task_id] = running
+    orchestrator._running_dispatch_owners[dispatch.task_id] = (
+        running,
+        dispatch,
+    )
+    orchestrator._active_dispatches[dispatch.task_id] = dispatch
+    orchestrator._handle_task_failure = AsyncMock()  # type: ignore[method-assign]
+    await asyncio.sleep(0)
+    running.cancel()
+    await cancellation_seen.wait()
+
+    try:
+        recovered = await _settle_cancelled_straggler(
+            orchestrator,
+            dispatch.task_id,
+            running,
+            0.0,
+        )
+
+        assert recovered == 0
+        assert orchestrator._running_tasks[dispatch.task_id] is running
+        assert orchestrator._active_dispatches[dispatch.task_id] is dispatch
+        assert pool._reservation_tokens[agent.id] == (dispatch.task_id, dispatch)
+        orchestrator._handle_task_failure.assert_not_awaited()  # type: ignore[attr-defined]
+    finally:
+        release_work.set()
+        await running
+        assert await pool.release_reservation(
+            agent.id,
+            dispatch.task_id,
+            reservation_token=dispatch,
+        )
