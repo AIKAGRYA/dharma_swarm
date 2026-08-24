@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import base64
+import hashlib
 import json
 import os
 import stat
@@ -15,6 +16,11 @@ import pytest
 import dharma_swarm._mission_control_operator_control_fs as control_fs
 import dharma_swarm._mission_control_operator_control_protocol as control_protocol
 import dharma_swarm.mission_control_operator_control as control_module
+from dharma_swarm.mission_control_operator_runtime import (
+    OPERATOR_HMAC_CREDENTIAL_NAME,
+    SYSTEMD_CREDENTIALS_DIRECTORY_ENV,
+    operator_control_reconciler_from_config,
+)
 from dharma_swarm.mission_control_operator_control import (
     ApplicationStatus,
     AuthorityApplication,
@@ -200,7 +206,10 @@ def test_request_rejects_unknown_and_decision_actions() -> None:
             OperatorControlRequest.from_mapping(_request(action))
 
 
-def test_noncanonical_bytes_duplicate_keys_and_bad_hmac_fail_closed() -> None:
+async def test_noncanonical_bytes_duplicate_keys_and_bad_hmac_fail_closed(
+    tmp_path: Path,
+    inboxes: tuple[Path, Path],
+) -> None:
     request = OperatorControlRequest.from_mapping(_request())
     envelope = OperatorControlEnvelope.sign(
         request, operator_login=LOGIN, secret=SECRET, now=NOW
@@ -220,6 +229,53 @@ def test_noncanonical_bytes_duplicate_keys_and_bad_hmac_fail_closed() -> None:
     tampered_raw = json.dumps(tampered, sort_keys=True, separators=(",", ":")).encode()
     with pytest.raises(ControlAuthenticationError, match="verification"):
         decode_and_verify_envelope(tampered_raw, secret=SECRET, now=NOW)
+
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    credentials = tmp_path / "credentials"
+    credentials.mkdir(mode=0o700)
+    credentials.chmod(0o700)
+    credential = credentials / OPERATOR_HMAC_CREDENTIAL_NAME
+    credential.write_bytes(b"wrong-operator-control-key-32-bytes-minimum")
+    credential.chmod(0o600)
+    reconciler = operator_control_reconciler_from_config(
+        "campaign-alpha",
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        credential_environ={SYSTEMD_CREDENTIALS_DIRECTORY_ENV: str(credentials)},
+    )
+    assert reconciler is not None
+    request = OperatorControlRequest.from_mapping(_request())
+    publication = ControlInboxPublisher(normal, emergency).publish(
+        request,
+        operator_login=LOGIN,
+        secret=SECRET,
+        now=NOW,
+    )
+    callback_calls = 0
+
+    async def apply(control, _login, digest):
+        nonlocal callback_calls
+        callback_calls += 1
+        return _authority_application(control, digest)
+
+    [result] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply),
+        now=NOW,
+    )
+    assert result.status is ReconcileStatus.INVALID
+    assert result.error_code == "invalid_authentication"
+    assert callback_calls == 0
+    assert not publication.path.exists()
+    assert not list(applied.iterdir())
+    rejected_evidence = list(rejected.iterdir())
+    assert rejected_evidence
+    for path in rejected_evidence:
+        raw = path.read_bytes()
+        assert SECRET not in raw
+        assert hashlib.sha256(SECRET).hexdigest().encode() not in raw
+        assert str(len(SECRET)).encode() not in raw
 
 
 def test_expiry_future_skew_and_max_ttl_are_enforced() -> None:
@@ -1176,7 +1232,9 @@ async def test_crash_after_terminal_candidate_move_recovers_missing_sidecar(
             raise RuntimeError("crash after terminal candidate move")
         return original_publish(directory, filename, payload, **kwargs)
 
-    monkeypatch.setattr(control_module, "_atomic_publish", crash_before_terminal_sidecar)
+    monkeypatch.setattr(
+        control_module, "_atomic_publish", crash_before_terminal_sidecar
+    )
     with pytest.raises(RuntimeError, match="crash after terminal candidate move"):
         await reconciler.reconcile_once(
             SupervisorControlCallbacks(apply=apply), now=NOW
@@ -1286,9 +1344,7 @@ async def test_authority_echo_mismatch_is_terminally_rejected(
         if control_fs.CONTROL_QUARANTINE_FILENAME_RE.fullmatch(path.name)
     ]
     receipt = json.loads(
-        (
-            rejected / control_fs.quarantine_receipt_filename(quarantine.name)
-        ).read_text()
+        (rejected / control_fs.quarantine_receipt_filename(quarantine.name)).read_text()
     )
     assert receipt["error_code"] == "idempotency_conflict"
     assert receipt["authority_applied"] is False

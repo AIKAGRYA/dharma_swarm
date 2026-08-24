@@ -380,8 +380,6 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
         inflight_inbox=args.operator_control_inflight_inbox,
         applied_inbox=args.operator_control_applied_inbox,
         rejected_inbox=args.operator_control_rejected_inbox,
-        hmac_credential_path=args.operator_control_hmac_credential,
-        hmac_credential_sha256=args.operator_control_hmac_sha256,
         max_candidates_per_cycle=args.operator_control_max_candidates_per_cycle,
     )
     verifier_seat = _requested_verifier_seat(requested_roster, args.verifier_seat)
@@ -567,16 +565,6 @@ def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[s
         args.observer_health_receipt,
         args.observer_health_receipt_sha256,
     )
-    operator_control_reconciler_from_config(
-        args.mission_id,
-        normal_inbox=args.operator_control_normal_inbox,
-        inflight_inbox=args.operator_control_inflight_inbox,
-        applied_inbox=args.operator_control_applied_inbox,
-        rejected_inbox=args.operator_control_rejected_inbox,
-        hmac_credential_path=args.operator_control_hmac_credential,
-        hmac_credential_sha256=args.operator_control_hmac_sha256,
-        max_candidates_per_cycle=args.operator_control_max_candidates_per_cycle,
-    )
     command = [
         sys.executable,
         str(Path(__file__).resolve()),
@@ -635,27 +623,20 @@ def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[s
                 args.observer_health_receipt_sha256,
             ]
         )
-    if args.operator_control_hmac_credential:
-        command.extend(
-            [
-                "--operator-control-normal-inbox",
-                str(Path(args.operator_control_normal_inbox).expanduser().absolute()),
-                "--operator-control-inflight-inbox",
-                str(Path(args.operator_control_inflight_inbox).expanduser().absolute()),
-                "--operator-control-applied-inbox",
-                str(Path(args.operator_control_applied_inbox).expanduser().absolute()),
-                "--operator-control-rejected-inbox",
-                str(Path(args.operator_control_rejected_inbox).expanduser().absolute()),
-                "--operator-control-hmac-credential",
-                str(
-                    Path(args.operator_control_hmac_credential).expanduser().absolute()
-                ),
-                "--operator-control-hmac-sha256",
-                args.operator_control_hmac_sha256,
-                "--operator-control-max-candidates-per-cycle",
-                str(args.operator_control_max_candidates_per_cycle),
-            ]
-        )
+    command.extend(
+        [
+            "--operator-control-normal-inbox",
+            str(Path(args.operator_control_normal_inbox).expanduser().absolute()),
+            "--operator-control-inflight-inbox",
+            str(Path(args.operator_control_inflight_inbox).expanduser().absolute()),
+            "--operator-control-applied-inbox",
+            str(Path(args.operator_control_applied_inbox).expanduser().absolute()),
+            "--operator-control-rejected-inbox",
+            str(Path(args.operator_control_rejected_inbox).expanduser().absolute()),
+            "--operator-control-max-candidates-per-cycle",
+            str(args.operator_control_max_candidates_per_cycle),
+        ]
+    )
     if args.lease_root:
         command.extend(
             [

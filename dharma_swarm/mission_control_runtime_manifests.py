@@ -315,8 +315,6 @@ def add_campaign_runtime_arguments(parser: Any) -> None:
         "--operator-control-rejected-inbox",
         default="/run/dharma-sadhana/control/rejected",
     )
-    parser.add_argument("--operator-control-hmac-credential", default="")
-    parser.add_argument("--operator-control-hmac-sha256", default="")
     parser.add_argument(
         "--operator-control-max-candidates-per-cycle",
         type=int,

@@ -365,14 +365,13 @@ async def test_dead_exact_name_is_a_conflict_not_a_spawn_hint(tmp_path: Path) ->
     assert swarm.spawn_calls == []
 
 
-def test_campaign_child_command_forwards_exact_roster_triplet(tmp_path: Path) -> None:
+def test_campaign_child_command_forwards_roster_without_hmac_material(
+    tmp_path: Path,
+) -> None:
     path, digest = _write_manifest(tmp_path, _payload())
     observer_path, observer_digest = _write_observer_health_receipt(tmp_path)
-    control_secret = b"sadhana-operator-control-test-secret"
-    control_credential = tmp_path / "operator-control-hmac"
-    control_credential.write_bytes(control_secret)
-    control_credential.chmod(0o600)
-    control_digest = hashlib.sha256(control_secret).hexdigest()
+    forbidden_secret = "sadhana-operator-control-test-secret"
+    forbidden_digest = hashlib.sha256(forbidden_secret.encode()).hexdigest()
     args = campaign_cli.build_parser().parse_args(
         [
             "start",
@@ -396,10 +395,6 @@ def test_campaign_child_command_forwards_exact_roster_triplet(tmp_path: Path) ->
             str(observer_path),
             "--observer-health-receipt-sha256",
             observer_digest,
-            "--operator-control-hmac-credential",
-            str(control_credential),
-            "--operator-control-hmac-sha256",
-            control_digest,
         ]
     )
 
@@ -412,12 +407,33 @@ def test_campaign_child_command_forwards_exact_roster_triplet(tmp_path: Path) ->
     assert command[command.index("--agent-roster") + 1] == str(path.resolve())
     assert command[command.index("--agent-roster-sha256") + 1] == digest
     assert command[command.index("--objective-sha256") + 1] == OBJECTIVE_SHA
-    assert command[command.index("--operator-control-hmac-credential") + 1] == str(
-        control_credential
-    )
-    assert command[command.index("--operator-control-hmac-sha256") + 1] == (
-        control_digest
-    )
+    command_text = "\0".join(command)
+    assert "--operator-control-hmac-credential" not in command
+    assert "--operator-control-hmac-sha256" not in command
+    assert forbidden_secret not in command_text
+    assert forbidden_digest not in command_text
+    for retired_flag in (
+        "--operator-control-hmac-credential",
+        "--operator-control-hmac-sha256",
+    ):
+        with pytest.raises(SystemExit):
+            campaign_cli.build_parser().parse_args(
+                [
+                    "start",
+                    "--state-dir",
+                    str(tmp_path / "state"),
+                    "--mission-id",
+                    CAMPAIGN_ID,
+                    "--authority-manifest",
+                    str(tmp_path / "authority.json"),
+                    "--observed-input-manifest",
+                    str(tmp_path / "observed-inputs.json"),
+                    "--held-out-oracle-manifest",
+                    str(tmp_path / "held-out-oracle.json"),
+                    retired_flag,
+                    "forbidden-value",
+                ]
+            )
 
 
 def test_campaign_child_command_rejects_partial_roster_configuration(

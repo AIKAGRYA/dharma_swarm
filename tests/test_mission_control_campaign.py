@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -58,7 +59,9 @@ from dharma_swarm.mission_control_operator_control import (
     OperatorControlRequest,
 )
 from dharma_swarm.mission_control_operator_runtime import (
+    OPERATOR_HMAC_CREDENTIAL_NAME,
     SADHANA_OPERATOR_CAMPAIGN_ID,
+    SYSTEMD_CREDENTIALS_DIRECTORY_ENV,
     load_operator_hmac_credential,
     operator_control_reconciler_from_config,
 )
@@ -325,50 +328,73 @@ def test_campaign_config_bounds_projection_freshness() -> None:
         CampaignConfig(MISSION_ID, max_dispatch_per_cycle=1.5)  # type: ignore[arg-type]
 
 
-def test_operator_runtime_requires_complete_hash_pinned_credential(
+def _operator_credential_environment(
+    tmp_path: Path,
+    secret: bytes,
+) -> tuple[Path, dict[str, str]]:
+    credentials = tmp_path / "credentials"
+    credentials.mkdir(mode=0o700)
+    credentials.chmod(0o700)
+    credential = credentials / OPERATOR_HMAC_CREDENTIAL_NAME
+    credential.write_bytes(secret)
+    credential.chmod(0o600)
+    return credential, {SYSTEMD_CREDENTIALS_DIRECTORY_ENV: str(credentials)}
+
+
+def test_operator_runtime_requires_systemd_credential(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(MissionControlError, match="requires the exact operator HMAC"):
+    with pytest.raises(MissionControlError, match="requires the systemd operator HMAC"):
         operator_control_reconciler_from_config(
             SADHANA_OPERATOR_CAMPAIGN_ID,
-            hmac_credential_path=None,
-            hmac_credential_sha256="",
+            credential_environ={},
         )
 
     secret = b"sadhana-runtime-hmac-credential-32-bytes"
-    credential = tmp_path / "operator.hmac"
-    credential.write_bytes(secret)
-    credential.chmod(0o600)
-    with pytest.raises(MissionControlError, match="SHA-256 conflicts"):
-        load_operator_hmac_credential(
-            credential,
-            expected_file_sha256="0" * 64,
-        )
+    _, environment = _operator_credential_environment(tmp_path, secret)
+    assert load_operator_hmac_credential(environ=environment) == secret
 
 
-@pytest.mark.parametrize("custody_fault", ["mode", "hardlink", "symlink"])
+@pytest.mark.parametrize(
+    "custody_fault",
+    [
+        "directory_mode",
+        "file_mode",
+        "hardlink",
+        "file_symlink",
+        "directory_symlink",
+        "missing",
+    ],
+)
 def test_operator_runtime_credential_custody_fails_closed(
     tmp_path: Path,
     custody_fault: str,
 ) -> None:
     secret = b"sadhana-runtime-hmac-credential-32-bytes"
-    credential = tmp_path / "operator.hmac"
-    credential.write_bytes(secret)
-    credential.chmod(0o600)
-    candidate = credential
-    if custody_fault == "mode":
+    credential, environment = _operator_credential_environment(tmp_path, secret)
+    credentials = credential.parent
+    if custody_fault == "directory_mode":
+        credentials.chmod(0o755)
+    elif custody_fault == "file_mode":
         credential.chmod(0o640)
     elif custody_fault == "hardlink":
-        os.link(credential, tmp_path / "operator-hardlink.hmac")
+        os.link(credential, credentials / "operator-hardlink.hmac")
+    elif custody_fault == "file_symlink":
+        credential.unlink()
+        credential.symlink_to(tmp_path / "foreign-credential")
+    elif custody_fault == "directory_symlink":
+        alias = tmp_path / "credentials-link"
+        alias.symlink_to(credentials, target_is_directory=True)
+        environment[SYSTEMD_CREDENTIALS_DIRECTORY_ENV] = str(alias)
     else:
-        candidate = tmp_path / "operator-symlink.hmac"
-        candidate.symlink_to(credential)
+        credential.unlink()
 
-    with pytest.raises(MissionControlError, match="custody|opened exactly"):
-        load_operator_hmac_credential(
-            candidate,
-            expected_file_sha256=hashlib.sha256(secret).hexdigest(),
-        )
+    with pytest.raises(MissionControlError, match="custody|opened exactly") as raised:
+        load_operator_hmac_credential(environ=environment)
+    error = str(raised.value)
+    assert secret.decode() not in error
+    assert hashlib.sha256(secret).hexdigest() not in error
+    assert str(len(secret)) not in error
 
 
 @pytest.mark.parametrize("flag", ["O_NOFOLLOW", "O_DIRECTORY"])
@@ -378,16 +404,11 @@ def test_operator_runtime_requires_nofollow_directory_support(
     flag: str,
 ) -> None:
     secret = b"sadhana-runtime-hmac-credential-32-bytes"
-    credential = tmp_path / "operator.hmac"
-    credential.write_bytes(secret)
-    credential.chmod(0o600)
+    _, environment = _operator_credential_environment(tmp_path, secret)
     monkeypatch.setattr(operator_runtime.os, flag, 0)
 
     with pytest.raises(MissionControlError, match="O_NOFOLLOW and O_DIRECTORY"):
-        load_operator_hmac_credential(
-            credential,
-            expected_file_sha256=hashlib.sha256(secret).hexdigest(),
-        )
+        load_operator_hmac_credential(environ=environment)
 
 
 @pytest.mark.asyncio
@@ -474,17 +495,14 @@ async def test_signed_pause_runtime_composition_suppresses_same_cycle_dispatch(
         directory.mkdir(parents=True, exist_ok=True)
 
     secret = b"sadhana-operator-runtime-composition-secret"
-    credential = tmp_path / "operator-control.hmac"
-    credential.write_bytes(secret)
-    credential.chmod(0o600)
+    _, environment = _operator_credential_environment(tmp_path, secret)
     reconciler = operator_control_reconciler_from_config(
         MISSION_ID,
         normal_inbox=normal,
         inflight_inbox=inflight,
         applied_inbox=applied,
         rejected_inbox=rejected,
-        hmac_credential_path=credential,
-        hmac_credential_sha256=hashlib.sha256(secret).hexdigest(),
+        credential_environ=environment,
     )
     assert reconciler is not None
 
@@ -524,6 +542,19 @@ async def test_signed_pause_runtime_composition_suppresses_same_cycle_dispatch(
     assert session.metadata["operator_control_state"]["transition_sequence"] == 1
     assert dispatcher.calls == 0
     assert result.snapshot.campaign_status == "paused"
+    private_values = (
+        secret.decode(),
+        hashlib.sha256(secret).hexdigest(),
+    )
+    projected = json.dumps(result.snapshot.to_dict(), sort_keys=True)
+    session_state = json.dumps(session.metadata, sort_keys=True)
+    reconciler_state = repr(reconciler)
+    assert all(value not in projected for value in private_values)
+    assert all(value not in session_state for value in private_values)
+    assert all(value not in reconciler_state for value in private_values)
+    for length_field in ("credential_length", "hmac_key_length", "secret_length"):
+        assert length_field not in projected
+        assert length_field not in session_state
     assert not publication.path.exists()
     assert len(tuple(applied.glob("*.control.json"))) == 1
     assert len(tuple(applied.glob("*.terminal.json"))) == 1

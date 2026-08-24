@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import os
-import re
 import stat
+from collections.abc import Mapping
 from pathlib import Path
 
 from dharma_swarm.mission_control_contract import MissionControlError
@@ -19,8 +17,9 @@ from dharma_swarm.mission_control_operator_control import (
 )
 
 SADHANA_OPERATOR_CAMPAIGN_ID = "sadhana-10-20260823"
+SYSTEMD_CREDENTIALS_DIRECTORY_ENV = "CREDENTIALS_DIRECTORY"
+OPERATOR_HMAC_CREDENTIAL_NAME = "control_hmac_key"
 MAX_OPERATOR_HMAC_BYTES = 4096
-_RAW_SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def _need(condition: bool, message: str) -> None:
@@ -95,21 +94,31 @@ def _file_identity(value: os.stat_result) -> tuple[int, ...]:
 
 
 def load_operator_hmac_credential(
-    path: Path | str,
     *,
-    expected_file_sha256: str,
+    environ: Mapping[str, str] | None = None,
 ) -> bytes:
-    """Read one hash-pinned systemd credential without following path links."""
-    candidate = _absolute_path(path, "operator HMAC credential")
+    values = os.environ if environ is None else environ
+    directory_raw = values.get(SYSTEMD_CREDENTIALS_DIRECTORY_ENV, "")
     _need(
-        isinstance(expected_file_sha256, str)
-        and _RAW_SHA256_RE.fullmatch(expected_file_sha256) is not None,
-        "operator HMAC credential SHA-256 must be raw lowercase hex",
+        isinstance(directory_raw, str) and bool(directory_raw),
+        "operator HMAC credential is unavailable",
     )
+    # Configuration selects systemd's directory, never a credential filename.
+    credential_directory = _absolute_path(
+        directory_raw, "systemd credentials directory"
+    )
+    candidate = credential_directory / OPERATOR_HMAC_CREDENTIAL_NAME
     parent, name = _open_parent(candidate)
     nofollow = getattr(os, "O_NOFOLLOW", None)
     assert isinstance(nofollow, int) and nofollow != 0
     try:
+        directory = os.fstat(parent)
+        _need(
+            stat.S_ISDIR(directory.st_mode)
+            and directory.st_uid in {0, os.geteuid()}
+            and stat.S_IMODE(directory.st_mode) in {0o500, 0o700},
+            "operator HMAC credential directory custody is invalid",
+        )
         descriptor = os.open(
             name,
             os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -154,11 +163,6 @@ def load_operator_hmac_credential(
         and 32 <= len(secret) <= MAX_OPERATOR_HMAC_BYTES,
         "operator HMAC credential byte contract is invalid",
     )
-    observed = hashlib.sha256(secret).hexdigest()
-    _need(
-        hmac.compare_digest(observed, expected_file_sha256),
-        "operator HMAC credential SHA-256 conflicts",
-    )
     return secret
 
 
@@ -169,24 +173,23 @@ def operator_control_reconciler_from_config(
     inflight_inbox: Path | str = DEFAULT_INFLIGHT_INBOX,
     applied_inbox: Path | str = DEFAULT_APPLIED_INBOX,
     rejected_inbox: Path | str = DEFAULT_REJECTED_INBOX,
-    hmac_credential_path: Path | str | None,
-    hmac_credential_sha256: str,
+    credential_environ: Mapping[str, str] | None = None,
     max_candidates_per_cycle: int = 128,
 ) -> OperatorControlInboxReconciler | None:
     """Build the sole-writer inbox adapter or fail closed for SADHANA."""
-    path_text = str(hmac_credential_path or "")
-    digest = str(hmac_credential_sha256 or "")
-    configured = bool(path_text), bool(digest)
-    if mission_id == SADHANA_OPERATOR_CAMPAIGN_ID and configured != (True, True):
+    values = os.environ if credential_environ is None else credential_environ
+    directory_raw = values.get(SYSTEMD_CREDENTIALS_DIRECTORY_ENV, "")
+    configured = isinstance(directory_raw, str) and bool(directory_raw)
+    if mission_id == SADHANA_OPERATOR_CAMPAIGN_ID and not configured:
         raise MissionControlError(
-            "SADHANA run requires the exact operator HMAC credential and SHA-256"
+            "SADHANA run requires the systemd operator HMAC credential"
         )
-    if configured == (False, False):
+    if not configured:
+        _need(
+            directory_raw is None or directory_raw == "",
+            "operator HMAC credential is unavailable",
+        )
         return None
-    _need(
-        configured == (True, True),
-        "operator HMAC credential configuration is partial",
-    )
     roots = tuple(
         _absolute_path(value, label)
         for value, label in (
@@ -197,10 +200,7 @@ def operator_control_reconciler_from_config(
         )
     )
     _need(len(set(roots)) == 4, "operator control inbox roots must be distinct")
-    secret = load_operator_hmac_credential(
-        path_text,
-        expected_file_sha256=digest,
-    )
+    secret = load_operator_hmac_credential(environ=values)
     return OperatorControlInboxReconciler(
         normal_inbox=roots[0],
         inflight_inbox=roots[1],
@@ -213,7 +213,9 @@ def operator_control_reconciler_from_config(
 
 __all__ = [
     "MAX_OPERATOR_HMAC_BYTES",
+    "OPERATOR_HMAC_CREDENTIAL_NAME",
     "SADHANA_OPERATOR_CAMPAIGN_ID",
+    "SYSTEMD_CREDENTIALS_DIRECTORY_ENV",
     "load_operator_hmac_credential",
     "operator_control_reconciler_from_config",
 ]
