@@ -39,6 +39,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.operator_core.a2a_task_lifecycle import queue_path
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -55,8 +57,11 @@ DHARMA_HOME = Path(os.environ.get("DHARMA_HOME", Path.home() / ".dharma"))
 # Hermes state file — documents Hermes' liveness
 HERMES_STATE_FILE = DHARMA_HOME / "agents" / "hermes-m5" / "state.json"
 
-# A2A bus queue — file-based task queue for inter-agent coordination
-QUEUE_FILE = DHARMA_HOME / "a2a_bus" / "queue.jsonl"
+# A2A bus queue — file-based task queue for inter-agent coordination.
+# Sourced from the canonical writer (a2a_task_lifecycle.queue_path) so Hermes
+# reads the same ``a2a_bus/tasks/queue.jsonl`` surface every other consumer
+# writes/reads — not the legacy root ``a2a_bus/queue.jsonl``.
+QUEUE_FILE = queue_path(DHARMA_HOME)
 
 # Hermes agent ID
 HERMES_AGENT_ID = "hermes-m5"
