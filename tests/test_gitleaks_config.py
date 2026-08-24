@@ -9,6 +9,7 @@ from pathlib import Path
 
 CONFIG_PATH = Path(".gitleaks.toml")
 SADHANA_FIXTURE_PATTERN = r"^idempotency-[0-9]{3}$"
+ED25519_TYPE_PATTERN = r"^Ed25519PrivateKey$"
 
 
 def _config() -> dict[str, object]:
@@ -44,3 +45,40 @@ def test_sadhana_idempotency_exception_rejects_broader_token_shapes() -> None:
         "production-idempotency-secret-001",
     ):
         assert fixture.fullmatch(candidate) is None
+
+
+def test_ed25519_type_exception_is_exact_unique_and_rule_scoped() -> None:
+    config = _config()
+    rules = config["rules"]
+    assert isinstance(rules, list)
+    matching_rules = [rule for rule in rules if rule.get("id") == "generic-api-key"]
+    assert len(matching_rules) == 1
+
+    allowlist = matching_rules[0]["allowlist"]
+    assert isinstance(allowlist, dict)
+    assert set(allowlist) == {"description", "regexTarget", "regexes"}
+    assert allowlist["regexTarget"] == "secret"
+    regexes = allowlist["regexes"]
+    assert isinstance(regexes, list)
+    assert regexes == [ED25519_TYPE_PATTERN]
+
+    global_allowlist = config["allowlist"]
+    assert isinstance(global_allowlist, dict)
+    assert ED25519_TYPE_PATTERN not in global_allowlist["regexes"]
+    assert "commits" not in global_allowlist
+
+
+def test_ed25519_type_exception_rejects_other_literal_shapes() -> None:
+    identifier = re.compile(ED25519_TYPE_PATTERN)
+    assert identifier.fullmatch("Ed25519PrivateKey")
+
+    credential_shaped = "api-key-" + ("A1b2" * 8)
+    for candidate in (
+        "prefix-Ed25519PrivateKey",
+        "Ed25519PrivateKey-suffix",
+        "ed25519PrivateKey",
+        "Ed25519privateKey",
+        "ED25519PRIVATEKEY",
+        credential_shaped,
+    ):
+        assert identifier.fullmatch(candidate) is None

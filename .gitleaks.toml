@@ -87,6 +87,16 @@ regexes = [
 # =============================================================================
 # Per-rule overrides
 # =============================================================================
+# The default generic-api-key heuristic can treat this public cryptography
+# class name as a credential. Bind the exception to that rule and exact type
+# identifier; do not suppress its containing paths or commits.
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+description = "exact public Ed25519 private-key type identifier"
+regexTarget = "secret"
+regexes = ['''^Ed25519PrivateKey$''']
+
 # The bundled `finnhub-access-token` rule is tuned for finnhub.io tokens.
 # dharma_swarm does not use Finnhub. The rule false-positives on identifiers
 # like `FinnhubBackend = ...` (a class assignment in web_search.py).
