@@ -1476,12 +1476,49 @@ async def test_campaign_authority_rejects_non_pipeline_topology() -> None:
         metadata=_campaign_metadata(exact.id, task_id="task-no-fanout"),
     )
 
-    assert await orchestrator.dispatch(
-        task,
-        TopologyType.FAN_OUT,
-        authenticated_principal_id=exact.id,
-        campaign_effect_fence=_allow_campaign_effect,
-    ) == []
+    with pytest.raises(NotImplementedError, match="exact campaign dispatch"):
+        await orchestrator.dispatch(
+            task,
+            TopologyType.FAN_OUT,
+            authenticated_principal_id=exact.id,
+            campaign_effect_fence=_allow_campaign_effect,
+        )
+    orchestrator._assign_dispatch.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_campaign_authority_rejects_multi_entry_topology() -> None:
+    exact = AgentState(
+        id="agent-exact",
+        name="exact-seat",
+        role=AgentRole.CODER,
+        status=AgentStatus.IDLE,
+    )
+    orchestrator = Orchestrator(agent_pool=MockAgentPool([exact]))
+    orchestrator._assign_dispatch = AsyncMock()  # type: ignore[method-assign]
+    task = Task(
+        id="task-no-parallel-genome",
+        title="No parallel campaign genome",
+        metadata=_campaign_metadata(exact.id, task_id="task-no-parallel-genome"),
+    )
+    genome = SimpleNamespace(
+        genome_id="campaign-parallel-genome",
+        entrypoints=["root-a", "root-b"],
+        nodes=[
+            SimpleNamespace(node_id="root-a"),
+            SimpleNamespace(node_id="root-b"),
+        ],
+        validate_structure=MagicMock(),
+        incoming_edge_ids=MagicMock(return_value=[]),
+    )
+
+    with pytest.raises(NotImplementedError, match="exact campaign dispatch"):
+        await orchestrator.dispatch(
+            task,
+            genome,
+            authenticated_principal_id=exact.id,
+            campaign_effect_fence=_allow_campaign_effect,
+        )
     orchestrator._assign_dispatch.assert_not_awaited()  # type: ignore[attr-defined]
 
 

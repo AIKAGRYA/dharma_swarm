@@ -214,13 +214,13 @@ class Orchestrator:
         """Assign task to available agents based on topology."""
         if self._pool is None:
             return []
-        if _campaign_guard.campaign_principal(task)[0]:
+        if _dispatch_guard.guard_campaign_topology(
+            _campaign_guard.campaign_principal(task), topology,
+            authenticated_principal_id, campaign_effect_fence):
             return await _campaign_guard.dispatch_exact_campaign(
-                self._pool, self._board, self._campaign_reservations,
-                task, topology, authenticated_principal_id,
+                self._pool, self._board, self._campaign_reservations, task, topology, authenticated_principal_id,
                 self._resolve_timeout_seconds(task, self._default_timeout_seconds),
-                self._assign_campaign_dispatch_guarded,
-                campaign_effect_fence,
+                self._assign_campaign_dispatch_guarded, campaign_effect_fence,
             )
         if self._is_topology_genome(topology):
             return await self._dispatch_topology_genome(task, topology)

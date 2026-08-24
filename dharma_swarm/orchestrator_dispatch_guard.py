@@ -5,6 +5,31 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Awaitable, Callable, NamedTuple
 
+from dharma_swarm.models import TopologyType
+
+
+def guard_campaign_topology(
+    campaign_identity: tuple[bool, str],
+    topology: Any,
+    authenticated_principal_id: str,
+    campaign_effect_fence: Callable[[], Awaitable[None]] | None,
+) -> bool:
+    """Return campaign custody, rejecting unsupported exact-authority topology."""
+    bound, campaign_principal = campaign_identity
+    if (
+        bound
+        and topology is not TopologyType.PIPELINE
+        and campaign_principal
+        and authenticated_principal_id == campaign_principal
+        and campaign_effect_fence is not None
+    ):
+        topology_name = str(getattr(topology, "value", type(topology).__name__))
+        raise NotImplementedError(
+            f"{topology_name} is unsupported for exact campaign dispatch until "
+            "dispatch identity is composite across task and agent"
+        )
+    return bound
+
 
 class CampaignRecoveryTicket(NamedTuple):
     task_id: str
@@ -432,4 +457,10 @@ async def graceful_stop(
             host._stop_operation = None
 
 
-__all__ = ["assign_dispatch", "graceful_stop", "require_admission", "shield_recovery"]
+__all__ = [
+    "assign_dispatch",
+    "graceful_stop",
+    "guard_campaign_topology",
+    "require_admission",
+    "shield_recovery",
+]
