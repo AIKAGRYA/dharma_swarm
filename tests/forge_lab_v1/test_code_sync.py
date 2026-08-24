@@ -157,6 +157,16 @@ def test_activation_is_atomic_idempotent_and_preserves_host_state(
     assert (root / "bin" / "rsi-env").read_text(encoding="utf-8") == "legacy env\n"
     assert not (root / "bin" / "rsi-env").is_symlink()
     assert (root / "bin" / "rsi-lab-env").is_symlink()
+    assert (root / "bin" / "rsi-provider-refresh").resolve() == (
+        release / "repo" / "scripts" / "forge_lab" / "rsi-provider-refresh"
+    )
+    assert (root / "bin" / "rsi-provider-refresh-install").resolve() == (
+        release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-provider-refresh-install"
+    )
 
     second = sync.activate_release(
         plan,
@@ -199,6 +209,62 @@ def test_campaign_block_refuses_switch_without_touching_current(tmp_path: Path) 
             root,
             node="test",
             request_id="test-campaign-refusal",
+            expected_current=None,
+            require_canonical_head=False,
+        )
+
+    assert error.value.code == "ACTIVE_CAMPAIGN"
+    assert not (root / "current").exists()
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        "101 python -m dharma_swarm.forge_lab.experiment --generations 1",
+        "102 python -m dharma_swarm.forge_lab.cli run --mode shadow",
+        "103 python -m dharma_swarm.forge_lab newrun --preset fast --execute",
+        "104 python -m dharma_swarm.forge_lab.rsi_cli newrun --execute --preset fast",
+        "105 python -m dharma_swarm.forge_lab campaign run --manifest sha256:abc",
+        "106 /root/rsi-lab/bin/rsi campaign pause campaign-1",
+        "107 /root/rsi-lab/bin/RSILAB campaign stop campaign-1",
+        "108 /root/rsi-lab/bin/RSILAB - NEWRUN --preset fast --execute",
+        "109 python /root/rsi-lab/current/repo/dharma_swarm/forge_lab/experiment.py",
+        "110 rsi-manager-overnight",
+    ],
+)
+def test_campaign_guard_recognizes_every_canonical_foreground_argv(argv: str) -> None:
+    assert sync._foreground_campaign_argv(argv) is True
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        "201 rsi campaign list",
+        "202 rsi campaign status campaign-1",
+        "203 rsi doctor",
+        "204 rsi provider selftest --profile staged --live",
+        "205 python -m dharma_swarm.forge_lab newrun --preset fast",
+    ],
+)
+def test_campaign_guard_allows_read_only_foreground_argv(argv: str) -> None:
+    assert sync._foreground_campaign_argv(argv) is False
+
+
+def test_nonterminal_active_manifest_blocks_release_switch(tmp_path: Path) -> None:
+    root, _, plan = _make_release(tmp_path)
+    active = root / "state" / ".dharma" / "forge_lab" / "active_campaign.json"
+    active.parent.mkdir(parents=True)
+    active.write_text(
+        json.dumps({"campaign_id": "campaign-1", "state": "PREFLIGHTING"}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(sync.SyncError) as error:
+        sync.activate_release(
+            plan,
+            root,
+            node="test",
+            request_id="test-active-manifest",
             expected_current=None,
             require_canonical_head=False,
         )

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# Converge the provider-health schedule without ever printing crontab content.
+# Default is read-only plan. Mutation requires both --apply and a safe request
+# ID so deployment is deliberate and receipt-backed.
+apply=0
+request_id=""
+while (($#)); do
+    case "$1" in
+        --plan) apply=0 ;;
+        --apply) apply=1 ;;
+        --request-id)
+            shift
+            request_id="${1:-}"
+            ;;
+        *)
+            printf 'usage: rsi-provider-refresh-install [--plan | --apply --request-id ID]\n' >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+if ((apply)) && [[ ! "${request_id}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$ ]]; then
+    printf 'rsi-provider-refresh-install: --apply requires a safe request ID\n' >&2
+    exit 2
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x /root/rsi-lab/bin/rsi-provider-refresh ]]; then
+    refresh="/root/rsi-lab/bin/rsi-provider-refresh"
+elif [[ -x "${HOME}/.dharma/bin/rsi-provider-refresh" ]]; then
+    refresh="${HOME}/.dharma/bin/rsi-provider-refresh"
+else
+    refresh="${script_dir}/rsi-provider-refresh"
+fi
+if [[ ! -x "${refresh}" ]]; then
+    printf 'rsi-provider-refresh-install: versioned refresh wrapper missing\n' >&2
+    exit 2
+fi
+
+if [[ -d /root/rsi-lab ]]; then
+    state="/root/rsi-lab/state"
+elif [[ -n "${RSI_LAB_STATE:-}" ]]; then
+    state="${RSI_LAB_STATE}"
+else
+    state="${HOME}/.dharma/rsi-lab/state"
+fi
+log_path="${state}/provider_refresh.log"
+current="$(mktemp)"
+next="$(mktemp)"
+trap 'rm -f -- "${current}" "${next}"' EXIT
+if ! crontab -l >"${current}" 2>/dev/null; then
+    : >"${current}"
+fi
+
+legacy_count="$(awk '
+    /rsi-keys-refresh/ || /current-main\/state\/rsi_runs/ { count += 1 }
+    END { print count + 0 }
+' "${current}")"
+versioned_count="$(awk '/rsi-provider-refresh/ && !/rsi-provider-refresh-install/ { count += 1 } END { print count + 0 }' "${current}")"
+legacy_script="/root/rsi-lab/bin/rsi-keys-refresh"
+legacy_script_present=0
+if [[ -e "${legacy_script}" || -L "${legacy_script}" ]]; then
+    legacy_script_present=1
+fi
+legacy_state_paths=(
+    "/root/rsi-lab/current-main/state/rsi_runs"
+    "/root/rsi-lab/current-main/state/.dharma/keys_status.json"
+    "/root/rsi-lab/state/.dharma/keys_status.json"
+)
+legacy_state_present=0
+for legacy_path in "${legacy_state_paths[@]}"; do
+    if [[ -e "${legacy_path}" || -L "${legacy_path}" ]]; then
+        legacy_state_present=$((legacy_state_present + 1))
+    fi
+done
+
+awk '
+    /rsi-keys-refresh/ { next }
+    /current-main\/state\/rsi_runs/ { next }
+    /rsi-provider-refresh/ { next }
+    { print }
+' "${current}" >"${next}"
+printf '%s\n' '# RSI Lab versioned provider selftest (managed)' >>"${next}"
+printf '17 * * * * %s >> %s 2>&1\n' "${refresh}" "${log_path}" >>"${next}"
+
+printf 'legacy_entries_to_retire: %s\n' "${legacy_count}"
+printf 'legacy_script_to_retire: %s\n' "${legacy_script_present}"
+printf 'legacy_state_artifacts_to_retire: %s\n' "${legacy_state_present}"
+printf 'versioned_entries_before: %s\n' "${versioned_count}"
+printf 'versioned_entries_after: 1\n'
+if ((!apply)); then
+    printf 'result: PLAN_ONLY\n'
+    exit 0
+fi
+
+crontab "${next}"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+legacy_script_retired=0
+if ((legacy_script_present)); then
+    mv -- "${legacy_script}" "${legacy_script}.legacy-${stamp}-${request_id}"
+    legacy_script_retired=1
+fi
+legacy_state_retired=0
+for legacy_path in "${legacy_state_paths[@]}"; do
+    if [[ -e "${legacy_path}" || -L "${legacy_path}" ]]; then
+        mv -- "${legacy_path}" "${legacy_path}.legacy-${stamp}-${request_id}"
+        legacy_state_retired=$((legacy_state_retired + 1))
+    fi
+done
+receipt_dir="${state}/.dharma/forge_lab/maintenance"
+mkdir -p -- "${receipt_dir}"
+receipt="${receipt_dir}/${stamp}__${request_id}__provider_refresh_install.json"
+printf '{"schema":"rsi_lab.provider_refresh_install.v1","request_id":"%s","legacy_entries_retired":%s,"legacy_script_retired":%s,"legacy_state_artifacts_retired":%s,"versioned_entries_before":%s,"versioned_entries_after":1,"provider_calls":false,"secret_values_recorded":false}\n' \
+    "${request_id}" "${legacy_count}" "${legacy_script_retired}" "${legacy_state_retired}" "${versioned_count}" >"${receipt}"
+printf 'result: APPLIED\nreceipt: %s\n' "${receipt}"

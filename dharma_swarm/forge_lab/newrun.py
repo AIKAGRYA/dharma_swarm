@@ -13,12 +13,19 @@ import argparse
 import json
 import os
 import shlex
-from pathlib import Path
+import sys
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, Iterable
+
+from dharma_swarm.model_pool import (
+    FORGE_KIMI_27_CODE_CLOUD_MODEL_ID,
+    forge_high_slot_model_ids,
+)
 
 NEW_RUN_SCHEMA = "rsi_lab.newrun_options.v1"
 NEW_RUN_RECOMMEND_SCHEMA = "rsi_lab.newrun_recommendation.v1"
+SOURCE_REFUSAL_EXIT = 7
 
 CURRENT_MODEL_ENV_KEYS = (
     "RSILAB_MODEL",
@@ -31,12 +38,23 @@ CURRENT_MODEL_ENV_KEYS = (
 DEFAULT_FAST_SOLVER = "kimi-code"
 DEFAULT_FAST_VERIFIER = "glm-5.2"
 DEFAULT_FAST_MUTATOR = "gemini-2.5-flash"
-# The broad diversity preset must use exact slot-resolvable route IDs. Bare
-# deepseek-v4-pro/minimax-m3 route through the OpenAI-compatible fallback and 404
-# on this Mac; the :cloud IDs are the verified Ollama Cloud frontier routes.
-DEFAULT_DIVERSE_SOLVER = "deepseek-v4-pro:cloud"
-DEFAULT_DIVERSE_VERIFIER = "minimax-m3:cloud"
-DEFAULT_DIVERSE_MUTATOR = "kimi-k2.7-code:cloud"
+
+
+def _model_pool_cloud_route(family: str) -> str:
+    """Resolve a high-slot cloud route without duplicating model IDs here."""
+
+    for model_id in forge_high_slot_model_ids():
+        if model_id.casefold().startswith(family) and model_id.endswith(":cloud"):
+            return model_id
+    raise RuntimeError(f"model pool has no cloud route for family={family!r}")
+
+
+# Broad diversity is projected from the canonical model pool.  Bare family
+# routes can select incompatible OpenAI-style fallbacks; the pool owns the
+# exact provider-resolvable cloud IDs.
+DEFAULT_DIVERSE_SOLVER = _model_pool_cloud_route("deepseek")
+DEFAULT_DIVERSE_VERIFIER = _model_pool_cloud_route("minimax")
+DEFAULT_DIVERSE_MUTATOR = FORGE_KIMI_27_CODE_CLOUD_MODEL_ID
 
 
 @dataclass(frozen=True)
@@ -578,7 +596,41 @@ def run_newrun(args: argparse.Namespace) -> int:
             print(f"Execute with: rsi newrun --preset {selected.name} --execute")
         return 0
 
-    print(f"[rsi newrun] executing preset={selected.name}; live model tokens may be spent", flush=True)
+    from dharma_swarm.forge_lab.source_guard import require_execution_source
+
+    try:
+        source = require_execution_source(
+            Path(args.source_repo) if args.source_repo else None
+        )
+    except RuntimeError as exc:
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "schema": NEW_RUN_SCHEMA,
+                        "error": {
+                            "code": "NONCANONICAL_EXECUTION_SOURCE",
+                            "message": str(exc),
+                        },
+                    },
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(f"rsi newrun refused: {exc}", file=sys.stderr)
+        return SOURCE_REFUSAL_EXIT
+
+    print(
+        f"[rsi newrun] executing preset={selected.name} source={source['commit']}; "
+        "live model tokens may be spent",
+        flush=True,
+    )
     from dharma_swarm.forge_lab.cli import main as forge_lab_main
 
-    return forge_lab_main(selected.forge_args(source_repo=args.source_repo, keep_worktree=args.keep_worktree))
+    return forge_lab_main(
+        selected.forge_args(
+            source_repo=str(source["repo"]),
+            keep_worktree=args.keep_worktree,
+        )
+    )

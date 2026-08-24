@@ -5,8 +5,8 @@ are not yet complete
 
 **Target release:** `dharma_swarm.forge_lab` `0.1.0`
 
-**Current release:** `0.1.0-dev` (Packet A CLI skeleton; live campaign paths
-remain fail-closed)
+**Current release:** `0.1.0-dev` (bounded operator-control slice; live campaign,
+promotion, and persistent-supervisor paths remain fail-closed)
 
 **Canonical host:** Meghadharma (`meghadharma-cloud`)
 
@@ -734,6 +734,13 @@ Live mode MUST:
   `--require-independent-routes`; and
 - never print credentials or full provider responses containing secrets.
 
+The versioned v0.1 implementation persists every live observation as an
+append-only, collision-proof `rsi_lab.provider_selftest.v2` receipt. Its digest
+binds source commit/package/tree state, requested profile/models, route count,
+timeout, call ceiling, and alias policy; cached reuse requires the same policy
+digest. A provider-declared successor alias is not an exact identity match and
+MUST consume a second bounded confirmation probe before it can count callable.
+
 The staged profile MUST initially contain only independently proven routes.
 
 ### 11.5 Model roles
@@ -837,6 +844,12 @@ trust zone. Each invocation MUST run with:
 - network disabled or restricted only to the scoped model broker;
 - explicit cleanup of containers, worktrees, and temp data;
 - captured stdout, stderr, exit status, and resource usage.
+
+The SWE-bench adapter MUST inspect and receipt, rather than merely request,
+network disablement, empty/scrubbed environment, `cap_drop=ALL`, no added
+capabilities, read-only root, no-new-privileges, bounded writable mounts, and
+exact PID/CPU/memory ceilings. Any false or absent proof field makes the grade
+non-comparable and blocks confirmation/promotion use.
 
 `container_or_equivalent_sandbox=true` may be emitted only after the launcher
 proves these controls. A host subprocess is not equivalent containment.
@@ -1051,6 +1064,13 @@ package/image, wrapper, dependency lock, taskpack, evaluator, provider contract,
 selection policy, containment policy, and all referenced artifacts. Any drift
 blocks recovery. `rsi campaign fork` may create a provenance-linked campaign
 with a new manifest; it MUST NOT rewrite or silently resume the old campaign.
+
+The bounded five-attempt pilot additionally uses a hash chain for lifecycle
+events and a separate hash chain for exclusive-create attempt receipts. Its
+exclusive-create closeout seals the ordered attempt and event digests. Resume
+accepts only a valid prefix of the fixed schedule, including at most one
+attempt written immediately before its missing event; every other gap,
+duplicate, truncation, extra file, or digest mismatch fails closed.
 
 ### 14.5 Crash-safe and idempotent stop
 

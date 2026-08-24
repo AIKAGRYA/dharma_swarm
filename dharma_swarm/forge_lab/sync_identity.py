@@ -17,7 +17,7 @@ RELEASE_SCHEMA = "rsi_lab.release_manifest.v1"
 RECEIPT_SCHEMA = "rsi_lab.sync_receipt.v1"
 STATUS_SCHEMA = "rsi_lab.sync_status.v1"
 
-CANONICAL_REPOSITORY = "https://github.com/AmitabhainArunachala/dharma_swarm.git"
+CANONICAL_REPOSITORY = "https://github.com/AIKAGRYA/dharma_swarm.git"
 CANONICAL_REF = "refs/heads/rsi-lab/canonical"
 DEFAULT_REMOTE = "meghadharma"
 DEFAULT_REMOTE_ROOT = Path("/root/rsi-lab")
@@ -26,8 +26,19 @@ CRITICAL_FILES = (
     "uv.lock",
     "dharma_swarm/forge_lab/version.py",
     "dharma_swarm/forge_lab/rsi_cli.py",
+    "dharma_swarm/forge_lab/rsi_cli_parsers.py",
     "dharma_swarm/forge_lab/newrun.py",
     "dharma_swarm/forge_lab/provider_selftest.py",
+    "dharma_swarm/forge_lab/confirm_swebench.py",
+    "dharma_swarm/forge_lab/experiment.py",
+    "dharma_swarm/forge_lab/grade_explore.py",
+    "dharma_swarm/forge_lab/grader_isolation.py",
+    "dharma_swarm/forge_lab/run_receipts.py",
+    "dharma_swarm/forge_lab/source_guard.py",
+    "dharma_swarm/forge_lab/state_io.py",
+    "dharma_swarm/forge_lab/campaign_control.py",
+    "dharma_swarm/forge_lab/operator_views.py",
+    "dharma_swarm/forge_lab/rsi_operations.py",
     "dharma_swarm/forge_lab/sync_control.py",
     "dharma_swarm/forge_lab/sync_identity.py",
     "dharma_swarm/forge_lab/sync_node.py",
@@ -47,17 +58,18 @@ CRITICAL_FILES = (
     "scripts/forge_lab/rsi",
     "scripts/forge_lab/RSILAB",
     "scripts/forge_lab/rsi-env",
+    "scripts/forge_lab/rsi-provider-refresh",
+    "scripts/forge_lab/rsi-provider-refresh-install",
     "scripts/forge_lab/rsi-sync-retired",
     "scripts/forge_lab/operator-history",
     "examples/agents/codex_rsi_lab_manager.registration.json",
     "specs/FORGE_LAB_V0_1_0_SPEC.md",
     "docs/ops/FORGE_LAB_V0_1_RUNBOOK.md",
+    "docs/ops/RSI_LAB_SYNC.md",
 )
 
 VERIFICATION_TESTS = (
-    "tests/forge_lab_v1/test_cli_contract.py",
-    "tests/forge_lab_v1/test_manager_registration.py",
-    "tests/forge_lab_v1/test_code_sync.py",
+    "tests/forge_lab_v1",
     "tests/test_forge_lab_operator_history.py",
 )
 

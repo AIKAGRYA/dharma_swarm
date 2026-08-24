@@ -11,7 +11,7 @@ from pathlib import Path
 PACKAGE_NAME = "dharma_swarm.forge_lab"
 PACKAGE_VERSION = "0.1.0-dev"
 CLI_RESULT_SCHEMA = "forge_lab.cli_result.v1"
-IMPLEMENTATION_STATUS = "cli_skeleton"
+IMPLEMENTATION_STATUS = "bounded_operator_control"
 
 
 def _default_lab_base(

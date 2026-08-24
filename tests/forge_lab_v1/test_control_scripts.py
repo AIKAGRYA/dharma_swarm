@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+import subprocess
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -108,3 +109,49 @@ def test_canonical_launcher_is_never_custodied_as_legacy() -> None:
     if canonical_launcher.exists():
         assert canonical_launcher.parent == FORGE_SCRIPT_ROOT
         assert LEGACY_ROOT not in canonical_launcher.parents
+
+
+def test_versioned_provider_refresh_is_credential_safe_and_spend_bounded() -> None:
+    refresh = (FORGE_SCRIPT_ROOT / "rsi-provider-refresh").read_text(encoding="utf-8")
+    assert "provider selftest" in refresh
+    assert "moonshot:kimi-k2.7-code,glm-5.2" in refresh
+    assert "--profile staged" in refresh
+    assert "--require-independent-routes 2" in refresh
+    assert "--max-probes 4" in refresh
+    assert "--min-refresh-interval-s 3600" in refresh
+    assert "curl" not in refresh
+    assert "Authorization" not in refresh
+    assert "API_KEY" not in refresh
+    assert "Bearer" not in refresh
+
+    syntax = subprocess.run(
+        ["bash", "-n", str(FORGE_SCRIPT_ROOT / "rsi-provider-refresh")],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert syntax.returncode == 0, syntax.stderr
+
+
+def test_refresh_installer_is_plan_only_by_default_and_retires_legacy_markers() -> None:
+    installer = (FORGE_SCRIPT_ROOT / "rsi-provider-refresh-install").read_text(
+        encoding="utf-8"
+    )
+    assert "apply=0" in installer
+    assert "--apply" in installer
+    assert "--request-id" in installer
+    assert "/rsi-keys-refresh/ { next }" in installer
+    assert "/current-main\\/state\\/rsi_runs/ { next }" in installer
+    assert "17 * * * *" in installer
+    assert 'mv -- "${legacy_script}"' in installer
+    assert 'mv -- "${legacy_path}"' in installer
+    assert "secret_values_recorded\":false" in installer
+    assert "crontab \"${next}\"" in installer
+
+    syntax = subprocess.run(
+        ["bash", "-n", str(FORGE_SCRIPT_ROOT / "rsi-provider-refresh-install")],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert syntax.returncode == 0, syntax.stderr

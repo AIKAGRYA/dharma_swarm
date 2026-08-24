@@ -1,8 +1,8 @@
-"""Repo-owned RSI CLI skeleton.
+"""Repo-owned RSI CLI for bounded control and immutable release operations.
 
-Only version reporting is implemented in Packet A. Every operational command is
-registered so callers can discover the target surface, but dispatch fails closed
-before importing legacy experiment or live-provider code.
+Finite read surfaces, provider attestation, exact-code sync, and the hermetic
+five-attempt pilot are implemented. Unfenced live mutations remain registered
+for discoverability and fail closed.
 """
 
 from __future__ import annotations
@@ -80,212 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _json_flag(doctor)
 
-    provider = commands.add_parser("provider", help="inspect provider routes")
-    provider_commands = provider.add_subparsers(dest="provider_command", required=True)
-    provider_selftest = _leaf(
-        provider_commands,
-        "selftest",
-        command_path="provider selftest",
-        help_text="test provider readiness",
-    )
-    provider_selftest.add_argument("--profile", required=True)
-    provider_selftest.add_argument("--live", action="store_true")
-    provider_selftest.add_argument("--require-independent-routes", type=int)
-    provider_selftest.add_argument("--model", help="current model id to include for current/newrun profiles")
-    provider_selftest.add_argument("--timeout-s", type=int, default=20, help="per-route live probe timeout")
-    _json_flag(provider_selftest)
+    from dharma_swarm.forge_lab.rsi_cli_parsers import add_operator_commands
 
-    taskpack = commands.add_parser("taskpack", help="manage evaluation taskpacks")
-    taskpack_commands = taskpack.add_subparsers(dest="taskpack_command", required=True)
-    taskpack_build = _leaf(
-        taskpack_commands,
-        "build",
-        command_path="taskpack build",
-        help_text="build a content-addressed taskpack",
-    )
-    taskpack_build.add_argument("--profile", required=True)
-    _json_flag(taskpack_build)
-
-    campaign = commands.add_parser("campaign", help="manage governed RSI campaigns")
-    campaign_commands = campaign.add_subparsers(dest="campaign_command", required=True)
-
-    campaign_plan = _leaf(
-        campaign_commands,
-        "plan",
-        command_path="campaign plan",
-        help_text="materialize a campaign manifest",
-    )
-    campaign_plan.add_argument("--profile", required=True, choices=("explore-open",))
-    _json_flag(campaign_plan)
-
-    campaign_run = _leaf(
-        campaign_commands,
-        "run",
-        command_path="campaign run",
-        help_text="run a stored campaign manifest",
-    )
-    campaign_run.add_argument("--manifest", required=True)
-    campaign_run.add_argument("--request-id")
-    _json_flag(campaign_run)
-
-    campaign_list = _leaf(
-        campaign_commands,
-        "list",
-        command_path="campaign list",
-        help_text="list campaigns",
-    )
-    campaign_list.add_argument("--state")
-    _json_flag(campaign_list)
-
-    campaign_status = _leaf(
-        campaign_commands,
-        "status",
-        command_path="campaign status",
-        help_text="show campaign state",
-    )
-    campaign_status.add_argument("campaign", nargs="?")
-    _json_flag(campaign_status)
-
-    campaign_progress = _leaf(
-        campaign_commands,
-        "progress",
-        command_path="campaign progress",
-        help_text="show durable campaign progress",
-    )
-    campaign_progress.add_argument("campaign", nargs="?")
-    _json_flag(campaign_progress)
-
-    campaign_events = _leaf(
-        campaign_commands,
-        "events",
-        command_path="campaign events",
-        help_text="read the authoritative campaign event sequence",
-    )
-    campaign_events.add_argument("campaign")
-    campaign_events.add_argument("--after", type=int)
-    campaign_events.add_argument("--follow", action="store_true")
-    _json_flag(campaign_events)
-
-    for name in ("pause", "resume", "stop"):
-        lifecycle = _leaf(
-            campaign_commands,
-            name,
-            command_path=f"campaign {name}",
-            help_text=f"{name} a campaign",
-        )
-        lifecycle.add_argument("campaign")
-        lifecycle.add_argument("--request-id")
-        _json_flag(lifecycle)
-
-    campaign_fork = _leaf(
-        campaign_commands,
-        "fork",
-        command_path="campaign fork",
-        help_text="create a provenance-linked campaign fork",
-    )
-    campaign_fork.add_argument("campaign")
-    campaign_fork.add_argument("--runner")
-    _json_flag(campaign_fork)
-
-    campaign_fuse_ack = _leaf(
-        campaign_commands,
-        "fuse-ack",
-        command_path="campaign fuse-ack",
-        help_text="acknowledge a campaign fuse trip",
-    )
-    campaign_fuse_ack.add_argument("campaign")
-    campaign_fuse_ack.add_argument("--trip", required=True)
-    campaign_fuse_ack.add_argument("--reason", required=True)
-    campaign_fuse_ack.add_argument("--rearm", action="store_true")
-    _json_flag(campaign_fuse_ack)
-
-    reconcile = _leaf(
-        commands,
-        "reconcile",
-        command_path="reconcile",
-        help_text="report control-plane drift",
-    )
-    reconcile.add_argument("--apply", action="store_true")
-    _json_flag(reconcile)
-
-    backup = commands.add_parser("backup", help="manage control-plane snapshots")
-    backup_commands = backup.add_subparsers(dest="backup_command", required=True)
-    backup_create = _leaf(
-        backup_commands,
-        "create",
-        command_path="backup create",
-        help_text="create a snapshot",
-    )
-    _json_flag(backup_create)
-    backup_verify = _leaf(
-        backup_commands,
-        "verify",
-        command_path="backup verify",
-        help_text="verify a stored snapshot",
-    )
-    backup_verify.add_argument("--snapshot", required=True)
-    _json_flag(backup_verify)
-    backup_restore = _leaf(
-        backup_commands,
-        "restore",
-        command_path="backup restore",
-        help_text="restore a snapshot into an isolated target",
-    )
-    backup_restore.add_argument("--snapshot", required=True)
-    backup_restore.add_argument("--target", required=True)
-    backup_restore.add_argument("--apply", action="store_true")
-    _json_flag(backup_restore)
-
-    worker = commands.add_parser("worker", help="manage enrolled workers")
-    worker_commands = worker.add_subparsers(dest="worker_command", required=True)
-    worker_list = _leaf(
-        worker_commands,
-        "list",
-        command_path="worker list",
-        help_text="list enrolled workers",
-    )
-    _json_flag(worker_list)
-    for name in ("enroll", "revoke"):
-        worker_mutation = _leaf(
-            worker_commands,
-            name,
-            command_path=f"worker {name}",
-            help_text=f"{name} a worker",
-        )
-        worker_mutation.add_argument("worker")
-        worker_mutation.add_argument("--request-id")
-        _json_flag(worker_mutation)
-
-    alerts = commands.add_parser("alerts", help="inspect and acknowledge durable alerts")
-    alerts_commands = alerts.add_subparsers(dest="alerts_command", required=True)
-    alerts_list = _leaf(
-        alerts_commands,
-        "list",
-        command_path="alerts list",
-        help_text="list durable alerts",
-    )
-    _json_flag(alerts_list)
-    alerts_ack = _leaf(
-        alerts_commands,
-        "ack",
-        command_path="alerts ack",
-        help_text="acknowledge an alert",
-    )
-    alerts_ack.add_argument("alert")
-    alerts_ack.add_argument("--reason", required=True)
-    alerts_ack.add_argument("--request-id")
-    _json_flag(alerts_ack)
-
-    archive = commands.add_parser("archive", help="inspect the immutable archive")
-    archive_commands = archive.add_subparsers(dest="archive_command", required=True)
-    archive_inspect = _leaf(
-        archive_commands,
-        "inspect",
-        command_path="archive inspect",
-        help_text="inspect an archived candidate",
-    )
-    archive_inspect.add_argument("candidate", nargs="?")
-    _json_flag(archive_inspect)
+    add_operator_commands(commands, leaf=_leaf, json_flag=_json_flag)
 
     sync = commands.add_parser(
         "sync", help="verify and converge immutable RSI Lab code releases"
@@ -483,6 +280,8 @@ def _dispatch_provider(args: argparse.Namespace) -> int:
             require_independent_routes=args.require_independent_routes,
             current_model=args.model,
             timeout_s=args.timeout_s,
+            max_probes=args.max_probes,
+            min_refresh_interval_s=args.min_refresh_interval_s,
         )
     except ValueError as exc:
         if args.json:
@@ -583,6 +382,11 @@ def main(argv: list[str] | None = None) -> int:
         return _dispatch_provider(args)
     if command_path.startswith("sync "):
         return _dispatch_sync(args)
+    from dharma_swarm.forge_lab.rsi_operations import dispatch as dispatch_operation
+
+    result = dispatch_operation(args)
+    if result is not None:
+        return result
     return _fail_not_implemented(command_path, args.json)
 
 

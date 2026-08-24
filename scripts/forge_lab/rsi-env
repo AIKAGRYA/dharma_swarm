@@ -3,20 +3,36 @@
 # Source this file to enter the canonical RSI Lab environment on either host:
 #   source "$(dirname "$(command -v rsi)")/rsi-lab-env"
 if [[ -n "${RSI_LAB_BASE:-}" ]]; then
-    _rsi_base="${RSI_LAB_BASE}"
+    _rsi_logical_base="${RSI_LAB_BASE}"
 elif [[ -d /root/rsi-lab/current ]]; then
-    _rsi_base="/root/rsi-lab/current"
+    _rsi_logical_base="/root/rsi-lab/current"
 else
-    _rsi_base="${HOME}/.dharma/rsi-lab/current"
+    _rsi_logical_base="${HOME}/.dharma/rsi-lab/current"
+fi
+
+if [[ "${RSI_LAB_DEV_SOURCE:-0}" == "1" ]]; then
+    _rsi_base="${_rsi_logical_base}"
+else
+    _rsi_base="$(cd -- "${_rsi_logical_base}" && pwd -P)"
 fi
 
 export RSI_LAB_BASE="${_rsi_base}"
-export RSI_LAB_REPO="${RSI_LAB_REPO:-${RSI_LAB_BASE}/repo}"
-export RSI_LAB_STATE="${RSI_LAB_STATE:-${RSI_LAB_BASE}/state}"
-export RSI_LAB_VENV="${RSI_LAB_VENV:-${RSI_LAB_BASE}/.venv}"
-export RSI_LAB_PYDEPS="${RSI_LAB_PYDEPS:-${RSI_LAB_BASE}/pydeps}"
-export RSI_LAB_PYTHON="${RSI_LAB_PYTHON:-${RSI_LAB_VENV}/bin/python}"
-export DHARMA_HOME="${DHARMA_HOME:-${RSI_LAB_STATE}/.dharma}"
+if [[ "${RSI_LAB_DEV_SOURCE:-0}" == "1" ]]; then
+    export RSI_LAB_REPO="${RSI_LAB_REPO:-${RSI_LAB_BASE}/repo}"
+    export RSI_LAB_STATE="${RSI_LAB_STATE:-${RSI_LAB_BASE}/state}"
+    export RSI_LAB_VENV="${RSI_LAB_VENV:-${RSI_LAB_BASE}/.venv}"
+    export RSI_LAB_PYDEPS="${RSI_LAB_PYDEPS:-${RSI_LAB_BASE}/pydeps}"
+    export RSI_LAB_PYTHON="${RSI_LAB_PYTHON:-${RSI_LAB_VENV}/bin/python}"
+    export RSI_LAB_GRADER_MODE="${RSI_LAB_GRADER_MODE:-official-swebench-docker}"
+else
+    export RSI_LAB_REPO="${RSI_LAB_BASE}/repo"
+    export RSI_LAB_STATE="${RSI_LAB_BASE}/state"
+    export RSI_LAB_VENV="${RSI_LAB_BASE}/.venv"
+    export RSI_LAB_PYDEPS="${RSI_LAB_BASE}/pydeps"
+    export RSI_LAB_PYTHON="${RSI_LAB_VENV}/bin/python"
+    export RSI_LAB_GRADER_MODE="official-swebench-docker"
+fi
+export DHARMA_HOME="${RSI_LAB_STATE}/.dharma"
 export PYTHONDONTWRITEBYTECODE=1
-export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}${PYTHONPATH:+:${PYTHONPATH}}"
-unset _rsi_base
+export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}"
+unset _rsi_base _rsi_logical_base

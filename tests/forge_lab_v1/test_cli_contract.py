@@ -33,6 +33,7 @@ def _invoke(command: tuple[str, ...], *args: str) -> subprocess.CompletedProcess
     env["RSI_LAB_REPO"] = str(REPO_ROOT)
     env["RSI_LAB_PYTHON"] = sys.executable
     env["RSI_LAB_PYDEPS"] = str(PYDEPS_ROOT)
+    env["RSI_LAB_DEV_SOURCE"] = "1"
     return subprocess.run(
         [*command, *args],
         cwd=REPO_ROOT,
@@ -79,7 +80,7 @@ def test_package_and_cli_report_packet_a_version() -> None:
     assert payload["result"]["canonical_checkout"] == str(REPO_ROOT)
     assert payload["result"]["source_checkout"] == str(REPO_ROOT)
     assert payload["result"]["source_tree_state"] in {"clean", "dirty", "unknown"}
-    assert payload["result"]["implementation_status"] == "cli_skeleton"
+    assert payload["result"]["implementation_status"] == "bounded_operator_control"
 
 
 def test_default_checkout_selection_survives_inaccessible_remote_path(
@@ -111,6 +112,7 @@ def test_launcher_exports_custom_base_as_reported_identity(tmp_path: Path) -> No
     env["RSI_LAB_REPO"] = ""
     env["RSI_LAB_PYTHON"] = sys.executable
     env["RSI_LAB_PYDEPS"] = str(base / "pydeps")
+    env["RSI_LAB_DEV_SOURCE"] = "1"
 
     result = subprocess.run(
         [*SCRIPT_COMMAND, "version", "--json"],
@@ -143,6 +145,7 @@ def test_launcher_cannot_be_shadowed_by_the_callers_working_directory(
     env["RSI_LAB_REPO"] = str(REPO_ROOT)
     env["RSI_LAB_PYTHON"] = sys.executable
     env["RSI_LAB_PYDEPS"] = str(REPO_ROOT.parent / "pydeps")
+    env["RSI_LAB_DEV_SOURCE"] = "1"
 
     result = subprocess.run(
         [*SCRIPT_COMMAND, "version", "--json"],
@@ -219,13 +222,78 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
 
     assert 'base="/root/rsi-lab/current"' in launcher
     assert 'base="${HOME}/.dharma/rsi-lab/current"' in launcher
-    assert 'repo="${RSI_LAB_REPO:-${base}/repo}"' in launcher
-    assert 'python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"' in launcher
-    assert 'pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"' in launcher
+    assert 'base="$(cd -- "${logical_base}" && pwd -P)"' in launcher
+    assert 'repo="${base}/repo"' in launcher
+    assert 'python="${base}/.venv/bin/python"' in launcher
+    assert 'pydeps="${base}/pydeps"' in launcher
+    assert 'state="${base}/state"' in launcher
+    assert 'export RSI_LAB_STATE="${state}"' in launcher
+    assert 'export DHARMA_HOME="${state}/.dharma"' in launcher
+    assert 'export RSI_LAB_GRADER_MODE="${grader_mode}"' in launcher
+    assert 'export PYTHONPATH="${repo}:${pydeps}"' in launcher
     assert "export PYTHONDONTWRITEBYTECODE=1" in launcher
 
     rsilab = (REPO_ROOT / "scripts" / "forge_lab" / "RSILAB").read_text(encoding="utf-8")
     assert 'exec "${script_dir}/rsi" "$@"' in rsilab
+
+    env_script = (REPO_ROOT / "scripts" / "forge_lab" / "rsi-env").read_text(
+        encoding="utf-8"
+    )
+    assert 'export RSI_LAB_REPO="${RSI_LAB_BASE}/repo"' in env_script
+    assert 'export RSI_LAB_STATE="${RSI_LAB_BASE}/state"' in env_script
+    assert 'export DHARMA_HOME="${RSI_LAB_STATE}/.dharma"' in env_script
+    assert 'export RSI_LAB_GRADER_MODE="official-swebench-docker"' in env_script
+    assert 'export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}"' in env_script
+
+
+def test_production_launcher_ignores_inherited_source_state_and_pythonpath(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "releases" / ("a" * 40)
+    logical = tmp_path / "current"
+    (release / "repo" / "dharma_swarm" / "forge_lab").mkdir(parents=True)
+    (release / ".venv" / "bin").mkdir(parents=True)
+    (release / "pydeps").mkdir()
+    (release / "state").mkdir()
+    logical.symlink_to(release, target_is_directory=True)
+    fake_python = release / ".venv" / "bin" / "python"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s|%s|%s|%s\\n' \"$RSI_LAB_STATE\" \"$DHARMA_HOME\" "
+        "\"$PYTHONPATH\" \"$RSI_LAB_REPO\"\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+    env = os.environ.copy()
+    env.pop("RSI_LAB_DEV_SOURCE", None)
+    env.update(
+        {
+            "RSI_LAB_BASE": str(logical),
+            "RSI_LAB_REPO": str(tmp_path / "rogue-repo"),
+            "RSI_LAB_STATE": str(tmp_path / "rogue-state"),
+            "DHARMA_HOME": str(tmp_path / "rogue-home"),
+            "PYTHONPATH": str(tmp_path / "rogue-pythonpath"),
+        }
+    )
+
+    result = subprocess.run(
+        [*SCRIPT_COMMAND, "version", "--json"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "|".join(
+        (
+            str(release / "state"),
+            str(release / "state" / ".dharma"),
+            f"{release / 'repo'}:{release / 'pydeps'}",
+            str(release / "repo"),
+        )
+    )
 
 
 
@@ -299,12 +367,14 @@ def test_newrun_selected_preset_can_be_overridden_without_execute() -> None:
 def test_provider_selftest_config_json_is_implemented() -> None:
     result = _invoke(MODULE_COMMAND, "provider", "selftest", "--profile", "offline", "--json")
 
-    assert result.returncode == 0, result.stderr
+    assert result.returncode != 0
     payload = json.loads(result.stdout)
     assert payload["schema"] == "forge_lab.cli_result.v1"
     assert payload["command"] == "provider selftest"
-    assert payload["result"]["schema"] == "rsi_lab.provider_selftest.v1"
+    assert payload["result"]["schema"] == "rsi_lab.provider_selftest.v2"
     assert payload["result"]["live"] is False
+    assert payload["result"]["callable_count"] == 0
+    assert "config_only_no_callable_route_attestation" in payload["result"]["failures"]
 
 
 def test_provider_selftest_route_requirement_fails_closed_without_live() -> None:
@@ -322,20 +392,13 @@ def test_provider_selftest_route_requirement_fails_closed_without_live() -> None
     assert result.returncode != 0
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
-    assert payload["result"]["failures"] == ["live_probe_required_for_independent_routes"]
+    assert "live_probe_required_for_independent_routes" in payload["result"]["failures"]
 
 
 @pytest.mark.parametrize(
     "args",
     [
-        ("doctor",),
         ("taskpack", "build", "--profile", "offline"),
-        ("campaign", "plan", "--profile", "explore-open"),
-        ("campaign", "run", "--manifest", "sha256:" + "0" * 64),
-        ("campaign", "list"),
-        ("campaign", "status"),
-        ("campaign", "progress"),
-        ("campaign", "events", "campaign-1"),
         ("campaign", "pause", "campaign-1"),
         ("campaign", "resume", "campaign-1"),
         ("campaign", "stop", "campaign-1"),
@@ -349,7 +412,6 @@ def test_provider_selftest_route_requirement_fails_closed_without_live() -> None
             "--reason",
             "test",
         ),
-        ("reconcile",),
         ("backup", "create"),
         ("backup", "verify", "--snapshot", "sha256:" + "2" * 64),
         (
@@ -360,12 +422,9 @@ def test_provider_selftest_route_requirement_fails_closed_without_live() -> None
             "--target",
             "/tmp/forge-restore-test",
         ),
-        ("worker", "list"),
         ("worker", "enroll", "worker-1"),
         ("worker", "revoke", "worker-1"),
-        ("alerts", "list"),
         ("alerts", "ack", "alert-1", "--reason", "test"),
-        ("archive", "inspect"),
     ],
 )
 
@@ -380,21 +439,118 @@ def test_registered_operations_fail_closed_until_implemented(
     assert "not implemented" in result.stderr.lower()
 
 
-def test_json_operation_failure_uses_versioned_envelope() -> None:
+def test_doctor_json_is_truthful_and_versioned() -> None:
     result = _invoke(MODULE_COMMAND, "doctor", "--json")
 
     assert result.returncode != 0
     payload = json.loads(result.stdout)
-    assert payload == {
-        "schema": "forge_lab.cli_result.v1",
-        "ok": False,
-        "command": "doctor",
-        "error": {
-            "code": "NOT_IMPLEMENTED",
-            "message": "rsi doctor is registered but not implemented",
-        },
+    assert payload["schema"] == "forge_lab.cli_result.v1"
+    assert payload["ok"] is False
+    assert payload["command"] == "doctor"
+    assert payload["result"]["schema"] == "rsi_lab.doctor.v1"
+    assert set(payload["result"]["checks"]) == {
+        "source",
+        "state_anchor",
+        "providers",
+        "grader",
+        "legacy_controls",
     }
-    assert "not implemented" in result.stderr.lower()
+
+
+def test_campaign_cli_plan_run_and_read_surfaces_are_real(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PYTHONPATH": _pythonpath(env),
+            "RSI_LAB_REPO": str(REPO_ROOT),
+            "RSI_LAB_BASE": str(REPO_ROOT.parent),
+            "RSI_LAB_STATE": str(state),
+            "DHARMA_HOME": str(state / ".dharma"),
+            "RSI_LAB_DEV_SOURCE": "1",
+        }
+    )
+
+    def invoke(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [*MODULE_COMMAND, *args],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+
+    planned = invoke("campaign", "plan", "--profile", "pilot-five-offline", "--json")
+    assert planned.returncode == 0, planned.stderr
+    digest = json.loads(planned.stdout)["result"]["manifest_digest"]
+    ran = invoke(
+        "campaign",
+        "run",
+        "--manifest",
+        digest,
+        "--request-id",
+        "cli-five-run-pilot",
+        "--json",
+    )
+    assert ran.returncode == 0, ran.stderr
+    campaign_id = json.loads(ran.stdout)["result"]["campaign_id"]
+
+    listed = invoke("campaign", "list", "--json")
+    status = invoke("campaign", "status", campaign_id, "--json")
+    progress = invoke("campaign", "progress", campaign_id, "--json")
+    events = invoke("campaign", "events", campaign_id, "--after", "10", "--json")
+    assert all(result.returncode == 0 for result in (listed, status, progress, events))
+    assert json.loads(listed.stdout)["result"]["count"] == 1
+    assert json.loads(status.stdout)["result"]["campaign"]["state"] == "COMPLETED"
+    assert json.loads(progress.stdout)["result"]["completed"] == 5
+    assert json.loads(events.stdout)["result"]["count"] == 2
+
+
+def test_minimum_read_only_cli_views_are_implemented(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PYTHONPATH": _pythonpath(env),
+            "RSI_LAB_REPO": str(REPO_ROOT),
+            "RSI_LAB_BASE": str(REPO_ROOT.parent),
+            "RSI_LAB_STATE": str(state),
+            "DHARMA_HOME": str(state / ".dharma"),
+            "RSI_LAB_DEV_SOURCE": "1",
+            "RSI_LAB_CRONTAB_TEXT": "",
+        }
+    )
+    for args in (
+        ("worker", "list", "--json"),
+        ("alerts", "list", "--json"),
+        ("archive", "inspect", "--json"),
+    ):
+        result = subprocess.run(
+            [*MODULE_COMMAND, *args],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is True
+        assert payload["result"]["read_only"] is True
+
+    reconcile = subprocess.run(
+        [*MODULE_COMMAND, "reconcile", "--json"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert reconcile.returncode != 0
+    report = json.loads(reconcile.stdout)["result"]
+    assert report["read_only"] is True
+    assert report["findings"]
 
 
 def test_new_cli_never_imports_legacy_or_live_experiment_modules() -> None:
@@ -417,8 +573,24 @@ raise SystemExit(rsi_cli.main(['doctor']))
     )
 
     assert result.returncode != 0
-    assert "not implemented" in result.stderr.lower()
+    assert "not ready" in result.stdout.lower()
     assert "traceback" not in result.stderr.lower()
+
+
+def test_newrun_execute_refuses_dirty_nonrelease_source_before_live_imports() -> None:
+    result = _invoke(
+        MODULE_COMMAND,
+        "newrun",
+        "--preset",
+        "fast",
+        "--execute",
+        "--json",
+    )
+
+    assert result.returncode == 7
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "NONCANONICAL_EXECUTION_SOURCE"
 
 
 def test_newrun_recommend_selects_fast_without_provider_health(tmp_path: Path) -> None:
