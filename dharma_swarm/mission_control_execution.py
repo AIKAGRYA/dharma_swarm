@@ -49,6 +49,8 @@ from dharma_swarm.mission_control_execution_support import (
     OWNER_RUN_STATUSES as OWNER_RUN_STATUSES,
     OWNER_TERMINAL_STATUSES as OWNER_TERMINAL_STATUSES,
     _OwnerExecutionValidationMixin,
+    terminal_projection_is_acknowledged,
+    terminal_projection_is_pending,
 )
 from dharma_swarm.models import Task, TaskStatus, TopologyType
 from dharma_swarm.orchestrator import Orchestrator
@@ -402,11 +404,54 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             and claim.stale_after <= observed_at
         )
         terminal = run_status in OWNER_TERMINAL_STATUSES
-        succeeded = run_status == "completed" and task.status == TaskStatus.COMPLETED
-        if run_status == "completed" and task.status != TaskStatus.COMPLETED:
-            raise MissionControlError(
-                "completed owner run conflicts with non-completed TaskBoard state"
+        expected_task_status = (
+            TaskStatus.COMPLETED if run_status == "completed" else TaskStatus.FAILED
+        )
+        if terminal:
+            projection_kwargs = {
+                "task": task,
+                "run": run,
+                "identity": identity,
+                "task_id": ref.task_id,
+                "run_id": ref.run_id,
+                "claim_id": ref.claim_id,
+                "agent_id": ref.agent_id,
+                "session_id": ref.owner_session_id,
+                "idempotency_key": ref.idempotency_key,
+            }
+            pending_projection = await terminal_projection_is_pending(
+                self._runtime,
+                **projection_kwargs,
             )
+            if pending_projection:
+                terminal = False
+            else:
+                acknowledged = await terminal_projection_is_acknowledged(
+                    self._runtime,
+                    self._board,
+                    **projection_kwargs,
+                )
+                if not acknowledged:
+                    # Board commit precedes the runtime acknowledgement. Re-read
+                    # once so an ACK racing this observation does not become a
+                    # false conflict; exact receipt/target proof is still owed.
+                    task = await self._require_task(ref.mission_id, ref.task_id)
+                    projection_kwargs["task"] = task
+                    acknowledged = await terminal_projection_is_acknowledged(
+                        self._runtime,
+                        self._board,
+                        **projection_kwargs,
+                    )
+                if not acknowledged or task.status != expected_task_status:
+                    raise MissionControlError(
+                        "terminal owner run conflicts with TaskBoard state; "
+                        "terminal owner execution is not proven"
+                    )
+        succeeded = (
+            terminal
+            and run_status == "completed"
+            and task.status == TaskStatus.COMPLETED
+        )
         return OwnerExecutionObservation(
             ref=ref,
             task_status=task.status,

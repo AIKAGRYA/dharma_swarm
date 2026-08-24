@@ -199,6 +199,36 @@ async def _new_bound_campaign_task(
     return bound, metadata
 
 
+@pytest.mark.asyncio
+async def test_campaign_metadata_cas_uses_locked_raw_metadata_bytes(
+    board: TaskBoard,
+) -> None:
+    expected, metadata = await _new_bound_campaign_task(
+        board,
+        "Metadata byte-order CAS",
+    )
+    reordered_raw = json.dumps(dict(reversed(tuple(metadata.items()))))
+    assert reordered_raw != board._coerce_db_value("metadata", metadata)
+    async with board._open() as db:
+        cursor = await db.execute(
+            "UPDATE tasks SET metadata = ? WHERE id = ?",
+            (reordered_raw, expected.id),
+        )
+        assert cursor.rowcount == 1
+        await db.commit()
+
+    semantically_equal = await board.get(expected.id)
+    assert semantically_equal == expected
+    replacement = {**metadata, "metadata_byte_order_proof": True}
+    updated = await board.compare_and_swap_campaign_metadata(
+        expected,
+        metadata=replacement,
+    )
+
+    assert updated is not None
+    assert updated.metadata == replacement
+
+
 def _next_attempt(metadata: dict) -> tuple[dict, dict, dict]:
     authority = copy.deepcopy(metadata["mission_campaign_authority"])
     authority.update(
@@ -1411,6 +1441,20 @@ async def _attach_projection_intent(
         ).fetchone()
         assert row is not None
         run_metadata = json.loads(row[0])
+        run_metadata["task_board_projection"] = {
+            "schema_version": "dharma.graph.task_board_projection_prepare.v1",
+            "state": "pending",
+            "task_id": identity["task_id"],
+            "run_id": identity["run_id"],
+            "action": marker["action"],
+            "run_status": marker["run_status"],
+            "result": result,
+            "completion_binding": completion_binding,
+            "metadata_set": metadata_set,
+            "metadata_remove": metadata_remove,
+            "source": "test_task_board.attach_projection_intent",
+            "prepared_at": marker["projected_at"],
+        }
         run_metadata["task_board_projection_intent"] = intent
         cursor = await db.execute(
             "UPDATE delegation_runs SET metadata_json = ?"
@@ -1443,6 +1487,22 @@ def _projection_completion_binding(task_id: str, result: str) -> dict:
         "dispatch_idempotency_key": "dispatch-idem-0",
         "result_sha256": hashlib.sha256(result.encode()).hexdigest(),
     }
+
+
+async def _replace_projection_registry(
+    store: RuntimeStateStore,
+    identity: dict,
+) -> None:
+    async with aiosqlite.connect(store.db_path) as db:
+        await db.execute(
+            "DELETE FROM execution_identities WHERE run_id = ?",
+            (identity["run_id"],),
+        )
+        await db.commit()
+    await store.record_execution_identity(
+        ExecutionIdentity(**identity),
+        source="test_task_board.projection_registry",
+    )
 
 
 async def _seed_runtime_projection_authority(
@@ -1517,6 +1577,7 @@ async def _seed_runtime_projection_authority(
         "idempotency_key": run_identity["idempotency_key"],
         "task_id": run_identity["task_id"],
         "run_id": run_identity["run_id"],
+        "runtime_run_id": run_identity["run_id"],
         "claim_id": run_identity["claim_id"],
         "agent_id": run_identity["agent_id"],
         "session_id": run_identity["session_id"],
@@ -1548,6 +1609,7 @@ async def _seed_runtime_projection_authority(
             ),
         )
         await db.commit()
+    await _replace_projection_registry(store, run_identity)
     return binding, runtime_idempotency_authority_snapshot_sha256(record)
 
 
@@ -1585,6 +1647,7 @@ async def _seed_failed_run_projection_authority(
                 "idempotency_key": identity["idempotency_key"],
                 "task_id": identity["task_id"],
                 "run_id": identity["run_id"],
+                "runtime_run_id": identity["run_id"],
                 "claim_id": identity["claim_id"],
                 "agent_id": identity["agent_id"],
                 "session_id": identity["session_id"],
@@ -1593,6 +1656,7 @@ async def _seed_failed_run_projection_authority(
             },
         )
     )
+    await _replace_projection_registry(store, identity)
     return runtime_run_projection_authority_snapshot_sha256(run)
 
 
@@ -1737,6 +1801,162 @@ async def test_terminal_projection_cas_preserves_campaign_authority_and_history(
         "run-prior": prior,
         "run-0": marker,
     }
+    with sqlite3.connect(board._db_path) as db:
+        rows = db.execute(
+            "SELECT receipt_json FROM task_board_effect_commits"
+        ).fetchall()
+        transitions = db.execute(
+            "SELECT receipt_sha256, mutation_id FROM task_board_effect_transitions"
+        ).fetchall()
+        mutations = db.execute(
+            "SELECT mutation_id, old_status, new_status"
+            " FROM task_board_effect_mutations"
+        ).fetchall()
+    assert len(rows) == 1
+    assert len(transitions) == 1
+    assert len(mutations) == 1
+    receipt = json.loads(rows[0][0])
+    with sqlite3.connect(projection_runtime.db_path) as db:
+        run_metadata = json.loads(
+            db.execute(
+                "SELECT metadata_json FROM delegation_runs WHERE run_id = ?",
+                ("run-0",),
+            ).fetchone()[0]
+        )
+    intent = run_metadata["task_board_projection_intent"]
+    assert receipt["effect_id"] == "graph_projection:run-0"
+    assert receipt["authority_sha256"] == intent["intent_sha256"]
+    assert transitions[0][0] == receipt["receipt_sha256"]
+    assert mutations == [(transitions[0][1], "running", "completed")]
+    assert receipt["expected_snapshot"] == running.model_dump(mode="json")
+    assert receipt["target_snapshot"] == projected.model_dump(mode="json")
+    with sqlite3.connect(board._db_path) as db:
+        with pytest.raises(sqlite3.IntegrityError, match="immutable"):
+            db.execute(
+                "UPDATE task_board_effect_commits SET task_id = 'forged'"
+            )
+        db.rollback()
+        with pytest.raises(sqlite3.IntegrityError, match="immutable"):
+            db.execute("DELETE FROM task_board_effect_commits")
+
+
+def test_historical_projection_receipt_binds_effect_id_to_marker_run():
+    from dharma_swarm.task_board_effect_commit import (
+        GRAPH_PROJECTION_EFFECT_KIND,
+        GRAPH_PROJECTION_PAYLOAD_SCHEMA,
+        _task_row_is_exact_target,
+    )
+
+    marker = _projection_marker(
+        "task-historical",
+        "legitimate result",
+        run_id="run-legitimate",
+    )
+    metadata = {
+        "graph_reconcile_projection": marker,
+        "graph_reconcile_projection_history": {"run-legitimate": marker},
+    }
+    timestamp = "2026-08-23T12:00:00+00:00"
+    target = {
+        "id": "task-historical",
+        "title": "historical projection",
+        "description": "",
+        "status": "failed",
+        "priority": "normal",
+        "assigned_to": "agent-exact",
+        "created_by": "system",
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "depends_on": [],
+        "blocked_by": [],
+        "result": "substituted outcome",
+        "metadata": metadata,
+    }
+    row = {
+        **target,
+        "status": "completed",
+        "result": "legitimate result",
+        "metadata": json.dumps(metadata),
+    }
+    receipt = {
+        "effect_id": "graph_projection:run-substituted",
+        "effect_kind": GRAPH_PROJECTION_EFFECT_KIND,
+        "task_id": target["id"],
+        "authority_sha256": "a" * 64,
+        "target_snapshot": target,
+        "effect_payload": {
+            "schema_version": GRAPH_PROJECTION_PAYLOAD_SCHEMA,
+            "intent_sha256": "a" * 64,
+            "marker": marker,
+        },
+    }
+
+    assert not _task_row_is_exact_target(
+        row,
+        receipt=receipt,
+        dependencies=[],
+    )
+    receipt["effect_id"] = "graph_projection:run-legitimate"
+    assert _task_row_is_exact_target(
+        row,
+        receipt=receipt,
+        dependencies=[],
+    )
+
+
+@pytest.mark.asyncio
+async def test_terminal_projection_receipt_failure_rolls_back_board_update(
+    board,
+    projection_runtime,
+    monkeypatch,
+):
+    import dharma_swarm.task_board_effect_commit as effect_commit_mod
+
+    running, _prior = await _running_campaign_projection_task(
+        board, projection_runtime
+    )
+    result = "verified result"
+    binding, authority_sha256 = await _seed_runtime_projection_authority(
+        projection_runtime, running.id, result
+    )
+    marker = _projection_marker(
+        running.id,
+        result,
+        run_id="run-0",
+        runtime_authority_sha256=authority_sha256,
+    )
+    metadata = await _attach_projection_intent(
+        projection_runtime,
+        running,
+        marker,
+        result,
+        completion_binding=binding,
+    )
+
+    async def fail_receipt_append(*_args, **_kwargs):
+        raise ValueError("injected receipt append failure")
+
+    monkeypatch.setattr(
+        effect_commit_mod,
+        "_append_effect_commit",
+        fail_receipt_append,
+    )
+    with pytest.raises(TaskBoardError, match="durable runtime authority"):
+        await board.compare_and_swap_terminal_projection(
+            running,
+            metadata=metadata,
+            result=result,
+            runtime_state_store=projection_runtime,
+        )
+
+    assert await board.get(running.id) == running
+    with sqlite3.connect(board._db_path) as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM task_board_effect_commits"
+        ).fetchone()[0] == 0
+        assert db.execute(
+            "SELECT COUNT(*) FROM task_board_effect_transitions"
+        ).fetchone()[0] == 0
 
 
 @pytest.mark.asyncio

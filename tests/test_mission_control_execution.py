@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
+import sqlite3
 from types import SimpleNamespace
 from dataclasses import replace
 from datetime import timedelta
@@ -49,6 +51,7 @@ from dharma_swarm.runtime_state import (
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
+from dharma_swarm.task_board_projection_intent import stable_sha256
 
 
 MISSION_ID = "mission-alpha"
@@ -340,6 +343,30 @@ async def test_real_agent_pool_runner_executes_once_and_retry_recovers(
         _no_optional_background_work,
     )
 
+    from dharma_swarm.graph import reconcile_board as reconcile_board_module
+
+    real_settle_task_board = reconcile_board_module.settle_task_board
+    projection_settlement_started = asyncio.Event()
+    projection_settlement_finished = asyncio.Event()
+    release_projection_settlement = asyncio.Event()
+    settlement_calls = 0
+
+    async def _paused_settle_task_board(*args: Any, **kwargs: Any) -> None:
+        nonlocal settlement_calls
+        settlement_calls += 1
+        projection_settlement_started.set()
+        await release_projection_settlement.wait()
+        try:
+            await real_settle_task_board(*args, **kwargs)
+        finally:
+            projection_settlement_finished.set()
+
+    monkeypatch.setattr(
+        reconcile_board_module,
+        "settle_task_board",
+        _paused_settle_task_board,
+    )
+
     board, runtime, control, task_view = await _stack(tmp_path)
     provider = _FakeProvider()
     memory = AgentMemoryManager(
@@ -385,11 +412,251 @@ async def test_real_agent_pool_runner_executes_once_and_retry_recovers(
 
     try:
         ref = await adapter.dispatch(MISSION_ID, task_view.task_id)
-        observation = await adapter.wait(
-            ref,
-            timeout_seconds=20,
-            poll_interval_seconds=0.02,
+        real_observe = adapter.observe
+        pending_observations = 0
+        pending_observed = asyncio.Event()
+
+        async def _counted_observe(owner_ref: OwnerExecutionRef):
+            nonlocal pending_observations
+            if pending_observed.is_set() and not projection_settlement_finished.is_set():
+                await projection_settlement_finished.wait()
+            observed = await real_observe(owner_ref)
+            if observed.run_status == "completed" and not observed.terminal:
+                pending_observations += 1
+                pending_observed.set()
+            return observed
+
+        monkeypatch.setattr(adapter, "observe", _counted_observe)
+        waiter = asyncio.create_task(
+            adapter.wait(
+                ref,
+                timeout_seconds=20,
+                poll_interval_seconds=0.005,
+            )
         )
+        await asyncio.wait_for(projection_settlement_started.wait(), timeout=20)
+        await asyncio.wait_for(pending_observed.wait(), timeout=20)
+        assert waiter.done() is False
+
+        pending = await real_observe(ref)
+        assert pending.run_status == "completed"
+        assert pending.task_status == TaskStatus.RUNNING
+        assert pending.terminal is False
+        assert pending.succeeded is False
+
+        terminal_run = await runtime.get_delegation_run(ref.run_id)
+        assert terminal_run is not None
+        original_get_run = runtime.get_delegation_run
+        intent_key = "task_board_projection_intent"
+        original_intent = terminal_run.metadata[intent_key]
+        forged_digest_intent = {
+            **original_intent,
+            "runtime_authority_snapshot_sha256": "f" * 64,
+        }
+        forged_digest_intent["intent_sha256"] = stable_sha256(
+            {
+                key: value
+                for key, value in forged_digest_intent.items()
+                if key != "intent_sha256"
+            }
+        )
+        forged_binding_intent = {
+            **original_intent,
+            "completion_binding": {
+                **original_intent["completion_binding"],
+                "receipt_id": "foreign-runtime-receipt",
+            },
+        }
+        forged_binding_intent["intent_sha256"] = stable_sha256(
+            {
+                key: value
+                for key, value in forged_binding_intent.items()
+                if key != "intent_sha256"
+            }
+        )
+
+        for forged_metadata in (
+            {
+                key: value
+                for key, value in terminal_run.metadata.items()
+                if key != intent_key
+            },
+            {
+                **terminal_run.metadata,
+                intent_key: {
+                    **terminal_run.metadata[intent_key],
+                    "intent_sha256": "0" * 64,
+                },
+            },
+            {**terminal_run.metadata, intent_key: forged_digest_intent},
+            {**terminal_run.metadata, intent_key: forged_binding_intent},
+        ):
+            forged_run = replace(terminal_run, metadata=forged_metadata)
+
+            async def _forged_get_run(run_id: str) -> DelegationRun | None:
+                if run_id == ref.run_id:
+                    return forged_run
+                return await original_get_run(run_id)
+
+            with monkeypatch.context() as context:
+                context.setattr(runtime, "get_delegation_run", _forged_get_run)
+                with pytest.raises(
+                    MissionControlError,
+                    match="terminal owner run conflicts",
+                ):
+                    await real_observe(ref)
+
+        # Persist fully self-consistent forgeries so the negative control
+        # proves authority is re-derived from runtime truth, rather than only
+        # comparing the observer's in-memory run with the durable row.
+        for forged_intent in (forged_digest_intent, forged_binding_intent):
+            with sqlite3.connect(runtime.db_path) as db:
+                db.execute(
+                    "UPDATE delegation_runs SET metadata_json = ? WHERE run_id = ?",
+                    (
+                        json.dumps(
+                            {**terminal_run.metadata, intent_key: forged_intent},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                        ref.run_id,
+                    ),
+                )
+                db.commit()
+            try:
+                with pytest.raises(
+                    MissionControlError,
+                    match="terminal owner run conflicts",
+                ):
+                    await real_observe(ref)
+            finally:
+                with sqlite3.connect(runtime.db_path) as db:
+                    db.execute(
+                        "UPDATE delegation_runs SET metadata_json = ? WHERE run_id = ?",
+                        (
+                            json.dumps(
+                                terminal_run.metadata,
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ),
+                            ref.run_id,
+                        ),
+                    )
+                    db.commit()
+
+        board_task = await board.get(ref.task_id)
+        assert board_task is not None
+        original_board_get = board.get
+        mismatched_identity = dict(board_task.metadata["execution_identity"])
+        mismatched_identity["run_id"] = "foreign-run"
+        forged_board_task = board_task.model_copy(
+            update={
+                "metadata": {
+                    **board_task.metadata,
+                    "execution_identity": mismatched_identity,
+                }
+            }
+        )
+
+        async def _forged_board_get(task_id: str):
+            if task_id == ref.task_id:
+                return forged_board_task
+            return await original_board_get(task_id)
+
+        with monkeypatch.context() as context:
+            context.setattr(board, "get", _forged_board_get)
+            with pytest.raises(
+                MissionControlError,
+                match="terminal owner run conflicts",
+            ):
+                await real_observe(ref)
+
+        assert (await real_observe(ref)).terminal is False
+        release_projection_settlement.set()
+        observation = await waiter
+
+        # A structurally exact runtime witness is still not Board authority.
+        # Replace its embedded receipt with a different self-consistent receipt
+        # and prove Mission Control compares it to the canonical Board ledger.
+        from dharma_swarm.graph.reconcile_board_proof import (
+            validate_atomic_graph_projection_commit,
+        )
+        from dharma_swarm.graph.reconcile_board_replay import _projection_marker
+        from dharma_swarm.task_board_effect_commit import (
+            graph_projection_effect_id,
+            load_board_effect_commit,
+        )
+
+        terminal_run = await runtime.get_delegation_run(ref.run_id)
+        assert terminal_run is not None
+        exact_intent = terminal_run.metadata[intent_key]
+        exact_marker = _projection_marker(exact_intent)
+        board_receipt = await load_board_effect_commit(
+            board,
+            effect_id=graph_projection_effect_id(ref.run_id),
+        )
+        assert board_receipt is not None
+        foreign_receipt = json.loads(json.dumps(board_receipt))
+        foreign_receipt["committed_at"] = "2026-08-24T09:30:00+00:00"
+        foreign_receipt["target_snapshot"]["updated_at"] = (
+            foreign_receipt["committed_at"]
+        )
+        foreign_receipt["receipt_sha256"] = stable_sha256(
+            {
+                key: value
+                for key, value in foreign_receipt.items()
+                if key != "receipt_sha256"
+            }
+        )
+        assert validate_atomic_graph_projection_commit(
+            foreign_receipt,
+            intent=exact_intent,
+            marker=exact_marker,
+        ) == foreign_receipt
+        def canonical(value: Any) -> str:
+            return json.dumps(value, sort_keys=True, separators=(",", ":"))
+        with sqlite3.connect(runtime.db_path) as db:
+            db.execute("DROP TRIGGER task_board_atomic_projection_witness_no_update")
+            db.execute(
+                "UPDATE task_board_atomic_projection_witnesses"
+                " SET board_receipt_sha256 = ?, board_receipt_json = ?"
+                " WHERE run_id = ?",
+                (
+                    foreign_receipt["receipt_sha256"],
+                    canonical(foreign_receipt),
+                    ref.run_id,
+                ),
+            )
+            db.commit()
+        try:
+            with pytest.raises(
+                MissionControlError,
+                match="terminal owner run conflicts",
+            ):
+                await real_observe(ref)
+        finally:
+            with sqlite3.connect(runtime.db_path) as db:
+                db.execute(
+                    "DROP TRIGGER task_board_atomic_projection_witness_no_update"
+                )
+                db.execute(
+                    "UPDATE task_board_atomic_projection_witnesses"
+                    " SET board_receipt_sha256 = ?, board_receipt_json = ?"
+                    " WHERE run_id = ?",
+                    (
+                        board_receipt["receipt_sha256"],
+                        canonical(board_receipt),
+                        ref.run_id,
+                    ),
+                )
+                db.execute(
+                    "CREATE TRIGGER task_board_atomic_projection_witness_no_update "
+                    "BEFORE UPDATE ON task_board_atomic_projection_witnesses "
+                    "BEGIN SELECT RAISE(ABORT, "
+                    "'task board atomic projection witness is immutable'); END"
+                )
+                db.commit()
+
         recovered = await adapter.dispatch(MISSION_ID, task_view.task_id)
 
         assert recovered == ref
@@ -403,6 +670,8 @@ async def test_real_agent_pool_runner_executes_once_and_retry_recovers(
         assert observation.proves_executor_liveness is False
         assert "Hermetic owner execution" in observation.result
         assert len(provider.requests) == 1
+        assert settlement_calls == 1
+        assert pending_observations >= 1
         assert boundary.lifecycle_calls == 0
 
         runs = await runtime.list_delegation_runs(
@@ -428,6 +697,7 @@ async def test_real_agent_pool_runner_executes_once_and_retry_recovers(
         assert campaign.model_execution_state == "observed"
         assert campaign.proves_model_execution is True
     finally:
+        release_projection_settlement.set()
         await asyncio.sleep(0.05)
         await pool.shutdown_all()
         memory.close()
@@ -687,6 +957,39 @@ async def test_observe_is_read_only_and_never_claims_liveness(tmp_path: Path) ->
     assert await board.get(task.task_id) == task_before
     assert await runtime.get_delegation_run(run_id) == run_before
     assert await runtime.get_task_claim(ref.claim_id) == claim_before
+
+
+@pytest.mark.asyncio
+async def test_observe_rejects_terminal_board_without_exact_projection_ack(
+    tmp_path: Path,
+) -> None:
+    board, runtime, control, task = await _stack(tmp_path)
+    await board.assign(task.task_id, "owner-agent")
+    await board.start(task.task_id)
+    await board.complete(task.task_id, "FORGED BOARD RESULT")
+    run_id, idempotency_key = _expected(task.task_id)
+    ref = await _record_owner_execution(
+        runtime,
+        task_id=task.task_id,
+        run_id=run_id,
+        idempotency_key=idempotency_key,
+        claim_id="owner-claim",
+        agent_id="owner-agent",
+        owner_session_id=OWNER_SESSION_ID,
+        status="completed",
+    )
+    adapter = OrchestratorMissionAdapter(
+        _NoDispatch(),  # type: ignore[arg-type]
+        control,
+        board,
+        runtime,
+    )
+
+    with pytest.raises(
+        MissionControlError,
+        match="terminal owner run conflicts with TaskBoard state",
+    ):
+        await adapter.observe(ref)
 
 
 @pytest.mark.asyncio

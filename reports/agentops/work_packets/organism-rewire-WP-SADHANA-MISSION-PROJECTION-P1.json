@@ -1,0 +1,150 @@
+{
+  "id": "organism-rewire-WP-SADHANA-MISSION-PROJECTION-P1",
+  "base_ref": "5235a8acb3dd922f0f161a9a732ab15b2d6c5c26",
+  "branch": "agent/sadhana-vps-mobile-release-20260825",
+  "worktree": ".",
+  "intent": "Close the organism-owned Mission Control companion to the DharmaGraph crash-replay consumer. Terminal owner execution must remain transient while an exact projection is pending, and may become terminal only after Mission Control re-derives the durable runtime ProjectionIntent, the immutable Board-local effect receipt, the imported runtime witness, and the exact acknowledgement. This packet performs no provider, transport, VPS, public route, or other external effect.",
+  "allowed_files": [
+    "dharma_swarm/mission_control_execution.py",
+    "dharma_swarm/mission_control_execution_support.py",
+    "tests/test_mission_control_execution.py",
+    "tests/test_task_board.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-MISSION-PROJECTION-P1.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "scripts/**",
+    "terminal/**",
+    "uv.lock",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/mission_control_executor_guard.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/orchestrator_bsp.py",
+    "dharma_swarm/orchestrator_dispatch_guard.py",
+    "dharma_swarm/orchestrator_execution.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/task_board_campaign_guard.py",
+    "dharma_swarm/task_board_effect_commit.py",
+    "tests/test_agent_runner.py",
+    "tests/test_graph_*.py",
+    "tests/test_orchestrator.py",
+    "tests/test_orchestrator_execution_custody.py",
+    "tests/test_orphan_reaper.py",
+    "tests/test_swarm.py",
+    "tests/test_topology_execution.py"
+  ],
+  "gates": [
+    {
+      "name": "mission-projection-authority-focused",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control_execution.py tests/test_task_board.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "mission-projection-compatibility",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_mission_control.py tests/test_mission_control_attempts.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "mission-projection-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/mission_control_execution.py dharma_swarm/mission_control_execution_support.py tests/test_mission_control_execution.py tests/test_task_board.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "removing-durable-projection-authority-rederivation-is-detected",
+      "command": "python3 -c \"import sys; from pathlib import Path; t=Path('dharma_swarm/mission_control_execution_support.py').read_text(); needle='if not await projection_intent_authority_is_exact('; n=t.replace(needle,'if False and not await projection_intent_authority_is_exact(',1); sys.exit(0 if t.count(needle) == 1 and n.count(needle) == 0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(mission-control): prove terminal projection authority"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-MISSION-PROJECTION-P1",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "5235a8acb3dd922f0f161a9a732ab15b2d6c5c26",
+      "details": []
+    },
+    "cross_packet_interface": {
+      "provider_packets": [
+        "organism-rewire-WP-SADHANA-BOARD-EFFECT-P1",
+        "dharmagraph-WP-SADHANA-CRASH-REPLAY-P1",
+        "dharmagraph-WP-SADHANA-TOPOLOGY-CUSTODY-P1"
+      ],
+      "this_packet_provides": [
+        "Mission Control pending classification only for an exactly re-derived unacknowledged terminal ProjectionIntent",
+        "terminal owner observation only after exact Board effect, runtime witness, and acknowledgement proof"
+      ],
+      "shared_proof": "Terminal provider evidence and terminal orchestration state are distinct modalities: Mission Control promotes the owner observation only after the exact Graph-to-Board convergence proof is durable."
+    },
+    "interface_mismatches": [
+      "The Graph consumer cannot own Mission Control observer files under the active portfolio surface contract.",
+      "The prior observer treated terminal runtime status and a matching TaskBoard status as enough without re-deriving the exact projection receipt and acknowledgement."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_execution.py",
+      "dharma_swarm/mission_control_execution_support.py",
+      "dharma_swarm/graph/reconcile_board_replay.py"
+    ],
+    "honest_blockers": [
+      "This packet depends on the exact preceding DharmaGraph consumer commit; it must not be cherry-picked without that parent.",
+      "An in-flight provider effect without a bound terminal receipt remains effect-indeterminate and cannot authorize retry.",
+      "The preceding Graph packet remains authoritative for exact campaign topology admission and rejection.",
+      "Campaign dispatch remains stopped until independent review, canonical CI, explicit merge approval, and exact VPS cutover verification.",
+      "No external service, VPS, provider, public route, or Git remote may be mutated by this packet."
+    ],
+    "rollback": "Keep campaign dispatch stopped and revert this Mission Control companion before reverting the underlying Graph consumer or Board effect provider. Preserve runtime.db and tasks.db for forensic reconciliation.",
+    "packet_digest": "08e5dbcb4ae8502362dcaa23ae4adfc4655db07cc916a49fcb4cf93ec7912e13"
+  }
+}

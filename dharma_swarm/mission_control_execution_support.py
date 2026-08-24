@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
+
+import aiosqlite
 
 from dharma_swarm.mission_control_contract import MissionControlError, stable_id
 from dharma_swarm.models import Task
-from dharma_swarm.runtime_state import DelegationRun, TaskClaim
+from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore, TaskClaim
 from dharma_swarm.spine.identity import ExecutionIdentity
+from dharma_swarm.task_board_projection_intent import (
+    TASK_BOARD_PROJECTION_INTENT_KEY,
+    TASK_BOARD_PROJECTION_INTENT_SCHEMA,
+    is_aware_iso8601,
+    is_sha256_hex,
+    stable_sha256,
+    valid_completion_binding,
+)
 
 
 LEGACY_EXECUTION_SCHEMA_VERSION = "dharma.mission_control.owner_execution.v1"
@@ -17,6 +29,294 @@ OWNER_BACKEND = "orchestrator"
 OWNER_TERMINAL_STATUSES = frozenset({"completed", "failed"})
 OWNER_RUN_STATUSES = frozenset({"claimed", "running", *OWNER_TERMINAL_STATUSES})
 OWNER_CLAIM_STATUSES = frozenset({"claimed", "running", *OWNER_TERMINAL_STATUSES})
+_PROJECTION_INTENT_FIELDS = frozenset(
+    "schema_version task_id run_id claim_id agent_id action run_status source_kind "
+    "runtime_authority_snapshot_sha256 result result_sha256 metadata_set "
+    "metadata_remove metadata_delta_sha256 completion_binding execution_identity "
+    "prepared_at intent_sha256".split()
+)
+_PROJECTION_PROTOCOL_METADATA_FIELDS = frozenset(
+    {
+        "graph_reconcile_projection",
+        "graph_reconcile_projection_history",
+        "task_board_completion_binding",
+    }
+)
+
+
+async def _exact_terminal_projection_intent(
+    runtime_state: RuntimeStateStore,
+    *,
+    task: Task,
+    run: DelegationRun,
+    identity: ExecutionIdentity,
+    task_id: str,
+    run_id: str,
+    claim_id: str,
+    agent_id: str,
+    session_id: str,
+    idempotency_key: str,
+) -> dict[str, Any] | None:
+    """Re-derive one exact terminal ProjectionIntent from durable authority."""
+
+    metadata = run.metadata if isinstance(run.metadata, dict) else {}
+    intent = metadata.get(TASK_BOARD_PROJECTION_INTENT_KEY)
+    durable_identity = identity.to_dict()
+    board_identity = task.metadata.get("execution_identity")
+    run_identity = metadata.get("execution_identity")
+    run_status = run.status.lower()
+    if not (
+        run_status in OWNER_TERMINAL_STATUSES
+        and isinstance(intent, dict)
+        and set(intent) == _PROJECTION_INTENT_FIELDS
+        and intent.get("schema_version") == TASK_BOARD_PROJECTION_INTENT_SCHEMA
+        and intent.get("action") == "receipt"
+        and intent.get("source_kind") == "idempotency_record"
+        and intent.get("run_status") == run_status
+        and intent.get("task_id") == task_id == run.task_id
+        and intent.get("run_id") == run_id == run.run_id
+        and intent.get("claim_id") == claim_id == run.claim_id
+        and intent.get("agent_id") == agent_id == run.assigned_to
+        and run.session_id == session_id
+        and run.assigned_by == OWNER_BACKEND
+        and intent.get("execution_identity")
+        == board_identity
+        == run_identity
+        == durable_identity
+        and durable_identity.get("task_id") == task_id
+        and durable_identity.get("run_id") == run_id
+        and durable_identity.get("claim_id") == claim_id
+        and durable_identity.get("agent_id") == agent_id
+        and durable_identity.get("session_id") == session_id
+        and durable_identity.get("idempotency_key") == idempotency_key
+        and metadata.get("status") == run_status
+        and metadata.get("trace_id") == durable_identity.get("trace_id")
+        and metadata.get("correlation_id")
+        == durable_identity.get("correlation_id")
+        and metadata.get("task_id") == task_id
+        and metadata.get("run_id") == run_id
+        and metadata.get("runtime_run_id") == run_id
+        and metadata.get("claim_id") == claim_id
+        and metadata.get("agent_id") == agent_id
+        and metadata.get("session_id") == session_id
+        and metadata.get("parent_run_id")
+        == durable_identity.get("parent_run_id")
+        and metadata.get("causation_id") == durable_identity.get("causation_id")
+        and metadata.get("idempotency_key") == idempotency_key
+        and run.parent_run_id == durable_identity.get("parent_run_id")
+        and run.completed_at is not None
+        and is_sha256_hex(intent.get("runtime_authority_snapshot_sha256"))
+        and isinstance(intent.get("result"), str)
+        and intent.get("result_sha256")
+        == hashlib.sha256(intent["result"].encode("utf-8")).hexdigest()
+        and is_aware_iso8601(intent.get("prepared_at"))
+    ):
+        return None
+
+    metadata_set = intent.get("metadata_set")
+    metadata_remove = intent.get("metadata_remove")
+    if not (
+        isinstance(metadata_set, dict)
+        and all(isinstance(key, str) and key for key in metadata_set)
+        and isinstance(metadata_remove, list)
+        and metadata_remove == sorted(set(metadata_remove))
+        and all(isinstance(key, str) and key for key in metadata_remove)
+        and not set(metadata_set).intersection(metadata_remove)
+        and not (set(metadata_set) | set(metadata_remove)).intersection(
+            _PROJECTION_PROTOCOL_METADATA_FIELDS
+        )
+        and intent.get("metadata_delta_sha256")
+        == stable_sha256({"set": metadata_set, "remove": metadata_remove})
+        and valid_completion_binding(
+            intent.get("completion_binding"),
+            task_id=task_id,
+            run_id=run_id,
+            claim_id=claim_id,
+            agent_id=agent_id,
+            dispatch_idempotency_key=idempotency_key,
+            result=intent["result"],
+        )
+        and intent.get("intent_sha256")
+        == stable_sha256(
+            {key: value for key, value in intent.items() if key != "intent_sha256"}
+        )
+        and (
+            (run_status == "completed" and not run.failure_code)
+            or (
+                run_status == "failed"
+                and bool(run.failure_code)
+                and metadata.get("error") == intent["result"]
+            )
+        )
+    ):
+        return None
+
+    async with aiosqlite.connect(runtime_state.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("BEGIN")
+        # Local import avoids making Mission Control startup depend on the
+        # broader Graph package initialization path.
+        from dharma_swarm.graph.reconcile_board_intent import (
+            projection_intent_authority_is_exact,
+        )
+
+        if not await projection_intent_authority_is_exact(
+            db,
+            run_id=run_id,
+            expected_intent=intent,
+        ):
+            await db.rollback()
+            return None
+        await db.rollback()
+    return intent
+
+
+async def terminal_projection_is_pending(
+    runtime_state: RuntimeStateStore,
+    *,
+    task: Task,
+    run: DelegationRun,
+    identity: ExecutionIdentity,
+    task_id: str,
+    run_id: str,
+    claim_id: str,
+    agent_id: str,
+    session_id: str,
+    idempotency_key: str,
+) -> bool:
+    """Prove the narrow runtime-first window before phase-three ACK."""
+    intent = await _exact_terminal_projection_intent(
+        runtime_state,
+        task=task,
+        run=run,
+        identity=identity,
+        task_id=task_id,
+        run_id=run_id,
+        claim_id=claim_id,
+        agent_id=agent_id,
+        session_id=session_id,
+        idempotency_key=idempotency_key,
+    )
+    if intent is None:
+        return False
+    async with aiosqlite.connect(runtime_state.db_path) as db:
+        ledger = await (
+            await db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table'"
+                " AND name = 'task_board_projection_acks'"
+            )
+        ).fetchone()
+        if ledger is None:
+            return True
+        acknowledgement = await (
+            await db.execute(
+                "SELECT 1 FROM task_board_projection_acks WHERE run_id = ?",
+                (run_id,),
+            )
+        ).fetchone()
+    return acknowledgement is None
+
+
+async def terminal_projection_is_acknowledged(
+    runtime_state: RuntimeStateStore,
+    task_board: Any,
+    *,
+    task: Task,
+    run: DelegationRun,
+    identity: ExecutionIdentity,
+    task_id: str,
+    run_id: str,
+    claim_id: str,
+    agent_id: str,
+    session_id: str,
+    idempotency_key: str,
+) -> bool:
+    """Prove terminal Board state is this run's exact acknowledged effect."""
+    intent = await _exact_terminal_projection_intent(
+        runtime_state,
+        task=task,
+        run=run,
+        identity=identity,
+        task_id=task_id,
+        run_id=run_id,
+        claim_id=claim_id,
+        agent_id=agent_id,
+        session_id=session_id,
+        idempotency_key=idempotency_key,
+    )
+    if intent is None:
+        return False
+
+    # Local imports keep Mission Control startup independent of Graph package
+    # initialization while binding terminal truth to both stores at observe.
+    from dharma_swarm.graph.reconcile_board_proof import (
+        load_exact_atomic_projection_witness,
+        validate_atomic_graph_projection_commit,
+    )
+    from dharma_swarm.graph.reconcile_board_replay import (
+        PROJECTION_ACK_SCHEMA,
+        _projection_marker,
+    )
+    from dharma_swarm.task_board_effect_commit import (
+        graph_projection_effect_id,
+        load_board_effect_commit,
+        task_effect_snapshot,
+    )
+
+    marker = _projection_marker(intent)
+    try:
+        receipt = await load_board_effect_commit(
+            task_board,
+            effect_id=graph_projection_effect_id(run_id),
+        )
+        if (
+            receipt is None
+            or validate_atomic_graph_projection_commit(
+                receipt,
+                intent=intent,
+                marker=marker,
+            )
+            is None
+            or receipt["target_snapshot"] != task_effect_snapshot(task)
+            or await load_exact_atomic_projection_witness(
+                runtime_state,
+                intent=intent,
+                marker=marker,
+                expected_board_receipt=receipt,
+            )
+            is None
+        ):
+            return False
+    except (KeyError, TypeError, ValueError, RuntimeError):
+        return False
+
+    encoded_marker = json.dumps(marker, sort_keys=True, separators=(",", ":"))
+    async with aiosqlite.connect(runtime_state.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        ledger = await (
+            await db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table'"
+                " AND name = 'task_board_projection_acks'"
+            )
+        ).fetchone()
+        if ledger is None:
+            return False
+        acknowledgement = await (
+            await db.execute(
+                "SELECT * FROM task_board_projection_acks WHERE run_id = ?",
+                (run_id,),
+            )
+        ).fetchone()
+    return bool(
+        acknowledgement is not None
+        and str(acknowledgement["task_id"]) == task_id
+        and str(acknowledgement["intent_sha256"]) == intent["intent_sha256"]
+        and str(acknowledgement["board_receipt_sha256"])
+        == stable_sha256(marker)
+        and str(acknowledgement["board_receipt_json"]) == encoded_marker
+        and is_aware_iso8601(str(acknowledgement["acknowledged_at"]))
+        and str(acknowledgement["schema_version"]) == PROJECTION_ACK_SCHEMA
+    )
 
 
 def owner_execution_identity(
@@ -268,4 +568,6 @@ __all__ = [
     "OWNER_RUN_STATUSES",
     "OWNER_TERMINAL_STATUSES",
     "owner_execution_identity",
+    "terminal_projection_is_acknowledged",
+    "terminal_projection_is_pending",
 ]
