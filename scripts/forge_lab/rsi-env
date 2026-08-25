@@ -33,6 +33,7 @@ else
     export RSI_LAB_GRADER_MODE="official-swebench-docker"
 fi
 export DHARMA_HOME="${RSI_LAB_STATE}/.dharma"
+export RSI_LAB_PROVIDER_SELFTEST_ROOT="${RSI_LAB_STATE}/.dharma/forge_lab/provider_selftests"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}"
 unset _rsi_base _rsi_logical_base

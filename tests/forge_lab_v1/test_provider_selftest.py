@@ -13,6 +13,17 @@ from dharma_swarm.forge_lab.newrun import (
 from dharma_swarm.models import ProviderType
 
 
+def test_receipt_root_defaults_to_stable_state_anchor(monkeypatch, tmp_path):
+    state = tmp_path / "state"
+    monkeypatch.setenv("RSI_LAB_STATE", str(state))
+    monkeypatch.delenv("DHARMA_HOME", raising=False)
+    monkeypatch.delenv("RSI_LAB_PROVIDER_SELFTEST_ROOT", raising=False)
+
+    assert provider_selftest._receipt_root() == (
+        state / ".dharma" / "forge_lab" / "provider_selftests"
+    ).resolve()
+
+
 def _slot(model_id: str, provider: ProviderType = ProviderType.OLLAMA) -> SimpleNamespace:
     return SimpleNamespace(model_id=model_id, provider=provider, tier="frontier")
 

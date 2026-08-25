@@ -229,6 +229,10 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
     assert 'state="${base}/state"' in launcher
     assert 'export RSI_LAB_STATE="${state}"' in launcher
     assert 'export DHARMA_HOME="${state}/.dharma"' in launcher
+    assert (
+        'export RSI_LAB_PROVIDER_SELFTEST_ROOT="${state}/.dharma/forge_lab/provider_selftests"'
+        in launcher
+    )
     assert 'export RSI_LAB_GRADER_MODE="${grader_mode}"' in launcher
     assert 'export PYTHONPATH="${repo}:${pydeps}"' in launcher
     assert "export PYTHONDONTWRITEBYTECODE=1" in launcher
@@ -242,6 +246,10 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
     assert 'export RSI_LAB_REPO="${RSI_LAB_BASE}/repo"' in env_script
     assert 'export RSI_LAB_STATE="${RSI_LAB_BASE}/state"' in env_script
     assert 'export DHARMA_HOME="${RSI_LAB_STATE}/.dharma"' in env_script
+    assert (
+        'export RSI_LAB_PROVIDER_SELFTEST_ROOT="${RSI_LAB_STATE}/.dharma/forge_lab/provider_selftests"'
+        in env_script
+    )
     assert 'export RSI_LAB_GRADER_MODE="official-swebench-docker"' in env_script
     assert 'export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}"' in env_script
 
@@ -259,8 +267,8 @@ def test_production_launcher_ignores_inherited_source_state_and_pythonpath(
     fake_python = release / ".venv" / "bin" / "python"
     fake_python.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s|%s|%s|%s\\n' \"$RSI_LAB_STATE\" \"$DHARMA_HOME\" "
-        "\"$PYTHONPATH\" \"$RSI_LAB_REPO\"\n",
+        "printf '%s|%s|%s|%s|%s\\n' \"$RSI_LAB_STATE\" \"$DHARMA_HOME\" "
+        "\"$PYTHONPATH\" \"$RSI_LAB_REPO\" \"$RSI_LAB_PROVIDER_SELFTEST_ROOT\"\n",
         encoding="utf-8",
     )
     fake_python.chmod(0o755)
@@ -292,6 +300,7 @@ def test_production_launcher_ignores_inherited_source_state_and_pythonpath(
             str(release / "state" / ".dharma"),
             f"{release / 'repo'}:{release / 'pydeps'}",
             str(release / "repo"),
+            str(release / "state" / ".dharma" / "forge_lab" / "provider_selftests"),
         )
     )
 

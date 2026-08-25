@@ -16,6 +16,7 @@ from dharma_swarm.forge_lab.source_guard import execution_source_status
 from dharma_swarm.forge_lab.state_io import (
     dharma_home,
     forge_state_root,
+    provider_selftest_root,
     read_jsonl,
     safe_json,
 )
@@ -33,12 +34,7 @@ def _parse_time(value: object) -> datetime | None:
 
 
 def _latest_provider_receipt() -> tuple[dict[str, Any] | None, Path | None]:
-    root = Path(
-        os.environ.get(
-            "RSI_LAB_PROVIDER_SELFTEST_ROOT",
-            forge_state_root() / "provider_selftests",
-        )
-    )
+    root = provider_selftest_root()
     if not root.is_dir():
         return None, None
     for path in sorted(root.glob("*provider_selftest.json"), reverse=True):

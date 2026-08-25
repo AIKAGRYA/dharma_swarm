@@ -34,6 +34,7 @@ from dharma_swarm.forge_lab.newrun import (
 )
 from dharma_swarm.forge_lab.state_io import (
     content_digest,
+    provider_selftest_root,
     safe_json,
     write_json_exclusive,
 )
@@ -99,12 +100,7 @@ def profile_model_ids(profile: str, *, current_model: str | None = None) -> list
 
 
 def _receipt_root() -> Path:
-    return Path(
-        os.environ.get(
-            "RSI_LAB_PROVIDER_SELFTEST_ROOT",
-            Path.home() / ".dharma" / "forge_lab" / "provider_selftests",
-        )
-    )
+    return provider_selftest_root()
 
 
 def _receipt_digest(payload: dict[str, Any]) -> str:

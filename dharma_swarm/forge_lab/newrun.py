@@ -22,6 +22,7 @@ from dharma_swarm.model_pool import (
     FORGE_KIMI_27_CODE_CLOUD_MODEL_ID,
     forge_high_slot_model_ids,
 )
+from dharma_swarm.forge_lab.state_io import provider_selftest_root
 
 NEW_RUN_SCHEMA = "rsi_lab.newrun_options.v1"
 NEW_RUN_RECOMMEND_SCHEMA = "rsi_lab.newrun_recommendation.v1"
@@ -407,12 +408,7 @@ def _is_fast_route(run: dict[str, Any]) -> bool:
 
 
 def _latest_provider_selftest() -> dict[str, Any] | None:
-    root = Path(
-        os.environ.get(
-            "RSI_LAB_PROVIDER_SELFTEST_ROOT",
-            Path.home() / ".dharma" / "forge_lab" / "provider_selftests",
-        )
-    )
+    root = provider_selftest_root()
     if not root.exists():
         return None
     receipts = sorted(root.glob("*provider_selftest.json"), key=lambda path: path.stat().st_mtime, reverse=True)

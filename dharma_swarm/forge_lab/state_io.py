@@ -45,6 +45,21 @@ def forge_state_root() -> Path:
     return dharma_home() / "forge_lab"
 
 
+def provider_selftest_root() -> Path:
+    """Return the single receipt root used by writers and every reader.
+
+    An explicit override is useful for isolated tests, but the production
+    launcher pins it below the stable ``RSI_LAB_STATE`` anchor.  Keeping this
+    resolver here prevents a successful refresher from writing evidence that
+    ``doctor`` cannot observe.
+    """
+
+    explicit = os.environ.get("RSI_LAB_PROVIDER_SELFTEST_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve(strict=False)
+    return forge_state_root() / "provider_selftests"
+
+
 def canonical_json(payload: Any) -> bytes:
     return json.dumps(
         payload,

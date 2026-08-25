@@ -149,7 +149,9 @@ repair synchronization.
 The managed `rsi` and `rsi-lab-env` wrappers resolve `current` to its physical
 full-SHA release before exporting `RSI_LAB_REPO`. In production they also pin
 `RSI_LAB_STATE`, `DHARMA_HOME`, the Python executable, dependencies, and
-`PYTHONPATH` to that release's stable host-owned links. Inherited values cannot
+`RSI_LAB_PROVIDER_SELFTEST_ROOT`, and `PYTHONPATH` to that release's stable
+host-owned links. Provider writers and all admission/readiness readers therefore
+use the same state-anchored receipt directory. Inherited values cannot
 select a mutable checkout or a second state root. The opt-in
 `RSI_LAB_DEV_SOURCE=1` escape hatch exists for repository tests and is not a
 production launch mode. Verify this contract with:
@@ -210,9 +212,10 @@ install -o root -g root -m 0644 \
   /root/rsi-lab/current/repo/scripts/forge_lab/systemd/rsi-lab-explore.timer \
   /etc/systemd/system/rsi-lab-explore.timer
 systemctl daemon-reload
-systemctl enable --now rsi-lab-explore.timer
 systemd-analyze verify /etc/systemd/system/rsi-lab-explore.service \
   /etc/systemd/system/rsi-lab-explore.timer
+systemctl enable rsi-lab-explore.timer
+systemctl start rsi-lab-explore.timer
 systemctl status rsi-lab-explore.timer --no-pager
 ```
 
