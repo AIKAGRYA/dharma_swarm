@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -133,6 +135,190 @@ async def _task_ids(inputs: preparation.RuntimePreparationInputs) -> set[str]:
     board = TaskBoard(inputs.state_dir / "db" / "tasks.db")
     await board.init_db()
     return {task.id for task in await board.list_tasks(limit=20)}
+
+
+_LEGACY_EFFECT_AT = datetime(2026, 8, 25, tzinfo=timezone.utc)
+_LEGACY_EFFECT_METADATA = {
+    "legacy_no_identity_allowed": True,
+    "runtime_spine_status": "legacy_no_identity",
+}
+
+
+def _insert_foreign_legacy_effect(
+    runtime: preparation.RuntimeStateStore,
+    effect_kind: str,
+    *,
+    suffix: str,
+) -> tuple[str, str, dict[str, object]]:
+    session_id = f"foreign-session-{suffix}"
+    task_id = f"foreign-task-{suffix}"
+    timestamp = _LEGACY_EFFECT_AT.isoformat()
+    with sqlite3.connect(runtime.db_path) as db:
+        if effect_kind == "claim":
+            row_id = f"foreign-claim-{suffix}"
+            db.execute(
+                "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id,"
+                " status, claimed_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row_id,
+                    task_id,
+                    session_id,
+                    f"foreign-agent-{suffix}",
+                    "running",
+                    timestamp,
+                    json.dumps(_LEGACY_EFFECT_METADATA, sort_keys=True),
+                ),
+            )
+            semantic = {
+                "claim_id": row_id,
+                "task_id": task_id,
+                "agent_id": f"foreign-agent-{suffix}",
+                "status": "running",
+                "session_id": session_id,
+                "claimed_at": _LEGACY_EFFECT_AT,
+                "acked_at": None,
+                "heartbeat_at": None,
+                "stale_after": None,
+                "recovered_at": None,
+                "retry_count": 0,
+                "metadata": dict(_LEGACY_EFFECT_METADATA),
+            }
+            collection = "claims"
+        elif effect_kind == "run":
+            row_id = f"foreign-run-{suffix}"
+            db.execute(
+                "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
+                " assigned_to, status, started_at, metadata_json)"
+                " VALUES (?, ?, ?, '', ?, ?, ?, ?)",
+                (
+                    row_id,
+                    session_id,
+                    task_id,
+                    f"foreign-agent-{suffix}",
+                    "running",
+                    timestamp,
+                    json.dumps(_LEGACY_EFFECT_METADATA, sort_keys=True),
+                ),
+            )
+            semantic = {
+                "run_id": row_id,
+                "task_id": task_id,
+                "assigned_to": f"foreign-agent-{suffix}",
+                "status": "running",
+                "session_id": session_id,
+                "claim_id": "",
+                "parent_run_id": "",
+                "assigned_by": "",
+                "requested_output": [],
+                "current_artifact_id": "",
+                "started_at": _LEGACY_EFFECT_AT,
+                "completed_at": None,
+                "failure_code": "",
+                "metadata": dict(_LEGACY_EFFECT_METADATA),
+            }
+            collection = "runs"
+        else:  # pragma: no cover - test helper misuse
+            raise AssertionError(f"unsupported effect kind: {effect_kind}")
+        db.commit()
+    return collection, row_id, semantic
+
+
+async def _semantic_effect_rows(
+    runtime: preparation.RuntimeStateStore,
+) -> dict[str, dict[str, dict[str, object]]]:
+    claims = await runtime.list_task_claims(limit=10_000)
+    runs = await runtime.list_delegation_runs(limit=10_000)
+    return {
+        "claims": {row.claim_id: asdict(row) for row in claims},
+        "runs": {row.run_id: asdict(row) for row in runs},
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("effect_kind", ("claim", "run"))
+async def test_preexisting_foreign_legacy_effect_rejects_before_owner_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    effect_kind: str,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name=f"foreign-{effect_kind}")
+    runtime = preparation.RuntimeStateStore(
+        inputs.state_dir / "state" / "runtime.db",
+        include_memory_plane=False,
+    )
+    await runtime.init_db()
+    collection, row_id, expected = _insert_foreign_legacy_effect(
+        runtime,
+        effect_kind,
+        suffix=effect_kind,
+    )
+    before = await _semantic_effect_rows(runtime)
+    assert before[collection][row_id] == expected
+
+    owner_calls: list[str] = []
+
+    def forbidden_board(*args: object, **kwargs: object) -> None:
+        owner_calls.append("TaskBoard")
+        raise AssertionError("TaskBoard must not be constructed")
+
+    async def forbidden_bootstrap(*args: object, **kwargs: object) -> None:
+        owner_calls.append("bootstrap")
+        raise AssertionError("bootstrap must not be called")
+
+    monkeypatch.setattr(preparation, "TaskBoard", forbidden_board)
+    monkeypatch.setattr(
+        preparation,
+        "initialize_sadhana_campaign",
+        forbidden_bootstrap,
+    )
+
+    with pytest.raises(MissionControlError, match="effect-free runtime state"):
+        await preparation.prepare_runtime(inputs)
+
+    assert owner_calls == []
+    assert await _semantic_effect_rows(runtime) == before
+    assert await runtime.list_runtime_receipts(limit=10_000) == []
+    assert not (inputs.state_dir / "db").exists()
+    assert not inputs.output_root.exists()
+    assert not (inputs.state_dir / "preparation-scratch").exists()
+    assert not (
+        inputs.state_dir / "receipts" / preparation.PREPARATION_RECEIPT_NAME
+    ).exists()
+
+
+@pytest.mark.asyncio
+async def test_effect_inserted_between_censuses_rejects_and_is_preserved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="effect-race")
+    inserted: list[tuple[str, str, dict[str, object]]] = []
+
+    def inject(phase: str) -> None:
+        if phase == "owners_initialized":
+            runtime = preparation.RuntimeStateStore(
+                inputs.state_dir / "state" / "runtime.db",
+                include_memory_plane=False,
+            )
+            inserted.append(
+                _insert_foreign_legacy_effect(runtime, "claim", suffix="race")
+            )
+
+    with pytest.raises(MissionControlError, match="crossed an effect boundary"):
+        await preparation.prepare_runtime(inputs, checkpoint=inject)
+
+    assert len(inserted) == 1
+    collection, row_id, expected = inserted[0]
+    runtime = preparation.RuntimeStateStore(
+        inputs.state_dir / "state" / "runtime.db",
+        include_memory_plane=False,
+    )
+    rows = await _semantic_effect_rows(runtime)
+    assert rows[collection] == {row_id: expected}
+    assert rows["runs"] == {}
+    assert not (
+        inputs.state_dir / "receipts" / preparation.PREPARATION_RECEIPT_NAME
+    ).exists()
 
 
 @pytest.mark.asyncio

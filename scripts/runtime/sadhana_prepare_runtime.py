@@ -855,8 +855,8 @@ def validate_preparation_receipt(
 
 
 async def _effect_census(runtime: RuntimeStateStore, session_id: str) -> dict[str, int]:
-    claims = await runtime.list_task_claims(session_id=session_id, limit=10_000)
-    runs = await runtime.list_delegation_runs(session_id=session_id, limit=10_000)
+    claims = await runtime.list_task_claims(limit=10_000)
+    runs = await runtime.list_delegation_runs(limit=10_000)
     leases = await runtime.list_workspace_leases(active_only=False, limit=10_000)
     artifacts = await runtime.list_artifacts(session_id=session_id, limit=10_000)
     receipts = await runtime.list_runtime_receipts(
@@ -881,6 +881,17 @@ async def _effect_census(runtime: RuntimeStateStore, session_id: str) -> dict[st
         "acceptance": acceptance,
         "publication": publication,
     }
+
+
+def _require_pristine_effect_census(census: Mapping[str, int]) -> None:
+    _need(
+        tuple(census) == EFFECT_KINDS,
+        "effect census keys are not exact",
+    )
+    _need(
+        all(type(census[kind]) is int and census[kind] == 0 for kind in EFFECT_KINDS),
+        f"runtime preparation requires an effect-free runtime state: {dict(census)}",
+    )
 
 
 def _zero_delta(before: Mapping[str, int], after: Mapping[str, int]) -> None:
@@ -1017,10 +1028,14 @@ async def prepare_runtime(
             inputs.state_dir / "state" / "runtime.db",
             include_memory_plane=False,
         )
+        await runtime.init_db()
+        session_id = f"mission_campaign:{portfolio.campaign_id}"
+        before = await _effect_census(runtime, session_id)
+        _require_pristine_effect_census(before)
+
         task_db = inputs.state_dir / "db" / "tasks.db"
         task_db.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         board = TaskBoard(task_db, runtime_state=runtime)
-        await runtime.init_db()
         await board.init_db()
         control = MissionControl(board, runtime)
         if checkpoint is not None:
@@ -1035,9 +1050,7 @@ async def prepare_runtime(
         if checkpoint is not None:
             checkpoint("mission_bootstrapped")
 
-        session_id = f"mission_campaign:{portfolio.campaign_id}"
         await _require_authority_unbound(board, dict(bootstrap.goal_task_map))
-        before = await _effect_census(runtime, session_id)
         manifest_scratch = _reset_manifest_scratch(
             inputs.state_dir / "preparation-scratch" / "runtime-manifests"
         )

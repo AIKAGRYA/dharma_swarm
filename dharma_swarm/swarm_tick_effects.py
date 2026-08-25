@@ -350,8 +350,19 @@ async def run_tick_effects(
                 or t.created_by == "operator"
                 for t in _pending
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            _has_real_tasks = True
+            allow_autonomous_generation = False
+            result["pending_task_inspection_error"] = (
+                f"{type(exc).__name__}: {exc}"
+            )
+            result["autonomous_generation_hold"] = (
+                "pending_task_inspection_failed"
+            )
+            logger.warning(
+                "Pending-task inspection failed; autonomous generation held: %s",
+                exc,
+            )
     if allow_autonomous_generation and not _has_real_tasks:
         import time as _t
 

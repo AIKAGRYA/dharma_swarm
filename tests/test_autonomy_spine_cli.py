@@ -305,8 +305,17 @@ def test_run_runtime_warrant_denial_blocks_kernel_dispatch(tmp_path, capsys, mon
     ) == 0
     capsys.readouterr()
 
-    def deny_warrant(*_args, **_kwargs):
-        raise autonomy_spine.RuntimeWarrantDenied("blocked by test warrant")
+    def deny_warrant(runtime_dispatch):
+        return autonomy_spine.issue_runtime_warrant(
+            store=runtime_dispatch["store"],
+            identity=runtime_dispatch["identity"],
+            surface="scripts/runtime/autonomy_spine.py",
+            action="kernel_wake",
+            side_effect_key=runtime_dispatch["side_effect_key"],
+            idempotency_inserted=runtime_dispatch["idempotency_inserted"],
+            requested_claims=("completed",),
+            metadata={"denial_source": "hostile_test"},
+        )
 
     monkeypatch.setattr(autonomy_spine, "_issue_runtime_warrant_for_kernel_wake", deny_warrant)
 
@@ -327,6 +336,28 @@ def test_run_runtime_warrant_denial_blocks_kernel_dispatch(tmp_path, capsys, mon
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "warrant_denied"
     assert payload["runtime_truth_ref"]["idempotency_inserted"] is True
+    warrant_ref = payload["runtime_truth_ref"]["runtime_warrant_ref"]
+    assert warrant_ref["status"] == "blocked"
+    assert warrant_ref["blocked_claims"] == ["completed"]
+
+    runtime_ref = payload["runtime_truth_ref"]
+    store = RuntimeStateStore(runtime_ref["runtime_db"])
+    record = store.get_idempotency_record_sync(
+        runtime_ref["idempotency_key"], runtime_ref["side_effect_key"]
+    )
+    assert record is not None
+    assert record.status == "failed"
+    assert record.result_receipt_id == warrant_ref["receipt_id"]
+    assert record.metadata["runtime_warrant_ref"]["status"] == "blocked"
+    warrant_receipts = asyncio.run(
+        store.list_runtime_receipts(receipt_type="runtime_warrant")
+    )
+    denied_receipt = next(
+        receipt
+        for receipt in warrant_receipts
+        if receipt.receipt_id == warrant_ref["receipt_id"]
+    )
+    assert denied_receipt.status == "blocked"
     assert not (kernel_store / "wake_ledger.jsonl").exists()
 
 

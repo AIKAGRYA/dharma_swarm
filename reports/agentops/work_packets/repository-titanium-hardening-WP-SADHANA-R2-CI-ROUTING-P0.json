@@ -1,0 +1,104 @@
+{
+  "id": "repository-titanium-hardening-WP-SADHANA-R2-CI-ROUTING-P0",
+  "base_ref": "d439f17ebbcf8114b2fe82d98c093be52041ff51",
+  "branch": "agent/sadhana-vps-mobile-release-r2-20260825",
+  "worktree": ".",
+  "intent": "Restore truthful cumulative-stack repository routing without weakening any threshold or regenerating an environment-sensitive baseline. Add exact explicit CODEOWNERS routes for every module currently above the measured blast-radius threshold, and add only the already-declared uvicorn import root to the sorted provenance allowlist. This packet performs no provider, transport, deployment, service, VPS, public-route, or other external effect.",
+  "allowed_files": [
+    ".github/CODEOWNERS",
+    "scripts/governance/import_provenance_allowlist.txt",
+    "reports/agentops/work_packets/repository-titanium-hardening-WP-SADHANA-R2-CI-ROUTING-P0.json"
+  ],
+  "forbidden_files": [
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/governance/hygiene/**",
+    "terminal/**",
+    "tests/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "routing-and-workflow-contracts",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_hermetic_supply_chain.py tests/test_workflow_path_filters.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "all-heavy-modules-require-explicit-routes",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/codeowners_blast_radius.py --check",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "provenance-entry-is-exact-and-sorted",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -c \"from pathlib import Path; p=Path('scripts/governance/import_provenance_allowlist.txt'); rows=[x.strip() for x in p.read_text().splitlines() if x.strip() and not x.lstrip().startswith('#')]; assert rows == sorted(set(rows)); assert rows.count('uvicorn') == 1\"",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "chore(ci): route integrated SADHANA surfaces"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-CI-ROUTING-P0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "d439f17ebbcf8114b2fe82d98c093be52041ff51",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The integrated import graph pushes twenty-three modules above the repository's explicit CODEOWNERS routing threshold while the wildcard owner alone is intentionally insufficient.",
+      "uvicorn is already declared in pyproject.toml and imported by the integration stack, but the provenance allowlist lacks that root; full local regeneration is unsafe because the macOS interpreter misclassifies standard-library roots."
+    ],
+    "closest_existing_implementation": [
+      ".github/CODEOWNERS",
+      "scripts/governance/codeowners_blast_radius.py",
+      "scripts/governance/import_provenance_allowlist.txt"
+    ],
+    "honest_blockers": [
+      "The narrow local check proves exact routing and allowlist shape; canonical Linux CI must run the full import-provenance detector.",
+      "This packet does not resolve executable, documentation, fitness-ratchet, release-seal, merge, or deployment gates.",
+      "No external service, VPS, provider, public route, or Git remote may be mutated by this packet."
+    ],
+    "rollback": "Revert only the exact routing and uvicorn allowlist additions if their corresponding code is removed; never lower the blast threshold or regenerate the allowlist from the macOS probe.",
+    "packet_digest": "bbfa150297172d5725a344efc52d69ad33aa38c3125a89a127ebc72e72dad6fd"
+  }
+}

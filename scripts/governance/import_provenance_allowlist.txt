@@ -51,6 +51,7 @@ tree_sitter_python
 tree_sitter_rust
 tree_sitter_typescript
 typer
+uvicorn
 yaml
 yfinance
 z3

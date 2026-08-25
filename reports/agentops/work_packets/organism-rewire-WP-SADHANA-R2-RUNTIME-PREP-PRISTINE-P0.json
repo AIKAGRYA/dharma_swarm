@@ -1,0 +1,120 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-RUNTIME-PREP-PRISTINE-P0",
+  "base_ref": "f40a450dfcca58849f5fda2ba353cb7f92fbb66f",
+  "branch": "agent/sadhana-vps-mobile-release-r2-20260825",
+  "worktree": ".",
+  "intent": "Strengthen the SADHANA no-effect preparation boundary from campaign-local row comparison to a global pristine-state obligation. Immediately after runtime schema initialization and before TaskBoard construction or bootstrap, require zero claims and delegation runs across every session; retain the final global zero-delta check. Reject pre-existing or concurrently inserted rows unchanged and publish no preparation proof. This packet never deletes, adopts, rewrites, or individually quarantines legacy effect rows and performs no provider, transport, deployment, service, VPS, public-route, or Git-remote effect.",
+  "allowed_files": [
+    "scripts/runtime/sadhana_prepare_runtime.py",
+    "tests/test_sadhana_prepare_runtime.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-RUNTIME-PREP-PRISTINE-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "terminal/**",
+    "uv.lock",
+    "dharma_swarm/**",
+    "scripts/runtime/autonomy_spine.py",
+    "scripts/runtime/sadhana_release.py",
+    "scripts/runtime/sadhana_snapshot.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "gates": [
+    {
+      "name": "runtime-preparation-suite",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_sadhana_prepare_runtime.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "runtime-preparation-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check scripts/runtime/sadhana_prepare_runtime.py tests/test_sadhana_prepare_runtime.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "preexisting-global-effect-rows-reject-unchanged",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_sadhana_prepare_runtime.py -k preexisting_foreign_legacy_effect_rejects_before_owner_creation",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "between-census-insert-rejects-and-clean-replay-passes",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_sadhana_prepare_runtime.py -k \"effect_inserted_between_censuses_rejects_and_is_preserved or every_phase_crash_replays_to_identical_prepared_no_effect_proof\"",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): require pristine SADHANA effect state"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-RUNTIME-PREP-PRISTINE-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f40a450dfcca58849f5fda2ba353cb7f92fbb66f",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The preparation census filters claims and delegation runs by the SADHANA session, allowing ownerless or foreign-session legacy rows to survive a typed no-effect preparation proof.",
+      "The first census currently occurs after TaskBoard construction and campaign bootstrap, so preparation can cross an effect-state boundary before proving its entry state pristine."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_prepare_runtime.py",
+      "dharma_swarm/runtime_state.py",
+      "tests/test_sadhana_prepare_runtime.py"
+    ],
+    "honest_blockers": [
+      "A typed no-effect preparation proof now requires GlobalDispatchRows(before) = GlobalDispatchRows(after) = empty; campaign-local emptiness is insufficient promotion evidence.",
+      "A nonzero live store must cause deployment abort and offline whole-store reprovision or quarantine; this packet deliberately provides no in-place cleanup path.",
+      "Schema initialization may legitimately alter SQLite schema, WAL, and metadata, so tests compare semantic rows rather than database bytes.",
+      "No external service, VPS, provider, public route, release seal, or Git remote may be mutated by this packet."
+    ],
+    "rollback": "Stop SADHANA dispatch and revert the global entry census with its hostile controls as one unit. Never restore session-filtered proof or synthesize ownership for pre-existing rows.",
+    "packet_digest": "9f0ad13662ec38dc8d846988d4b34e0c8350f2645fec32b4ad6ac5df7334e05f"
+  }
+}

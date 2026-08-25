@@ -395,18 +395,15 @@ async def record_terminal_projection(
             logger=logger,
             run_id=identity.run_id,
         )
-    except Exception:
+    except Exception as exc:
+        report.errors.append(f"TaskBoard projection error: {type(exc).__name__}: {exc}")
         logger.warning(
             "Task %s terminal Board projection remains pending replay",
             td.task_id,
             exc_info=True,
         )
     if report.errors:
-        logger.warning(
-            "Task %s terminal Board projection remains pending: %s",
-            td.task_id,
-            report.errors,
-        )
+        logger.warning("Task %s Board projection pending: %s", td.task_id, report.errors)
     return report
 
 

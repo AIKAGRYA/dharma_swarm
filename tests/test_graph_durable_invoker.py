@@ -9,6 +9,7 @@ graph-run key form is stable; the A2A path is untouched.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -340,7 +341,10 @@ async def test_concurrent_stale_takeover_reclaims_atomically(store):
     tasks = [asyncio.create_task(_invoke(inv)) for inv in invokers]
     await _wait_for_claim_losers(tasks, inners)
     assert not await store._mark_idempotency_record_stale(stale_snapshot)
-    with pytest.raises(RuntimeError, match="lease lost"):
+    # Reclaim transfers the row to the winning recovery identity, so the
+    # superseded owner now fails the stronger identity fence before its stale
+    # ownership token is considered.
+    with pytest.raises(ValueError, match="identity conflicts"):
         await store.complete_idempotent_side_effect(
             _claim(identity),
             KEY,
@@ -392,6 +396,71 @@ async def test_concurrent_cross_identity_double_begin_loses_one(store):
     receipt = await winner_task
     assert receipt.status == "ok"
     assert winner_inner.calls == 1
+
+
+async def test_value_error_foreign_live_owner_never_calls_provider(store):
+    """A re-minted identity rejected by the store must inspect the live row
+    and stop before the provider, never reinterpret authority as an outage."""
+    owner = _claim(_identity("live-owner"))
+    operation_hash = hashlib.sha256(
+        f"invoke_agent:{TASK_ID}:{AGENT_ID}".encode("utf-8")
+    ).hexdigest()
+    assert await store.try_begin_idempotent_side_effect(
+        owner,
+        KEY,
+        metadata={"operation_hash": operation_hash, "task_id": TASK_ID},
+    )
+    live_record = await store.get_idempotency_record(CLAIM_KEY, KEY)
+    assert live_record is not None and live_record.status == "started"
+
+    inner = StubInner()
+    retry = wrap_invoker(
+        inner,
+        store=store,
+        identity=_identity("foreign-live"),
+        side_effect_key=KEY,
+    )
+    with pytest.raises(DuplicateDispatchInFlight):
+        await _invoke(retry)
+
+    assert inner.calls == 0, "a foreign live owner must fence the provider"
+    assert await store.get_idempotency_record(CLAIM_KEY, KEY) == live_record
+
+
+async def test_reminted_failed_retry_operation_hash_conflict_never_calls_provider(
+    store,
+):
+    """Bypassing duplicate-begin via retry CAS must not bypass its operation
+    fingerprint check."""
+    owner = _claim(_identity("operation-owner"))
+    metadata = {"operation_hash": "foreign-operation", "task_id": TASK_ID}
+    assert await store.try_begin_idempotent_side_effect(
+        owner,
+        KEY,
+        metadata=metadata,
+    )
+    started = await store.get_idempotency_record(CLAIM_KEY, KEY)
+    assert started is not None
+    failed = await store.complete_idempotent_side_effect(
+        owner,
+        KEY,
+        status="failed",
+        metadata=metadata,
+        expected_updated_at=started.updated_at,
+    )
+
+    inner = StubInner()
+    retry = wrap_invoker(
+        inner,
+        store=store,
+        identity=_identity("operation-retry"),
+        side_effect_key=KEY,
+    )
+    with pytest.raises(ValueError, match="operation_hash conflict"):
+        await _invoke(retry)
+
+    assert inner.calls == 0, "an operation conflict must fence the provider"
+    assert await store.get_idempotency_record(CLAIM_KEY, KEY) == failed
 
 
 async def test_oversized_result_declines_memo_and_reexecutes(store):

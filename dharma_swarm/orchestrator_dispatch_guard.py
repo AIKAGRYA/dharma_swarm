@@ -241,9 +241,11 @@ async def _cancel_and_join(
     tasks: list[asyncio.Task[Any]],
     *,
     deadline: float,
-) -> int:
+) -> tuple[int, list[str]]:
+    """Cancel and join tasks, returning cancellation and failure evidence."""
     tasks = list(dict.fromkeys(tasks))
     cancelled = 0
+    failures: list[str] = []
     for task in tasks:
         if not task.done():
             task.cancel()
@@ -260,9 +262,13 @@ async def _cancel_and_join(
         if task.done():
             try:
                 task.result()
-            except (asyncio.CancelledError, Exception):
-                pass
-    return cancelled
+            except asyncio.CancelledError:
+                continue
+            except Exception as exc:
+                failures.append(
+                    f"{task.get_name()}: {type(exc).__name__}: {exc}"
+                )
+    return cancelled, failures
 
 
 async def _graceful_stop_once(
@@ -277,7 +283,7 @@ async def _graceful_stop_once(
     deadline = asyncio.get_running_loop().time() + max(0.0, timeout)
 
     assignments = list(host._assignment_tasks.items())
-    assignment_cancelled = await _cancel_and_join(
+    assignment_cancelled, assignment_failures = await _cancel_and_join(
         [task for _, task in assignments],
         deadline=deadline,
     )
@@ -289,7 +295,7 @@ async def _graceful_stop_once(
 
     snapshot = list(host._running_tasks.items())
     completed = sum(task.done() for _, task in snapshot)
-    cancelled = await _cancel_and_join(
+    cancelled, execution_failures = await _cancel_and_join(
         [task for _, task in snapshot],
         deadline=deadline,
     )
@@ -395,6 +401,10 @@ async def _graceful_stop_once(
     summary: dict[str, Any] = {"cancelled": cancelled, "completed": completed}
     if assignment_cancelled:
         summary["assignment_cancelled"] = assignment_cancelled
+    if assignment_failures:
+        summary["assignment_failure_diagnostics"] = assignment_failures
+    if execution_failures:
+        summary["execution_failure_diagnostics"] = execution_failures
     if recovered:
         summary["recovered"] = recovered
     if unreleased:

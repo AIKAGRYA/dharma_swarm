@@ -1,0 +1,120 @@
+{
+  "id": "repository-titanium-hardening-WP-SADHANA-R2-WRITER-SENTINEL-P0",
+  "base_ref": "ae312d903c945d373266cbe81322191511a760b5",
+  "branch": "agent/sadhana-vps-mobile-release-r2-20260825",
+  "worktree": ".",
+  "intent": "Classify the eight exact direct SQLite writer discoveries introduced across the integrated graph reconciliation and tick-effect surfaces. Register the seven runtime authority/evidence transactions as explicit REVIEW_REQUIRED specifications and preserve the seed marker as a visible REVIEW_REQUIRED warning. This packet removes no discovery, grants no global waiver, raises no baseline, approves no writer, and performs no runtime, provider, transport, deployment, service, VPS, public-route, or Git-remote effect.",
+  "allowed_files": [
+    "dharma_swarm/memory_kernel/writer_specs.py",
+    "tests/test_memory_writer_sentinel.py",
+    "reports/agentops/work_packets/repository-titanium-hardening-WP-SADHANA-R2-WRITER-SENTINEL-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/**",
+    "terminal/**",
+    "uv.lock",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/swarm_tick_effects.py"
+  ],
+  "gates": [
+    {
+      "name": "writer-sentinel-focused",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_memory_writer_sentinel.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "writer-sentinel-ruff",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/memory_kernel/writer_specs.py tests/test_memory_writer_sentinel.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "eight-runtime-discoveries-remain-explicit-warnings",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_memory_writer_sentinel.py -k sadhana_runtime_writes_are_exact_registered_warnings",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "action-required-gate-passes-without-waiver",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_memory_writer_sentinel.py -k \"action_required_gate_passes_for_triaged_repo or ci_profile_runs_discovery_and_gates\"",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(governance): register SADHANA runtime writers"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-WRITER-SENTINEL-P0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "ae312d903c945d373266cbe81322191511a760b5",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The AST writer census finds eight direct SQLite connections across SADHANA graph reconciliation and tick effects that are semantically known but absent from the exact writer specification registry.",
+      "The sentinel correctly distinguishes registered REVIEW_REQUIRED warnings from unreviewed action-required writers; a blanket ignore or baseline raise would erase that distinction."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/memory_kernel/writer_specs.py",
+      "dharma_swarm/memory_kernel/writer_sentinel.py",
+      "scripts/memory_writer_sentinel.py",
+      "tests/test_memory_writer_sentinel.py"
+    ],
+    "honest_blockers": [
+      "Registration proves explicit ownership and classification only; it does not prove every transaction append-only, race-free, or semantically correct.",
+      "The seed marker intentionally remains a REVIEW_REQUIRED warning because its read/write implementation does not match an append-only claim.",
+      "No writer is promoted to APPROVED and no discovery or action-required threshold is waived by this packet.",
+      "No provider, transport, VPS, service, public route, release seal, or Git remote may be mutated by this packet."
+    ],
+    "rollback": "Revert the exact specifications and tests together if the underlying writer functions move. Never silence new discoveries globally; replace each stale specification with a reviewed exact successor.",
+    "packet_digest": "bf3cf0bbfe8c506da84f9c3ff7cb1a9d5d4eb729cea2793b73fe26695b0b60db"
+  }
+}
