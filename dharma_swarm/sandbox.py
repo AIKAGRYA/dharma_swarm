@@ -211,9 +211,15 @@ class SandboxManager:
         self._prefer_docker = prefer_docker
         self._docker_available: Optional[bool] = None  # Cached after first check
 
-    async def _check_docker(self) -> bool:
-        """Check Docker availability (cached)."""
-        if self._docker_available is None:
+    async def _check_docker(self, *, refresh: bool = False) -> bool:
+        """Check Docker availability, optionally bypassing the cached probe.
+
+        Auto-selection keeps the inexpensive process-lifetime cache. An
+        explicit Docker request refreshes it so a daemon started after an
+        earlier negative auto probe can be selected without rebuilding the
+        manager.
+        """
+        if refresh or self._docker_available is None:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox
 
@@ -276,7 +282,7 @@ class SandboxManager:
         isolation_required = require_isolation or explicit_docker
         use_docker = explicit_docker
 
-        if explicit_docker and not await self._check_docker():
+        if explicit_docker and not await self._check_docker(refresh=True):
             raise IsolationUnavailableError(
                 "Docker isolation was explicitly requested but is unavailable"
             )
