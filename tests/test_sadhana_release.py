@@ -1092,7 +1092,7 @@ def test_gitless_staged_release_admission_persists_ledger_and_rejects_substituti
             "git-clone",
             "git-checkout",
             "git-origin",
-            "uv-venv",
+            "python-venv",
             "uv-sync",
             "npm-ci",
             "next-build",
@@ -9205,7 +9205,7 @@ def test_isolated_build_binds_precomputed_manifest_without_root_path_read(
         "git-clone",
         "git-checkout",
         "git-origin",
-        "uv-venv",
+        "python-venv",
         "uv-sync",
         "npm-ci",
         "next-build",
@@ -9350,6 +9350,90 @@ def test_isolated_build_rejects_invalid_0400_manifest_before_lifecycle_command(
         )
 
     assert calls == []
+
+
+def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir(mode=0o700)
+    bundle = staging / "candidate.bundle"
+    bundle.write_bytes(b"runner fixture\n")
+    bundle.chmod(0o400)
+    manifest_path = staging / "release-manifest.json"
+    manifest_path.write_bytes(release._canonical_bytes(_payload()) + b"\n")
+    manifest_path.chmod(0o400)
+    for name in ("build-home", "uv-cache", "npm-cache"):
+        (staging / name).mkdir(mode=0o700)
+
+    monkeypatch.setattr(release, "_make_build_process_undumpable", lambda: None)
+    monkeypatch.setattr(
+        release, "_require_solo_hardened_build_process", lambda: None
+    )
+    monkeypatch.setattr(release, "verify_dashboard_build", lambda _root: None)
+    monkeypatch.setattr(release, "verify_venv", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(release, "verify_checkout", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        release, "verify_tracked_checkout", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(release, "sha256_file", lambda *_args, **_kwargs: "a" * 64)
+
+    uv_binary = Path(
+        f"/opt/dharma-sadhana/tooling/uv-{release.UV_VERSION}/bin/uv"
+    )
+    calls: list[tuple[str, ...]] = []
+
+    def runner(
+        argv: tuple[str, ...], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        command = tuple(argv)
+        calls.append(command)
+        if command[:3] == (release.GIT_PATH, "clone", "--no-checkout"):
+            repo = staging / "repo"
+            repo.mkdir()
+            (repo / ".git").mkdir()
+        stdout = ""
+        if command == (str(uv_binary), "--version"):
+            stdout = f"uv {release.UV_VERSION}\n"
+        elif command == (str(staging / "repo/.venv/bin/python"), "--version"):
+            stdout = "Python 3.12.3\n"
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    receipt = release.execute_isolated_build_plan(
+        staging=staging,
+        bundle=bundle,
+        manifest_path=manifest_path,
+        uv_binary=uv_binary,
+        release_sha="1" * 40,
+        expected_uid=os.geteuid(),
+        expected_gid=os.getegid(),
+        runner=runner,
+    )
+
+    python_venv = (
+        release.PYTHON312_PATH,
+        "-m",
+        "venv",
+        "--copies",
+        ".venv",
+    )
+    assert calls.count(python_venv) == 1
+    assert not any(command[:2] == (str(uv_binary), "venv") for command in calls)
+    assert receipt["commands"] == [
+        "uv-version",
+        "git-clone",
+        "git-checkout",
+        "git-origin",
+        "python-venv",
+        "uv-sync",
+        "npm-ci",
+        "next-build",
+        "venv-python-version",
+        "git-verify-checkout",
+        "git-verify-tracked",
+        "git-metadata-removed",
+    ]
 
 
 def test_artifact_hash_custody_still_rejects_a_foreign_owned_parent(
