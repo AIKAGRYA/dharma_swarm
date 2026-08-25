@@ -4,15 +4,35 @@ set -euo pipefail
 # Keep every launcher pinned to the host's immutable current release. The Mac
 # and Meghadharma intentionally use different runtime roots but identical code.
 if [[ -n "${RSI_LAB_BASE:-}" ]]; then
-    base="${RSI_LAB_BASE}"
+    logical_base="${RSI_LAB_BASE}"
 elif [[ -d /root/rsi-lab/current ]]; then
-    base="/root/rsi-lab/current"
+    logical_base="/root/rsi-lab/current"
 else
-    base="${HOME}/.dharma/rsi-lab/current"
+    logical_base="${HOME}/.dharma/rsi-lab/current"
 fi
-repo="${RSI_LAB_REPO:-${base}/repo}"
-python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"
-pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"
+
+# Production always imports from the physical immutable release target.  The
+# explicit dev switch exists only for repository tests and cannot be inherited
+# accidentally from RSI_LAB_REPO/PYTHONPATH alone.
+if [[ "${RSI_LAB_DEV_SOURCE:-0}" == "1" ]]; then
+    base="${logical_base}"
+    repo="${RSI_LAB_REPO:-${base}/repo}"
+    python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"
+    pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"
+    state="${RSI_LAB_STATE:-${base}/state}"
+    grader_mode="${RSI_LAB_GRADER_MODE:-official-swebench-docker}"
+else
+    if [[ ! -d "${logical_base}" ]]; then
+        printf 'rsi: immutable current release is missing: %s\n' "${logical_base}" >&2
+        exit 2
+    fi
+    base="$(cd -- "${logical_base}" && pwd -P)"
+    repo="${base}/repo"
+    python="${base}/.venv/bin/python"
+    pydeps="${base}/pydeps"
+    state="${base}/state"
+    grader_mode="official-swebench-docker"
+fi
 
 if [[ ! -x "${python}" ]]; then
     printf 'rsi: canonical Python is not executable: %s\n' "${python}" >&2
@@ -26,6 +46,10 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 export RSI_LAB_BASE="${base}"
 export RSI_LAB_REPO="${repo}"
-export PYTHONPATH="${repo}:${pydeps}${PYTHONPATH:+:${PYTHONPATH}}"
+export RSI_LAB_STATE="${state}"
+export DHARMA_HOME="${state}/.dharma"
+export RSI_LAB_PROVIDER_SELFTEST_ROOT="${state}/.dharma/forge_lab/provider_selftests"
+export RSI_LAB_GRADER_MODE="${grader_mode}"
+export PYTHONPATH="${repo}:${pydeps}"
 cd "${repo}"
 exec "${python}" -m dharma_swarm.forge_lab "$@"

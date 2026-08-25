@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Scheduled provider liveness: at most four tiny probes per hour. Credentials
+# are resolved inside the provider layer and never appear in argv or output.
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# These are model IDs only. They intentionally map to the VPS's distinct
+# Moonshot Platform and Zhipu entitlements; an operator may override the
+# names without changing the versioned wrapper.
+export RSI_LAB_STAGED_MODELS="${RSI_LAB_STAGED_MODELS:-moonshot:kimi-k2.7-code,glm-5.2}"
+exec "${script_dir}/rsi" provider selftest \
+    --profile staged \
+    --live \
+    --require-independent-routes 2 \
+    --timeout-s 20 \
+    --max-probes 4 \
+    --min-refresh-interval-s 3600 \
+    --json

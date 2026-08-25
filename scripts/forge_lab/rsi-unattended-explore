@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# Production-only launcher.  Unlike the interactive `rsi` wrapper there is no
+# development-source escape hatch: a timer must execute the immutable current
+# release and the stable host-owned state root or fail closed.
+if [[ "${RSI_LAB_DEV_SOURCE:-0}" == "1" ]]; then
+    printf 'rsi-unattended-explore: RSI_LAB_DEV_SOURCE is forbidden\n' >&2
+    exit 9
+fi
+
+if [[ -d /root/rsi-lab/current ]]; then
+    logical_base="/root/rsi-lab/current"
+    state="/root/rsi-lab/state"
+else
+    logical_base="${HOME}/.dharma/rsi-lab/current"
+    state="${HOME}/.dharma/rsi-lab/state"
+fi
+if [[ ! -d "${logical_base}" ]]; then
+    printf 'rsi-unattended-explore: immutable current release is missing\n' >&2
+    exit 9
+fi
+base="$(cd -- "${logical_base}" && pwd -P)"
+repo="${base}/repo"
+python="${base}/.venv/bin/python"
+pydeps="${base}/pydeps"
+if [[ ! -x "${python}" || ! -d "${repo}/dharma_swarm/forge_lab" ]]; then
+    printf 'rsi-unattended-explore: immutable release runtime is incomplete\n' >&2
+    exit 9
+fi
+
+export PYTHONDONTWRITEBYTECODE=1
+export RSI_LAB_BASE="${base}"
+export RSI_LAB_REPO="${repo}"
+export RSI_LAB_STATE="${state}"
+export DHARMA_HOME="${state}/.dharma"
+export RSI_LAB_GRADER_MODE="official-swebench-docker"
+export PYTHONPATH="${repo}:${pydeps}"
+cd "${repo}"
+exec "${python}" -m dharma_swarm.forge_lab.unattended_explore \
+    --state-root "${state}" "$@"

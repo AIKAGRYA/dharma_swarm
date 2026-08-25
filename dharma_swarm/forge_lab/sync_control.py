@@ -172,6 +172,37 @@ def prepare_release(
     }
 
 
+_FOREGROUND_CAMPAIGN_PATTERNS = (
+    re.compile(r"dharma_swarm\.forge_lab\.experiment(?:\s|$)", re.I),
+    re.compile(r"dharma_swarm\.forge_lab\.cli\s+run(?:\s|$)", re.I),
+    re.compile(
+        r"dharma_swarm\.forge_lab(?:\.rsi_cli)?\s+newrun\b.*(?:^|\s)--execute(?:\s|$)",
+        re.I,
+    ),
+    re.compile(
+        r"dharma_swarm\.forge_lab(?:\.rsi_cli)?\s+campaign\s+"
+        r"(?:run|pause|resume|stop|fork|fuse-ack)\b",
+        re.I,
+    ),
+    re.compile(
+        r"(?:^|\s)(?:\S*/)?(?:rsi|rsilab)(?:\s+-)?\s+newrun\b"
+        r".*(?:^|\s)--execute(?:\s|$)",
+        re.I,
+    ),
+    re.compile(
+        r"(?:^|\s)(?:\S*/)?(?:rsi|rsilab)\s+campaign\s+"
+        r"(?:run|pause|resume|stop|fork|fuse-ack)\b",
+        re.I,
+    ),
+    re.compile(r"(?:^|\s)(?:\S*/)?experiment\.py(?:\s|$)", re.I),
+    re.compile(r"rsi-manager-|rsi-overnight|forge_lab_v1_run", re.I),
+)
+
+
+def _foreground_campaign_argv(argv: str) -> bool:
+    return any(pattern.search(argv) for pattern in _FOREGROUND_CAMPAIGN_PATTERNS)
+
+
 def _campaign_guard(root: Path) -> dict[str, Any]:
     reasons: list[str] = []
     evidence: dict[str, Any] = {}
@@ -185,7 +216,15 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
             payload = json.loads(active_manifest.read_text(encoding="utf-8"))
             state = str(payload.get("state", "unknown")).lower()
             evidence["active_campaign_manifest_state"] = state
-            if state in {"active", "running", "pausing", "resuming", "stopping"}:
+            terminal_states = {
+                "completed",
+                "failed",
+                "paused",
+                "stopped",
+                "aborted",
+                "cancelled",
+            }
+            if state not in terminal_states:
                 reasons.append(f"campaign manifest reports active state: {state}")
         except (OSError, json.JSONDecodeError) as exc:
             reasons.append(f"active campaign manifest is unreadable: {exc}")
@@ -220,16 +259,11 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
         ).stdout.splitlines()
     except (OSError, subprocess.SubprocessError):
         processes = []
-    patterns = (
-        "dharma_swarm.forge_lab.experiment",
-        "rsi-manager-",
-        "rsi-overnight",
-        "forge_lab_v1_run",
-    )
     active_processes = [
         line.strip()
         for line in processes
-        if any(pattern in line for pattern in patterns) and "sync_control" not in line
+        if _foreground_campaign_argv(line)
+        and "sync_control" not in line
     ]
     evidence["active_process_count"] = len(active_processes)
     if active_processes:
@@ -269,6 +303,21 @@ def _install_wrappers(root: Path, release: Path, *, node: str) -> dict[str, str]
         / "scripts"
         / "forge_lab"
         / "operator-history",
+        "rsi-provider-refresh": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-provider-refresh",
+        "rsi-provider-refresh-install": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-provider-refresh-install",
+        "rsi-unattended-explore": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-unattended-explore",
     }
     if node != "meghadharma":
         targets["rsi-env"] = targets["rsi-lab-env"]

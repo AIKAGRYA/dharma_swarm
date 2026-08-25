@@ -1,0 +1,53 @@
+[Unit]
+Description=RSI Lab bounded unattended EXPLORE (one run)
+Documentation=file:/root/rsi-lab/current/repo/docs/ops/FORGE_LAB_V0_1_RUNBOOK.md
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+ConditionPathExists=/root/rsi-lab/current
+ConditionPathExists=!/root/rsi-lab/state/.dharma/forge_lab/HALT
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/root/rsi-lab/bin/rsi-unattended-explore --timeout-seconds 2700
+TimeoutStartSec=2800
+KillMode=mixed
+KillSignal=SIGTERM
+Restart=no
+
+# The release is read-only.  All experiment, scratch, ledger, and receipt writes
+# are confined to the one stable host state root; Docker grading is reached via
+# its Unix socket and candidate containers have their own stricter isolation.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/rsi-lab/state
+ReadOnlyPaths=/root/rsi-lab/current
+PrivateTmp=true
+PrivateDevices=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+MemoryMax=6G
+TasksMax=512
+LimitNOFILE=4096
+LimitFSIZE=64M
+CPUQuota=300%
+
+[Install]
+WantedBy=multi-user.target

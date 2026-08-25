@@ -1,8 +1,8 @@
 """Confirm/depth tier: grade a genome (or a control patch) against REAL
 SWE-bench-Verified instances via the official Docker harness.
 
-This is the depth tier of the ratified cascade: the fast host-pytest
-``explore`` tier screens breadth; this tier grades survivors against actual
+This is the depth tier of the ratified cascade: the isolated ``explore`` tier
+screens breadth; this tier grades survivors against actual
 SWE-bench-Verified instances, where the verdict comes only from swebench's
 per-instance ``report.json`` (never self-reported). It reuses the ALREADY
 tier-agnostic grade chain: ``grade_genome_explore -> production_seams.grade_task
@@ -17,12 +17,16 @@ Estate invariants held structurally, not by promise:
                      ranked against explore rows.
   * honest failure — a missing report.json raises (infra fail) and is recorded
                      as a hard error row, never coerced to a False verdict.
+  * route admission — candidate generation requires a fresh live selftest for
+                      two distinct provider entitlements; availability is not
+                      judge authority.
 
 Usage:
   # falsifiable honesty proof — gold must resolve True, empty False:
   python -m dharma_swarm.forge_lab.confirm_swebench --instance django__django-12209 --control
   # grade a real solver genome against the instance (confirm tier):
-  python -m dharma_swarm.forge_lab.confirm_swebench --instance django__django-12209 --solver-model kimi-code
+  python -m dharma_swarm.forge_lab.confirm_swebench --instance django__django-12209 \
+    --solver-model kimi-code --provider-receipt /path/to/provider_selftest.json
 """
 
 from __future__ import annotations
@@ -34,6 +38,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,10 +51,91 @@ from dharma_swarm.forge_lab.grade_explore import (
     GradeSeams,
     TIER_CONFIRM_SWEBENCH,
     grade_genome_explore,
+    normalize_grader_result,
     production_seams,
 )
+from dharma_swarm.forge_lab.provider_selftest import (
+    PROVIDER_SELFTEST_SCHEMA,
+    validate_provider_receipt,
+)
+from dharma_swarm.forge_lab.state_io import safe_json
+from dharma_swarm.forge_lab.version import PACKAGE_VERSION, source_commit
 
 CONFIRM_ROOT = Path.home() / ".dharma" / "forge_lab" / "confirm"
+
+
+def confirm_provider_admission(
+    receipt_path: str | Path | None,
+    *,
+    max_age_seconds: int = 3600,
+) -> dict[str, Any]:
+    """Require fresh live evidence for two provider entitlements.
+
+    Model-family diversity is not provider independence.  Confirm generation
+    is refused unless the supplied selftest receipt names at least two distinct
+    callable provider routes.  This admission is availability evidence only;
+    it does not make the providers scientific judges.
+    """
+
+    if receipt_path is None:
+        raise ValueError("confirm requires --provider-receipt from a live selftest")
+    path = Path(receipt_path).expanduser().resolve(strict=False)
+    payload = safe_json(path)
+    if payload is None:
+        raise ValueError("confirm provider receipt is missing or invalid")
+    failures = validate_provider_receipt(payload, path=path)
+    routes = sorted(
+        {
+            str(route).strip().lower()
+            for route in payload.get("independent_routes", [])
+            if str(route).strip()
+        }
+    )
+    checked_text = str(payload.get("checked_at") or "")
+    try:
+        checked = datetime.fromisoformat(checked_text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("confirm provider receipt has no parseable checked_at") from exc
+    age = max(0.0, (datetime.now(timezone.utc) - checked).total_seconds())
+    policy = payload.get("policy") if isinstance(payload.get("policy"), dict) else {}
+    source = policy.get("source") if isinstance(policy.get("source"), dict) else {}
+    probe_policy = (
+        policy.get("probe_policy")
+        if isinstance(policy.get("probe_policy"), dict)
+        else {}
+    )
+    if payload.get("schema") != PROVIDER_SELFTEST_SCHEMA:
+        failures.append("wrong_schema")
+    if source.get("commit") != source_commit():
+        failures.append("receipt_source_commit_mismatch")
+    if source.get("package_version") != PACKAGE_VERSION:
+        failures.append("receipt_package_version_mismatch")
+    if source.get("tree_state") != "clean":
+        failures.append("receipt_source_not_clean")
+    if int(probe_policy.get("require_independent_routes") or 0) < 2:
+        failures.append("probe_policy_did_not_require_two_routes")
+    if not payload.get("ok") or not payload.get("live"):
+        failures.append("not_live_and_passing")
+    if int(payload.get("callable_count") or 0) < 2:
+        failures.append("fewer_than_two_callable_routes")
+    if len(routes) < 2 or int(payload.get("independent_route_count") or 0) != len(routes):
+        failures.append("two_distinct_provider_entitlements_not_attested")
+    if age > max(1, int(max_age_seconds)):
+        failures.append("receipt_stale")
+    if failures:
+        raise ValueError("confirm provider admission refused: " + ",".join(failures))
+    return {
+        "schema": "forge_lab.confirm_provider_admission.v1",
+        "policy": "two_distinct_live_provider_entitlements",
+        "receipt": str(path),
+        "receipt_digest": payload.get("receipt_digest"),
+        "provider_policy_digest": payload.get("policy_digest"),
+        "checked_at": checked_text,
+        "age_seconds": round(age, 3),
+        "independent_routes": routes,
+        "independent_route_count": len(routes),
+        "availability_only_not_judge_authority": True,
+    }
 
 
 def _ensure_docker() -> None:
@@ -117,15 +203,33 @@ def _control(inst: dict, image_key: str, run_id: str) -> dict[str, Any]:
         row: dict[str, Any] = {"arm": arm, "tier": TIER_CONFIRM_SWEBENCH, "resolved": False}
         t0 = time.time()
         try:
-            resolved, seconds, note = seams.grade_task(inst, patch, timeout=1800)
-            row.update(resolved=bool(resolved), grade_seconds=float(seconds), note=note)
+            result = normalize_grader_result(
+                seams.grade_task(inst, patch, timeout=1800)
+            )
+            row.update(
+                resolved=bool(result.resolved),
+                grade_seconds=float(result.seconds),
+                note=result.note,
+                grader_outcome=result.outcome.value,
+                grader_executed=result.executed,
+                grader_comparable=result.comparable,
+                grader_error_class=result.error_class,
+                isolation_proofs=list(result.isolation_proofs),
+            )
         except Exception as exc:  # infra/report failure — hard error, NOT a False verdict
             row["error"] = f"{type(exc).__name__}:{exc}"[:500]
             row["grade_seconds"] = round(time.time() - t0, 1)
         rows.append(row)
     gold = next(r for r in rows if r["arm"] == "gold")
     empty = next(r for r in rows if r["arm"] == "empty")
-    discriminates = bool(gold.get("resolved")) and not bool(empty.get("resolved"))
+    discriminates = bool(
+        gold.get("resolved")
+        and gold.get("grader_executed")
+        and gold.get("grader_comparable")
+        and not empty.get("resolved")
+        and empty.get("grader_executed")
+        and empty.get("grader_comparable")
+    )
     return {
         "schema": "forge_lab.confirm_swebench.control.v0",
         "run_id": run_id,
@@ -138,8 +242,15 @@ def _control(inst: dict, image_key: str, run_id: str) -> dict[str, Any]:
     }
 
 
-def _candidate(inst: dict, ctx: dict, image_key: str, run_id: str, solver_model: str,
-               budget_tokens: int) -> dict[str, Any]:
+def _candidate(
+    inst: dict,
+    ctx: dict,
+    image_key: str,
+    run_id: str,
+    solver_model: str,
+    budget_tokens: int,
+    provider_admission: dict[str, Any],
+) -> dict[str, Any]:
     """Grade one real solver genome against the instance on the confirm tier."""
     genome = dict(DEFAULT_GENOME)
     genome["generator_model"] = solver_model
@@ -183,6 +294,7 @@ def _candidate(inst: dict, ctx: dict, image_key: str, run_id: str, solver_model:
         "image_key": image_key,
         "tier": outcome.tier,
         "solver_model": solver_model,
+        "provider_admission": provider_admission,
         **patch_meta,
         "pass_rate": outcome.pass_rate,
         "tokens_used": outcome.tokens_used,
@@ -199,7 +311,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--solver-model", default="kimi-code",
                     help="slot-resolvable model id for the candidate path")
     ap.add_argument("--budget-tokens", type=int, default=400_000)
+    ap.add_argument(
+        "--provider-receipt",
+        help="fresh live provider-selftest receipt attesting two independent routes",
+    )
+    ap.add_argument("--provider-receipt-max-age-s", type=int, default=3600)
     args = ap.parse_args(argv)
+
+    provider_admission: dict[str, Any] | None = None
+    if not args.control:
+        try:
+            provider_admission = confirm_provider_admission(
+                args.provider_receipt,
+                max_age_seconds=args.provider_receipt_max_age_s,
+            )
+        except ValueError as exc:
+            print(f"[confirm] admission refused: {exc}", file=sys.stderr)
+            return 2
 
     _ensure_docker()
     stamp = time.time()
@@ -211,7 +339,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.control:
         payload = _control(inst, image_key, run_id)
     else:
-        payload = _candidate(inst, ctx, image_key, run_id, args.solver_model, args.budget_tokens)
+        assert provider_admission is not None
+        payload = _candidate(
+            inst,
+            ctx,
+            image_key,
+            run_id,
+            args.solver_model,
+            args.budget_tokens,
+            provider_admission,
+        )
 
     path = _write_receipt(run_id, payload)
     print(json.dumps({k: payload[k] for k in payload if k not in ("per_task", "rows")}, indent=2), flush=True)
