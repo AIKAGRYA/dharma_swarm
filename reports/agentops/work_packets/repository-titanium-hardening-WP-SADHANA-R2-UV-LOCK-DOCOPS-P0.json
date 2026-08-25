@@ -1,0 +1,118 @@
+{
+  "id": "repository-titanium-hardening-WP-SADHANA-R2-UV-LOCK-DOCOPS-P0",
+  "base_ref": "3543e650fd5218fbdf47cc8d91e29454db107c34",
+  "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
+  "worktree": ".",
+  "intent": "Converge repository-owned DocOps inventory and asserted manifest counts from the exact SADHANA R2 uv-lock custody source tree, and correct the deployment guide's stale copied-venv command to the executable `/usr/bin/python3.12 -m venv --copies .venv` followed by pinned frozen uv synchronization. Preserve doctrine and authority relationships; this child is documentation truth convergence, not deployment approval, runtime evidence, activation, or authority promotion.",
+  "allowed_files": [
+    "deploy/sadhana/README.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/repository-titanium-hardening-WP-SADHANA-R2-UV-LOCK-DOCOPS-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "docops-contract-tests",
+      "command": "python3 -m pytest -q tests/test_docops_integrity.py tests/test_docops_reconcile_workflow.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "strict-docops-owner-check",
+      "command": "python3 scripts/docops/check_docops_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "integrated-docops-integrity",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-child-diff-check",
+      "command": "git diff --check 3543e650fd5218fbdf47cc8d91e29454db107c34 HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "docops-selected-hostile-contracts-remain-effective",
+      "command": "python3 -m pytest -q tests/test_docops_integrity.py::test_changed_canonical_guard_fails_added_and_modified_docs tests/test_docops_integrity.py::test_staleness_ttl_expires tests/test_docops_integrity.py::test_duplicate_asserted_token_is_flagged tests/test_docops_integrity.py::test_registered_canon_missing_fails tests/test_docops_integrity.py::test_agents_pointer_rejects_contract_duplication tests/test_docops_reconcile_workflow.py::test_missing_required_context_is_a_red_job",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(governance): refresh SADHANA uv lock inventory"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-UV-LOCK-DOCOPS-P0",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "3543e650fd5218fbdf47cc8d91e29454db107c34",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The uv-lock custody regressions add four tracked release-contract test functions after the previous generated DocOps snapshot, so the asserted test-function count and generated inventory are stale by four at exact source commit 3543e650fd5218fbdf47cc8d91e29454db107c34.",
+      "The deployment guide still names an unsupported `uv venv --python 3.12 --copies` command even though the executable and tested ledger create `.venv` with `/usr/bin/python3.12 -m venv --copies .venv`, then use pinned uv 0.11.2 only for frozen synchronization.",
+      "The existing DocOps generator is the sole deterministic writer for generated inventory/count sections; the command prose correction is a narrow manual truth fix adjacent to the executable contract."
+    ],
+    "closest_existing_implementation": [
+      "deploy/sadhana/README.md",
+      "scripts/docops/check_docops_integrity.py",
+      "docs/docops/AUTO_INVENTORY.md",
+      "docs/governance/SOVEREIGN_MANIFEST.md"
+    ],
+    "honest_blockers": [
+      "Documentation convergence proves only that repository claims match the tracked uv-lock custody tree; it does not independently approve, deploy, activate, or prove the SADHANA runtime.",
+      "No provider, transport, VPS, service, route, credential, release seal, or Git remote is mutated by this packet.",
+      "This child does not authorize merge, provider dispatch, account-confirmation promotion, credential acceptance, supervisor start, or campaign activation."
+    ],
+    "rollback": "Regenerate inventory and asserted counts from the restored tracked tree, and restore deployment prose only if the executable copied-venv contract is itself reverted. Never hand-edit generated counts, weaken strict verification, or treat documentation totals as runtime evidence.",
+    "packet_digest": "7ea137d5fe6edb2b81b7e875a807fd43b59d86f768dd8e54bc74cce2e509e25d"
+  }
+}

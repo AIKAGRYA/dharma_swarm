@@ -301,10 +301,14 @@ under `/etc/dharma-sadhana/receipts/releases/SHA/`, independently verifies the
 Gitless frozen tree again, and publishes `staged-release-admission.v1.json`
 last. The service-owned preparation projection is byte-identical to that root
 receipt. Only then may root promote the release. It extracts the
-hash-pinned uv executable without trusting host `PATH` or pip, creates the copied Python environment with
-`uv venv --python 3.12 --copies`, runs the frozen dependency sync, builds the
-dashboard, rejects every broken or venv-escaping link, and renders exact-SHA
-units. There is no `deploy --activate` option: deployment stages and completes
+hash-pinned uv executable without trusting host `PATH` or pip, creates the
+copied Python environment with `/usr/bin/python3.12 -m venv --copies .venv`,
+then runs pinned `uv sync --active --frozen --no-dev` and builds the dashboard.
+After every lifecycle command exits and the solo-process proof succeeds, it
+converges only uv 0.11.2's exact empty `.venv/.lock` inode from `0666` to
+owner-private `0600` before trusted candidate reads. It rejects every broken
+or venv-escaping link and renders exact-SHA units. There is no
+`deploy --activate` option: deployment stages and completes
 only the no-effect preparation boundary. After installing the writer unit it
 reloads systemd, proves the preparation oneshot is static (not enableable),
 starts it, and requires its successful active/exited state. That oneshot creates
