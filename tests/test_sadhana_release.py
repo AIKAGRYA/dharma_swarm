@@ -1134,6 +1134,20 @@ def test_gitless_staged_release_admission_persists_ledger_and_rejects_substituti
         admitted,
         "receipt_digest",
     )
+    replayed = release.publish_staged_release_admission(
+        release_sha=release_sha,
+        release_path=release_path,
+        tracked_source=tracked,
+        build_receipt=build_receipt,
+        release_input_set_digest="c" * 64,
+        account=account,
+        receipt_root=receipt_root,
+        projection_path=projection,
+        expected_root_uid=root_uid,
+        expected_root_gid=root_gid,
+    )
+    assert replayed == admitted
+    assert projection.read_bytes() == admission_path.read_bytes()
 
     substituted_build = dict(build_receipt)
     substituted_build["build_driver_sha256"] = "d" * 64

@@ -2511,6 +2511,7 @@ def _publish_or_replay_private_receipt(
     *,
     expected_uid: int,
     expected_gid: int,
+    digest_includes_trailing_newline: bool = False,
 ) -> dict[str, Any]:
     """Publish one immutable canonical receipt or accept an exact-byte replay."""
     schema = payload.get("schema_version")
@@ -2524,6 +2525,7 @@ def _publish_or_replay_private_receipt(
             expected_gid=expected_gid,
             expected_schema=schema,
             digest_field="receipt_digest",
+            digest_includes_trailing_newline=digest_includes_trailing_newline,
         )
         if prior_raw != raw:
             raise ReleaseContractError(
@@ -2547,6 +2549,7 @@ def _read_exact_canonical_json(
     expected_gid: int,
     expected_schema: str,
     digest_field: str,
+    digest_includes_trailing_newline: bool = False,
     maximum_bytes: int = _MAX_JSON_BYTES,
 ) -> tuple[dict[str, Any], bytes, os.stat_result]:
     """Read one immutable canonical JSON object with stable inode metadata."""
@@ -2623,10 +2626,15 @@ def _read_exact_canonical_json(
     if payload.get("schema_version") != expected_schema:
         raise ReleaseContractError("runtime binding artifact schema differs")
     digest = payload.get(digest_field)
+    expected_digest = (
+        _canonical_newline_self_digest(payload, digest_field)
+        if digest_includes_trailing_newline
+        else _canonical_self_digest(payload, digest_field)
+    )
     if (
         not isinstance(digest, str)
         or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
-        or digest != _canonical_self_digest(payload, digest_field)
+        or digest != expected_digest
     ):
         raise ReleaseContractError("runtime binding artifact self-digest differs")
     if raw != _canonical_bytes(payload) + b"\n":
@@ -20924,6 +20932,7 @@ def publish_staged_release_admission(
         payload,
         expected_uid=expected_root_uid,
         expected_gid=expected_root_gid,
+        digest_includes_trailing_newline=True,
     )
     admission_raw = _canonical_bytes(admitted) + b"\n"
     if project_for_preparation:
