@@ -5461,6 +5461,7 @@ def test_prepare_host_binds_role_before_creating_any_path(
 
 
 def test_prepare_host_creates_oracle_roots_after_identity_before_build(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     order: list[str] = []
@@ -5527,6 +5528,77 @@ def test_prepare_host_creates_oracle_roots_after_identity_before_build(
         "oracle-roots",
         "build",
     ]
+    monkeypatch.undo()
+    _assert_standby_service_preparation_creates_preactivation_receipt_root(
+        tmp_path,
+        monkeypatch,
+    )
+
+
+def _assert_standby_service_preparation_creates_preactivation_receipt_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = SimpleNamespace(
+        pw_name="dharma-sadhana",
+        pw_uid=max(os.geteuid(), 1),
+        pw_gid=max(os.getegid(), 1),
+        pw_dir="/var/lib/dharma-sadhana",
+        pw_shell="/bin/sh",
+    )
+    receipt_root = tmp_path / "etc/dharma-sadhana/receipts"
+    preactivation_root = receipt_root / "preactivation"
+    monkeypatch.setattr(release.pwd, "getpwnam", lambda _name: service)
+    monkeypatch.setattr(
+        release,
+        "_admit_preexisting_host_scaffolding",
+        lambda **_kwargs: {},
+    )
+    monkeypatch.setattr(release, "_ensure_emergency_apply_lock", lambda: None)
+    monkeypatch.setattr(
+        release,
+        "PREACTIVATION_CLOCK_RECEIPT",
+        preactivation_root / "preactivation-clock-proof.v1.json",
+    )
+    monkeypatch.setattr(
+        release,
+        "ROLLBACK_RECEIPT",
+        receipt_root / "rollback/rollback.v1.json",
+    )
+    monkeypatch.setattr(
+        release,
+        "STANDBY_STOP_MARKER",
+        receipt_root / "standby/deadline-stopped.v1.json",
+    )
+    monkeypatch.setattr(release, "RELEASE_RECEIPT_ROOT", receipt_root / "releases")
+    monkeypatch.setattr(
+        release,
+        "RUNTIME_BINDING_RECEIPT_TARGET",
+        receipt_root / "runtime/runtime-binding-activation.v2.json",
+    )
+    monkeypatch.setattr(
+        release,
+        "WRITER_MARKER",
+        tmp_path / "etc/dharma-sadhana/writer-enabled",
+    )
+    ensured: dict[Path, tuple[int, int, int]] = {}
+
+    def ensure(path: Path, *, uid: int, gid: int, mode: int) -> None:
+        ensured[path] = (uid, gid, mode)
+
+    monkeypatch.setattr(release, "_ensure_host_directory", ensure)
+
+    for _attempt in range(2):
+        assert (
+            release._prepare_service_identity_and_paths(
+                role="standby",
+                observed_node=release.STANDBY_NODE,
+                runner=lambda *_args, **_kwargs: pytest.fail("unexpected useradd"),
+            )
+            is service
+        )
+    assert preactivation_root.is_dir()
+    assert ensured[preactivation_root] == (0, 0, 0o700)
 
 
 def test_oracle_clean_host_persistent_roots_are_exact_replay_only(

@@ -17350,6 +17350,7 @@ def _prepare_service_identity_and_paths(
         mode=0o750,
     )
     for receipt_parent in (
+        PREACTIVATION_CLOCK_RECEIPT.parent,
         ROLLBACK_RECEIPT.parent,
         STANDBY_STOP_MARKER.parent,
         RELEASE_RECEIPT_ROOT,

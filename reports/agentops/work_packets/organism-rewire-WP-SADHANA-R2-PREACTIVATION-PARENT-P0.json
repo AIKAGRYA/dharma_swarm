@@ -1,0 +1,111 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-PREACTIVATION-PARENT-P0",
+  "base_ref": "1de725fbbc563d5cbd0c3e6d13fe4847c9c85472",
+  "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
+  "worktree": ".",
+  "intent": "Repair the live-proven SADHANA R2 standby preactivation receipt-parent omission without weakening root custody or widening service authority. The exact 1de725fbbc563d5cbd0c3e6d13fe4847c9c85472 release completed inert standby deployment and mandatory replay on AGNI, but its root-run clock-proof could not publish because standby prepare-host never created `/etc/dharma-sadhana/receipts/preactivation`; writer preparation creates that parent only through writer-specific control identity setup. Make the common service preparation transaction create and replay-validate the exact root:root 0700 parent before any clock proof, preserving the rule that the non-root standby service can neither write activation receipts nor self-authorize activation.",
+  "allowed_files": [
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-PREACTIVATION-PARENT-P0.json",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/governance/**",
+    "terminal/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-release-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check 1de725fbbc563d5cbd0c3e6d13fe4847c9c85472 HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "standby-preactivation-authority-fence",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'prepare_host or clock_proof or standby_activation'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): prepare standby activation receipts"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-PREACTIVATION-PARENT-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "1de725fbbc563d5cbd0c3e6d13fe4847c9c85472",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The exact 1de725fbbc563d5cbd0c3e6d13fe4847c9c85472 release completed AGNI's isolated build, inert standby deployment, and mandatory deploy replay, then the root-run clock-proof rejected before activation because `/etc/dharma-sadhana/receipts/preactivation` did not exist; Tailscale Serve remained empty and every standby authority unit remained inactive.",
+      "Common service preparation creates root-custodied rollback, standby-stop, release, and runtime-binding receipt parents, but omits the parent of PREACTIVATION_CLOCK_RECEIPT. Writer preparation incidentally creates that same directory later through writer-only observer/control identity setup; standby intentionally skips those identities and therefore exposes the omission only on the real two-role path.",
+      "The repair must create the exact common preactivation parent as root:root 0700 and replay-validate that custody. Clock-proof and standby activation remain root-run, separately receipted transactions; the service account receives no read, traverse, write, Serve, unit-start, dispatch, supervisor, or campaign authority from directory existence alone."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "tests/test_sadhana_release.py",
+      "deploy/sadhana/README.md"
+    ],
+    "honest_blockers": [
+      "This pristine-base preflight grants only the three-file source repair envelope. It does not prove the implementation, authorize a remote hot patch, or activate the inert 1de725fbbc563d5cbd0c3e6d13fe4847c9c85472 release.",
+      "The repaired exact SHA still requires focused and full test gates, AgentOps closeout, DocOps convergence, a fresh sealed envelope, non-root host verification, inert AGNI deploy, mandatory replay, a fresh bounded clock proof, and exact-route activation probes.",
+      "This packet does not authorize account confirmation, provider dispatch, supervisor start, campaign activation, writer failover, merge, or any Megh mutation before AGNI's standby proof closes."
+    ],
+    "rollback": "Revert only the common root-custodied preactivation-parent preparation, its replay/custody regression, and this packet before resealing. Preserve the inert 1de725fbbc563d5cbd0c3e6d13fe4847c9c85472 release and live rejection evidence; never prepublish a clock receipt manually, grant the service access to activation receipts, relax secure-parent checks, or bypass clock-proof and activate-standby.",
+    "packet_digest": "5ad568464a94a0678b27fb0fe206e733d969d52970ef2093e308eedb3b8974f5"
+  }
+}
