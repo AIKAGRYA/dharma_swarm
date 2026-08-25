@@ -5165,6 +5165,133 @@ def verify_venv(
         raise ReleaseContractError("venv must use Python 3.12")
 
 
+def _normalize_uv_venv_lock_custody(
+    venv_root: Path,
+    *,
+    expected_uid: int,
+    expected_gid: int,
+) -> None:
+    """Converge only uv 0.11.2's exact empty venv lock to private custody."""
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    cloexec = getattr(os, "O_CLOEXEC", 0)
+    if not nofollow or not directory or not cloexec:
+        raise ReleaseContractError("platform lacks no-follow uv venv lock custody")
+    if (
+        not venv_root.is_absolute()
+        or venv_root.name != ".venv"
+        or expected_uid <= 0
+        or expected_gid <= 0
+        or os.geteuid() != expected_uid
+        or os.getegid() != expected_gid
+    ):
+        raise ReleaseContractError("uv venv lock transition identity differs")
+
+    def exact_lock(identity: os.stat_result, modes: set[int]) -> bool:
+        return (
+            stat.S_ISREG(identity.st_mode)
+            and identity.st_uid == expected_uid
+            and identity.st_gid == expected_gid
+            and identity.st_nlink == 1
+            and identity.st_size == 0
+            and stat.S_IMODE(identity.st_mode) in modes
+        )
+
+    def exact_root(identity: os.stat_result) -> bool:
+        return (
+            stat.S_ISDIR(identity.st_mode)
+            and identity.st_uid == expected_uid
+            and identity.st_gid == expected_gid
+            and stat.S_IMODE(identity.st_mode) == 0o700
+        )
+
+    lock_path = venv_root / ".lock"
+    try:
+        root_before = venv_root.lstat()
+        lock_before = lock_path.lstat()
+    except OSError as exc:
+        raise ReleaseContractError("uv venv lock is unavailable") from exc
+    if not exact_root(root_before) or not exact_lock(
+        lock_before, {0o600, 0o666}
+    ):
+        raise ReleaseContractError("uv venv lock lacks exact generated custody")
+
+    root_descriptor = -1
+    descriptor = -1
+    try:
+        root_descriptor = os.open(
+            venv_root,
+            os.O_RDONLY | directory | nofollow | cloexec,
+        )
+        opened_root = os.fstat(root_descriptor)
+        if (
+            not exact_root(opened_root)
+            or (opened_root.st_dev, opened_root.st_ino)
+            != (root_before.st_dev, root_before.st_ino)
+            or opened_root.st_uid != expected_uid
+            or opened_root.st_gid != expected_gid
+        ):
+            raise ReleaseContractError("uv venv root changed during lock transition")
+        admitted = os.stat(".lock", dir_fd=root_descriptor, follow_symlinks=False)
+        if (
+            not exact_lock(admitted, {0o600, 0o666})
+            or (admitted.st_dev, admitted.st_ino)
+            != (lock_before.st_dev, lock_before.st_ino)
+        ):
+            raise ReleaseContractError("uv venv lock changed before custody transition")
+
+        descriptor = os.open(
+            ".lock",
+            os.O_RDWR | nofollow | cloexec,
+            dir_fd=root_descriptor,
+        )
+        opened = os.fstat(descriptor)
+        if (
+            not exact_lock(opened, {0o600, 0o666})
+            or (opened.st_dev, opened.st_ino)
+            != (admitted.st_dev, admitted.st_ino)
+            or os.read(descriptor, 1) != b""
+        ):
+            raise ReleaseContractError("uv venv lock changed during custody transition")
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        locked = os.fstat(descriptor)
+        if (
+            not exact_lock(locked, {0o600, 0o666})
+            or (locked.st_dev, locked.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise ReleaseContractError("uv venv lock changed after kernel lock")
+
+        # uv 0.11.2 LockedFile::create persists an unwritten NamedTempFile and
+        # deliberately chmods it to 0666. Empty bytes are therefore part of
+        # the admitted producer contract, not a generic writable-file carveout.
+        os.fchmod(descriptor, 0o600)
+        os.fsync(descriptor)
+        normalized = os.fstat(descriptor)
+        rebound = os.stat(".lock", dir_fd=root_descriptor, follow_symlinks=False)
+        absolute_after = lock_path.lstat()
+        root_after = venv_root.lstat()
+        if (
+            not exact_lock(normalized, {0o600})
+            or not exact_lock(rebound, {0o600})
+            or (rebound.st_dev, rebound.st_ino)
+            != (normalized.st_dev, normalized.st_ino)
+            or not exact_lock(absolute_after, {0o600})
+            or (absolute_after.st_dev, absolute_after.st_ino)
+            != (normalized.st_dev, normalized.st_ino)
+            or not exact_root(root_after)
+            or (root_after.st_dev, root_after.st_ino)
+            != (opened_root.st_dev, opened_root.st_ino)
+        ):
+            raise ReleaseContractError("uv venv lock normalization was not retained")
+    except OSError as exc:
+        raise ReleaseContractError("uv venv lock custody transition failed") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if root_descriptor >= 0:
+            os.close(root_descriptor)
+
+
 def _run_build_command(
     runner: Callable[..., subprocess.CompletedProcess[str]],
     argv: Sequence[str],
@@ -18928,6 +19055,11 @@ def execute_isolated_build_plan(
     # All untrusted lifecycle children must be gone before trusted Python reads
     # any candidate output or removes candidate-controlled Git metadata.
     _require_solo_hardened_build_process()
+    _normalize_uv_venv_lock_custody(
+        repo / ".venv",
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+    )
     verify_dashboard_build(repo / "dashboard")
     verify_venv(repo / ".venv", expected_uid=expected_uid, execute_version=False)
     tracked_driver = repo / "scripts/runtime/sadhana_release.py"

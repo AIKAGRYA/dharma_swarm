@@ -8889,6 +8889,183 @@ def test_venv_rejects_group_writable_regular_file(tmp_path: Path) -> None:
         release.verify_venv(venv, execute_version=False)
 
 
+def test_uv_venv_lock_custody_normalizes_exact_empty_lock_and_replays(
+    tmp_path: Path,
+) -> None:
+    venv = tmp_path / ".venv"
+    venv.mkdir(mode=0o700)
+    lock = venv / ".lock"
+    lock.write_bytes(b"")
+    lock.chmod(0o666)
+
+    release._normalize_uv_venv_lock_custody(
+        venv,
+        expected_uid=os.geteuid(),
+        expected_gid=os.getegid(),
+    )
+    identity = lock.lstat()
+    assert stat.S_ISREG(identity.st_mode)
+    assert stat.S_IMODE(identity.st_mode) == 0o600
+    assert identity.st_nlink == 1
+    assert identity.st_size == 0
+
+    release._normalize_uv_venv_lock_custody(
+        venv,
+        expected_uid=os.geteuid(),
+        expected_gid=os.getegid(),
+    )
+    replayed = lock.lstat()
+    assert (replayed.st_dev, replayed.st_ino) == (identity.st_dev, identity.st_ino)
+    assert stat.S_IMODE(replayed.st_mode) == 0o600
+
+
+@pytest.mark.parametrize(
+    "hostile_kind",
+    (
+        "nonempty",
+        "unexpected-mode",
+        "hardlink",
+        "symlink",
+        "missing",
+        "special-file",
+        "foreign-owner",
+        "foreign-group",
+        "unexpected-root-mode",
+    ),
+)
+def test_uv_venv_lock_custody_rejects_hostile_entries_without_normalizing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_kind: str,
+) -> None:
+    venv = tmp_path / ".venv"
+    venv.mkdir(mode=0o700)
+    lock = venv / ".lock"
+    external: Path | None = None
+    if hostile_kind == "missing":
+        pass
+    elif hostile_kind == "special-file":
+        os.mkfifo(lock, mode=0o666)
+    elif hostile_kind == "symlink":
+        external = tmp_path / "outside-lock"
+        external.write_bytes(b"")
+        external.chmod(0o666)
+        lock.symlink_to(external)
+    elif hostile_kind == "hardlink":
+        external = tmp_path / "outside-lock"
+        external.write_bytes(b"")
+        external.chmod(0o666)
+        os.link(external, lock)
+    else:
+        lock.write_bytes(b"occupied" if hostile_kind == "nonempty" else b"")
+        lock.chmod(0o644 if hostile_kind == "unexpected-mode" else 0o666)
+    if hostile_kind == "unexpected-root-mode":
+        venv.chmod(0o755)
+    if hostile_kind in {"foreign-owner", "foreign-group"}:
+        actual_lstat = Path.lstat
+
+        def foreign_lock_lstat(path: Path) -> os.stat_result:
+            identity = actual_lstat(path)
+            if path != lock:
+                return identity
+            fields = list(identity)
+            field = stat.ST_UID if hostile_kind == "foreign-owner" else stat.ST_GID
+            fields[field] = fields[field] + 1
+            return os.stat_result(fields)
+
+        monkeypatch.setattr(Path, "lstat", foreign_lock_lstat)
+
+    with pytest.raises(
+        release.ReleaseContractError,
+        match=(
+            "uv venv lock is unavailable"
+            if hostile_kind == "missing"
+            else "uv venv lock lacks exact generated custody"
+        ),
+    ):
+        release._normalize_uv_venv_lock_custody(
+            venv,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+
+    if hostile_kind == "nonempty":
+        assert lock.read_bytes() == b"occupied"
+    elif hostile_kind == "unexpected-mode":
+        assert stat.S_IMODE(lock.lstat().st_mode) == 0o644
+    elif hostile_kind == "hardlink":
+        assert external is not None
+        assert lock.lstat().st_nlink == 2
+        assert stat.S_IMODE(external.lstat().st_mode) == 0o666
+    elif hostile_kind == "symlink":
+        assert external is not None
+        assert lock.is_symlink()
+        assert stat.S_IMODE(external.lstat().st_mode) == 0o666
+    elif hostile_kind == "special-file":
+        assert stat.S_ISFIFO(lock.lstat().st_mode)
+
+
+def test_uv_venv_lock_custody_rejects_post_fsync_path_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    venv = tmp_path / ".venv"
+    venv.mkdir(mode=0o700)
+    lock = venv / ".lock"
+    lock.write_bytes(b"")
+    lock.chmod(0o666)
+    original_fsync = os.fsync
+    swapped = False
+
+    def swap_after_fsync(descriptor: int) -> None:
+        nonlocal swapped
+        original_fsync(descriptor)
+        if swapped:
+            return
+        swapped = True
+        lock.rename(venv / ".lock.retired")
+        lock.write_bytes(b"")
+        lock.chmod(0o600)
+
+    monkeypatch.setattr(release.os, "fsync", swap_after_fsync)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="uv venv lock normalization was not retained",
+    ):
+        release._normalize_uv_venv_lock_custody(
+            venv,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+    assert swapped is True
+
+
+def test_uv_venv_lock_custody_rejects_busy_lock_without_normalizing(
+    tmp_path: Path,
+) -> None:
+    venv = tmp_path / ".venv"
+    venv.mkdir(mode=0o700)
+    lock = venv / ".lock"
+    lock.write_bytes(b"")
+    lock.chmod(0o666)
+    descriptor = os.open(lock, os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        release.fcntl.flock(descriptor, release.fcntl.LOCK_EX | release.fcntl.LOCK_NB)
+        with pytest.raises(
+            release.ReleaseContractError,
+            match="uv venv lock custody transition failed",
+        ):
+            release._normalize_uv_venv_lock_custody(
+                venv,
+                expected_uid=os.geteuid(),
+                expected_gid=os.getegid(),
+            )
+    finally:
+        release.fcntl.flock(descriptor, release.fcntl.LOCK_UN)
+        os.close(descriptor)
+    assert stat.S_IMODE(lock.lstat().st_mode) == 0o666
+
+
 def test_venv_rejects_foreign_owned_contained_symlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -9368,16 +9545,43 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         (staging / name).mkdir(mode=0o700)
 
     monkeypatch.setattr(release, "_make_build_process_undumpable", lambda: None)
+    lifecycle_events: list[object] = []
     monkeypatch.setattr(
-        release, "_require_solo_hardened_build_process", lambda: None
+        release,
+        "_require_solo_hardened_build_process",
+        lambda: lifecycle_events.append("solo-process-proof"),
     )
-    monkeypatch.setattr(release, "verify_dashboard_build", lambda _root: None)
-    monkeypatch.setattr(release, "verify_venv", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(release, "verify_checkout", lambda *_args, **_kwargs: None)
+    venv_roots: list[Path] = []
+
+    def verify_dashboard(_root: Path) -> None:
+        lifecycle_events.append("trusted-dashboard-read")
+
+    def normalize_venv_lock(root: Path, **_kwargs: object) -> None:
+        lifecycle_events.append("normalize-lock")
+        venv_roots.append(root)
+
+    def verify_venv(root: Path, **_kwargs: object) -> None:
+        lifecycle_events.append("trusted-venv-read")
+        venv_roots.append(root)
+
+    def verify_checkout(*_args: object, **_kwargs: object) -> None:
+        lifecycle_events.append("trusted-checkout-read")
+
+    def verify_tracked_checkout(*_args: object, **_kwargs: object) -> None:
+        lifecycle_events.append("trusted-tracked-read")
+
+    def hash_driver(*_args: object, **_kwargs: object) -> str:
+        lifecycle_events.append("trusted-driver-hash")
+        return "a" * 64
+
+    monkeypatch.setattr(release, "verify_dashboard_build", verify_dashboard)
     monkeypatch.setattr(
-        release, "verify_tracked_checkout", lambda *_args, **_kwargs: None
+        release, "_normalize_uv_venv_lock_custody", normalize_venv_lock
     )
-    monkeypatch.setattr(release, "sha256_file", lambda *_args, **_kwargs: "a" * 64)
+    monkeypatch.setattr(release, "verify_venv", verify_venv)
+    monkeypatch.setattr(release, "verify_checkout", verify_checkout)
+    monkeypatch.setattr(release, "verify_tracked_checkout", verify_tracked_checkout)
+    monkeypatch.setattr(release, "sha256_file", hash_driver)
 
     uv_binary = Path(
         f"/opt/dharma-sadhana/tooling/uv-{release.UV_VERSION}/bin/uv"
@@ -9389,6 +9593,7 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
     ) -> subprocess.CompletedProcess[str]:
         command = tuple(argv)
         calls.append(command)
+        lifecycle_events.append(command)
         if command[:3] == (release.GIT_PATH, "clone", "--no-checkout"):
             repo = staging / "repo"
             repo.mkdir()
@@ -9420,6 +9625,33 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
     )
     assert calls.count(python_venv) == 1
     assert not any(command[:2] == (str(uv_binary), "venv") for command in calls)
+    assert calls[-4:] == [
+        (str(uv_binary), "sync", "--active", "--frozen", "--no-dev"),
+        (
+            release.NPM_PATH,
+            "ci",
+            "--legacy-peer-deps",
+            "--no-audit",
+            "--no-fund",
+        ),
+        (release.NPM_PATH, "run", "build"),
+        (str(staging / "repo/.venv/bin/python"), "--version"),
+    ]
+    assert lifecycle_events == [
+        *calls,
+        "solo-process-proof",
+        "normalize-lock",
+        "trusted-dashboard-read",
+        "trusted-venv-read",
+        "trusted-driver-hash",
+        "trusted-driver-hash",
+        "trusted-checkout-read",
+        "trusted-tracked-read",
+        "solo-process-proof",
+        "trusted-driver-hash",
+        "trusted-driver-hash",
+    ]
+    assert venv_roots == [staging / "repo/.venv"] * 2
     assert receipt["commands"] == [
         "uv-version",
         "git-clone",
