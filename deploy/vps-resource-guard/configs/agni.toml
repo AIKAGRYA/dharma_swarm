@@ -1,0 +1,24 @@
+[guard]
+host = "agni"
+expected_hostname = "agni-openclaw"
+memory_ceiling_percent = 85.0
+recovery_percent = 78.0
+critical_percent = 92.0
+poll_interval_seconds = 5.0
+cooldown_seconds = 300.0
+state_file = "/var/lib/vps-resource-guard/state.json"
+receipt_file = "/var/log/vps-resource-guard/receipts.jsonl"
+receipt_max_bytes = 5242880
+minimum_candidate_memory_bytes = 134217728
+
+[[targets]]
+id = "ollama"
+action = "systemd-restart"
+target = "ollama.service"
+priority = 10
+
+[[targets]]
+id = "hermes-gateway"
+action = "systemd-user-restart"
+target = "hermes-gateway.service"
+priority = 10
