@@ -9310,6 +9310,443 @@ def test_pinned_next_declaration_rejects_named_path_swap_before_removal(
         assert (retired_dashboard / "next-env.d.ts").exists()
 
 
+_PINNED_UV_PKG_INFO_HEADER = (
+    b"Metadata-Version: 2.4\n"
+    b"Name: dharma-swarm\n"
+    b"Version: 0.1.0\n"
+    b"Summary: Darwin-Heuristic Autonomous Recursive Meta-Agent Swarm\n"
+    b"Author-email: John Shrader <dhyana@example.com>\n"
+    b"License-Expression: MIT\n"
+    b"Requires-Python: >=3.11\n"
+    b"Description-Content-Type: text/markdown\n"
+    b"Requires-Dist: pydantic>=2.0\n"
+    b"Requires-Dist: typer>=0.9\n"
+    b"Requires-Dist: rich>=13.0\n"
+    b"Requires-Dist: anthropic>=0.40\n"
+    b"Requires-Dist: openai>=1.0\n"
+    b"Requires-Dist: httpx>=0.25\n"
+    b"Requires-Dist: aiosqlite>=0.19\n"
+    b"Requires-Dist: aiofiles>=23.0\n"
+    b"Requires-Dist: scipy>=1.11\n"
+    b"Requires-Dist: textual>=0.40\n"
+    b"Requires-Dist: fastapi>=0.104\n"
+    b"Requires-Dist: uvicorn>=0.24\n"
+    b"Requires-Dist: numpy>=1.24\n"
+    b"Requires-Dist: pyyaml>=6.0\n"
+    b"Requires-Dist: cryptography>=50.0.0\n"
+    b"Requires-Dist: icontract>=2.6\n"
+    b"Requires-Dist: croniter>=2.0\n"
+    b"Provides-Extra: mcp\n"
+    b'Requires-Dist: mcp>=1.28.1; extra == "mcp"\n'
+    b"Provides-Extra: ingest\n"
+    b'Requires-Dist: markitdown>=0.1.6; extra == "ingest"\n'
+    b"Provides-Extra: dev\n"
+    b'Requires-Dist: pytest>=7.0; extra == "dev"\n'
+    b'Requires-Dist: pytest-asyncio>=0.21; extra == "dev"\n'
+    b'Requires-Dist: pytest-cov>=4.0; extra == "dev"\n'
+    b'Requires-Dist: pytest-timeout>=2.3; extra == "dev"\n'
+    b'Requires-Dist: pytest-rerunfailures>=14.0; extra == "dev"\n'
+    b'Requires-Dist: ruff==0.15.16; extra == "dev"\n'
+    b'Requires-Dist: hypothesis>=6.100; extra == "dev"\n'
+    b'Requires-Dist: mutmut>=3.5; extra == "dev"\n'
+    b'Requires-Dist: scikit-learn>=1.3; extra == "dev"\n'
+    b"Provides-Extra: router\n"
+    b'Requires-Dist: fasttext-wheel>=0.9.2; extra == "router"\n'
+    b'Requires-Dist: redis>=5.0.0; extra == "router"\n'
+    b"Provides-Extra: infra\n"
+    b'Requires-Dist: langgraph>=0.2.0; extra == "infra"\n'
+    b'Requires-Dist: temporalio>=1.8.0; extra == "infra"\n'
+    b'Requires-Dist: qdrant-client>=1.11.0; extra == "infra"\n'
+    b'Requires-Dist: neo4j>=5.25.0; extra == "infra"\n'
+    b"Provides-Extra: ginko\n"
+    b'Requires-Dist: hmmlearn>=0.3; extra == "ginko"\n'
+    b'Requires-Dist: arch>=6.0; extra == "ginko"\n'
+    b'Requires-Dist: yfinance>=0.2; extra == "ginko"\n'
+    b"Provides-Extra: test-oracle\n"
+    b'Requires-Dist: langgraph==1.2.4; extra == "test-oracle"\n'
+    b'Requires-Dist: langgraph-checkpoint==4.1.1; extra == "test-oracle"\n'
+    b'Requires-Dist: langgraph-checkpoint-sqlite==3.1.0; extra == "test-oracle"\n'
+    b"Provides-Extra: test-oracle-vocab\n"
+    b'Requires-Dist: langchain-core==1.4.4; extra == "test-oracle-vocab"\n'
+    b"\n"
+)
+_PINNED_UV_REQUIRES = (
+    b"pydantic>=2.0\ntyper>=0.9\nrich>=13.0\nanthropic>=0.40\n"
+    b"openai>=1.0\nhttpx>=0.25\naiosqlite>=0.19\naiofiles>=23.0\n"
+    b"scipy>=1.11\ntextual>=0.40\nfastapi>=0.104\nuvicorn>=0.24\n"
+    b"numpy>=1.24\npyyaml>=6.0\ncryptography>=50.0.0\nicontract>=2.6\n"
+    b"croniter>=2.0\n\n[dev]\npytest>=7.0\npytest-asyncio>=0.21\n"
+    b"pytest-cov>=4.0\npytest-timeout>=2.3\npytest-rerunfailures>=14.0\n"
+    b"ruff==0.15.16\nhypothesis>=6.100\nmutmut>=3.5\nscikit-learn>=1.3\n"
+    b"\n[ginko]\nhmmlearn>=0.3\narch>=6.0\nyfinance>=0.2\n"
+    b"\n[infra]\nlanggraph>=0.2.0\ntemporalio>=1.8.0\n"
+    b"qdrant-client>=1.11.0\nneo4j>=5.25.0\n"
+    b"\n[ingest]\nmarkitdown>=0.1.6\n\n[mcp]\nmcp>=1.28.1\n"
+    b"\n[router]\nfasttext-wheel>=0.9.2\nredis>=5.0.0\n"
+    b"\n[test-oracle]\nlanggraph==1.2.4\nlanggraph-checkpoint==4.1.1\n"
+    b"langgraph-checkpoint-sqlite==3.1.0\n"
+    b"\n[test-oracle-vocab]\nlangchain-core==1.4.4\n"
+)
+_PINNED_UV_EGG_INFO_SPECS = {
+    "PKG-INFO": (
+        0o644,
+        7195,
+        "e00f05deb287e778feeca546a6eedddcee1118fb88327b6a460d6f6f67208a7f",
+    ),
+    "SOURCES.txt": (
+        0o600,
+        77815,
+        "0d129f9b098ea385dc25e14034b69f5a893bddb22949da85d6d419a15ea7a0b7",
+    ),
+    "dependency_links.txt": (
+        0o600,
+        1,
+        "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    ),
+    "entry_points.txt": (
+        0o600,
+        86,
+        "527d7eff9970fb0b5836add9c512e5d5534b0995184c01715dde354cd6c0af78",
+    ),
+    "requires.txt": (
+        0o600,
+        758,
+        "e2e500aed400f5b87def500fa5d088803fc5c78e741a7bb01681aa3ec3338b60",
+    ),
+    "top_level.txt": (
+        0o600,
+        13,
+        "b5fe4879c9717208fed00941fe78f2b626ec0d30a7106199fc54ad22b0f1e6d7",
+    ),
+}
+
+
+def _pinned_uv_egg_info_bytes() -> dict[str, bytes]:
+    source_root = Path(__file__).resolve().parent.parent
+    readme = (source_root / "README.md").read_bytes()
+    assert len(readme) == 5016
+    assert hashlib.sha256(readme).hexdigest() == (
+        "fe7a5e59ef2dbe04b2186faf3c5064d5fabdd6e18d8d675eddf9f7cedf5ab96c"
+    )
+    package_sources = [
+        path.relative_to(source_root).as_posix()
+        for path in (source_root / "dharma_swarm").rglob("*.py")
+    ]
+    test_sources = [
+        path.relative_to(source_root).as_posix()
+        for path in (source_root / "tests").glob("test*.py")
+    ]
+    assert (len(package_sources), len(test_sources)) == (1170, 998)
+    source_paths = [
+        "README.md",
+        "pyproject.toml",
+        *package_sources,
+        *(f"dharma_swarm.egg-info/{name}" for name in _PINNED_UV_EGG_INFO_SPECS),
+        *test_sources,
+    ]
+    sources = "\n".join(sorted(source_paths, key=os.path.split)).encode("ascii")
+    return {
+        "PKG-INFO": _PINNED_UV_PKG_INFO_HEADER + readme,
+        "SOURCES.txt": sources,
+        "dependency_links.txt": b"\n",
+        "entry_points.txt": (
+            b"[console_scripts]\n"
+            b"dgc = dharma_swarm.dgc_cli:main\n"
+            b"dharma-swarm = dharma_swarm.cli:app\n"
+        ),
+        "requires.txt": _PINNED_UV_REQUIRES,
+        "top_level.txt": b"dharma_swarm\n",
+    }
+
+
+def _write_pinned_uv_egg_info(tmp_path: Path) -> tuple[Path, Path, Path]:
+    repo = tmp_path / "repo"
+    egg_root = repo / "dharma_swarm.egg-info"
+    egg_root.mkdir(parents=True, mode=0o700)
+    repo.chmod(0o700)
+    egg_root.chmod(0o700)
+    for name, raw in _pinned_uv_egg_info_bytes().items():
+        path = egg_root / name
+        path.write_bytes(raw)
+        path.chmod(_PINNED_UV_EGG_INFO_SPECS[name][0])
+    sentinel = repo / "sentinel"
+    sentinel.write_bytes(b"retained\n")
+    sentinel.chmod(0o600)
+    return repo, egg_root, sentinel
+
+
+def _identity_tree_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+    snapshot: dict[str, tuple[object, ...]] = {}
+    for path in (root, *root.rglob("*")):
+        identity = os.lstat(path)
+        payload: object = None
+        if stat.S_ISREG(identity.st_mode):
+            payload = path.read_bytes()
+        elif stat.S_ISLNK(identity.st_mode):
+            payload = os.readlink(path)
+        snapshot[path.relative_to(root).as_posix()] = (
+            identity.st_mode,
+            identity.st_uid,
+            identity.st_gid,
+            identity.st_nlink,
+            identity.st_size,
+            identity.st_dev,
+            identity.st_ino,
+            payload,
+        )
+    return snapshot
+
+
+def _force_linux_directory_nlinks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """APFS counts child entries in directory nlink; Linux counts child dirs."""
+    actual_lstat = Path.lstat
+    actual_stat = os.stat
+    actual_fstat = os.fstat
+
+    def linux_identity(identity: os.stat_result) -> os.stat_result:
+        if not stat.S_ISDIR(identity.st_mode):
+            return identity
+        fields = list(identity)
+        fields[stat.ST_NLINK] = 2
+        return os.stat_result(fields)
+
+    def linux_lstat(path: Path) -> os.stat_result:
+        return linux_identity(actual_lstat(path))
+
+    def linux_stat(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> os.stat_result:
+        return linux_identity(actual_stat(path, *args, **kwargs))
+
+    def linux_fstat(descriptor: int) -> os.stat_result:
+        return linux_identity(actual_fstat(descriptor))
+
+    monkeypatch.setattr(Path, "lstat", linux_lstat)
+    monkeypatch.setattr(release.os, "stat", linux_stat)
+    monkeypatch.setattr(release.os, "fstat", linux_fstat)
+
+
+def test_pinned_uv_egg_info_removal_is_exact_and_missing_replay_rejects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, egg_root, sentinel = _write_pinned_uv_egg_info(tmp_path)
+    _force_linux_directory_nlinks(monkeypatch)
+    expected_specs = tuple(
+        (name, *spec) for name, spec in _PINNED_UV_EGG_INFO_SPECS.items()
+    )
+    assert release._UV_0_11_2_EGG_INFO_FILES == expected_specs
+    for name, raw in _pinned_uv_egg_info_bytes().items():
+        mode, size, digest = _PINNED_UV_EGG_INFO_SPECS[name]
+        assert (mode, len(raw), hashlib.sha256(raw).hexdigest()) == (
+            mode,
+            size,
+            digest,
+        )
+    repo_before = repo.lstat()
+    sentinel_before = sentinel.lstat()
+
+    release._remove_pinned_uv_egg_info(
+        repo,
+        expected_uid=os.geteuid(),
+        expected_gid=os.getegid(),
+    )
+
+    assert not egg_root.exists()
+    assert (repo.lstat().st_dev, repo.lstat().st_ino) == (
+        repo_before.st_dev,
+        repo_before.st_ino,
+    )
+    assert sentinel.read_bytes() == b"retained\n"
+    assert (sentinel.lstat().st_dev, sentinel.lstat().st_ino) == (
+        sentinel_before.st_dev,
+        sentinel_before.st_ino,
+    )
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="pinned uv egg-info is unavailable",
+    ):
+        release._remove_pinned_uv_egg_info(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+    assert sentinel.read_bytes() == b"retained\n"
+
+
+def test_pinned_uv_egg_info_rejects_post_parent_fsync_reappearance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, egg_root, sentinel = _write_pinned_uv_egg_info(tmp_path)
+    _force_linux_directory_nlinks(monkeypatch)
+    original_fsync = os.fsync
+    fsync_calls = 0
+
+    def recreate_after_parent_fsync(descriptor: int) -> None:
+        nonlocal fsync_calls
+        original_fsync(descriptor)
+        fsync_calls += 1
+        if fsync_calls != 2:
+            return
+        egg_root.mkdir(mode=0o700)
+        replacement = egg_root / "replacement"
+        replacement.write_bytes(b"hostile\n")
+        replacement.chmod(0o600)
+
+    monkeypatch.setattr(release.os, "fsync", recreate_after_parent_fsync)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="pinned uv egg-info removal was not retained",
+    ):
+        release._remove_pinned_uv_egg_info(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+
+    assert fsync_calls == 2
+    assert (egg_root / "replacement").read_bytes() == b"hostile\n"
+    assert sentinel.read_bytes() == b"retained\n"
+
+
+@pytest.mark.parametrize(
+    "hostile_kind",
+    (
+        "missing-dir",
+        "dir-symlink",
+        "extra-file",
+        "extra-dir",
+        "missing-file",
+        "file-symlink",
+        "fifo",
+        "hardlink",
+        "altered-bytes",
+        "wrong-mode",
+        "foreign-owner",
+        "repo-mode",
+    ),
+)
+def test_pinned_uv_egg_info_rejects_hostile_tree_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_kind: str,
+) -> None:
+    repo, egg_root, _sentinel = _write_pinned_uv_egg_info(tmp_path)
+    _force_linux_directory_nlinks(monkeypatch)
+    target = egg_root / "dependency_links.txt"
+    outside = tmp_path / "outside"
+    if hostile_kind == "missing-dir":
+        for child in egg_root.iterdir():
+            child.unlink()
+        egg_root.rmdir()
+    elif hostile_kind == "dir-symlink":
+        egg_root.rename(outside)
+        egg_root.symlink_to(outside, target_is_directory=True)
+    elif hostile_kind == "extra-file":
+        (egg_root / "unexpected").write_bytes(b"hostile\n")
+    elif hostile_kind == "extra-dir":
+        (egg_root / "unexpected").mkdir(mode=0o700)
+    elif hostile_kind == "missing-file":
+        target.unlink()
+    elif hostile_kind == "file-symlink":
+        target.unlink()
+        outside.write_bytes(b"\n")
+        outside.chmod(0o600)
+        target.symlink_to(outside)
+    elif hostile_kind == "fifo":
+        target.unlink()
+        os.mkfifo(target, mode=0o600)
+    elif hostile_kind == "hardlink":
+        target.rename(outside)
+        os.link(outside, target)
+    elif hostile_kind == "altered-bytes":
+        target.write_bytes(b"x")
+        target.chmod(0o600)
+    elif hostile_kind == "wrong-mode":
+        target.chmod(0o640)
+    elif hostile_kind == "repo-mode":
+        repo.chmod(0o750)
+    elif hostile_kind == "foreign-owner":
+        actual_lstat = Path.lstat
+
+        def foreign_target_lstat(path: Path) -> os.stat_result:
+            identity = actual_lstat(path)
+            if path != target:
+                return identity
+            fields = list(identity)
+            fields[stat.ST_UID] += 1
+            return os.stat_result(fields)
+
+        monkeypatch.setattr(Path, "lstat", foreign_target_lstat)
+
+    before = _identity_tree_snapshot(tmp_path)
+    with pytest.raises(release.ReleaseContractError):
+        release._remove_pinned_uv_egg_info(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+    assert _identity_tree_snapshot(tmp_path) == before
+
+
+@pytest.mark.parametrize("swap_kind", ("file", "directory"))
+def test_pinned_uv_egg_info_rejects_named_path_swap_before_removal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    swap_kind: str,
+) -> None:
+    repo, egg_root, sentinel = _write_pinned_uv_egg_info(tmp_path)
+    _force_linux_directory_nlinks(monkeypatch)
+    target = egg_root / "dependency_links.txt"
+    retired_target = egg_root / "dependency_links.txt.retired"
+    retired_egg = repo / "dharma_swarm.egg-info.retired"
+    actual_stat = os.stat
+    file_stats = 0
+    directory_stats = 0
+
+    def swap_on_last_named_stat(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> os.stat_result:
+        nonlocal file_stats, directory_stats
+        if path == "dependency_links.txt" and kwargs.get("dir_fd") is not None:
+            file_stats += 1
+            if swap_kind == "file" and file_stats == 2:
+                target.rename(retired_target)
+                target.write_bytes(b"\n")
+                target.chmod(0o600)
+        if path == "dharma_swarm.egg-info" and kwargs.get("dir_fd") is not None:
+            directory_stats += 1
+            if swap_kind == "directory" and directory_stats == 2:
+                egg_root.rename(retired_egg)
+                egg_root.mkdir(mode=0o700)
+                (egg_root / "hostile").write_bytes(b"retained\n")
+        return actual_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(release.os, "stat", swap_on_last_named_stat)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="pinned uv egg-info changed before removal",
+    ):
+        release._remove_pinned_uv_egg_info(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+
+    if swap_kind == "file":
+        assert target.read_bytes() == b"\n"
+        assert retired_target.read_bytes() == b"\n"
+    else:
+        assert (egg_root / "hostile").read_bytes() == b"retained\n"
+        assert (retired_egg / "dependency_links.txt").read_bytes() == b"\n"
+    assert sentinel.read_bytes() == b"retained\n"
+
+
 def test_venv_rejects_foreign_owned_contained_symlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -9808,6 +10245,10 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         lifecycle_events.append("remove-next-declaration")
         assert root == staging / "repo"
 
+    def remove_egg_info(root: Path, **_kwargs: object) -> None:
+        lifecycle_events.append("remove-egg-info")
+        assert root == staging / "repo"
+
     def verify_venv(root: Path, **_kwargs: object) -> None:
         lifecycle_events.append("trusted-venv-read")
         venv_roots.append(root)
@@ -9837,6 +10278,7 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         "_remove_pinned_next_env_declaration",
         remove_next_declaration,
     )
+    monkeypatch.setattr(release, "_remove_pinned_uv_egg_info", remove_egg_info)
     monkeypatch.setattr(release, "verify_venv", verify_venv)
     monkeypatch.setattr(release, "verify_checkout", verify_checkout)
     monkeypatch.setattr(release, "verify_tracked_checkout", verify_tracked_checkout)
@@ -9909,6 +10351,7 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         "trusted-tracked-read",
         "solo-process-proof",
         "remove-next-declaration",
+        "remove-egg-info",
         "git-metadata-rmtree",
         "trusted-driver-hash",
         "trusted-driver-hash",

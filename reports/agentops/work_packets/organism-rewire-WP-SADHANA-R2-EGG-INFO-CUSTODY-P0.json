@@ -1,0 +1,112 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-EGG-INFO-CUSTODY-P0",
+  "base_ref": "744a06b458d9ee765e8c8d9b33e5efa7d2a8077b",
+  "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
+  "worktree": ".",
+  "intent": "Repair the live-proven SADHANA R2 editable-install metadata closure contradiction without weakening the tracked-source ledger. The isolated AGNI build passes copied-venv creation, pinned uv synchronization, exact uv-lock custody, npm, Next compilation, final tracked-checkout proof, and exact Next declaration removal, but pinned uv 0.11.2 creates one ignored build-only `dharma_swarm.egg-info` source-root directory. Require its exact live-observed six-file set, regular single-link build custody, producer-specific modes, sizes, and bytes, then remove only those bound inodes and their exact parent through no-follow directory descriptors after every lifecycle child exits and the second solo-process proof succeeds. Preserve the closed tracked-source set, Gitless freeze, no-root candidate execution, standby fencing, and every writer/dispatch lock.",
+  "allowed_files": [
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-EGG-INFO-CUSTODY-P0.json",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/governance/**",
+    "terminal/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-release-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check 744a06b458d9ee765e8c8d9b33e5efa7d2a8077b HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "egg-info-custody-hostiles",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'egg_info or isolated_build or tracked_source or custody or build_commands'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): remove exact uv egg-info metadata"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-EGG-INFO-CUSTODY-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "744a06b458d9ee765e8c8d9b33e5efa7d2a8077b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The exact sealed release 744a06b458d9ee765e8c8d9b33e5efa7d2a8077b passes the repaired Next declaration boundary, then rejects at the root-custodied frozen tracked-source gate because pinned uv 0.11.2's editable synchronization emits ignored `dharma_swarm.egg-info` outside the three admitted dependency/build-output directories.",
+      "A second isolated AGNI reproduction from the exact 744a release proves a deterministic directory mode 0700 with no nested directories and exactly six build-owned regular single-link files: producer-specific mode 0644 `PKG-INFO`, and mode 0600 `SOURCES.txt`, `dependency_links.txt`, `entry_points.txt`, `requires.txt`, and `top_level.txt`, all with exact live-captured sizes and bytes.",
+      "The metadata is consumed by the completed editable environment synchronization but is not a runtime artifact and is intentionally ignored. It must not become an admitted build-output root, an unbounded verifier exception, or a recursive deletion of unexplained candidate paths."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "tests/test_sadhana_release.py",
+      "pyproject.toml",
+      "uv.lock"
+    ],
+    "honest_blockers": [
+      "The failed 744a06b deployment transaction removed its release staging tree and receipts and activated no SADHANA target, authority marker, supervisor, listener, or Tailscale route. AGNI remains inert with empty Serve configuration and zero build-user processes.",
+      "A passing source closeout is not authority to reuse the rejected seal. The repaired exact SHA still requires a DocOps child, fresh sealed envelope, non-root host verification, inert standby deploy, clock proof, and bounded activation.",
+      "This packet does not authorize provider dispatch, account-confirmation promotion, writer failover, campaign activation, or merge."
+    ],
+    "rollback": "Revert only the exact editable-install egg-info custody transition, its regressions, and this work packet before resealing. Preserve the fail-closed AGNI evidence; never admit arbitrary source-root build output, weaken the tracked-source ledger, or recursively remove an unexplained directory.",
+    "packet_digest": "7ecd73f9b1fc5e93aa04eed87bcac1d806e0175b2404315e44e9f312c1c5dccd"
+  }
+}

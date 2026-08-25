@@ -188,6 +188,55 @@ _NEXT_16_3_0_ENV_DTS = (
 )
 if len(_NEXT_16_3_0_ENV_DTS) != 288:
     raise RuntimeError("pinned Next declaration bytes differ")
+_UV_0_11_2_EGG_INFO_FILES = (
+    (
+        "PKG-INFO",
+        0o644,
+        7195,
+        "e00f05deb287e778feeca546a6eedddcee1118fb88327b6a460d6f6f67208a7f",
+    ),
+    (
+        "SOURCES.txt",
+        0o600,
+        77815,
+        "0d129f9b098ea385dc25e14034b69f5a893bddb22949da85d6d419a15ea7a0b7",
+    ),
+    (
+        "dependency_links.txt",
+        0o600,
+        1,
+        "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    ),
+    (
+        "entry_points.txt",
+        0o600,
+        86,
+        "527d7eff9970fb0b5836add9c512e5d5534b0995184c01715dde354cd6c0af78",
+    ),
+    (
+        "requires.txt",
+        0o600,
+        758,
+        "e2e500aed400f5b87def500fa5d088803fc5c78e741a7bb01681aa3ec3338b60",
+    ),
+    (
+        "top_level.txt",
+        0o600,
+        13,
+        "b5fe4879c9717208fed00941fe78f2b626ec0d30a7106199fc54ad22b0f1e6d7",
+    ),
+)
+if (
+    tuple(entry[0] for entry in _UV_0_11_2_EGG_INFO_FILES)
+    != tuple(sorted(entry[0] for entry in _UV_0_11_2_EGG_INFO_FILES))
+    or any(
+        mode not in {0o600, 0o644}
+        or size <= 0
+        or not re.fullmatch(r"[0-9a-f]{64}", digest)
+        for _name, mode, size, digest in _UV_0_11_2_EGG_INFO_FILES
+    )
+):
+    raise RuntimeError("pinned uv egg-info inventory differs")
 UV_WHEEL_FILE = "uv-0.11.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
 UV_WHEEL_URL = (
     "https://files.pythonhosted.org/packages/9f/6e/"
@@ -5514,6 +5563,281 @@ def _remove_pinned_next_env_declaration(
             os.close(declaration_descriptor)
         if dashboard_descriptor >= 0:
             os.close(dashboard_descriptor)
+        if repo_descriptor >= 0:
+            os.close(repo_descriptor)
+
+
+def _remove_pinned_uv_egg_info(
+    repo_root: Path,
+    *,
+    expected_uid: int,
+    expected_gid: int,
+) -> None:
+    """Remove only uv 0.11.2's exact root setuptools metadata directory."""
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    cloexec = getattr(os, "O_CLOEXEC", 0)
+    if not nofollow or not directory or not cloexec:
+        raise ReleaseContractError("platform lacks no-follow uv egg-info custody")
+    if (
+        not repo_root.is_absolute()
+        or repo_root.name != "repo"
+        or expected_uid <= 0
+        or expected_gid <= 0
+        or os.geteuid() != expected_uid
+        or os.getegid() != expected_gid
+    ):
+        raise ReleaseContractError("uv egg-info transition identity differs")
+
+    egg_name = "dharma_swarm.egg-info"
+    egg_root = repo_root / egg_name
+    expected_files = {
+        name: (mode, size, digest)
+        for name, mode, size, digest in _UV_0_11_2_EGG_INFO_FILES
+    }
+
+    def exact_root(identity: os.stat_result) -> bool:
+        return (
+            stat.S_ISDIR(identity.st_mode)
+            and identity.st_uid == expected_uid
+            and identity.st_gid == expected_gid
+            and stat.S_IMODE(identity.st_mode) == 0o700
+        )
+
+    def exact_egg_directory(identity: os.stat_result) -> bool:
+        return exact_root(identity) and identity.st_nlink == 2
+
+    def exact_file(
+        identity: os.stat_result,
+        spec: tuple[int, int, str],
+        *,
+        links: int,
+    ) -> bool:
+        mode, size, _digest = spec
+        return (
+            stat.S_ISREG(identity.st_mode)
+            and identity.st_uid == expected_uid
+            and identity.st_gid == expected_gid
+            and stat.S_IMODE(identity.st_mode) == mode
+            and identity.st_nlink == links
+            and identity.st_size == size
+        )
+
+    def same_file(left: os.stat_result, right: os.stat_result) -> bool:
+        return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+    def open_file_digest(descriptor: int, maximum: int) -> tuple[int, str]:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        digest = hashlib.sha256()
+        total = 0
+        while total <= maximum:
+            chunk = os.read(descriptor, min(65_536, maximum + 1 - total))
+            if not chunk:
+                break
+            total += len(chunk)
+            digest.update(chunk)
+        return total, digest.hexdigest()
+
+    try:
+        repo_before = repo_root.lstat()
+        egg_before = egg_root.lstat()
+    except OSError as exc:
+        raise ReleaseContractError("pinned uv egg-info is unavailable") from exc
+    if not exact_root(repo_before) or not exact_egg_directory(egg_before):
+        raise ReleaseContractError("pinned uv egg-info lacks exact custody")
+
+    repo_descriptor = -1
+    egg_descriptor = -1
+    file_descriptors: dict[str, int] = {}
+    opened_files: dict[str, os.stat_result] = {}
+    try:
+        repo_descriptor = os.open(
+            repo_root,
+            os.O_RDONLY | directory | nofollow | cloexec,
+        )
+        opened_repo = os.fstat(repo_descriptor)
+        if not exact_root(opened_repo) or not same_file(opened_repo, repo_before):
+            raise ReleaseContractError(
+                "repository root changed during uv egg-info admission"
+            )
+
+        admitted_egg = os.stat(
+            egg_name,
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+        if not exact_egg_directory(admitted_egg) or not same_file(
+            admitted_egg, egg_before
+        ):
+            raise ReleaseContractError("uv egg-info changed during admission")
+        egg_descriptor = os.open(
+            egg_name,
+            os.O_RDONLY | directory | nofollow | cloexec,
+            dir_fd=repo_descriptor,
+        )
+        opened_egg = os.fstat(egg_descriptor)
+        if not exact_egg_directory(opened_egg) or not same_file(
+            opened_egg, admitted_egg
+        ):
+            raise ReleaseContractError("uv egg-info changed during admission")
+        if set(os.listdir(egg_descriptor)) != set(expected_files):
+            raise ReleaseContractError("pinned uv egg-info file set differs")
+
+        for name, spec in expected_files.items():
+            absolute_before = (egg_root / name).lstat()
+            admitted = os.stat(
+                name,
+                dir_fd=egg_descriptor,
+                follow_symlinks=False,
+            )
+            if (
+                not exact_file(absolute_before, spec, links=1)
+                or not exact_file(admitted, spec, links=1)
+                or not same_file(absolute_before, admitted)
+            ):
+                raise ReleaseContractError(
+                    "pinned uv egg-info file custody differs"
+                )
+            descriptor = os.open(
+                name,
+                os.O_RDONLY | nofollow | cloexec,
+                dir_fd=egg_descriptor,
+            )
+            file_descriptors[name] = descriptor
+            opened = os.fstat(descriptor)
+            size, digest = open_file_digest(descriptor, spec[1])
+            if (
+                not exact_file(opened, spec, links=1)
+                or not same_file(opened, admitted)
+                or size != spec[1]
+                or digest != spec[2]
+            ):
+                raise ReleaseContractError(
+                    "pinned uv egg-info file bytes or identity differ"
+                )
+            opened_files[name] = opened
+
+        # Every expected path is rebound immediately before the first unlink.
+        # The build UID is already proven solo, so this complete preflight keeps
+        # an unexpected replacement outside the mutation boundary.
+        if set(os.listdir(egg_descriptor)) != set(expected_files):
+            raise ReleaseContractError("pinned uv egg-info changed before removal")
+        for name, spec in expected_files.items():
+            named = os.stat(
+                name,
+                dir_fd=egg_descriptor,
+                follow_symlinks=False,
+            )
+            absolute = (egg_root / name).lstat()
+            if (
+                not exact_file(named, spec, links=1)
+                or not exact_file(absolute, spec, links=1)
+                or not same_file(named, opened_files[name])
+                or not same_file(absolute, opened_files[name])
+            ):
+                raise ReleaseContractError(
+                    "pinned uv egg-info changed before removal"
+                )
+        named_egg = os.stat(
+            egg_name,
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+        absolute_repo = repo_root.lstat()
+        absolute_egg = egg_root.lstat()
+        if (
+            not exact_egg_directory(named_egg)
+            or not same_file(named_egg, opened_egg)
+            or not exact_root(absolute_repo)
+            or not same_file(absolute_repo, opened_repo)
+            or not exact_egg_directory(absolute_egg)
+            or not same_file(absolute_egg, opened_egg)
+        ):
+            raise ReleaseContractError("pinned uv egg-info changed before removal")
+
+        for name in expected_files:
+            os.unlink(name, dir_fd=egg_descriptor)
+        os.fsync(egg_descriptor)
+
+        if os.listdir(egg_descriptor):
+            raise ReleaseContractError("pinned uv egg-info removal was not retained")
+        for name, spec in expected_files.items():
+            try:
+                os.stat(
+                    name,
+                    dir_fd=egg_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                pass
+            else:
+                raise ReleaseContractError(
+                    "pinned uv egg-info removal was not retained"
+                )
+            detached = os.fstat(file_descriptors[name])
+            size, digest = open_file_digest(file_descriptors[name], spec[1])
+            if (
+                not exact_file(detached, spec, links=0)
+                or not same_file(detached, opened_files[name])
+                or size != spec[1]
+                or digest != spec[2]
+            ):
+                raise ReleaseContractError(
+                    "pinned uv egg-info removal was not retained"
+                )
+        rebound_egg = os.stat(
+            egg_name,
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+        absolute_egg = egg_root.lstat()
+        if (
+            not exact_egg_directory(rebound_egg)
+            or not same_file(rebound_egg, opened_egg)
+            or not exact_egg_directory(absolute_egg)
+            or not same_file(absolute_egg, opened_egg)
+        ):
+            raise ReleaseContractError("pinned uv egg-info removal was not retained")
+
+        os.rmdir(egg_name, dir_fd=repo_descriptor)
+        os.fsync(repo_descriptor)
+
+        detached_egg = os.fstat(egg_descriptor)
+        retained_repo = os.fstat(repo_descriptor)
+        named_repo_after = repo_root.lstat()
+        try:
+            os.stat(
+                egg_name,
+                dir_fd=repo_descriptor,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            raise ReleaseContractError("pinned uv egg-info removal was not retained")
+        try:
+            egg_root.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            raise ReleaseContractError("pinned uv egg-info removal was not retained")
+        if (
+            not exact_root(detached_egg)
+            or not same_file(detached_egg, opened_egg)
+            or os.listdir(egg_descriptor)
+            or not exact_root(retained_repo)
+            or not same_file(retained_repo, opened_repo)
+            or not exact_root(named_repo_after)
+            or not same_file(named_repo_after, opened_repo)
+        ):
+            raise ReleaseContractError("pinned uv egg-info removal was not retained")
+    except OSError as exc:
+        raise ReleaseContractError("pinned uv egg-info removal failed") from exc
+    finally:
+        for descriptor in file_descriptors.values():
+            os.close(descriptor)
+        if egg_descriptor >= 0:
+            os.close(egg_descriptor)
         if repo_descriptor >= 0:
             os.close(repo_descriptor)
 
@@ -19299,6 +19623,11 @@ def execute_isolated_build_plan(
     commands.append("git-verify-tracked")
     _require_solo_hardened_build_process()
     _remove_pinned_next_env_declaration(
+        repo,
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+    )
+    _remove_pinned_uv_egg_info(
         repo,
         expected_uid=expected_uid,
         expected_gid=expected_gid,
