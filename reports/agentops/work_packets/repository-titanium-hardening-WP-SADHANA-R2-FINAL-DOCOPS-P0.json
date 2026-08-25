@@ -1,9 +1,9 @@
 {
   "id": "repository-titanium-hardening-WP-SADHANA-R2-FINAL-DOCOPS-P0",
-  "base_ref": "d17520075022b276abe9808a7bec370354d9aa45",
+  "base_ref": "8b9c2049c3423e2482e41210e461c0947e44c338",
   "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
   "worktree": ".",
-  "intent": "Regenerate only the repository-owned DocOps inventory and asserted manifest counts from the exact SADHANA R2 C1 tree. Preserve doctrine and authority relationships; this packet is mechanical count convergence, not release approval, runtime evidence, deployment activation, or an authority promotion.",
+  "intent": "Regenerate only the repository-owned DocOps inventory and asserted manifest counts from the exact SADHANA R2 staging-custody truth-fix tree. Preserve doctrine and authority relationships; this packet is mechanical count convergence, not release approval, runtime evidence, deployment activation, or an authority promotion.",
   "allowed_files": [
     "docs/docops/AUTO_INVENTORY.md",
     "docs/governance/SOVEREIGN_MANIFEST.md",
@@ -52,8 +52,8 @@
       "timeout_seconds": 300
     },
     {
-      "name": "c1-to-head-diff-check",
-      "command": "git diff --check d17520075022b276abe9808a7bec370354d9aa45 HEAD",
+      "name": "c3-to-head-diff-check",
+      "command": "git diff --check 8b9c2049c3423e2482e41210e461c0947e44c338 HEAD",
       "expected_exit": 0,
       "timeout_seconds": 120
     }
@@ -93,11 +93,11 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "d17520075022b276abe9808a7bec370354d9aa45",
+      "checked_at_sha": "8b9c2049c3423e2482e41210e461c0947e44c338",
       "details": []
     },
     "interface_mismatches": [
-      "The C1 release changes tracked implementation, test, and documentation metrics after the previous generated DocOps snapshot, so the asserted inventory must be regenerated from the exact C1 tree.",
+      "The staging-custody truth fix changes tracked implementation, tests, and packet metrics after the previous generated DocOps snapshot, so the asserted inventory must be regenerated from exact commit 8b9c2049c3423e2482e41210e461c0947e44c338.",
       "The existing DocOps generator is the sole deterministic writer for both affected documents; manual count edits or advisory-mode verification would create competing truth."
     ],
     "closest_existing_implementation": [
@@ -106,10 +106,10 @@
       "docs/governance/SOVEREIGN_MANIFEST.md"
     ],
     "honest_blockers": [
-      "Generated count convergence proves only that these two documents match the tracked C1-derived tree; it does not independently approve, deploy, activate, or prove the SADHANA runtime.",
+      "Generated count convergence proves only that these two documents match the tracked staging-custody-fix tree; it does not independently approve, deploy, activate, or prove the SADHANA runtime.",
       "No provider, transport, VPS, service, route, credential, release seal, or Git remote is mutated by this packet."
     ],
     "rollback": "Regenerate both documents from the restored tracked tree. Never hand-edit asserted counts, append duplicate rows, weaken strict verification, or treat generated totals as runtime evidence.",
-    "packet_digest": "62ca754a6342dd110a1002a49045fa19bd288cf0899e145cc81b3d84ad4f167e"
+    "packet_digest": "fdcd73b701649727dcade900e955604b21f9a73433eb34c0310f85977394a917"
   }
 }
