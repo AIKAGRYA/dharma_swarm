@@ -176,6 +176,18 @@ CONTROL_MAX_REQUEST_BYTES = 4096
 CONTROL_CSRF_HEADER = "X-Sadhana-CSRF"
 CONTROL_CSRF_VALUE = MISSION_ID
 UV_VERSION = "0.11.2"
+_NEXT_16_3_0_ENV_DTS = (
+    b'/// <reference types="next" />\n'
+    b'/// <reference types="next/image-types/global" />\n'
+    b'import "./.next/types/routes.d.ts";\n'
+    b'import "./.next/types/root-params.d.ts";\n'
+    b"\n"
+    b"// NOTE: This file should not be edited\n"
+    b"// see https://nextjs.org/docs/app/api-reference/config/typescript "
+    b"for more information.\n"
+)
+if len(_NEXT_16_3_0_ENV_DTS) != 288:
+    raise RuntimeError("pinned Next declaration bytes differ")
 UV_WHEEL_FILE = "uv-0.11.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
 UV_WHEEL_URL = (
     "https://files.pythonhosted.org/packages/9f/6e/"
@@ -5290,6 +5302,220 @@ def _normalize_uv_venv_lock_custody(
             os.close(descriptor)
         if root_descriptor >= 0:
             os.close(root_descriptor)
+
+
+def _remove_pinned_next_env_declaration(
+    repo_root: Path,
+    *,
+    expected_uid: int,
+    expected_gid: int,
+) -> None:
+    """Remove only Next 16.3.0's exact ignored generated declaration."""
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    cloexec = getattr(os, "O_CLOEXEC", 0)
+    if not nofollow or not directory or not cloexec:
+        raise ReleaseContractError("platform lacks no-follow Next declaration custody")
+    if (
+        not repo_root.is_absolute()
+        or repo_root.name != "repo"
+        or expected_uid <= 0
+        or expected_gid <= 0
+        or os.geteuid() != expected_uid
+        or os.getegid() != expected_gid
+    ):
+        raise ReleaseContractError("Next declaration transition identity differs")
+
+    dashboard_root = repo_root / "dashboard"
+    declaration_path = dashboard_root / "next-env.d.ts"
+
+    def exact_directory(identity: os.stat_result) -> bool:
+        return (
+            stat.S_ISDIR(identity.st_mode)
+            and identity.st_uid == expected_uid
+            and identity.st_gid == expected_gid
+            and stat.S_IMODE(identity.st_mode) == 0o700
+        )
+
+    def exact_declaration(identity: os.stat_result, *, links: int) -> bool:
+        return (
+            stat.S_ISREG(identity.st_mode)
+            and identity.st_uid == expected_uid
+            and identity.st_gid == expected_gid
+            and stat.S_IMODE(identity.st_mode) == 0o600
+            and identity.st_nlink == links
+            and identity.st_size == len(_NEXT_16_3_0_ENV_DTS)
+        )
+
+    def same_file(left: os.stat_result, right: os.stat_result) -> bool:
+        return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+    def read_open_declaration(descriptor: int) -> bytes:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        raw = bytearray()
+        maximum = len(_NEXT_16_3_0_ENV_DTS) + 1
+        while len(raw) < maximum:
+            chunk = os.read(descriptor, maximum - len(raw))
+            if not chunk:
+                break
+            raw.extend(chunk)
+        return bytes(raw)
+
+    try:
+        repo_before = repo_root.lstat()
+        dashboard_before = dashboard_root.lstat()
+        declaration_before = declaration_path.lstat()
+    except OSError as exc:
+        raise ReleaseContractError("pinned Next declaration is unavailable") from exc
+    if (
+        not exact_directory(repo_before)
+        or not exact_directory(dashboard_before)
+        or not exact_declaration(declaration_before, links=1)
+    ):
+        raise ReleaseContractError("pinned Next declaration lacks exact custody")
+
+    repo_descriptor = -1
+    dashboard_descriptor = -1
+    declaration_descriptor = -1
+    try:
+        repo_descriptor = os.open(
+            repo_root,
+            os.O_RDONLY | directory | nofollow | cloexec,
+        )
+        opened_repo = os.fstat(repo_descriptor)
+        if not exact_directory(opened_repo) or not same_file(
+            opened_repo, repo_before
+        ):
+            raise ReleaseContractError(
+                "repository root changed during Next declaration admission"
+            )
+
+        admitted_dashboard = os.stat(
+            "dashboard",
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+        if not exact_directory(admitted_dashboard) or not same_file(
+            admitted_dashboard, dashboard_before
+        ):
+            raise ReleaseContractError(
+                "dashboard root changed during Next declaration admission"
+            )
+        dashboard_descriptor = os.open(
+            "dashboard",
+            os.O_RDONLY | directory | nofollow | cloexec,
+            dir_fd=repo_descriptor,
+        )
+        opened_dashboard = os.fstat(dashboard_descriptor)
+        if not exact_directory(opened_dashboard) or not same_file(
+            opened_dashboard, admitted_dashboard
+        ):
+            raise ReleaseContractError(
+                "dashboard root changed during Next declaration admission"
+            )
+
+        admitted_declaration = os.stat(
+            "next-env.d.ts",
+            dir_fd=dashboard_descriptor,
+            follow_symlinks=False,
+        )
+        if not exact_declaration(admitted_declaration, links=1) or not same_file(
+            admitted_declaration, declaration_before
+        ):
+            raise ReleaseContractError(
+                "pinned Next declaration changed during admission"
+            )
+        declaration_descriptor = os.open(
+            "next-env.d.ts",
+            os.O_RDONLY | nofollow | cloexec,
+            dir_fd=dashboard_descriptor,
+        )
+        opened_declaration = os.fstat(declaration_descriptor)
+        if (
+            not exact_declaration(opened_declaration, links=1)
+            or not same_file(opened_declaration, admitted_declaration)
+            or read_open_declaration(declaration_descriptor)
+            != _NEXT_16_3_0_ENV_DTS
+        ):
+            raise ReleaseContractError(
+                "pinned Next declaration bytes or identity differ"
+            )
+
+        # This is the last named-path admission before unlinkat. The build UID
+        # is already proven solo in its private cgroup, so no lifecycle child
+        # can race this exact generated file back into the dashboard tree.
+        named_declaration = os.stat(
+            "next-env.d.ts",
+            dir_fd=dashboard_descriptor,
+            follow_symlinks=False,
+        )
+        named_dashboard = os.stat(
+            "dashboard",
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+        absolute_repo = repo_root.lstat()
+        absolute_dashboard = dashboard_root.lstat()
+        if (
+            not exact_declaration(named_declaration, links=1)
+            or not same_file(named_declaration, opened_declaration)
+            or not exact_directory(named_dashboard)
+            or not same_file(named_dashboard, opened_dashboard)
+            or not exact_directory(absolute_repo)
+            or not same_file(absolute_repo, opened_repo)
+            or not exact_directory(absolute_dashboard)
+            or not same_file(absolute_dashboard, opened_dashboard)
+        ):
+            raise ReleaseContractError(
+                "pinned Next declaration changed before removal"
+            )
+
+        os.unlink("next-env.d.ts", dir_fd=dashboard_descriptor)
+        os.fsync(dashboard_descriptor)
+
+        detached = os.fstat(declaration_descriptor)
+        retained_repo = os.fstat(repo_descriptor)
+        retained_dashboard = os.fstat(dashboard_descriptor)
+        named_repo_after = repo_root.lstat()
+        named_dashboard_after = dashboard_root.lstat()
+        try:
+            os.stat(
+                "next-env.d.ts",
+                dir_fd=dashboard_descriptor,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            raise ReleaseContractError(
+                "pinned Next declaration removal was not retained"
+            )
+        if (
+            not exact_declaration(detached, links=0)
+            or not same_file(detached, opened_declaration)
+            or read_open_declaration(declaration_descriptor)
+            != _NEXT_16_3_0_ENV_DTS
+            or not exact_directory(retained_repo)
+            or not same_file(retained_repo, opened_repo)
+            or not exact_directory(retained_dashboard)
+            or not same_file(retained_dashboard, opened_dashboard)
+            or not exact_directory(named_repo_after)
+            or not same_file(named_repo_after, opened_repo)
+            or not exact_directory(named_dashboard_after)
+            or not same_file(named_dashboard_after, opened_dashboard)
+        ):
+            raise ReleaseContractError(
+                "pinned Next declaration removal was not retained"
+            )
+    except OSError as exc:
+        raise ReleaseContractError("pinned Next declaration removal failed") from exc
+    finally:
+        if declaration_descriptor >= 0:
+            os.close(declaration_descriptor)
+        if dashboard_descriptor >= 0:
+            os.close(dashboard_descriptor)
+        if repo_descriptor >= 0:
+            os.close(repo_descriptor)
 
 
 def _run_build_command(
@@ -19072,6 +19298,11 @@ def execute_isolated_build_plan(
     verify_tracked_checkout(repo, release_sha)
     commands.append("git-verify-tracked")
     _require_solo_hardened_build_process()
+    _remove_pinned_next_env_declaration(
+        repo,
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+    )
     git_metadata = repo / ".git"
     git_identity = git_metadata.lstat()
     if (

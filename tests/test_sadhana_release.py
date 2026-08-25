@@ -9066,6 +9066,250 @@ def test_uv_venv_lock_custody_rejects_busy_lock_without_normalizing(
     assert stat.S_IMODE(lock.lstat().st_mode) == 0o666
 
 
+def _write_pinned_next_declaration(tmp_path: Path) -> tuple[Path, Path, Path]:
+    repo = tmp_path / "repo"
+    dashboard = repo / "dashboard"
+    dashboard.mkdir(parents=True, mode=0o700)
+    repo.chmod(0o700)
+    dashboard.chmod(0o700)
+    declaration = dashboard / "next-env.d.ts"
+    declaration.write_bytes(release._NEXT_16_3_0_ENV_DTS)
+    declaration.chmod(0o600)
+    sentinel = dashboard / "sentinel"
+    sentinel.write_bytes(b"retained\n")
+    sentinel.chmod(0o600)
+    return repo, declaration, sentinel
+
+
+def test_pinned_next_declaration_removal_is_exact_and_missing_replay_rejects(
+    tmp_path: Path,
+) -> None:
+    repo, declaration, sentinel = _write_pinned_next_declaration(tmp_path)
+    dashboard = declaration.parent
+    repo_before = repo.lstat()
+    dashboard_before = dashboard.lstat()
+    sentinel_before = sentinel.lstat()
+    assert len(release._NEXT_16_3_0_ENV_DTS) == 288
+    assert hashlib.sha256(release._NEXT_16_3_0_ENV_DTS).hexdigest() == (
+        "1862ac4bbbc5192d4bf562161df66ea547ed3e67173100656ab606ae9797db2b"
+    )
+
+    release._remove_pinned_next_env_declaration(
+        repo,
+        expected_uid=os.geteuid(),
+        expected_gid=os.getegid(),
+    )
+
+    assert not declaration.exists()
+    assert (repo.lstat().st_dev, repo.lstat().st_ino) == (
+        repo_before.st_dev,
+        repo_before.st_ino,
+    )
+    assert (dashboard.lstat().st_dev, dashboard.lstat().st_ino) == (
+        dashboard_before.st_dev,
+        dashboard_before.st_ino,
+    )
+    assert sentinel.read_bytes() == b"retained\n"
+    assert (sentinel.lstat().st_dev, sentinel.lstat().st_ino) == (
+        sentinel_before.st_dev,
+        sentinel_before.st_ino,
+    )
+    assert stat.S_IMODE(sentinel.lstat().st_mode) == 0o600
+
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="pinned Next declaration is unavailable",
+    ):
+        release._remove_pinned_next_env_declaration(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+    assert sentinel.read_bytes() == b"retained\n"
+
+
+def test_pinned_next_declaration_rejects_post_fsync_reappearance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, declaration, sentinel = _write_pinned_next_declaration(tmp_path)
+    original_fsync = os.fsync
+    recreated = False
+
+    def recreate_after_fsync(descriptor: int) -> None:
+        nonlocal recreated
+        original_fsync(descriptor)
+        if recreated:
+            return
+        recreated = True
+        declaration.write_bytes(release._NEXT_16_3_0_ENV_DTS)
+        declaration.chmod(0o600)
+
+    monkeypatch.setattr(release.os, "fsync", recreate_after_fsync)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="pinned Next declaration removal was not retained",
+    ):
+        release._remove_pinned_next_env_declaration(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+
+    assert recreated is True
+    assert declaration.read_bytes() == release._NEXT_16_3_0_ENV_DTS
+    assert stat.S_IMODE(declaration.lstat().st_mode) == 0o600
+    assert declaration.lstat().st_nlink == 1
+    assert sentinel.read_bytes() == b"retained\n"
+
+
+@pytest.mark.parametrize(
+    "hostile_kind",
+    (
+        "missing",
+        "symlink",
+        "fifo",
+        "hardlink",
+        "extra-bytes",
+        "altered-bytes",
+        "wrong-mode",
+        "foreign-owner",
+        "foreign-group",
+        "repo-mode",
+        "dashboard-mode",
+    ),
+)
+def test_pinned_next_declaration_rejects_hostile_entry_without_removal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_kind: str,
+) -> None:
+    repo, declaration, sentinel = _write_pinned_next_declaration(tmp_path)
+    dashboard = declaration.parent
+    outside = tmp_path / "outside-next-env.d.ts"
+    if hostile_kind == "missing":
+        declaration.unlink()
+    elif hostile_kind == "symlink":
+        declaration.unlink()
+        outside.write_bytes(release._NEXT_16_3_0_ENV_DTS)
+        outside.chmod(0o600)
+        declaration.symlink_to(outside)
+    elif hostile_kind == "fifo":
+        declaration.unlink()
+        os.mkfifo(declaration, mode=0o600)
+    elif hostile_kind == "hardlink":
+        declaration.rename(outside)
+        os.link(outside, declaration)
+    elif hostile_kind == "extra-bytes":
+        declaration.write_bytes(release._NEXT_16_3_0_ENV_DTS + b"x")
+        declaration.chmod(0o600)
+    elif hostile_kind == "altered-bytes":
+        raw = bytearray(release._NEXT_16_3_0_ENV_DTS)
+        raw[0] ^= 1
+        declaration.write_bytes(raw)
+        declaration.chmod(0o600)
+    elif hostile_kind == "wrong-mode":
+        declaration.chmod(0o640)
+    elif hostile_kind == "repo-mode":
+        repo.chmod(0o750)
+    elif hostile_kind == "dashboard-mode":
+        dashboard.chmod(0o750)
+    elif hostile_kind in {"foreign-owner", "foreign-group"}:
+        actual_lstat = Path.lstat
+
+        def foreign_declaration_lstat(path: Path) -> os.stat_result:
+            identity = actual_lstat(path)
+            if path != declaration:
+                return identity
+            fields = list(identity)
+            field = stat.ST_UID if hostile_kind == "foreign-owner" else stat.ST_GID
+            fields[field] += 1
+            return os.stat_result(fields)
+
+        monkeypatch.setattr(Path, "lstat", foreign_declaration_lstat)
+
+    sentinel_before = sentinel.lstat()
+    with pytest.raises(release.ReleaseContractError):
+        release._remove_pinned_next_env_declaration(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+
+    assert sentinel.read_bytes() == b"retained\n"
+    assert (sentinel.lstat().st_dev, sentinel.lstat().st_ino) == (
+        sentinel_before.st_dev,
+        sentinel_before.st_ino,
+    )
+    if hostile_kind == "missing":
+        assert not declaration.exists()
+    elif hostile_kind == "symlink":
+        assert declaration.is_symlink()
+        assert outside.read_bytes() == release._NEXT_16_3_0_ENV_DTS
+    elif hostile_kind == "fifo":
+        assert stat.S_ISFIFO(declaration.lstat().st_mode)
+    elif hostile_kind == "hardlink":
+        assert declaration.lstat().st_nlink == 2
+        assert outside.read_bytes() == release._NEXT_16_3_0_ENV_DTS
+    else:
+        assert declaration.exists()
+
+
+@pytest.mark.parametrize("swap_kind", ("declaration", "dashboard"))
+def test_pinned_next_declaration_rejects_named_path_swap_before_removal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    swap_kind: str,
+) -> None:
+    repo, declaration, _sentinel = _write_pinned_next_declaration(tmp_path)
+    dashboard = declaration.parent
+    retired_declaration = dashboard / "next-env.d.ts.retired"
+    retired_dashboard = repo / "dashboard.retired"
+    actual_stat = os.stat
+    declaration_stats = 0
+    dashboard_stats = 0
+
+    def swap_on_last_named_stat(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> os.stat_result:
+        nonlocal declaration_stats, dashboard_stats
+        if path == "next-env.d.ts" and kwargs.get("dir_fd") is not None:
+            declaration_stats += 1
+            if swap_kind == "declaration" and declaration_stats == 2:
+                declaration.rename(retired_declaration)
+                declaration.write_bytes(release._NEXT_16_3_0_ENV_DTS)
+                declaration.chmod(0o600)
+        if path == "dashboard" and kwargs.get("dir_fd") is not None:
+            dashboard_stats += 1
+            if swap_kind == "dashboard" and dashboard_stats == 2:
+                dashboard.rename(retired_dashboard)
+                dashboard.mkdir(mode=0o700)
+                replacement = dashboard / "next-env.d.ts"
+                replacement.write_bytes(release._NEXT_16_3_0_ENV_DTS)
+                replacement.chmod(0o600)
+        return actual_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(release.os, "stat", swap_on_last_named_stat)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="pinned Next declaration changed before removal",
+    ):
+        release._remove_pinned_next_env_declaration(
+            repo,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+
+    if swap_kind == "declaration":
+        assert declaration.exists()
+        assert retired_declaration.exists()
+    else:
+        assert (dashboard / "next-env.d.ts").exists()
+        assert (retired_dashboard / "next-env.d.ts").exists()
+
+
 def test_venv_rejects_foreign_owned_contained_symlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -9560,6 +9804,10 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         lifecycle_events.append("normalize-lock")
         venv_roots.append(root)
 
+    def remove_next_declaration(root: Path, **_kwargs: object) -> None:
+        lifecycle_events.append("remove-next-declaration")
+        assert root == staging / "repo"
+
     def verify_venv(root: Path, **_kwargs: object) -> None:
         lifecycle_events.append("trusted-venv-read")
         venv_roots.append(root)
@@ -9574,14 +9822,26 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         lifecycle_events.append("trusted-driver-hash")
         return "a" * 64
 
+    actual_rmtree = shutil.rmtree
+
+    def remove_git_metadata(path: Path) -> None:
+        lifecycle_events.append("git-metadata-rmtree")
+        actual_rmtree(path)
+
     monkeypatch.setattr(release, "verify_dashboard_build", verify_dashboard)
     monkeypatch.setattr(
         release, "_normalize_uv_venv_lock_custody", normalize_venv_lock
+    )
+    monkeypatch.setattr(
+        release,
+        "_remove_pinned_next_env_declaration",
+        remove_next_declaration,
     )
     monkeypatch.setattr(release, "verify_venv", verify_venv)
     monkeypatch.setattr(release, "verify_checkout", verify_checkout)
     monkeypatch.setattr(release, "verify_tracked_checkout", verify_tracked_checkout)
     monkeypatch.setattr(release, "sha256_file", hash_driver)
+    monkeypatch.setattr(release.shutil, "rmtree", remove_git_metadata)
 
     uv_binary = Path(
         f"/opt/dharma-sadhana/tooling/uv-{release.UV_VERSION}/bin/uv"
@@ -9648,6 +9908,8 @@ def test_isolated_build_uses_stdlib_copied_venv_and_exact_ledger(
         "trusted-checkout-read",
         "trusted-tracked-read",
         "solo-process-proof",
+        "remove-next-declaration",
+        "git-metadata-rmtree",
         "trusted-driver-hash",
         "trusted-driver-hash",
     ]
