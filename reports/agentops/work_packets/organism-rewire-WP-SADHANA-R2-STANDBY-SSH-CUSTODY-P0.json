@@ -29,13 +29,13 @@
   "gates": [
     {
       "name": "sadhana-release-contracts",
-      "command": "PYTHONDONTWRITEBYTECODE=1 uv run --frozen --with pytest --with pytest-asyncio --with pytest-timeout --python 3.12 python -m pytest -q tests/test_sadhana_release.py --tb=short",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
       "name": "sadhana-release-ruff",
-      "command": "ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
       "expected_exit": 0,
       "timeout_seconds": 180
     },
@@ -55,7 +55,7 @@
   "negative_controls": [
     {
       "name": "standby-route-custody-hostiles",
-      "command": "PYTHONDONTWRITEBYTECODE=1 uv run --frozen --with pytest --with pytest-asyncio --with pytest-timeout --python 3.12 python -m pytest -q tests/test_sadhana_release.py -k 'standby_key or standby_serve or restricted_standby or tailscale' --tb=short",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'standby_key or standby_serve or restricted_standby or tailscale'",
       "expected_exit": 0,
       "timeout_seconds": 240
     }
@@ -107,6 +107,6 @@
       "This packet does not authorize provider dispatch, account-confirmation promotion, supervisor start, writer failover, campaign activation, or merge."
     ],
     "rollback": "Revert only the standby root-custodied read-only SSH sharing transaction, deterministic loopback Serve backend, source-bound forced key, regressions, and this packet before resealing. Preserve the rejected AGNI evidence; never broaden global secure-parent admission, grant the service write custody, or manually prepublish the route.",
-    "packet_digest": "dc17bbd40178d4771d5aebabf4e7cb0a993c4351a1648454993956cf23472068"
+    "packet_digest": "db44a1c6427f600aa263d474c36384da92958eb093434b814e7bbeeeff192d56"
   }
 }
