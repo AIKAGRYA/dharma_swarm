@@ -1,0 +1,110 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-PINNED-UV-TRAVERSAL-P0",
+  "base_ref": "68696695b03940ba56481da59aed27c281316e5e",
+  "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
+  "worktree": ".",
+  "intent": "Repair the live-proven SADHANA R2 pinned-uv traversal contradiction without weakening root custody. The immutable hash-pinned uv tree must remain root-owned and non-writable by every non-root principal while its directory chain is executable by the isolated build identity. Converge both fresh installation and the exact legacy mode-0700 installation already admitted on AGNI to a stable mode-0755 root through a no-follow descriptor custody transition. Preserve exact wheel hashing, copied-binary checks, no-root candidate execution, AGNI standby fencing, and all writer/dispatch locks.",
+  "allowed_files": [
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-PINNED-UV-TRAVERSAL-P0.json",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/governance/**",
+    "terminal/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-release-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check 68696695b03940ba56481da59aed27c281316e5e HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "pinned-uv-traversal-hostiles",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'pinned_uv or isolated_build or custody or build_commands or build_driver'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): admit pinned uv build traversal"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-PINNED-UV-TRAVERSAL-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "68696695b03940ba56481da59aed27c281316e5e",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The exact sealed release 68696695b03940ba56481da59aed27c281316e5e passed non-root host verification and both repaired staging-custody gates, then its isolated AGNI child rejected the absolute uv path as unavailable before the first lifecycle command.",
+      "provision_pinned_uv creates its staging root with tempfile mode 0700 and renames that mode unchanged into /opt/dharma-sadhana/tooling/uv-0.11.2. The executable and every other ancestor are mode 0755, but the isolated build UID cannot traverse this root-owned 0700 component.",
+      "RootImmutableExecutableTree(owner=root, root/bin/uv mode0755, marker mode0644, writes=root-only) is the required type. The fix must converge only an already-validated exact legacy-private mode set (0700 directories and executable, 0600 marker) or that exact final mode set through stable no-follow descriptors, while retaining hash, ownership, link, non-writability, marker, platform, and copied-ELF validation."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "tests/test_sadhana_release.py"
+    ],
+    "honest_blockers": [
+      "The failed AGNI deployment cleaned its own staging tree. A later, deliberately separate diagnostic run was preserved by the operator as one root-owned diagnostic tree after proving zero build-UID processes and retaking root custody; no SADHANA target, writer marker, dispatch marker, supervisor, listener, or Tailscale Serve route was activated.",
+      "A passing source closeout is not authority to reuse the rejected seal. The repaired exact SHA still requires a new DocOps child, release envelope, non-root host verification, inert deploy, clock proof, and bounded activation transaction.",
+      "This packet does not authorize provider dispatch, account-confirmation promotion, writer failover, campaign activation, or merge."
+    ],
+    "rollback": "Revert only the pinned-uv traversal convergence, regressions, and this work packet before resealing. On AGNI, preserve the fail-closed evidence and root-owned diagnostic tree; a later exact release may idempotently converge only the already-validated root-owned legacy-private uv tree and reuse no conflicting tooling.",
+    "packet_digest": "bb49a78e408e8169e862fd8f384de306b006741d494fe4704b07ff4969eec493"
+  }
+}

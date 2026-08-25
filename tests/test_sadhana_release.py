@@ -8952,26 +8952,143 @@ def _uv_version_runner(
     return subprocess.CompletedProcess(argv, 0, "uv 0.11.2 (x86_64-linux)\n", "")
 
 
+@pytest.mark.parametrize("hostile_umask", (0o027, 0o077))
 def test_hash_pinned_uv_is_copied_from_wheel_without_path_or_pip(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_umask: int,
 ) -> None:
     wheel = tmp_path / release.UV_WHEEL_FILE
     digest = _write_synthetic_uv_wheel(wheel)
     monkeypatch.setattr(release, "UV_WHEEL_SHA256", digest)
+    previous_umask = os.umask(hostile_umask)
+    try:
+        binary = release.provision_pinned_uv(
+            wheel,
+            tooling_root=tmp_path / "tooling",
+            runner=_uv_version_runner,
+            execution_uid=os.geteuid(),
+            execution_gid=os.getegid(),
+            execute_version=True,
+            system_name="Linux",
+            machine="x86_64",
+        )
+    finally:
+        os.umask(previous_umask)
+    assert binary.is_file()
+    assert not binary.is_symlink()
+    assert binary.read_bytes().startswith(b"\x7fELF")
+    assert "uv-0.11.2" in str(binary)
+    assert stat.S_IMODE(binary.parent.parent.stat().st_mode) == 0o755
+    assert stat.S_IMODE(binary.parent.stat().st_mode) == 0o755
+    assert stat.S_IMODE(binary.stat().st_mode) == 0o755
+    assert stat.S_IMODE((binary.parent.parent / "INSTALL.json").stat().st_mode) == 0o644
+    assert list((tmp_path / "tooling").glob(".uv-staging-*")) == []
+
+
+def test_pinned_uv_reuse_normalizes_legacy_private_modes_without_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wheel = tmp_path / release.UV_WHEEL_FILE
+    digest = _write_synthetic_uv_wheel(wheel)
+    monkeypatch.setattr(release, "UV_WHEEL_SHA256", digest)
+    tooling = tmp_path / "tooling"
     binary = release.provision_pinned_uv(
         wheel,
-        tooling_root=tmp_path / "tooling",
+        tooling_root=tooling,
         runner=_uv_version_runner,
+        system_name="Linux",
+        machine="x86_64",
+    )
+    version_root = binary.parent.parent
+    marker = version_root / "INSTALL.json"
+    identities = {
+        path: (path.stat().st_dev, path.stat().st_ino)
+        for path in (version_root, binary.parent, binary, marker)
+    }
+    binary_bytes = binary.read_bytes()
+    marker_bytes = marker.read_bytes()
+    version_root.chmod(0o700)
+    binary.parent.chmod(0o700)
+    binary.chmod(0o700)
+    marker.chmod(0o600)
+
+    observed: dict[str, object] = {}
+
+    def runner(
+        argv: tuple[str, ...], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(argv, 0, "uv 0.11.2\n", "")
+
+    reused = release.provision_pinned_uv(
+        wheel,
+        tooling_root=tooling,
+        runner=runner,
         execution_uid=os.geteuid(),
         execution_gid=os.getegid(),
         execute_version=True,
         system_name="Linux",
         machine="x86_64",
     )
-    assert binary.is_file()
-    assert not binary.is_symlink()
-    assert binary.read_bytes().startswith(b"\x7fELF")
-    assert "uv-0.11.2" in str(binary)
+
+    assert reused == binary
+    assert binary.read_bytes() == binary_bytes
+    assert marker.read_bytes() == marker_bytes
+    assert {
+        path: (path.stat().st_dev, path.stat().st_ino)
+        for path in (version_root, binary.parent, binary, marker)
+    } == identities
+    assert stat.S_IMODE(version_root.stat().st_mode) == 0o755
+    assert stat.S_IMODE(binary.parent.stat().st_mode) == 0o755
+    assert stat.S_IMODE(binary.stat().st_mode) == 0o755
+    assert stat.S_IMODE(marker.stat().st_mode) == 0o644
+    assert observed["run_uid"] == os.geteuid()
+    assert observed["run_gid"] == os.getegid()
+    assert observed["no_new_privileges"] is True
+
+
+def test_pinned_uv_reuse_rejects_hardlinked_marker_before_mode_transition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wheel = tmp_path / release.UV_WHEEL_FILE
+    digest = _write_synthetic_uv_wheel(wheel)
+    monkeypatch.setattr(release, "UV_WHEEL_SHA256", digest)
+    tooling = tmp_path / "tooling"
+    binary = release.provision_pinned_uv(
+        wheel,
+        tooling_root=tooling,
+        runner=_uv_version_runner,
+        system_name="Linux",
+        machine="x86_64",
+    )
+    version_root = binary.parent.parent
+    marker = version_root / "INSTALL.json"
+    version_root.chmod(0o700)
+    os.link(marker, tmp_path / "marker-hardlink")
+    called = False
+
+    def runner(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess([], 0, "uv 0.11.2\n", "")
+
+    with pytest.raises(release.ReleaseContractError, match="regular directory"):
+        release.provision_pinned_uv(
+            wheel,
+            tooling_root=tooling,
+            runner=runner,
+            execution_uid=os.geteuid(),
+            execution_gid=os.getegid(),
+            execute_version=True,
+            system_name="Linux",
+            machine="x86_64",
+        )
+
+    assert called is False
+    assert stat.S_IMODE(version_root.stat().st_mode) == 0o700
 
 
 def test_pinned_uv_version_probe_is_bound_to_nonroot_identity(
@@ -9409,6 +9526,9 @@ def test_candidate_git_helpers_and_staging_custody_never_execute_as_root(
     )
     assert "_cleanup_build_staging(" in stage_source
     assert "_rename_noreplace_at(" in stage_source
+    assert "execution_uid=build_account.pw_uid" in stage_source
+    assert "execution_gid=build_account.pw_gid" in stage_source
+    assert "execute_version=True" in stage_source
     build_plan_source = inspect.getsource(release.execute_isolated_build_plan)
     assert "load_manifest(" not in build_plan_source
     assert "_read_exact_custodied_json(" in build_plan_source

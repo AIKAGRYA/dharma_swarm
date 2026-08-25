@@ -4096,11 +4096,57 @@ def _validate_pinned_uv_tree(
     execution_uid: int | None,
     execution_gid: int | None,
     execute_version: bool,
+    allow_legacy_private_modes: bool = False,
 ) -> Path:
     marker = root / "INSTALL.json"
+    bin_root = root / "bin"
     binary = root / "bin" / "uv"
-    if root.is_symlink() or not root.is_dir():
+    try:
+        root_identity = root.lstat()
+        bin_identity = bin_root.lstat()
+        marker_identity = marker.lstat()
+        binary_identity = binary.lstat()
+        root_entries = {entry.name for entry in root.iterdir()}
+        bin_entries = {entry.name for entry in bin_root.iterdir()}
+    except OSError as exc:
+        raise ReleaseContractError("pinned uv tree is unavailable") from exc
+    directory_modes = {0o755}
+    executable_modes = {0o755}
+    marker_modes = {0o644}
+    if allow_legacy_private_modes:
+        directory_modes.add(0o700)
+        executable_modes.add(0o700)
+        marker_modes.add(0o600)
+    if (
+        root.is_symlink()
+        or not stat.S_ISDIR(root_identity.st_mode)
+        or bin_root.is_symlink()
+        or not stat.S_ISDIR(bin_identity.st_mode)
+        or marker.is_symlink()
+        or not stat.S_ISREG(marker_identity.st_mode)
+        or marker_identity.st_nlink != 1
+        or binary.is_symlink()
+        or not stat.S_ISREG(binary_identity.st_mode)
+        or binary_identity.st_nlink != 1
+        or root_entries != {"INSTALL.json", "bin"}
+        or bin_entries != {"uv"}
+    ):
         raise ReleaseContractError("pinned uv root is not a regular directory")
+    expected_uid = os.geteuid()
+    expected_gid = os.getegid()
+    custody = (
+        (root_identity, directory_modes),
+        (bin_identity, directory_modes),
+        (marker_identity, marker_modes),
+        (binary_identity, executable_modes),
+    )
+    if any(
+        identity.st_uid != expected_uid
+        or identity.st_gid != expected_gid
+        or stat.S_IMODE(identity.st_mode) not in allowed_modes
+        for identity, allowed_modes in custody
+    ):
+        raise ReleaseContractError("pinned uv tree lacks exact custody")
     expected_marker = {
         "schema_version": "dharma.sadhana.pinned_uv.v1",
         "uv_version": UV_VERSION,
@@ -4113,24 +4159,6 @@ def _validate_pinned_uv_tree(
         raise ReleaseContractError("pinned uv install marker is invalid") from exc
     if marker_payload != expected_marker:
         raise ReleaseContractError("pinned uv install marker differs")
-    for directory, names, files in os.walk(root, followlinks=False):
-        for name in (".", *names, *files):
-            candidate = Path(directory) if name == "." else Path(directory) / name
-            identity = candidate.lstat()
-            if (
-                identity.st_uid != os.geteuid()
-                or stat.S_IMODE(identity.st_mode) & 0o022
-            ):
-                raise ReleaseContractError("pinned uv tree lacks private custody")
-            if candidate.is_symlink():
-                try:
-                    candidate.resolve(strict=True).relative_to(root)
-                except (OSError, ValueError) as exc:
-                    raise ReleaseContractError(
-                        "pinned uv tree contains an escaping link"
-                    ) from exc
-    if binary.is_symlink() or not binary.is_file():
-        raise ReleaseContractError("pinned uv executable is not a copied regular file")
     if not execute_version:
         return binary
     if (
@@ -4152,6 +4180,53 @@ def _validate_pinned_uv_tree(
     if result.returncode != 0 or words[:2] != ["uv", UV_VERSION]:
         raise ReleaseContractError("pinned uv executable version differs")
     return binary
+
+
+def _normalize_pinned_uv_tree_modes(root: Path) -> None:
+    """Converge only the admitted legacy-private uv tree to executable custody."""
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if not nofollow:
+        raise ReleaseContractError("platform lacks no-follow pinned uv custody")
+    targets = (
+        (root / "INSTALL.json", 0o644, {0o600, 0o644}, False),
+        (root / "bin" / "uv", 0o755, {0o700, 0o755}, False),
+        (root / "bin", 0o755, {0o700, 0o755}, True),
+        (root, 0o755, {0o700, 0o755}, True),
+    )
+    for path, final_mode, admitted_modes, is_directory in targets:
+        before = path.lstat()
+        flags = os.O_RDONLY | nofollow
+        if is_directory:
+            flags |= os.O_DIRECTORY
+        descriptor = os.open(path, flags)
+        try:
+            opened = os.fstat(descriptor)
+            expected_type = stat.S_ISDIR if is_directory else stat.S_ISREG
+            if (
+                path.is_symlink()
+                or not expected_type(opened.st_mode)
+                or (opened.st_dev, opened.st_ino)
+                != (before.st_dev, before.st_ino)
+                or opened.st_uid != os.geteuid()
+                or opened.st_gid != os.getegid()
+                or stat.S_IMODE(opened.st_mode) not in admitted_modes
+                or (not is_directory and opened.st_nlink != 1)
+            ):
+                raise ReleaseContractError("pinned uv mode transition lacks custody")
+            os.fchmod(descriptor, final_mode)
+            os.fsync(descriptor)
+            normalized = os.fstat(descriptor)
+            if (
+                (normalized.st_dev, normalized.st_ino)
+                != (opened.st_dev, opened.st_ino)
+                or normalized.st_uid != opened.st_uid
+                or normalized.st_gid != opened.st_gid
+                or stat.S_IMODE(normalized.st_mode) != final_mode
+                or (not is_directory and normalized.st_nlink != 1)
+            ):
+                raise ReleaseContractError("pinned uv mode transition was not retained")
+        finally:
+            os.close(descriptor)
 
 
 def provision_pinned_uv(
@@ -4180,6 +4255,15 @@ def provision_pinned_uv(
     os.chmod(tooling_root, 0o755)
     target = tooling_root / f"uv-{UV_VERSION}"
     if target.exists() or target.is_symlink():
+        _validate_pinned_uv_tree(
+            target,
+            runner=execute,
+            execution_uid=None,
+            execution_gid=None,
+            execute_version=False,
+            allow_legacy_private_modes=True,
+        )
+        _normalize_pinned_uv_tree_modes(target)
         return _validate_pinned_uv_tree(
             target,
             runner=execute,
@@ -4189,6 +4273,7 @@ def provision_pinned_uv(
         )
     staging = Path(tempfile.mkdtemp(prefix=".uv-staging-", dir=tooling_root))
     try:
+        os.chmod(staging, 0o700)
         try:
             with zipfile.ZipFile(wheel_path) as archive:
                 try:
@@ -4211,11 +4296,13 @@ def provision_pinned_uv(
             raise ReleaseContractError("pinned uv executable is not x86_64 ELF")
         bin_root = staging / "bin"
         bin_root.mkdir(mode=0o755)
+        os.chmod(bin_root, 0o700)
         binary = bin_root / "uv"
         descriptor = os.open(binary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o755)
         with os.fdopen(descriptor, "wb") as executable:
             executable.write(binary_bytes)
             executable.flush()
+            os.fchmod(executable.fileno(), 0o700)
             os.fsync(executable.fileno())
         marker_payload = {
             "schema_version": "dharma.sadhana.pinned_uv.v1",
@@ -4225,13 +4312,22 @@ def provision_pinned_uv(
         }
         marker = staging / "INSTALL.json"
         marker.write_bytes(_canonical_bytes(marker_payload) + b"\n")
-        os.chmod(marker, 0o644)
+        os.chmod(marker, 0o600)
         _validate_pinned_uv_tree(
             staging,
             runner=execute,
-            execution_uid=execution_uid,
-            execution_gid=execution_gid,
-            execute_version=execute_version,
+            execution_uid=None,
+            execution_gid=None,
+            execute_version=False,
+            allow_legacy_private_modes=True,
+        )
+        _normalize_pinned_uv_tree_modes(staging)
+        _validate_pinned_uv_tree(
+            staging,
+            runner=execute,
+            execution_uid=None,
+            execution_gid=None,
+            execute_version=False,
         )
         if target.exists() or target.is_symlink():
             raise ReleaseContractError("pinned uv target appeared during installation")
@@ -20158,6 +20254,9 @@ def stage_candidate(
     uv_binary = provision_pinned_uv(
         uv_wheel_path,
         runner=runner,
+        execution_uid=build_account.pw_uid,
+        execution_gid=build_account.pw_gid,
+        execute_version=True,
     )
     build_driver = _install_exact_build_driver(
         release_sha=manifest["release_sha"],
