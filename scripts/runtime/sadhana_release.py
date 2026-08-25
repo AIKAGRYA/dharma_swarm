@@ -2323,7 +2323,7 @@ def _read_exact_custodied_bytes(
         # portable across macOS private-tmp and jailed fixture roots.  The
         # write-bit check still denies replacement by any untrusted group or
         # world principal, while the leaf must have the exact expected uid/gid,
-        # mode 0600, and single-link stable identity below.
+        # expected mode, and single-link stable identity below.
         if (
             not stat.S_ISDIR(parent.st_mode)
             or current.is_symlink()
@@ -18720,7 +18720,16 @@ def execute_isolated_build_plan(
         or manifest_identity.st_nlink != 1
     ):
         raise ReleaseContractError("isolated build staging custody differs")
-    manifest = load_manifest(manifest_path, for_activation=True)
+    manifest_payload, _manifest_raw, _manifest_identity = (
+        _read_exact_custodied_json(
+            manifest_path,
+            expected_uid=expected_uid,
+            expected_gid=expected_gid,
+            expected_mode=0o400,
+            maximum_bytes=_MAX_JSON_BYTES,
+        )
+    )
+    manifest = validate_manifest(manifest_payload, for_activation=True)
     if manifest["release_sha"] != release_sha:
         raise ReleaseContractError("isolated build manifest release differs")
     _make_build_process_undumpable()

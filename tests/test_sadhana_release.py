@@ -9179,6 +9179,62 @@ def test_isolated_build_binds_precomputed_manifest_without_root_path_read(
     assert hashed == [build_driver]
 
 
+def test_isolated_build_manifest_custody_admits_0400_without_relaxing_private_json(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "release-manifest.json"
+    raw = b'{"kind":"read-only-build-manifest"}\n'
+    manifest_path.write_bytes(raw)
+    manifest_path.chmod(0o400)
+
+    payload, admitted_raw, _identity = release._read_exact_custodied_json(
+        manifest_path,
+        expected_uid=os.geteuid(),
+        expected_gid=os.getegid(),
+        expected_mode=0o400,
+    )
+    assert payload == {"kind": "read-only-build-manifest"}
+    assert admitted_raw == raw
+    with pytest.raises(release.ReleaseContractError, match="required custody"):
+        release._secure_json(manifest_path, require_private=True)
+
+
+def test_isolated_build_rejects_invalid_0400_manifest_before_lifecycle_command(
+    tmp_path: Path,
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir(mode=0o700)
+    bundle = staging / "candidate.bundle"
+    bundle.write_bytes(b"invalid bundle bytes are not reached\n")
+    bundle.chmod(0o400)
+    manifest_path = staging / "release-manifest.json"
+    manifest_path.write_bytes(b'{"schema_version":"invalid"}\n')
+    manifest_path.chmod(0o400)
+    calls: list[tuple[str, ...]] = []
+
+    def runner(
+        argv: tuple[str, ...], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    with pytest.raises(release.ReleaseContractError, match="manifest fields differ"):
+        release.execute_isolated_build_plan(
+            staging=staging,
+            bundle=bundle,
+            manifest_path=manifest_path,
+            uv_binary=Path(
+                f"/opt/dharma-sadhana/tooling/uv-{release.UV_VERSION}/bin/uv"
+            ),
+            release_sha="a" * 40,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+            runner=runner,
+        )
+
+    assert calls == []
+
+
 def test_artifact_hash_custody_still_rejects_a_foreign_owned_parent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -9353,6 +9409,10 @@ def test_candidate_git_helpers_and_staging_custody_never_execute_as_root(
     )
     assert "_cleanup_build_staging(" in stage_source
     assert "_rename_noreplace_at(" in stage_source
+    build_plan_source = inspect.getsource(release.execute_isolated_build_plan)
+    assert "load_manifest(" not in build_plan_source
+    assert "_read_exact_custodied_json(" in build_plan_source
+    assert "expected_mode=0o400" in build_plan_source
     isolated_source = inspect.getsource(release._invoke_isolated_build_plan)
     assert "sha256_file(manifest_path" not in isolated_source
     assert '"--property=RuntimeMaxSec=1800"' in isolated_source

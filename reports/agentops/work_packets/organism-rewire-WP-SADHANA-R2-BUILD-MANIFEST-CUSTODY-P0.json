@@ -1,0 +1,110 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-BUILD-MANIFEST-CUSTODY-P0",
+  "base_ref": "d552ec9c056a658f34698b3f8e325993104c016a",
+  "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
+  "worktree": ".",
+  "intent": "Repair the live-proven SADHANA R2 isolated-build manifest leaf-mode contradiction without relaxing generic private-JSON custody. The isolated driver must admit its deliberately read-only build-owned manifest through an exact UID, GID, mode-0400, single-link, no-follow stable read, while ordinary private JSON remains mode 0600. Preserve the root-to-build-to-root parent custody transaction, exact digest binding, no-root candidate execution, AGNI standby fencing, and all writer/dispatch locks.",
+  "allowed_files": [
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-BUILD-MANIFEST-CUSTODY-P0.json",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/governance/**",
+    "terminal/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-release-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check d552ec9c056a658f34698b3f8e325993104c016a HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "isolated-build-custody-hostiles",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'isolated_build or custody or build_commands or build_driver'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): admit read-only isolated manifest"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-BUILD-MANIFEST-CUSTODY-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "d552ec9c056a658f34698b3f8e325993104c016a",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The exact sealed release d552ec9c056a658f34698b3f8e325993104c016a passed local and non-root host verification and advanced through the repaired parent handoff, then its isolated AGNI driver rejected release-manifest.json because execute_isolated_build_plan requires a build-owned 0400 leaf while load_manifest routes through generic private JSON that requires 0600.",
+      "ReadOnlyBuildManifest(BuildUid, BuildGid, mode0400):BuildReadable is not a subtype of GenericPrivateJSON(mode0600). The isolated driver needs a dedicated exact-custody reader; widening generic private JSON or making the build manifest owner-writable would erase a useful authority distinction.",
+      "The dedicated read must retain absolute-path, parent-custody, exact UID/GID/mode, regular-file, single-link, no-follow, stable-inode, size, JSON, and exact manifest-schema checks before any lifecycle command."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "tests/test_sadhana_release.py"
+    ],
+    "honest_blockers": [
+      "The failed AGNI deployment cleaned its own staging tree. A later, deliberately separate diagnostic run was preserved by the operator as one root-owned diagnostic tree after proving zero build-UID processes and retaking root custody; no SADHANA target, writer marker, dispatch marker, supervisor, listener, or Tailscale Serve route was activated.",
+      "A passing source closeout is not authority to reuse either rejected seal. The repaired exact SHA still requires a new DocOps child, release envelope, non-root host verification, inert deploy, clock proof, and bounded activation transaction.",
+      "This packet does not authorize provider dispatch, account-confirmation promotion, writer failover, campaign activation, or merge."
+    ],
+    "rollback": "Revert only the dedicated build-manifest read, regression, and this work packet before resealing. On AGNI, preserve the fail-closed evidence and root-owned diagnostic tree; a later exact release may idempotently reuse only artifacts whose built-in equality and ownership checks pass.",
+    "packet_digest": "5d73ecd0adccb53351ec2dc874a6a67c7e78407bceed658d36d3133d1fdc983e"
+  }
+}
