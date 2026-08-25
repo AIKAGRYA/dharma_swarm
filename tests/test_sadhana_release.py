@@ -9065,13 +9065,254 @@ def test_build_commands_and_freeze_reject_root_links_and_lingering_processes(
                 f"/opt/dharma-sadhana/tooling/sadhana-build-driver-{'a' * 40}.py"
             ),
             manifest_path=tmp_path / "release-manifest.json",
+            expected_manifest_sha256="b" * 64,
             release_sha="a" * 40,
             runner=runner,
         )
     assert called is False
 
 
-def test_candidate_git_helpers_never_execute_as_root(
+def test_isolated_build_binds_precomputed_manifest_without_root_path_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_sha = "a" * 40
+    manifest_digest = "b" * 64
+    driver_digest = "c" * 64
+    manifest_path = tmp_path / "release-manifest.json"
+    systemd_run = tmp_path / "systemd-run"
+    build_driver = tmp_path / f"sadhana-build-driver-{release_sha}.py"
+    build_account = SimpleNamespace(pw_uid=23145, pw_gid=23146)
+    expected_commands = [
+        "uv-version",
+        "git-clone",
+        "git-checkout",
+        "git-origin",
+        "uv-venv",
+        "uv-sync",
+        "npm-ci",
+        "next-build",
+        "venv-python-version",
+        "git-verify-checkout",
+        "git-verify-tracked",
+        "git-metadata-removed",
+    ]
+    child_receipt = {
+        "schema_version": "dharma.sadhana.isolated_build.v1",
+        "release_sha": release_sha,
+        "build_uid": build_account.pw_uid,
+        "build_gid": build_account.pw_gid,
+        "no_new_privileges": True,
+        "solo_cgroup_process": True,
+        "build_process_dumpable": False,
+        "runtime_max_seconds": 1800,
+        "tasks_max": 256,
+        "memory_max_bytes": 4_294_967_296,
+        "commands": expected_commands,
+        "manifest_sha256": manifest_digest,
+        "build_driver_sha256": driver_digest,
+        "candidate_code_executed_as_root": False,
+    }
+
+    monkeypatch.setattr(release.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(release, "_uid_process_ids", lambda _uid: ())
+    monkeypatch.setattr(release, "SYSTEMD_RUN_PATH", str(systemd_run))
+    monkeypatch.setattr(release, "UV_TOOLING_ROOT", tmp_path)
+    actual_lstat = Path.lstat
+
+    def root_tool_lstat(path: Path) -> os.stat_result:
+        if path in {systemd_run, build_driver}:
+            return os.stat_result(
+                (stat.S_IFREG | 0o555, 1, 1, 1, 0, 0, 1, 0, 0, 0)
+            )
+        return actual_lstat(path)
+
+    monkeypatch.setattr(Path, "lstat", root_tool_lstat)
+    hashed: list[Path] = []
+
+    def admitted_hash(path: Path, *, max_bytes: int) -> str:
+        hashed.append(path)
+        if path == manifest_path:
+            raise AssertionError("root traversed the build-owned manifest parent")
+        assert path == build_driver
+        assert max_bytes == release._MAX_JSON_BYTES
+        return driver_digest
+
+    monkeypatch.setattr(release, "sha256_file", admitted_hash)
+    calls: list[tuple[str, ...]] = []
+
+    def runner(
+        argv: tuple[str, ...], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, json.dumps(child_receipt), "")
+
+    receipt = release._invoke_isolated_build_plan(
+        staging=tmp_path,
+        build_account=build_account,
+        uv_binary=Path("/opt/dharma-sadhana/tooling/uv-0.11.2/bin/uv"),
+        build_driver=build_driver,
+        manifest_path=manifest_path,
+        expected_manifest_sha256=manifest_digest,
+        release_sha=release_sha,
+        runner=runner,
+    )
+
+    assert len(calls) == 1
+    assert hashed == [build_driver]
+    assert receipt["manifest_sha256"] == manifest_digest
+    assert receipt["post_exit_build_uid_process_count"] == 0
+
+    child_receipt["manifest_sha256"] = "d" * 64
+    with pytest.raises(release.ReleaseContractError, match="receipt binding differs"):
+        release._invoke_isolated_build_plan(
+            staging=tmp_path,
+            build_account=build_account,
+            uv_binary=Path("/opt/dharma-sadhana/tooling/uv-0.11.2/bin/uv"),
+            build_driver=build_driver,
+            manifest_path=manifest_path,
+            expected_manifest_sha256=manifest_digest,
+            release_sha=release_sha,
+            runner=runner,
+        )
+    assert len(calls) == 2
+    assert hashed == [build_driver]
+
+
+def test_artifact_hash_custody_still_rejects_a_foreign_owned_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    foreign = tmp_path / "foreign"
+    foreign.mkdir(mode=0o700)
+    artifact = foreign / "artifact.json"
+    artifact.write_bytes(b"{}\n")
+    artifact.chmod(0o600)
+    actual_lstat = Path.lstat
+
+    def foreign_parent_lstat(path: Path) -> os.stat_result:
+        identity = actual_lstat(path)
+        if path != foreign:
+            return identity
+        fields = list(identity)
+        fields[stat.ST_UID] = os.geteuid() + 1
+        return os.stat_result(fields)
+
+    monkeypatch.setattr(Path, "lstat", foreign_parent_lstat)
+    with pytest.raises(release.ReleaseContractError, match="parent lacks secure custody"):
+        release.sha256_file(artifact)
+
+
+def test_build_manifest_is_revalidated_only_after_root_custody_barrier(
+    tmp_path: Path,
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir(mode=0o700)
+    manifest = staging / "release-manifest.json"
+    expected_raw = b'{"release_sha":"' + (b"a" * 40) + b'"}\n'
+    expected_sha256 = hashlib.sha256(expected_raw).hexdigest()
+    manifest.write_bytes(expected_raw)
+    manifest.chmod(0o400)
+    uid = os.geteuid()
+    gid = os.getegid()
+
+    release._admit_build_manifest_after_custody_barrier(
+        manifest,
+        expected_raw=expected_raw,
+        expected_sha256=expected_sha256,
+        build_uid=uid,
+        build_gid=gid,
+        expected_root_uid=uid,
+        expected_root_gid=gid,
+    )
+
+    manifest.chmod(0o600)
+    manifest.write_bytes(expected_raw.replace(b"a", b"b"))
+    manifest.chmod(0o400)
+    with pytest.raises(release.ReleaseContractError, match="differs after"):
+        release._admit_build_manifest_after_custody_barrier(
+            manifest,
+            expected_raw=expected_raw,
+            expected_sha256=expected_sha256,
+            build_uid=uid,
+            build_gid=gid,
+            expected_root_uid=uid,
+            expected_root_gid=gid,
+        )
+
+    manifest.chmod(0o600)
+    manifest.write_bytes(expected_raw)
+    manifest.chmod(0o400)
+    staging.chmod(0o755)
+    with pytest.raises(release.ReleaseContractError, match="root custody barrier"):
+        release._admit_build_manifest_after_custody_barrier(
+            manifest,
+            expected_raw=expected_raw,
+            expected_sha256=expected_sha256,
+            build_uid=uid,
+            build_gid=gid,
+            expected_root_uid=uid,
+            expected_root_gid=gid,
+        )
+
+    staging.chmod(0o700)
+    os.link(manifest, staging / "manifest-hardlink")
+    with pytest.raises(release.ReleaseContractError, match="file scope differs"):
+        release._admit_build_manifest_after_custody_barrier(
+            manifest,
+            expected_raw=expected_raw,
+            expected_sha256=expected_sha256,
+            build_uid=uid,
+            build_gid=gid,
+            expected_root_uid=uid,
+            expected_root_gid=gid,
+        )
+
+
+def test_failed_build_staging_custody_is_preserved_until_process_absence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging = tmp_path / "failed-staging"
+    staging.mkdir(mode=0o700)
+    uid = os.geteuid()
+    gid = os.getegid()
+
+    monkeypatch.setattr(release, "_uid_process_ids", lambda _uid: (4242,))
+    with pytest.raises(release.ReleaseContractError, match="process remains"):
+        release._cleanup_build_staging(
+            staging,
+            build_uid=uid,
+            build_gid=gid,
+            expected_root_uid=uid,
+            expected_root_gid=gid,
+        )
+    assert staging.is_dir()
+
+    monkeypatch.setattr(release, "_uid_process_ids", lambda _uid: ())
+    staging.chmod(0o755)
+    with pytest.raises(release.ReleaseContractError, match="custody changed"):
+        release._cleanup_build_staging(
+            staging,
+            build_uid=uid,
+            build_gid=gid,
+            expected_root_uid=uid,
+            expected_root_gid=gid,
+        )
+    assert staging.is_dir()
+
+    staging.chmod(0o700)
+    release._cleanup_build_staging(
+        staging,
+        build_uid=uid,
+        build_gid=gid,
+        expected_root_uid=uid,
+        expected_root_gid=gid,
+    )
+    assert not staging.exists()
+
+
+def test_candidate_git_helpers_and_staging_custody_never_execute_as_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo = tmp_path / "repo"
@@ -9096,9 +9337,24 @@ def test_candidate_git_helpers_never_execute_as_root(
     stage_source = inspect.getsource(release.stage_candidate)
     assert "verify_checkout(repo" not in stage_source
     assert "verify_tracked_checkout(repo" not in stage_source
-    assert "os.fchown(staging_descriptor, 0, 0)" in stage_source
+    manifest_write = stage_source.index("_atomic_private_bytes(")
+    handoff = stage_source.index("os.chown(staging, build_account.pw_uid")
+    isolated_build = stage_source.index("_invoke_isolated_build_plan(")
+    custody_barrier = stage_source.index("_retake_build_staging_custody(")
+    post_barrier_admission = stage_source.index(
+        "_admit_build_manifest_after_custody_barrier("
+    )
+    assert (
+        manifest_write
+        < handoff
+        < isolated_build
+        < custody_barrier
+        < post_barrier_admission
+    )
+    assert "_cleanup_build_staging(" in stage_source
     assert "_rename_noreplace_at(" in stage_source
     isolated_source = inspect.getsource(release._invoke_isolated_build_plan)
+    assert "sha256_file(manifest_path" not in isolated_source
     assert '"--property=RuntimeMaxSec=1800"' in isolated_source
     assert '"--property=TasksMax=256"' in isolated_source
     assert '"--property=MemoryMax=4294967296"' in isolated_source

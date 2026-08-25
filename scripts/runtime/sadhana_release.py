@@ -18964,6 +18964,7 @@ def _invoke_isolated_build_plan(
     uv_binary: Path,
     build_driver: Path,
     manifest_path: Path,
+    expected_manifest_sha256: str,
     release_sha: str,
     runner: Callable[..., subprocess.CompletedProcess[str]],
 ) -> dict[str, Any]:
@@ -18971,8 +18972,9 @@ def _invoke_isolated_build_plan(
         raise ReleaseContractError("isolated build invocation requires root")
     if _uid_process_ids(build_account.pw_uid):
         raise ReleaseContractError("build identity already has a live process")
-    admitted_manifest_sha256 = sha256_file(
-        manifest_path, max_bytes=_MAX_JSON_BYTES
+    admitted_manifest_sha256 = _require_hash(
+        expected_manifest_sha256,
+        "expected_manifest_sha256",
     )
     systemd_run = Path(SYSTEMD_RUN_PATH)
     identity = systemd_run.lstat()
@@ -19089,8 +19091,6 @@ def _invoke_isolated_build_plan(
         or receipt.get("memory_max_bytes") != 4_294_967_296
         or receipt.get("manifest_sha256")
         != admitted_manifest_sha256
-        or sha256_file(manifest_path, max_bytes=_MAX_JSON_BYTES)
-        != admitted_manifest_sha256
         or receipt.get("build_driver_sha256")
         != sha256_file(build_driver, max_bytes=_MAX_JSON_BYTES)
         or receipt.get("candidate_code_executed_as_root") is not False
@@ -19113,6 +19113,127 @@ def _invoke_isolated_build_plan(
         raise ReleaseContractError("isolated build receipt binding differs")
     receipt["post_exit_build_uid_process_count"] = 0
     return receipt
+
+
+def _retake_build_staging_custody(
+    staging: Path,
+    *,
+    build_uid: int,
+    build_gid: int,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+) -> None:
+    """Retire build-parent authority only after a fresh zero-process proof."""
+    if os.geteuid() != expected_root_uid:
+        raise ReleaseContractError("build staging custody barrier requires root")
+    if _uid_process_ids(build_uid):
+        raise ReleaseContractError(
+            "build staging custody cannot be retaken while a build process remains"
+        )
+    identity = staging.lstat()
+    descriptor = os.open(
+        staging,
+        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            staging.is_symlink()
+            or (opened.st_dev, opened.st_ino) != (identity.st_dev, identity.st_ino)
+            or opened.st_uid != build_uid
+            or opened.st_gid != build_gid
+            or stat.S_IMODE(opened.st_mode) != 0o700
+        ):
+            raise ReleaseContractError("build staging custody changed at barrier")
+        os.fchown(descriptor, expected_root_uid, expected_root_gid)
+        os.fchmod(descriptor, 0o700)
+        os.fsync(descriptor)
+        retained = os.fstat(descriptor)
+        if (
+            (retained.st_dev, retained.st_ino) != (opened.st_dev, opened.st_ino)
+            or retained.st_uid != expected_root_uid
+            or retained.st_gid != expected_root_gid
+            or stat.S_IMODE(retained.st_mode) != 0o700
+        ):
+            raise ReleaseContractError("build staging root custody was not retained")
+    finally:
+        os.close(descriptor)
+
+
+def _cleanup_build_staging(
+    staging: Path,
+    *,
+    build_uid: int,
+    build_gid: int,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+) -> None:
+    """Remove staging only after root custody and build-process absence."""
+    if not staging.exists() and not staging.is_symlink():
+        return
+    identity = staging.lstat()
+    if staging.is_symlink() or not stat.S_ISDIR(identity.st_mode):
+        raise ReleaseContractError("failed build staging is not a directory")
+    if identity.st_uid == build_uid:
+        _retake_build_staging_custody(
+            staging,
+            build_uid=build_uid,
+            build_gid=build_gid,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+    elif (
+        identity.st_uid != expected_root_uid
+        or identity.st_gid != expected_root_gid
+        or stat.S_IMODE(identity.st_mode) != 0o700
+    ):
+        raise ReleaseContractError("failed build staging lacks root custody")
+    if _uid_process_ids(build_uid):
+        raise ReleaseContractError(
+            "failed build staging retained while a build process remains"
+        )
+    shutil.rmtree(staging)
+
+
+def _admit_build_manifest_after_custody_barrier(
+    manifest_path: Path,
+    *,
+    expected_raw: bytes,
+    expected_sha256: str,
+    build_uid: int,
+    build_gid: int,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+) -> None:
+    """Root-read the exact build manifest only after retaking its parent."""
+    expected_sha256 = _require_hash(expected_sha256, "expected_manifest_sha256")
+    if (
+        not 0 < len(expected_raw) <= _MAX_JSON_BYTES
+        or hashlib.sha256(expected_raw).hexdigest() != expected_sha256
+    ):
+        raise ReleaseContractError("root-admitted build manifest binding differs")
+    staging = manifest_path.parent
+    identity = staging.lstat()
+    if (
+        staging.is_symlink()
+        or not stat.S_ISDIR(identity.st_mode)
+        or identity.st_uid != expected_root_uid
+        or identity.st_gid != expected_root_gid
+        or stat.S_IMODE(identity.st_mode) != 0o700
+    ):
+        raise ReleaseContractError("build staging root custody barrier differs")
+    admitted_raw, _manifest_identity = _read_exact_custodied_bytes(
+        manifest_path,
+        expected_uid=build_uid,
+        expected_gid=build_gid,
+        expected_mode=0o400,
+        maximum_bytes=_MAX_JSON_BYTES,
+    )
+    if (
+        admitted_raw != expected_raw
+        or hashlib.sha256(admitted_raw).hexdigest() != expected_sha256
+    ):
+        raise ReleaseContractError("build manifest differs after root custody barrier")
 
 
 def _staged_release_receipt_paths(
@@ -20032,10 +20153,10 @@ def stage_candidate(
     build_driver = _install_exact_build_driver(
         release_sha=manifest["release_sha"],
     )
+    build_manifest_raw = _canonical_bytes(dict(manifest)) + b"\n"
+    expected_manifest_sha256 = hashlib.sha256(build_manifest_raw).hexdigest()
     staging = Path(tempfile.mkdtemp(prefix=".staging-", dir=release_root))
     try:
-        os.chown(staging, build_account.pw_uid, build_account.pw_gid)
-        os.chmod(staging, 0o700)
         build_home = staging / "build-home"
         uv_cache = staging / "uv-cache"
         npm_cache = staging / "npm-cache"
@@ -20050,43 +20171,41 @@ def stage_candidate(
         build_manifest = staging / "release-manifest.json"
         _atomic_private_bytes(
             build_manifest,
-            _canonical_bytes(dict(manifest)) + b"\n",
+            build_manifest_raw,
             uid=build_account.pw_uid,
             gid=build_account.pw_gid,
         )
         os.chmod(build_manifest, 0o400)
+        # Root creates and binds every exact input under a root-custodied parent.
+        # Parent-directory authority transfers only after the final write; from
+        # here until the post-process fchown barrier, root must not path-read a
+        # candidate-controlled leaf.
+        os.chown(staging, build_account.pw_uid, build_account.pw_gid)
+        os.chmod(staging, 0o700)
         build_receipt = _invoke_isolated_build_plan(
             staging=staging,
             build_account=build_account,
             uv_binary=uv_binary,
             build_driver=build_driver,
             manifest_path=build_manifest,
+            expected_manifest_sha256=expected_manifest_sha256,
             release_sha=manifest["release_sha"],
             runner=runner,
         )
         # Retire the build identity's parent-directory authority before root
         # reads, freezes, or promotes any candidate pathname.
-        staging_identity = staging.lstat()
-        staging_descriptor = os.open(
+        _retake_build_staging_custody(
             staging,
-            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            build_uid=build_account.pw_uid,
+            build_gid=build_account.pw_gid,
         )
-        try:
-            opened_staging = os.fstat(staging_descriptor)
-            if (
-                staging.is_symlink()
-                or (opened_staging.st_dev, opened_staging.st_ino)
-                != (staging_identity.st_dev, staging_identity.st_ino)
-                or opened_staging.st_uid != build_account.pw_uid
-                or opened_staging.st_gid != build_account.pw_gid
-                or stat.S_IMODE(opened_staging.st_mode) != 0o700
-            ):
-                raise ReleaseContractError("build staging custody changed at barrier")
-            os.fchown(staging_descriptor, 0, 0)
-            os.fchmod(staging_descriptor, 0o700)
-            os.fsync(staging_descriptor)
-        finally:
-            os.close(staging_descriptor)
+        _admit_build_manifest_after_custody_barrier(
+            build_manifest,
+            expected_raw=build_manifest_raw,
+            expected_sha256=expected_manifest_sha256,
+            build_uid=build_account.pw_uid,
+            build_gid=build_account.pw_gid,
+        )
         repo = staging / "repo"
         _freeze_release_tree(
             repo,
@@ -20141,8 +20260,11 @@ def stage_candidate(
             os.close(release_descriptor)
             os.close(staging_descriptor)
     finally:
-        if staging.exists():
-            shutil.rmtree(staging)
+        _cleanup_build_staging(
+            staging,
+            build_uid=build_account.pw_uid,
+            build_gid=build_account.pw_gid,
+        )
     admission = publish_staged_release_admission(
         release_sha=manifest["release_sha"],
         release_path=target,
