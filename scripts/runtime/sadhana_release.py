@@ -277,9 +277,9 @@ TAILSCALE_OWNERSHIP_SCHEMA_VERSION = "dharma.sadhana.tailscale_ownership.v3"
 TAILSCALE_STOP_SCHEMA_VERSION = "dharma.sadhana.tailscale_serve_stop.v1"
 TAILSCALE_EMPTY_CONFIG = {"version": "0.0.1"}
 STANDBY_TAILSCALE_PORT = 2222
-STANDBY_TAILSCALE_ROUTE = "tcp://localhost:22"
+STANDBY_TAILSCALE_ROUTE = "tcp://127.0.0.1:22"
 STANDBY_TAILSCALE_STATUS = {
-    "TCP": {str(STANDBY_TAILSCALE_PORT): {"TCPForward": "localhost:22"}}
+    "TCP": {str(STANDBY_TAILSCALE_PORT): {"TCPForward": "127.0.0.1:22"}}
 }
 STANDBY_TAILSCALE_INTENT_RECEIPT = Path(
     "/etc/dharma-sadhana/receipts/preactivation/"
@@ -15076,6 +15076,7 @@ def activate_standby(
         _validate_installed_standby_replication_route(
             account=account,
             expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
         )
         intent, _intent_created = _standby_activation_intent(
             release_sha=release_sha,
@@ -15735,7 +15736,7 @@ def _load_standby_tailscale_intent_receipt(
         "release_sha": release_sha,
         "route": STANDBY_TAILSCALE_ROUTE,
         "tailnet_port": STANDBY_TAILSCALE_PORT,
-        "local_endpoint": "localhost:22",
+        "local_endpoint": "127.0.0.1:22",
         "tailscale_version": TAILSCALE_VERSION,
         "serve_status_before_sha256": _tailscale_config_digest({}),
         "named_config_before_sha256": _tailscale_config_digest(
@@ -15767,7 +15768,7 @@ def _write_standby_tailscale_ownership_receipt(
         "release_sha": release_sha,
         "route": STANDBY_TAILSCALE_ROUTE,
         "tailnet_port": STANDBY_TAILSCALE_PORT,
-        "local_endpoint": "localhost:22",
+        "local_endpoint": "127.0.0.1:22",
         "tailscale_version": TAILSCALE_VERSION,
         "intent_receipt_digest": intent["receipt_digest"],
         "serve_status_before_sha256": intent["serve_status_before_sha256"],
@@ -15809,7 +15810,7 @@ def _load_standby_tailscale_ownership_receipt(
         or receipt.get("release_sha") != release_sha
         or receipt.get("route") != STANDBY_TAILSCALE_ROUTE
         or receipt.get("tailnet_port") != STANDBY_TAILSCALE_PORT
-        or receipt.get("local_endpoint") != "localhost:22"
+        or receipt.get("local_endpoint") != "127.0.0.1:22"
         or receipt.get("tailscale_version") != TAILSCALE_VERSION
         or receipt.get("serve_status_before_sha256")
         != _tailscale_config_digest({})
@@ -15892,7 +15893,7 @@ def standby_tailscale_start(
     expected_root_uid: int = 0,
     expected_root_gid: int = 0,
 ) -> dict[str, Any]:
-    """Own only AGNI's private 2222-to-localhost:22 Serve handler."""
+    """Own only AGNI's private 2222-to-loopback:22 Serve handler."""
     if os.geteuid() != expected_root_uid:
         raise ReleaseContractError("standby Serve start requires root")
     _require_host_role(role, observed_node=observed_node)
@@ -15923,7 +15924,7 @@ def standby_tailscale_start(
             "release_sha": release_sha,
             "route": STANDBY_TAILSCALE_ROUTE,
             "tailnet_port": STANDBY_TAILSCALE_PORT,
-            "local_endpoint": "localhost:22",
+            "local_endpoint": "127.0.0.1:22",
             "tailscale_version": TAILSCALE_VERSION,
             "serve_status_before_sha256": _tailscale_config_digest({}),
             "named_config_before_sha256": _tailscale_config_digest(
@@ -19160,9 +19161,130 @@ def _validate_ed25519_public_key(public_key: str) -> str:
 def _restricted_authorized_key_bytes(public_key: str) -> bytes:
     public_key = _validate_ed25519_public_key(public_key)
     return (
-        'restrict,command="/usr/bin/python3.12 /usr/bin/rrsync -wo -no-del '
+        'restrict,from="127.0.0.1/32",command="/usr/bin/python3.12 '
+        '/usr/bin/rrsync -wo -no-del '
         '/var/lib/dharma-sadhana/snapshot-incoming" ' + public_key + "\n"
     ).encode("ascii")
+
+
+def _validate_restricted_standby_key_file_at(
+    directory_descriptor: int,
+    forced: bytes,
+    *,
+    expected_uid: int,
+    expected_gid: int,
+    allowed_modes: frozenset[int],
+    require_installed: bool,
+) -> os.stat_result | None:
+    """Admit the exact sole entry in one already-bound standby SSH directory."""
+    try:
+        entries = os.listdir(directory_descriptor)
+    except OSError as exc:
+        raise ReleaseContractError("standby SSH root is unavailable") from exc
+    if len(entries) != len(set(entries)) or set(entries) not in (
+        set(),
+        {"authorized_keys"},
+    ):
+        raise ReleaseContractError("standby SSH root entries differ")
+    if not entries:
+        if require_installed:
+            raise ReleaseContractError("standby forced replication route is absent")
+        return None
+    if not allowed_modes or not allowed_modes <= {0o600, 0o640}:
+        raise ReleaseContractError("standby authorized_keys modes differ")
+
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    nonblock = getattr(os, "O_NONBLOCK", 0)
+    if not nofollow or not nonblock:
+        raise ReleaseContractError(
+            "platform lacks no-follow standby route admission"
+        )
+    try:
+        identity = os.stat(
+            "authorized_keys",
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(identity.st_mode)
+            or identity.st_uid != expected_uid
+            or identity.st_gid != expected_gid
+            or stat.S_IMODE(identity.st_mode) not in allowed_modes
+            or identity.st_nlink != 1
+            or identity.st_size != len(forced)
+        ):
+            raise ReleaseContractError(
+                "standby authorized_keys differs from forced route"
+            )
+        descriptor = os.open(
+            "authorized_keys",
+            os.O_RDONLY | nofollow | nonblock | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=directory_descriptor,
+        )
+    except ReleaseContractError:
+        raise
+    except OSError as exc:
+        raise ReleaseContractError(
+            "standby authorized_keys differs from forced route"
+        ) from exc
+    try:
+        try:
+            opened = os.fstat(descriptor)
+            admitted_identity = (
+                identity.st_dev,
+                identity.st_ino,
+                identity.st_mode,
+                identity.st_uid,
+                identity.st_gid,
+                identity.st_nlink,
+                identity.st_size,
+                identity.st_mtime_ns,
+            )
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or admitted_identity
+                != (
+                    opened.st_dev,
+                    opened.st_ino,
+                    opened.st_mode,
+                    opened.st_uid,
+                    opened.st_gid,
+                    opened.st_nlink,
+                    opened.st_size,
+                    opened.st_mtime_ns,
+                )
+            ):
+                raise ReleaseContractError(
+                    "standby authorized_keys differs from forced route"
+                )
+            raw = os.read(descriptor, len(forced) + 1)
+            stable = os.fstat(descriptor)
+        except ReleaseContractError:
+            raise
+        except OSError as exc:
+            raise ReleaseContractError(
+                "standby authorized_keys differs from forced route"
+            ) from exc
+    finally:
+        os.close(descriptor)
+    if (
+        admitted_identity
+        != (
+            stable.st_dev,
+            stable.st_ino,
+            stable.st_mode,
+            stable.st_uid,
+            stable.st_gid,
+            stable.st_nlink,
+            stable.st_size,
+            stable.st_mtime_ns,
+        )
+        or raw != forced
+    ):
+        raise ReleaseContractError(
+            "standby authorized_keys differs from forced route"
+        )
+    return stable
 
 
 def _validate_restricted_standby_key_destination(
@@ -19171,7 +19293,9 @@ def _validate_restricted_standby_key_destination(
     role: str,
     account: pwd.struct_passwd,
     expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
     require_installed: bool = False,
+    allow_inert_root_transaction: bool = False,
 ) -> bytes:
     """Pre-admit the exact forced route and any already-installed destination."""
     if role != "standby":
@@ -19202,71 +19326,92 @@ def _validate_restricted_standby_key_destination(
             raise ReleaseContractError(
                 f"forced replication tool lacks root custody: {executable.name}"
             )
+    _require_secure_parent_chain(STANDBY_SSH_ROOT)
     if STANDBY_SSH_ROOT.exists() or STANDBY_SSH_ROOT.is_symlink():
         root_identity = STANDBY_SSH_ROOT.lstat()
+        root_mode = stat.S_IMODE(root_identity.st_mode)
+        allowed_root_modes = (
+            {0o700, 0o750} if allow_inert_root_transaction else {0o750}
+        )
+        canonical_root_custody = (
+            root_identity.st_uid == expected_root_uid
+            and root_identity.st_gid == account.pw_gid
+            and root_mode in allowed_root_modes
+        )
+        empty_creation_intermediate = (
+            allow_inert_root_transaction
+            and not require_installed
+            and root_identity.st_uid == expected_root_uid
+            and root_identity.st_gid == expected_root_gid
+            and root_mode == 0o700
+            and not canonical_root_custody
+        )
         if (
             STANDBY_SSH_ROOT.is_symlink()
             or not stat.S_ISDIR(root_identity.st_mode)
-            or root_identity.st_uid != account.pw_uid
-            or root_identity.st_gid != account.pw_gid
-            or stat.S_IMODE(root_identity.st_mode) != 0o700
+            or not (canonical_root_custody or empty_creation_intermediate)
+            or (require_installed and root_mode != 0o750)
         ):
             raise ReleaseContractError("standby SSH root custody differs")
-    elif require_installed:
-        raise ReleaseContractError("standby forced replication route is absent")
-    authorized_keys = STANDBY_SSH_ROOT / "authorized_keys"
-    if authorized_keys.exists() or authorized_keys.is_symlink():
-        identity = authorized_keys.lstat()
-        if (
-            authorized_keys.is_symlink()
-            or not stat.S_ISREG(identity.st_mode)
-            or identity.st_uid != account.pw_uid
-            or identity.st_gid != account.pw_gid
-            or stat.S_IMODE(identity.st_mode) != 0o600
-            or identity.st_nlink != 1
-            or identity.st_size != len(forced)
-        ):
-            raise ReleaseContractError(
-                "standby authorized_keys differs from forced route"
-            )
         nofollow = getattr(os, "O_NOFOLLOW", 0)
-        if not nofollow:
+        directory = getattr(os, "O_DIRECTORY", 0)
+        if not nofollow or not directory:
             raise ReleaseContractError(
                 "platform lacks no-follow standby route admission"
             )
-        descriptor = os.open(authorized_keys, os.O_RDONLY | nofollow)
         try:
-            opened = os.fstat(descriptor)
-            raw = os.read(descriptor, len(forced) + 1)
-            stable = os.fstat(descriptor)
+            root_descriptor = os.open(
+                STANDBY_SSH_ROOT,
+                os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0),
+            )
+        except OSError as exc:
+            raise ReleaseContractError("standby SSH root is unavailable") from exc
+        try:
+            opened_root = os.fstat(root_descriptor)
+            if (
+                (opened_root.st_dev, opened_root.st_ino)
+                != (root_identity.st_dev, root_identity.st_ino)
+                or opened_root.st_uid != root_identity.st_uid
+                or opened_root.st_gid != root_identity.st_gid
+                or stat.S_IMODE(opened_root.st_mode)
+                != stat.S_IMODE(root_identity.st_mode)
+            ):
+                raise ReleaseContractError("standby SSH root identity differs")
+            if empty_creation_intermediate:
+                if os.listdir(root_descriptor):
+                    raise ReleaseContractError(
+                        "standby SSH creation intermediate is not empty"
+                    )
+            else:
+                _validate_restricted_standby_key_file_at(
+                    root_descriptor,
+                    forced,
+                    expected_uid=expected_root_uid,
+                    expected_gid=account.pw_gid,
+                    allowed_modes=(
+                        frozenset({0o640})
+                        if root_mode == 0o750
+                        else frozenset({0o600, 0o640})
+                    ),
+                    require_installed=require_installed or root_mode == 0o750,
+                )
+            stable_root = os.fstat(root_descriptor)
+            if (
+                stable_root.st_dev,
+                stable_root.st_ino,
+                stable_root.st_uid,
+                stable_root.st_gid,
+                stat.S_IMODE(stable_root.st_mode),
+            ) != (
+                root_identity.st_dev,
+                root_identity.st_ino,
+                root_identity.st_uid,
+                root_identity.st_gid,
+                stat.S_IMODE(root_identity.st_mode),
+            ):
+                raise ReleaseContractError("standby SSH root identity differs")
         finally:
-            os.close(descriptor)
-        admitted_identity = (
-            identity.st_dev,
-            identity.st_ino,
-            identity.st_size,
-            identity.st_mtime_ns,
-        )
-        if (
-            admitted_identity
-            != (
-                opened.st_dev,
-                opened.st_ino,
-                opened.st_size,
-                opened.st_mtime_ns,
-            )
-            or admitted_identity
-            != (
-                stable.st_dev,
-                stable.st_ino,
-                stable.st_size,
-                stable.st_mtime_ns,
-            )
-            or raw != forced
-        ):
-            raise ReleaseContractError(
-                "standby authorized_keys differs from forced route"
-            )
+            os.close(root_descriptor)
     elif require_installed:
         raise ReleaseContractError("standby forced replication route is absent")
     return forced
@@ -19276,6 +19421,7 @@ def _validate_installed_standby_replication_route(
     *,
     account: pwd.struct_passwd,
     expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
 ) -> None:
     public_key = _read_standby_public_key(expected_root_uid=expected_root_uid)
     _validate_restricted_standby_key_destination(
@@ -19283,6 +19429,7 @@ def _validate_installed_standby_replication_route(
         role="standby",
         account=account,
         expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
         require_installed=True,
     )
 
@@ -19293,65 +19440,311 @@ def _install_restricted_standby_key(
     role: str,
     account: pwd.struct_passwd,
     expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
     checkpoint: Callable[[str], None] | None = None,
 ) -> None:
-    """Atomically install the standby-only forced SSH route, with crash rollback."""
+    """Install one immutable root-custodied key through inert replay states."""
     forced = _validate_restricted_standby_key_destination(
         public_key,
         role=role,
         account=account,
         expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
+        allow_inert_root_transaction=True,
     )
     ssh_root_preexisted = STANDBY_SSH_ROOT.exists() or STANDBY_SSH_ROOT.is_symlink()
+    ssh_root_pre_gid = (
+        STANDBY_SSH_ROOT.lstat().st_gid if ssh_root_preexisted else None
+    )
     authorized_keys = STANDBY_SSH_ROOT / "authorized_keys"
-    if authorized_keys.exists() or authorized_keys.is_symlink():
-        return
-    published = False
+    if ssh_root_preexisted:
+        existing_root = STANDBY_SSH_ROOT.lstat()
+        if stat.S_IMODE(existing_root.st_mode) == 0o750:
+            _validate_restricted_standby_key_destination(
+                public_key,
+                role=role,
+                account=account,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+                require_installed=True,
+            )
+            return
+
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if not nofollow or not directory:
+        raise ReleaseContractError("platform lacks no-follow standby route admission")
+    parent_descriptor = os.open(
+        STANDBY_SSH_ROOT.parent,
+        os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0),
+    )
+    root_descriptor = -1
+    key_descriptor = -1
+    authorized_pre_mode: int | None = None
 
     def publication_checkpoint(phase: str) -> None:
-        nonlocal published
-        if phase == "private_bytes_post_publish":
-            published = True
         if checkpoint is not None:
             checkpoint(phase)
 
-    try:
-        _ensure_host_directory(
-            STANDBY_SSH_ROOT,
-            uid=account.pw_uid,
-            gid=account.pw_gid,
-            mode=0o700,
+    def validate_bound_root(
+        *,
+        mode: int,
+        gid: int | None = None,
+    ) -> os.stat_result:
+        if root_descriptor < 0:
+            raise ReleaseContractError("standby SSH root is unavailable")
+        opened = os.fstat(root_descriptor)
+        named = os.stat(
+            STANDBY_SSH_ROOT.name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
         )
-        _atomic_private_bytes(
-            authorized_keys,
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+            or opened.st_uid != expected_root_uid
+            or opened.st_gid != (account.pw_gid if gid is None else gid)
+            or stat.S_IMODE(opened.st_mode) != mode
+        ):
+            raise ReleaseContractError("standby SSH root transaction differs")
+        return opened
+
+    def validate_bound_key(
+        *,
+        allowed_modes: frozenset[int],
+        require_installed: bool,
+    ) -> os.stat_result | None:
+        return _validate_restricted_standby_key_file_at(
+            root_descriptor,
             forced,
-            uid=account.pw_uid,
-            gid=account.pw_gid,
-            checkpoint=publication_checkpoint,
+            expected_uid=expected_root_uid,
+            expected_gid=account.pw_gid,
+            allowed_modes=allowed_modes,
+            require_installed=require_installed,
         )
+
+    def open_bound_key(identity: os.stat_result) -> int:
+        descriptor = os.open(
+            "authorized_keys",
+            os.O_RDONLY
+            | nofollow
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=root_descriptor,
+        )
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or (
+                opened.st_dev,
+                opened.st_ino,
+                opened.st_mode,
+                opened.st_uid,
+                opened.st_gid,
+                opened.st_nlink,
+                opened.st_size,
+                opened.st_mtime_ns,
+            )
+            != (
+                identity.st_dev,
+                identity.st_ino,
+                identity.st_mode,
+                identity.st_uid,
+                identity.st_gid,
+                identity.st_nlink,
+                identity.st_size,
+                identity.st_mtime_ns,
+            )
+        ):
+            os.close(descriptor)
+            raise ReleaseContractError("standby authorized_keys identity differs")
+        return descriptor
+
+    try:
+        parent = os.fstat(parent_descriptor)
+        named_parent = STANDBY_SSH_ROOT.parent.lstat()
+        if (
+            not stat.S_ISDIR(parent.st_mode)
+            or STANDBY_SSH_ROOT.parent.is_symlink()
+            or (parent.st_dev, parent.st_ino)
+            != (named_parent.st_dev, named_parent.st_ino)
+            or parent.st_uid != expected_root_uid
+            or parent.st_gid != expected_root_gid
+            or stat.S_IMODE(parent.st_mode) != 0o755
+        ):
+            raise ReleaseContractError("standby SSH transaction parent differs")
+        created_root = False
+        try:
+            os.mkdir(STANDBY_SSH_ROOT.name, 0o700, dir_fd=parent_descriptor)
+            created_root = True
+        except FileExistsError:
+            pass
+        root_descriptor = os.open(
+            STANDBY_SSH_ROOT.name,
+            os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_descriptor,
+        )
+        if created_root:
+            os.fchown(root_descriptor, expected_root_uid, expected_root_gid)
+            os.fchmod(root_descriptor, 0o700)
+            os.fsync(root_descriptor)
+            os.fsync(parent_descriptor)
+        opened_root = os.fstat(root_descriptor)
+        if (
+            opened_root.st_uid == expected_root_uid
+            and opened_root.st_gid == expected_root_gid
+            and stat.S_IMODE(opened_root.st_mode) == 0o700
+            and expected_root_gid != account.pw_gid
+        ):
+            if os.listdir(root_descriptor):
+                raise ReleaseContractError(
+                    "standby SSH creation intermediate is not empty"
+                )
+            os.fchown(root_descriptor, expected_root_uid, account.pw_gid)
+            os.fchmod(root_descriptor, 0o700)
+            os.fsync(root_descriptor)
+            os.fsync(parent_descriptor)
+        validate_bound_root(mode=0o700)
+        authorized_prestate = validate_bound_key(
+            allowed_modes=frozenset({0o600, 0o640}),
+            require_installed=False,
+        )
+        authorized_pre_mode = (
+            None
+            if authorized_prestate is None
+            else stat.S_IMODE(authorized_prestate.st_mode)
+        )
+        if authorized_prestate is None:
+            _atomic_private_bytes(
+                authorized_keys,
+                forced,
+                uid=expected_root_uid,
+                gid=account.pw_gid,
+                checkpoint=publication_checkpoint,
+            )
+        validate_bound_root(mode=0o700)
+        intermediate = validate_bound_key(
+            allowed_modes=frozenset({0o600, 0o640}),
+            require_installed=True,
+        )
+        if intermediate is None:
+            raise ReleaseContractError("standby forced replication route is absent")
+        if stat.S_IMODE(intermediate.st_mode) == 0o600:
+            key_descriptor = open_bound_key(intermediate)
+            os.fchmod(key_descriptor, 0o640)
+            os.fsync(key_descriptor)
+        validate_bound_key(
+            allowed_modes=frozenset({0o640}),
+            require_installed=True,
+        )
+        os.fsync(root_descriptor)
+        if checkpoint is not None:
+            checkpoint("standby_authorized_keys_finalized")
+
+        os.fchmod(root_descriptor, 0o750)
+        os.fsync(root_descriptor)
+        os.fsync(parent_descriptor)
+        validate_bound_root(mode=0o750)
+        validate_bound_key(
+            allowed_modes=frozenset({0o640}),
+            require_installed=True,
+        )
+        if checkpoint is not None:
+            checkpoint("standby_ssh_route_finalized")
         _validate_restricted_standby_key_destination(
             public_key,
             role=role,
             account=account,
             expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+            require_installed=True,
         )
     except Exception:
         try:
-            if published:
-                _validate_restricted_standby_key_destination(
-                    public_key,
-                    role=role,
-                    account=account,
-                    expected_root_uid=expected_root_uid,
-                )
-                authorized_keys.unlink()
-            if not ssh_root_preexisted and STANDBY_SSH_ROOT.exists():
-                STANDBY_SSH_ROOT.rmdir()
+            if root_descriptor >= 0:
+                current_root = os.fstat(root_descriptor)
+                current_root_mode = stat.S_IMODE(current_root.st_mode)
+                if current_root_mode == 0o750:
+                    validate_bound_root(mode=0o750)
+                    validate_bound_key(
+                        allowed_modes=frozenset({0o640}),
+                        require_installed=True,
+                    )
+                    os.fchmod(root_descriptor, 0o700)
+                    os.fsync(root_descriptor)
+                    validate_bound_root(mode=0o700)
+                elif current_root_mode != 0o700:
+                    raise ReleaseContractError(
+                        "standby SSH rollback root mode differs"
+                    )
+                else:
+                    validate_bound_root(mode=0o700)
+                if authorized_pre_mode is None:
+                    installed = validate_bound_key(
+                        allowed_modes=frozenset({0o600, 0o640}),
+                        require_installed=False,
+                    )
+                    if installed is not None:
+                        os.unlink("authorized_keys", dir_fd=root_descriptor)
+                        os.fsync(root_descriptor)
+                    validate_bound_key(
+                        allowed_modes=frozenset({0o600, 0o640}),
+                        require_installed=False,
+                    )
+                elif authorized_pre_mode == 0o600:
+                    current_key = validate_bound_key(
+                        allowed_modes=frozenset({0o600, 0o640}),
+                        require_installed=True,
+                    )
+                    if current_key is None:
+                        raise ReleaseContractError(
+                            "standby authorized_keys rollback target is absent"
+                        )
+                    if stat.S_IMODE(current_key.st_mode) == 0o640:
+                        if key_descriptor < 0:
+                            key_descriptor = open_bound_key(current_key)
+                        os.fchmod(key_descriptor, 0o600)
+                        os.fsync(key_descriptor)
+                    validate_bound_key(
+                        allowed_modes=frozenset({0o600}),
+                        require_installed=True,
+                    )
+                if (
+                    ssh_root_preexisted
+                    and ssh_root_pre_gid == expected_root_gid
+                    and expected_root_gid != account.pw_gid
+                ):
+                    validate_bound_root(mode=0o700)
+                    if os.listdir(root_descriptor):
+                        raise ReleaseContractError(
+                            "standby SSH creation rollback root is not empty"
+                        )
+                    os.fchown(
+                        root_descriptor,
+                        expected_root_uid,
+                        expected_root_gid,
+                    )
+                    os.fsync(root_descriptor)
+                    validate_bound_root(mode=0o700, gid=expected_root_gid)
+                if not ssh_root_preexisted:
+                    validate_bound_root(mode=0o700)
+                    if os.listdir(root_descriptor):
+                        raise ReleaseContractError(
+                            "standby SSH rollback root is not empty"
+                        )
+                    os.rmdir(STANDBY_SSH_ROOT.name, dir_fd=parent_descriptor)
+                    os.fsync(parent_descriptor)
         except (OSError, ReleaseContractError) as rollback_exc:
             raise ReleaseContractError(
                 "standby authorized_keys transaction rollback failed"
             ) from rollback_exc
         raise
+    finally:
+        if key_descriptor >= 0:
+            os.close(key_descriptor)
+        if root_descriptor >= 0:
+            os.close(root_descriptor)
+        os.close(parent_descriptor)
 
 
 def _validate_existing_writer_marker(
@@ -20864,6 +21257,7 @@ def stage_candidate(
             standby_public_key,
             role=role,
             account=account,
+            allow_inert_root_transaction=True,
         )
         conflicting = [
             str(unit_root / name)

@@ -8247,7 +8247,7 @@ def _standby_serve_runner() -> tuple[
             "serve",
             "--bg",
             "--tcp=2222",
-            "tcp://localhost:22",
+            "tcp://127.0.0.1:22",
         ):
             state["status"] = copy.deepcopy(release.STANDBY_TAILSCALE_STATUS)
             return subprocess.CompletedProcess(argv, 0, "", "")
@@ -8288,7 +8288,7 @@ def test_standby_serve_owns_and_removes_only_tcp_2222_handler(
         "serve",
         "--bg",
         "--tcp=2222",
-        "tcp://localhost:22",
+        "tcp://127.0.0.1:22",
     ) in calls
     stop_receipt = release.standby_tailscale_stop(
         role="standby",
@@ -8346,7 +8346,7 @@ def test_standby_serve_stop_preserves_drift_without_node_reset(
         expected_root_uid=os.geteuid(),
         expected_root_gid=os.getegid(),
     )
-    state["status"] = {"TCP": {"2222": {"TCPForward": "localhost:23"}}}
+    state["status"] = {"TCP": {"2222": {"TCPForward": "127.0.0.1:23"}}}
     with pytest.raises(release.ReleaseContractError, match="owned TCP bridge"):
         release.standby_tailscale_stop(
             role="standby",
@@ -8594,9 +8594,12 @@ def test_standby_key_is_forced_to_write_only_snapshot_rrsync() -> None:
     public_key = _standby_public_key_fixture()
     rendered = release._restricted_authorized_key_bytes(public_key).decode("ascii")
     assert rendered.startswith(
-        'restrict,command="/usr/bin/python3.12 /usr/bin/rrsync -wo -no-del '
+        'restrict,from="127.0.0.1/32",command="/usr/bin/python3.12 '
+        '/usr/bin/rrsync -wo -no-del '
         '/var/lib/dharma-sadhana/snapshot-incoming" ssh-ed25519 '
     )
+    assert 'from="127.0.0.1/32"' in rendered
+    assert "::1" not in rendered
     with pytest.raises(release.ReleaseContractError, match="exact ed25519"):
         release._restricted_authorized_key_bytes(
             "command=/bin/sh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixture"
@@ -8639,7 +8642,7 @@ def test_pinned_known_hosts_admits_exact_agni_tailscale_replication_target(
 def _standby_key_install_fixture(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-) -> tuple[SimpleNamespace, Path, int]:
+) -> tuple[SimpleNamespace, Path, int, int]:
     root_uid = os.geteuid()
     root_gid = os.getegid()
     service_uid = root_uid if root_uid != 0 else 23145
@@ -8660,12 +8663,6 @@ def _standby_key_install_fixture(
     monkeypatch.setattr(release, "RRSYNC_PATH", rrsync)
     monkeypatch.setattr(release, "STANDBY_SSH_ROOT", ssh_root)
 
-    def ensure(path: Path, *, uid: int, gid: int, mode: int) -> None:
-        path.mkdir(mode=mode, exist_ok=True)
-        os.chown(path, uid, gid)
-        path.chmod(mode)
-
-    monkeypatch.setattr(release, "_ensure_host_directory", ensure)
     account = SimpleNamespace(
         pw_name="dharma-sadhana",
         pw_uid=service_uid,
@@ -8673,35 +8670,107 @@ def _standby_key_install_fixture(
         pw_dir="/var/lib/dharma-sadhana",
         pw_shell="/bin/sh",
     )
-    return account, ssh_root, root_uid
+    return account, ssh_root, root_uid, root_gid
+
+
+def _distinct_standby_key_install_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[SimpleNamespace, Path, Callable[[Path, int, int], None]]:
+    """Model production root/service custody on an unprivileged test host."""
+    _account, ssh_root, _uid, _gid = _standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    account = SimpleNamespace(
+        pw_name="dharma-sadhana",
+        pw_uid=23145,
+        pw_gid=23146,
+        pw_dir="/var/lib/dharma-sadhana",
+        pw_shell="/bin/sh",
+    )
+    actual_lstat = Path.lstat
+    actual_fstat = os.fstat
+    actual_stat = os.stat
+    logical_owners: dict[tuple[int, int], tuple[int, int]] = {}
+
+    def with_logical_owner(identity: os.stat_result) -> os.stat_result:
+        owner = logical_owners.get((identity.st_dev, identity.st_ino))
+        if owner is None:
+            return identity
+        fields = list(identity)
+        fields[stat.ST_UID], fields[stat.ST_GID] = owner
+        return os.stat_result(fields)
+
+    def set_owner(path: Path, uid: int, gid: int) -> None:
+        identity = actual_lstat(path)
+        logical_owners[(identity.st_dev, identity.st_ino)] = (uid, gid)
+
+    def logical_lstat(path: Path) -> os.stat_result:
+        return with_logical_owner(actual_lstat(path))
+
+    def logical_fstat(descriptor: int) -> os.stat_result:
+        return with_logical_owner(actual_fstat(descriptor))
+
+    def logical_stat(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> os.stat_result:
+        return with_logical_owner(actual_stat(path, *args, **kwargs))
+
+    def logical_fchown(descriptor: int, uid: int, gid: int) -> None:
+        identity = actual_fstat(descriptor)
+        logical_owners[(identity.st_dev, identity.st_ino)] = (uid, gid)
+
+    for root_owned in (
+        ssh_root.parent,
+        Path(release.PYTHON312_PATH),
+        release.RRSYNC_PATH,
+    ):
+        set_owner(root_owned, 0, 0)
+    monkeypatch.setattr(Path, "lstat", logical_lstat)
+    monkeypatch.setattr(release.os, "fstat", logical_fstat)
+    monkeypatch.setattr(release.os, "stat", logical_stat)
+    monkeypatch.setattr(release.os, "fchown", logical_fchown)
+    return account, ssh_root, set_owner
 
 
 def test_standby_key_install_is_atomic_idempotent_and_writer_denied(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    account, ssh_root, root_uid = _standby_key_install_fixture(tmp_path, monkeypatch)
+    account, ssh_root, root_uid, root_gid = _standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
     public_key = _standby_public_key_fixture()
     release._install_restricted_standby_key(
         public_key,
         role="standby",
         account=account,
         expected_root_uid=root_uid,
+        expected_root_gid=root_gid,
     )
     authorized_keys = ssh_root / "authorized_keys"
     first_identity = authorized_keys.lstat()
     assert authorized_keys.read_bytes() == release._restricted_authorized_key_bytes(
         public_key
     )
-    assert stat.S_IMODE(first_identity.st_mode) == 0o600
-    assert first_identity.st_uid == account.pw_uid
+    assert stat.S_IMODE(first_identity.st_mode) == 0o640
+    assert first_identity.st_uid == root_uid
     assert first_identity.st_gid == account.pw_gid
+    ssh_identity = ssh_root.lstat()
+    assert (
+        ssh_identity.st_uid,
+        ssh_identity.st_gid,
+        stat.S_IMODE(ssh_identity.st_mode),
+    ) == (root_uid, account.pw_gid, 0o750)
 
     release._install_restricted_standby_key(
         public_key,
         role="standby",
         account=account,
         expected_root_uid=root_uid,
+        expected_root_gid=root_gid,
     )
     assert authorized_keys.lstat().st_ino == first_identity.st_ino
 
@@ -8721,7 +8790,9 @@ def test_standby_key_install_rolls_back_post_publish_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    account, ssh_root, root_uid = _standby_key_install_fixture(tmp_path, monkeypatch)
+    account, ssh_root, root_uid, root_gid = _standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
 
     def fail_after_publish(phase: str) -> None:
         if phase == "private_bytes_post_publish":
@@ -8733,9 +8804,475 @@ def test_standby_key_install_rolls_back_post_publish_failure(
             role="standby",
             account=account,
             expected_root_uid=root_uid,
+            expected_root_gid=root_gid,
             checkpoint=fail_after_publish,
         )
     assert not ssh_root.exists()
+
+
+def test_standby_key_install_retains_root_custody_through_finalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, _set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    observed: list[tuple[str, int, int, bool, int | None]] = []
+
+    def observe(phase: str) -> None:
+        root = ssh_root.lstat()
+        key = ssh_root / "authorized_keys"
+        observed.append(
+            (
+                phase,
+                root.st_uid,
+                stat.S_IMODE(root.st_mode),
+                key.exists(),
+                stat.S_IMODE(key.lstat().st_mode) if key.exists() else None,
+            )
+        )
+
+    release._install_restricted_standby_key(
+        _standby_public_key_fixture(),
+        role="standby",
+        account=account,
+        expected_root_uid=0,
+        expected_root_gid=0,
+        checkpoint=observe,
+    )
+
+    assert observed == [
+        ("private_bytes_pre_publish", 0, 0o700, False, None),
+        ("private_bytes_post_publish", 0, 0o700, True, 0o600),
+        ("standby_authorized_keys_finalized", 0, 0o700, True, 0o640),
+        ("standby_ssh_route_finalized", 0, 0o750, True, 0o640),
+    ]
+    root = ssh_root.lstat()
+    key = (ssh_root / "authorized_keys").lstat()
+    assert (root.st_uid, root.st_gid, stat.S_IMODE(root.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o750,
+    )
+    assert root.st_uid != account.pw_uid
+    assert (key.st_uid, key.st_gid, stat.S_IMODE(key.st_mode), key.st_nlink) == (
+        0,
+        account.pw_gid,
+        0o640,
+        1,
+    )
+    assert key.st_uid != account.pw_uid
+    assert root.st_mode & (stat.S_IWGRP | stat.S_IWOTH) == 0
+    assert key.st_mode & (stat.S_IWGRP | stat.S_IWOTH) == 0
+
+
+@pytest.mark.parametrize("key_mode", (None, 0o600, 0o640))
+def test_standby_key_install_replays_exact_root_owned_intermediate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    key_mode: int | None,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    public_key = _standby_public_key_fixture()
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, account.pw_gid)
+    prior_inode: int | None = None
+    if key_mode is not None:
+        authorized_keys = ssh_root / "authorized_keys"
+        authorized_keys.write_bytes(
+            release._restricted_authorized_key_bytes(public_key)
+        )
+        authorized_keys.chmod(key_mode)
+        set_owner(authorized_keys, 0, account.pw_gid)
+        prior_inode = authorized_keys.lstat().st_ino
+
+    release._install_restricted_standby_key(
+        public_key,
+        role="standby",
+        account=account,
+        expected_root_uid=0,
+        expected_root_gid=0,
+    )
+
+    root = ssh_root.lstat()
+    assert (root.st_uid, root.st_gid, stat.S_IMODE(root.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o750,
+    )
+    authorized_keys = ssh_root / "authorized_keys"
+    assert authorized_keys.read_bytes() == release._restricted_authorized_key_bytes(
+        public_key
+    )
+    if prior_inode is not None:
+        assert authorized_keys.lstat().st_ino == prior_inode
+    final_key = authorized_keys.lstat()
+    assert (final_key.st_uid, final_key.st_gid, stat.S_IMODE(final_key.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o640,
+    )
+
+
+def test_standby_key_install_adopts_empty_root_root_creation_intermediate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, 0)
+
+    release._install_restricted_standby_key(
+        _standby_public_key_fixture(),
+        role="standby",
+        account=account,
+        expected_root_uid=0,
+        expected_root_gid=0,
+    )
+
+    root = ssh_root.lstat()
+    key = (ssh_root / "authorized_keys").lstat()
+    assert (root.st_uid, root.st_gid, stat.S_IMODE(root.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o750,
+    )
+    assert (key.st_uid, key.st_gid, stat.S_IMODE(key.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o640,
+    )
+
+
+def test_standby_key_install_rejects_nonempty_root_root_creation_intermediate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    public_key = _standby_public_key_fixture()
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, 0)
+    authorized_keys = ssh_root / "authorized_keys"
+    authorized_keys.write_bytes(release._restricted_authorized_key_bytes(public_key))
+    authorized_keys.chmod(0o600)
+    set_owner(authorized_keys, 0, account.pw_gid)
+    before = authorized_keys.lstat()
+
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="creation intermediate is not empty",
+    ):
+        release._install_restricted_standby_key(
+            public_key,
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+        )
+    assert authorized_keys.lstat().st_ino == before.st_ino
+
+
+def test_standby_key_install_restores_root_root_creation_prestate_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, 0)
+    prior_inode = ssh_root.lstat().st_ino
+
+    def fail_after_route_finalization(phase: str) -> None:
+        if phase == "standby_ssh_route_finalized":
+            raise RuntimeError("simulated creation replay failure")
+
+    with pytest.raises(RuntimeError, match="creation replay failure"):
+        release._install_restricted_standby_key(
+            _standby_public_key_fixture(),
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+            checkpoint=fail_after_route_finalization,
+        )
+    root = ssh_root.lstat()
+    assert (root.st_ino, root.st_uid, root.st_gid, stat.S_IMODE(root.st_mode)) == (
+        prior_inode,
+        0,
+        0,
+        0o700,
+    )
+    assert list(ssh_root.iterdir()) == []
+
+
+@pytest.mark.parametrize("pre_mode", (0o600, 0o640))
+def test_standby_key_install_restores_preexisting_inert_state_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pre_mode: int,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    public_key = _standby_public_key_fixture()
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, account.pw_gid)
+    authorized_keys = ssh_root / "authorized_keys"
+    authorized_keys.write_bytes(release._restricted_authorized_key_bytes(public_key))
+    authorized_keys.chmod(pre_mode)
+    set_owner(authorized_keys, 0, account.pw_gid)
+    prior_inode = authorized_keys.lstat().st_ino
+
+    def fail_after_route_finalization(phase: str) -> None:
+        if phase == "standby_ssh_route_finalized":
+            raise RuntimeError("simulated replay finalization failure")
+
+    with pytest.raises(RuntimeError, match="replay finalization failure"):
+        release._install_restricted_standby_key(
+            public_key,
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+            checkpoint=fail_after_route_finalization,
+        )
+    root = ssh_root.lstat()
+    key = authorized_keys.lstat()
+    assert (root.st_uid, root.st_gid, stat.S_IMODE(root.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o700,
+    )
+    assert (key.st_ino, key.st_uid, key.st_gid, stat.S_IMODE(key.st_mode)) == (
+        prior_inode,
+        0,
+        account.pw_gid,
+        pre_mode,
+    )
+
+
+def test_standby_key_install_rejects_empty_service_owned_prestate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, account.pw_uid, account.pw_gid)
+
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="SSH root custody differs",
+    ):
+        release._install_restricted_standby_key(
+            _standby_public_key_fixture(),
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+        )
+    assert ssh_root.exists()
+    assert list(ssh_root.iterdir()) == []
+
+
+def test_standby_key_install_rolls_back_after_route_finalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, _set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+
+    def fail_after_route_finalization(phase: str) -> None:
+        if phase == "standby_ssh_route_finalized":
+            raise RuntimeError("simulated route-finalization failure")
+
+    with pytest.raises(RuntimeError, match="route-finalization failure"):
+        release._install_restricted_standby_key(
+            _standby_public_key_fixture(),
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+            checkpoint=fail_after_route_finalization,
+        )
+    assert not ssh_root.exists()
+
+
+def test_standby_key_install_rejects_hostile_root_owned_intermediate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, account.pw_gid)
+    hostile = ssh_root / "unexpected"
+    hostile.write_bytes(b"hostile\n")
+    before = hostile.lstat()
+
+    with pytest.raises(release.ReleaseContractError, match="root entries differ"):
+        release._install_restricted_standby_key(
+            _standby_public_key_fixture(),
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+        )
+    assert hostile.read_bytes() == b"hostile\n"
+    assert hostile.lstat().st_ino == before.st_ino
+
+
+@pytest.mark.parametrize("hostile_kind", ("foreign-owner", "wrong-mode"))
+def test_standby_key_install_rejects_bad_directory_custody_without_repair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_kind: str,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, account.pw_gid)
+    if hostile_kind == "foreign-owner":
+        set_owner(ssh_root, 991, 992)
+    else:
+        ssh_root.chmod(0o710)
+    before = ssh_root.lstat()
+
+    with pytest.raises(release.ReleaseContractError, match="root custody differs"):
+        release._install_restricted_standby_key(
+            _standby_public_key_fixture(),
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+        )
+    after = ssh_root.lstat()
+    assert (after.st_dev, after.st_ino, after.st_uid, after.st_gid, after.st_mode) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_uid,
+        before.st_gid,
+        before.st_mode,
+    )
+
+
+@pytest.mark.parametrize("hostile_kind", ("fifo", "symlink", "directory"))
+def test_standby_key_validation_rejects_nonregular_entry_before_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_kind: str,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    ssh_root.mkdir(mode=0o750)
+    set_owner(ssh_root, 0, account.pw_gid)
+    authorized_keys = ssh_root / "authorized_keys"
+    if hostile_kind == "fifo":
+        os.mkfifo(authorized_keys, mode=0o600)
+    elif hostile_kind == "symlink":
+        outside = tmp_path / "outside"
+        outside.write_bytes(b"outside\n")
+        authorized_keys.symlink_to(outside)
+    else:
+        authorized_keys.mkdir(mode=0o700)
+    set_owner(authorized_keys, 0, account.pw_gid)
+    actual_open = os.open
+    key_open_attempts: list[int] = []
+
+    def reject_key_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        if path == "authorized_keys":
+            key_open_attempts.append(flags)
+            raise AssertionError("nonregular authorized_keys must not be opened")
+        return actual_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(release.os, "open", reject_key_open)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="authorized_keys differs from forced route",
+    ):
+        release._validate_restricted_standby_key_destination(
+            _standby_public_key_fixture(),
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+        )
+    assert key_open_attempts == []
+
+
+def test_standby_key_validation_nonblocking_open_rejects_fifo_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    public_key = _standby_public_key_fixture()
+    ssh_root.mkdir(mode=0o750)
+    set_owner(ssh_root, 0, account.pw_gid)
+    authorized_keys = ssh_root / "authorized_keys"
+    authorized_keys.write_bytes(release._restricted_authorized_key_bytes(public_key))
+    authorized_keys.chmod(0o640)
+    set_owner(authorized_keys, 0, account.pw_gid)
+    retired = ssh_root / "authorized_keys.retired"
+    actual_open = os.open
+    actual_read = os.read
+    actual_fstat = os.fstat
+    raced = False
+
+    def replace_before_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        nonlocal raced
+        if path == "authorized_keys" and not raced:
+            raced = True
+            assert flags & os.O_NONBLOCK
+            assert flags & os.O_NOFOLLOW
+            assert flags & os.O_CLOEXEC
+            authorized_keys.rename(retired)
+            os.mkfifo(authorized_keys, mode=0o600)
+            set_owner(authorized_keys, 0, account.pw_gid)
+        return actual_open(path, flags, *args, **kwargs)
+
+    def reject_fifo_read(descriptor: int, size: int) -> bytes:
+        if stat.S_ISFIFO(actual_fstat(descriptor).st_mode):
+            raise AssertionError("replacement FIFO must be rejected before read")
+        return actual_read(descriptor, size)
+
+    monkeypatch.setattr(release.os, "open", replace_before_open)
+    monkeypatch.setattr(release.os, "read", reject_fifo_read)
+    with pytest.raises(
+        release.ReleaseContractError,
+        match="authorized_keys differs from forced route",
+    ):
+        release._validate_restricted_standby_key_destination(
+            public_key,
+            role="standby",
+            account=account,
+            expected_root_uid=0,
+            expected_root_gid=0,
+        )
+    assert raced is True
 
 
 def test_deploy_finalizer_installs_route_only_for_standby(
@@ -8800,7 +9337,74 @@ def test_deploy_finalizer_installs_route_only_for_standby(
     assert calls == []
     stage_source = inspect.getsource(release.stage_candidate)
     assert "standby_public_key = _read_standby_public_key()" in stage_source
+    assert "allow_inert_root_transaction=True" in stage_source
     assert stage_source.count("_finalize_staged_candidate_host(") == 2
+
+
+@pytest.mark.parametrize("key_mode", (None, 0o600, 0o640))
+def test_standby_stage_preflight_and_finalizer_replay_root_owned_intermediate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    key_mode: int | None,
+) -> None:
+    account, ssh_root, set_owner = _distinct_standby_key_install_fixture(
+        tmp_path, monkeypatch
+    )
+    public_key = _standby_public_key_fixture()
+    ssh_root.mkdir(mode=0o700)
+    set_owner(ssh_root, 0, account.pw_gid)
+    prior_inode: int | None = None
+    if key_mode is not None:
+        authorized_keys = ssh_root / "authorized_keys"
+        authorized_keys.write_bytes(
+            release._restricted_authorized_key_bytes(public_key)
+        )
+        authorized_keys.chmod(key_mode)
+        set_owner(authorized_keys, 0, account.pw_gid)
+        prior_inode = authorized_keys.lstat().st_ino
+
+    # This is the exact stage_candidate standby preflight immediately before
+    # the inert release work; the finalizer then owns the authority transition.
+    release._validate_restricted_standby_key_destination(
+        public_key,
+        role="standby",
+        account=account,
+        allow_inert_root_transaction=True,
+    )
+    unit_calls: list[str] = []
+    monkeypatch.setattr(
+        release,
+        "_install_rendered_release_units",
+        lambda **_kwargs: unit_calls.append("units"),
+    )
+
+    def runner(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("standby finalizer must not start writer preparation")
+
+    release._finalize_staged_candidate_host(
+        target=tmp_path / "release",
+        release_sha="a" * 40,
+        role="standby",
+        unit_root=tmp_path / "units",
+        account=account,
+        standby_public_key=public_key,
+        runner=runner,
+    )
+
+    assert unit_calls == ["units"]
+    root = ssh_root.lstat()
+    assert (root.st_uid, root.st_gid, stat.S_IMODE(root.st_mode)) == (
+        0,
+        account.pw_gid,
+        0o750,
+    )
+    authorized_keys = ssh_root / "authorized_keys"
+    assert authorized_keys.read_bytes() == release._restricted_authorized_key_bytes(
+        public_key
+    )
+    if prior_inode is not None:
+        assert authorized_keys.lstat().st_ino == prior_inode
+    assert stat.S_IMODE(authorized_keys.lstat().st_mode) == 0o640
 
 
 def _write_minimal_venv(root: Path) -> Path:
