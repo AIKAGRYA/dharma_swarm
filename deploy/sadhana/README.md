@@ -21,11 +21,12 @@ The host topology is fixed:
   says `writer_authority_transferred=false`. Tailscale SSH still owns tailnet
   port 22, so this release never sends replication there. A separately
   receipted Tailscale Serve TCP handler exposes AGNI's ordinary OpenSSH daemon
-  only at tailnet port 2222 (`tcp://localhost:22`); the ordinary SSH daemon then
-  enforces the campaign key's forced `rrsync` command. Start, ownership, and
-  stop are exact-handler transactions. Teardown uses only
-  `tailscale serve --tcp=2222 off` after drift validation and never performs a
-  node-wide reset.
+  only at tailnet port 2222 (`tcp://127.0.0.1:22`). Serve opens a new backend
+  connection from IPv4 loopback; the ordinary SSH daemon admits the campaign
+  key only with `from="127.0.0.1/32"` and then enforces its forced `rrsync`
+  command. Start, ownership, and stop are exact-handler transactions. Teardown
+  uses only `tailscale serve --tcp=2222 off` after drift validation and never
+  performs a node-wide reset.
 - FastAPI listens only on `127.0.0.1:18420` and composes only the admitted
   immutable projection provider. Its scratch root is the separate
   `/var/lib/dharma-sadhana/api-state`.
@@ -200,9 +201,17 @@ same-euid custody; mutation therefore produces a hash-detectable self-denial,
 not new authority. The SSH key and `known_hosts` remain root-owned and are
 narrowed to mode 0640 for the static service group. No contents are printed.
 On AGNI, deploy accepts only one bare, unique-line Ed25519 public key and
-installs it with `restrict` and the forced command
+installs it with `restrict`, `from="127.0.0.1/32"`, and the forced command
 `/usr/bin/python3.12 /usr/bin/rrsync -wo -no-del` in write-only mode for
-`/var/lib/dharma-sadhana/snapshot-incoming`. The replication identity receives no
+`/var/lib/dharma-sadhana/snapshot-incoming`. The canonical
+`/var/lib/dharma-sadhana/.ssh` directory remains root-owned with the standby
+service group at mode 0750, and its sole `authorized_keys` file remains
+root-owned with that group at mode 0640. The service can traverse and read this
+policy for OpenSSH but cannot replace, unlink, or rewrite it. Publication moves
+through only the admitted root-custodied 0700/0600 crash intermediates before
+the file is widened to 0640 and the directory last to 0750; replay converges,
+while any service-owned, service-writable, extra-entry, non-regular, or
+replacement-race state rejects. The replication identity receives no
 interactive shell, cannot delete existing snapshots, and cannot write outside
 the incoming root. A root receiver validates a completed random-attempt upload,
 runs the SQLite/hash restore drill, finalizes it append-only under
@@ -396,14 +405,16 @@ pinned to version `1.102.2`; version drift also preserves the live config for
 manual review rather than exercising changed reset semantics.
 
 AGNI uses a distinct, narrower Serve contract. Its raw status must transition
-from `{}` to exactly `{"TCP":{"2222":{"TCPForward":"localhost:22"}}}` while
+from `{}` to exactly `{"TCP":{"2222":{"TCPForward":"127.0.0.1:22"}}}` while
 the named-Service representation remains empty. The standby unit records intent
 before the effect, ownership only after that exact live poststate, and on stop
 removes only port 2222 after proving the handler still equals its receipt. It
 then proves the poststate is the prestate minus that one owned handler. Missing
 ownership, any extra handler, named-Service drift, version drift, or an
 unexpected empty route is preserved for manual review rather than broadened
-into destructive Tailscale authority.
+into destructive Tailscale authority. Publishing the root-custodied forced key
+is still inert; this exact empty-to-owned Serve activation is the remote
+authority edge.
 
 Staging derives `/etc/dharma-sadhana/receipts/releases/SHA/runtime-prep.env`
 from the validated sealed input-set manifest, the Gitless admission, and only
