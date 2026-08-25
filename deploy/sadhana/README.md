@@ -307,7 +307,10 @@ then runs pinned `uv sync --active --frozen --no-dev` and builds the dashboard.
 After every lifecycle command exits and the solo-process proof succeeds, it
 converges only uv 0.11.2's exact empty `.venv/.lock` inode from `0666` to
 owner-private `0600` before trusted candidate reads. It rejects every broken
-or venv-escaping link and renders exact-SHA units. There is no
+or venv-escaping link. After the final tracked-checkout proof and second
+solo-process proof, it removes only pinned Next 16.3.0's exact 288-byte ignored
+`dashboard/next-env.d.ts` declaration before Git metadata removal; arbitrary
+source-root output remains rejected. It then renders exact-SHA units. There is no
 `deploy --activate` option: deployment stages and completes
 only the no-effect preparation boundary. After installing the writer unit it
 reloads systemd, proves the preparation oneshot is static (not enableable),
