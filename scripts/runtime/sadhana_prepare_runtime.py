@@ -14,6 +14,7 @@ import stat
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,13 @@ from dharma_swarm.mission_control_roster import (  # noqa: E402
     CampaignRosterError,
     load_campaign_agent_roster,
 )
+from dharma_swarm.mission_control_service import (  # noqa: E402
+    CAMPAIGN_PROJECTION_SCHEMA_VERSION,
+    MAX_CAMPAIGN_PROJECTION_BYTES,
+    CampaignService,
+    read_campaign_projection,
+    writer_lock_is_held,
+)
 from dharma_swarm.mission_control_runtime_manifests import (  # noqa: E402
     RUNTIME_MANIFEST_NAMES,
     RuntimeManifestPins,
@@ -54,13 +62,21 @@ from dharma_swarm.mission_control_runtime_manifests import (  # noqa: E402
 from dharma_swarm.runtime_admission import RuntimeAdmissionError  # noqa: E402
 from dharma_swarm.runtime_state import RuntimeStateStore  # noqa: E402
 from dharma_swarm.task_board import TaskBoard, TaskBoardError  # noqa: E402
+from api.mission_snapshot_validation import (  # noqa: E402
+    validate_campaign_projection,
+)
 
 
 PREPARATION_SCHEMA = "dharma.sadhana.runtime_preparation.v1"
 SUPERVISOR_CONFIG_PROJECTION_SCHEMA = "dharma.sadhana.supervisor_config_projection.v1"
-PREPARED_PROOF_TYPE = "Prepared<Mission,Release,InputSet,Config,TaskSet>"
+PREPARED_PROOF_TYPE = (
+    "Prepared<Mission,Release,InputSet,Config,TaskSet,ProjectionContract>"
+)
 NO_EFFECT = "NoEffect"
 PREPARATION_RECEIPT_NAME = "sadhana-runtime-preparation.v1.json"
+INITIAL_PROJECTION_NAME = "mission-projection.json"
+INITIAL_PROJECTION_MINIMUM_CYCLE_SEQUENCE = 1
+INITIAL_PROJECTION_PROVIDER_DISPATCH = "NoProviderDispatch"
 EFFECT_KINDS = (
     "provider",
     "tool",
@@ -89,6 +105,7 @@ class RuntimePreparationInputs:
     objective_sha256: str
     state_dir: Path
     output_root: Path
+    projection_path: Path
     operator_id: str
     verifier_seat: str
     pins: RuntimeManifestPins
@@ -106,6 +123,7 @@ class PreparedNoEffectProof:
     config_digest: str
     task_set_digest: str
     manifest_set_digest: str
+    projection_contract_digest: str
     session_generation: int
     session_status: str
 
@@ -122,6 +140,7 @@ class PreparedNoEffectProof:
                 "config_digest": self.config_digest,
                 "task_set_digest": self.task_set_digest,
                 "manifest_set_digest": self.manifest_set_digest,
+                "projection_contract_digest": self.projection_contract_digest,
                 "session_generation": self.session_generation,
                 "session_status": self.session_status,
             },
@@ -259,6 +278,294 @@ def validate_supervisor_config_projection(
         "supervisor config digest substitution detected",
     )
     return config
+
+
+def initial_projection_contract(
+    *,
+    path: Path,
+    config: CampaignConfig,
+    generation: int,
+) -> dict[str, object]:
+    """Bind the stable semantics that every fresh prep projection must satisfy."""
+    return {
+        "schema_version": "dharma.sadhana.prepared_projection_contract.v1",
+        "path": str(path),
+        "projection_schema_version": CAMPAIGN_PROJECTION_SCHEMA_VERSION,
+        "mission_id": config.mission_id,
+        "session_id": config.session_id,
+        "config_digest": config.digest,
+        "generation": generation,
+        "minimum_cycle_sequence": INITIAL_PROJECTION_MINIMUM_CYCLE_SEQUENCE,
+        "campaign_status": "paused",
+        "supervisor_state": "not_running",
+        "writer_lock_held": False,
+        "proves_process_liveness": False,
+        "provider_dispatch": INITIAL_PROJECTION_PROVIDER_DISPATCH,
+    }
+
+
+def validate_initial_projection_contract(
+    contract: Mapping[str, Any],
+    *,
+    expected_path: Path | None = None,
+    expected_config_digest: str | None = None,
+    expected_generation: int | None = None,
+) -> None:
+    """Validate the immutable receipt binding for refreshable projection bytes."""
+    _need(
+        set(contract)
+        == {
+            "schema_version",
+            "path",
+            "projection_schema_version",
+            "mission_id",
+            "session_id",
+            "config_digest",
+            "generation",
+            "minimum_cycle_sequence",
+            "campaign_status",
+            "supervisor_state",
+            "writer_lock_held",
+            "proves_process_liveness",
+            "provider_dispatch",
+        },
+        "prepared projection contract keys are not exact",
+    )
+    _need(
+        contract["schema_version"]
+        == "dharma.sadhana.prepared_projection_contract.v1"
+        and contract["projection_schema_version"]
+        == CAMPAIGN_PROJECTION_SCHEMA_VERSION,
+        "prepared projection contract schema conflicts",
+    )
+    _need(
+        contract["mission_id"] == EXPECTED_CAMPAIGN_ID
+        and contract["session_id"]
+        == f"mission_campaign:{EXPECTED_CAMPAIGN_ID}",
+        "prepared projection contract identity conflicts",
+    )
+    path = contract["path"]
+    _need(
+        isinstance(path, str)
+        and Path(path).is_absolute()
+        and Path(path).name == INITIAL_PROJECTION_NAME,
+        "prepared projection contract path is invalid",
+    )
+    config_digest = contract["config_digest"]
+    _need(
+        isinstance(config_digest, str)
+        and _SHA256_RE.fullmatch(config_digest) is not None,
+        "prepared projection contract config digest is invalid",
+    )
+    _need(
+        type(contract["generation"]) is int
+        and contract["generation"] == 1
+        and type(contract["minimum_cycle_sequence"]) is int
+        and contract["minimum_cycle_sequence"]
+        == INITIAL_PROJECTION_MINIMUM_CYCLE_SEQUENCE,
+        "prepared projection contract position is invalid",
+    )
+    _need(
+        contract["campaign_status"] == "paused"
+        and contract["supervisor_state"] == "not_running"
+        and contract["writer_lock_held"] is False
+        and contract["proves_process_liveness"] is False
+        and contract["provider_dispatch"]
+        == INITIAL_PROJECTION_PROVIDER_DISPATCH,
+        "prepared projection contract safety state conflicts",
+    )
+    if expected_path is not None:
+        _need(path == str(expected_path), "preparation projection path substitution detected")
+    if expected_config_digest is not None:
+        _need(
+            config_digest == expected_config_digest,
+            "preparation projection config substitution detected",
+        )
+    if expected_generation is not None:
+        _need(
+            contract["generation"] == expected_generation,
+            "preparation projection generation substitution detected",
+        )
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        _need(key not in payload, "campaign projection contains duplicate keys")
+        payload[key] = value
+    return payload
+
+
+def _read_campaign_projection_exact(path: Path) -> tuple[bytes, dict[str, Any]]:
+    """Read one private projection stably and cross-check the public decoder."""
+    first = read_campaign_projection(path)
+    _need(first is not None, "prepared campaign projection is absent")
+    directory_fd = _private_directory_descriptor(
+        path.parent,
+        "runtime preparation projection root",
+    )
+    descriptor = -1
+    try:
+        entry = os.stat(path.name, dir_fd=directory_fd, follow_symlinks=False)
+        _need(
+            stat.S_ISREG(entry.st_mode)
+            and entry.st_uid == os.geteuid()
+            and stat.S_IMODE(entry.st_mode) == 0o600
+            and entry.st_nlink == 1
+            and 0 < entry.st_size <= MAX_CAMPAIGN_PROJECTION_BYTES,
+            "prepared campaign projection custody is invalid",
+        )
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        _need(nofollow is not None, "campaign projection requires O_NOFOLLOW")
+        descriptor = os.open(
+            path.name,
+            os.O_RDONLY | nofollow,
+            dir_fd=directory_fd,
+        )
+        before = os.fstat(descriptor)
+        _need(
+            (before.st_dev, before.st_ino) == (entry.st_dev, entry.st_ino),
+            "prepared campaign projection changed during open",
+        )
+        chunks: list[bytes] = []
+        remaining = MAX_CAMPAIGN_PROJECTION_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(65_536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        _need(
+            remaining > 0
+            and len(raw) == after.st_size
+            and (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            == (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ),
+            "prepared campaign projection changed while read",
+        )
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(directory_fd)
+    try:
+        parsed = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MissionControlError("prepared campaign projection is invalid JSON") from exc
+    _need(
+        isinstance(parsed, dict)
+        and raw == _canonical_bytes(parsed)
+        and parsed == first
+        and read_campaign_projection(path) == first,
+        "prepared campaign projection replay conflicts",
+    )
+    return raw, parsed
+
+
+def validate_initial_projection(
+    path: Path,
+    contract: Mapping[str, Any],
+    *,
+    expected_cycle_sequence: int,
+    freshness_seconds: float,
+    require_fresh: bool,
+    allow_interrupted_writer: bool = False,
+    allow_lagging_cycle: bool = False,
+) -> dict[str, Any]:
+    """Validate one CampaignService projection against its receipt contract."""
+    validate_initial_projection_contract(contract, expected_path=path)
+    raw, projection = _read_campaign_projection_exact(path)
+    _need(
+        projection.get("mission_id") == contract["mission_id"]
+        and projection.get("session_id") == contract["session_id"]
+        and projection.get("config_digest") == contract["config_digest"]
+        and projection.get("generation") == contract["generation"],
+        "prepared campaign projection identity conflicts",
+    )
+    sequence = projection.get("cycle_sequence")
+    _need(
+        type(sequence) is int
+        and sequence >= contract["minimum_cycle_sequence"]
+        and (
+            sequence == expected_cycle_sequence
+            or (allow_lagging_cycle and sequence < expected_cycle_sequence)
+        ),
+        "prepared campaign projection cycle position conflicts",
+    )
+    terminal_safety = (
+        projection.get("campaign_status") == contract["campaign_status"]
+        and projection.get("supervisor_state") == contract["supervisor_state"]
+        and projection.get("writer_lock_held") is contract["writer_lock_held"]
+        and projection.get("proves_process_liveness")
+        is contract["proves_process_liveness"]
+    )
+    interrupted_writer = (
+        allow_interrupted_writer
+        and projection.get("campaign_status") == contract["campaign_status"]
+        and projection.get("supervisor_state") == "running"
+        and projection.get("writer_lock_held") is True
+        and projection.get("proves_process_liveness") is True
+    )
+    _need(
+        terminal_safety or interrupted_writer,
+        "prepared campaign projection safety state conflicts",
+    )
+    _need(
+        projection.get("owner_executions") == []
+        and projection.get("candidate_task_ids") == []
+        and projection.get("accepted_task_ids") == []
+        and projection.get("rejected_task_ids") == []
+        and projection.get("conflicting_acceptance_task_ids") == []
+        and projection.get("transport_state") == "unobserved"
+        and projection.get("model_execution_state") == "unobserved"
+        and projection.get("acceptance_state") == "unobserved"
+        and projection.get("proves_model_execution") is False
+        and projection.get("proves_semantic_acceptance") is False
+        and projection.get("errors") == [],
+        "prepared campaign projection contains execution evidence",
+    )
+    operator_state = projection.get("operator_control_state")
+    _need(
+        isinstance(operator_state, Mapping)
+        and operator_state.get("control_state") == "PAUSED"
+        and operator_state.get("action") == "pause"
+        and operator_state.get("effect_state") == "unobserved",
+        "prepared campaign projection is not pause-bound",
+    )
+    if require_fresh:
+        try:
+            validated = validate_campaign_projection(
+                raw,
+                mission_id=str(contract["mission_id"]),
+                config_digest=str(contract["config_digest"]),
+                minimum_generation=int(contract["generation"]),
+                max_age_seconds=freshness_seconds,
+                now=datetime.now(timezone.utc),
+            )
+        except (RuntimeError, TypeError, ValueError) as exc:
+            raise MissionControlError(
+                "prepared campaign projection failed observer admission"
+            ) from exc
+        _need(
+            validated[2] == contract["generation"] and validated[3] == sequence,
+            "prepared campaign projection observer position conflicts",
+        )
+    return projection
 
 
 def _need(condition: bool, message: str) -> None:
@@ -583,6 +890,7 @@ def validate_preparation_receipt(
     expected_config_digest: str | None = None,
     expected_task_set_digest: str | None = None,
     expected_manifest_set_digest: str | None = None,
+    expected_projection_path: Path | None = None,
     expected_session_generation: int | None = None,
 ) -> None:
     """Validate the exact promotion shape for ``Prepared<...>: NoEffect``."""
@@ -598,6 +906,8 @@ def validate_preparation_receipt(
             "manifests",
             "config",
             "session",
+            "projection",
+            "global_dispatch_rows",
             "receipt_digest",
         },
         "preparation receipt keys are not exact",
@@ -628,6 +938,7 @@ def validate_preparation_receipt(
             "config_digest",
             "task_set_digest",
             "manifest_set_digest",
+            "projection_contract_digest",
             "session_generation",
             "session_status",
         },
@@ -653,6 +964,7 @@ def validate_preparation_receipt(
         "config_digest",
         "task_set_digest",
         "manifest_set_digest",
+        "projection_contract_digest",
     ):
         _need(
             isinstance(parameters[field], str)
@@ -706,6 +1018,8 @@ def validate_preparation_receipt(
     manifests = payload["manifests"]
     config_projection = payload["config"]
     session = payload["session"]
+    projection = payload["projection"]
+    global_dispatch_rows = payload["global_dispatch_rows"]
     _need(
         isinstance(input_set, Mapping)
         and set(input_set)
@@ -834,6 +1148,11 @@ def validate_preparation_receipt(
         "prepared manifest proof does not bind manifests",
     )
     _need(
+        isinstance(projection, Mapping)
+        and parameters["projection_contract_digest"] == _digest(projection),
+        "prepared proof does not bind the projection contract",
+    )
+    _need(
         parameters["config_digest"] == session["config_digest"],
         "prepared session proof does not bind config",
     )
@@ -842,6 +1161,20 @@ def validate_preparation_receipt(
         config_projection,
         expected_config_digest=parameters["config_digest"],
         expected_held_out_oracle_digest=manifests["held_out_oracle_manifest_digest"],
+    )
+    validate_initial_projection_contract(
+        projection,
+        expected_path=expected_projection_path,
+        expected_config_digest=parameters["config_digest"],
+        expected_generation=session["generation"],
+    )
+    empty_dispatch_rows = {"task_claim_ids": [], "delegation_run_ids": []}
+    _need(
+        isinstance(global_dispatch_rows, Mapping)
+        and set(global_dispatch_rows) == {"before", "after"}
+        and global_dispatch_rows["before"] == empty_dispatch_rows
+        and global_dispatch_rows["after"] == empty_dispatch_rows,
+        "prepared global dispatch rows are not empty",
     )
     _need(
         type(parameters["session_generation"]) is int
@@ -881,6 +1214,23 @@ async def _effect_census(runtime: RuntimeStateStore, session_id: str) -> dict[st
         "acceptance": acceptance,
         "publication": publication,
     }
+
+
+async def _global_dispatch_rows(runtime: RuntimeStateStore) -> dict[str, list[str]]:
+    claims = await runtime.list_task_claims(limit=10_000)
+    runs = await runtime.list_delegation_runs(limit=10_000)
+    return {
+        "task_claim_ids": sorted(row.claim_id for row in claims),
+        "delegation_run_ids": sorted(row.run_id for row in runs),
+    }
+
+
+def _require_empty_global_dispatch_rows(rows: Mapping[str, Sequence[str]]) -> None:
+    _need(
+        dict(rows) == {"task_claim_ids": [], "delegation_run_ids": []},
+        "runtime preparation requires an effect-free runtime state; "
+        f"global dispatch rows are not empty: {dict(rows)}",
+    )
 
 
 def _require_pristine_effect_census(census: Mapping[str, int]) -> None:
@@ -948,6 +1298,20 @@ async def prepare_runtime(
         == (inputs.state_dir / "prepared-runtime-manifests").resolve(),
         "runtime manifests must stage under the service-owned state root",
     )
+    expected_projection_path = (
+        inputs.state_dir.parent / "projection-source" / INITIAL_PROJECTION_NAME
+    )
+    _need(
+        inputs.projection_path.is_absolute()
+        and inputs.projection_path == expected_projection_path,
+        "runtime projection must use the canonical service sibling path",
+    )
+    private_directory(
+        inputs.projection_path.parent,
+        "runtime preparation projection root",
+    )
+    if inputs.projection_path.exists() or inputs.projection_path.is_symlink():
+        _read_campaign_projection_exact(inputs.projection_path)
     _need(
         _RELEASE_SHA_RE.fullmatch(inputs.release_sha) is not None,
         "release_sha must be a lowercase full commit SHA",
@@ -1030,6 +1394,8 @@ async def prepare_runtime(
         )
         await runtime.init_db()
         session_id = f"mission_campaign:{portfolio.campaign_id}"
+        dispatch_rows_before = await _global_dispatch_rows(runtime)
+        _require_empty_global_dispatch_rows(dispatch_rows_before)
         before = await _effect_census(runtime, session_id)
         _require_pristine_effect_census(before)
 
@@ -1130,8 +1496,92 @@ async def prepare_runtime(
         if checkpoint is not None:
             checkpoint("session_prepared")
 
+        projection_contract = initial_projection_contract(
+            path=inputs.projection_path,
+            config=config,
+            generation=session.metadata["generation"],
+        )
+        previous_sequence = session.metadata.get("last_cycle_sequence")
+        _need(
+            type(previous_sequence) is int and previous_sequence >= 0,
+            "prepared campaign has an invalid cycle position",
+        )
+        projection_lock_path = (
+            inputs.state_dir
+            / "locks"
+            / "sadhana-initial-projection-writer.lock"
+        )
+        projection_control_path = (
+            inputs.state_dir
+            / "locks"
+            / "sadhana-initial-projection-control.lock"
+        )
+        if inputs.projection_path.exists() or inputs.projection_path.is_symlink():
+            _need(
+                not writer_lock_is_held(projection_lock_path),
+                "interrupted projection writer lock remains active",
+            )
+            validate_initial_projection(
+                inputs.projection_path,
+                projection_contract,
+                expected_cycle_sequence=previous_sequence,
+                freshness_seconds=config.freshness_seconds,
+                require_fresh=False,
+                allow_interrupted_writer=True,
+                allow_lagging_cycle=True,
+            )
+        projection_service = CampaignService(
+            supervisor,
+            lock_path=projection_lock_path,
+            control_gate_path=projection_control_path,
+            projection_path=inputs.projection_path,
+        )
+        projection_result = await projection_service.run(
+            max_cycles=1,
+            start_campaign=False,
+        )
+        _need(
+            projection_result.status == "completed"
+            and projection_result.completed_cycles == 1
+            and projection_result.snapshot.mission_id == portfolio.campaign_id
+            and projection_result.snapshot.session_id == session.session_id
+            and projection_result.snapshot.config_digest == config.digest
+            and projection_result.snapshot.generation == session.metadata["generation"]
+            and projection_result.snapshot.cycle_sequence == previous_sequence + 1
+            and projection_result.snapshot.campaign_status == "paused"
+            and projection_result.snapshot.supervisor_state == "not_running"
+            and projection_result.snapshot.writer_lock_held is False
+            and projection_result.snapshot.proves_process_liveness is False,
+            "prepared campaign projection service result conflicts",
+        )
+        if checkpoint is not None:
+            checkpoint("projection_published")
+        session_after_projection = await runtime.get_session(session.session_id)
+        _need(
+            session_after_projection is not None
+            and session_after_projection.status == "paused"
+            and session_after_projection.metadata.get("generation")
+            == session.metadata["generation"]
+            and session_after_projection.metadata.get("config_digest") == config.digest
+            and session_after_projection.metadata.get("last_cycle_sequence")
+            == projection_result.snapshot.cycle_sequence,
+            "prepared campaign projection did not bind the paused session",
+        )
+        session = session_after_projection
+        validate_initial_projection(
+            inputs.projection_path,
+            projection_contract,
+            expected_cycle_sequence=projection_result.snapshot.cycle_sequence,
+            freshness_seconds=config.freshness_seconds,
+            require_fresh=True,
+        )
+        if checkpoint is not None:
+            checkpoint("projection_validated")
+
         after = await _effect_census(runtime, session_id)
         _zero_delta(before, after)
+        dispatch_rows_after = await _global_dispatch_rows(runtime)
+        _require_empty_global_dispatch_rows(dispatch_rows_after)
         await _require_authority_unbound(board, dict(bootstrap.goal_task_map))
         task_map = dict(bootstrap.goal_task_map)
         manifest_map: dict[str, object] = {
@@ -1153,6 +1603,7 @@ async def prepare_runtime(
             config_digest=config.digest,
             task_set_digest=_digest(task_map),
             manifest_set_digest=_digest(manifest_map),
+            projection_contract_digest=_digest(projection_contract),
             session_generation=session.metadata["generation"],
             session_status=session.status,
         )
@@ -1171,6 +1622,11 @@ async def prepare_runtime(
                 "status": session.status,
                 "config_digest": config.digest,
             },
+            "projection": projection_contract,
+            "global_dispatch_rows": {
+                "before": dispatch_rows_before,
+                "after": dispatch_rows_after,
+            },
         }
         payload["receipt_digest"] = _digest(payload)
         validate_preparation_receipt(
@@ -1181,6 +1637,7 @@ async def prepare_runtime(
             expected_config_digest=config.digest,
             expected_task_set_digest=_digest(task_map),
             expected_manifest_set_digest=_digest(manifest_map),
+            expected_projection_path=inputs.projection_path,
             expected_session_generation=session.metadata["generation"],
         )
         receipt_root = private_directory(
@@ -1214,7 +1671,22 @@ async def prepare_runtime(
             expected_config_digest=config.digest,
             expected_task_set_digest=_digest(task_map),
             expected_manifest_set_digest=_digest(manifest_map),
+            expected_projection_path=inputs.projection_path,
             expected_session_generation=session.metadata["generation"],
+        )
+        replay_session = await runtime.get_session(session.session_id)
+        _need(
+            replay_session is not None
+            and replay_session.metadata.get("last_cycle_sequence")
+            == projection_result.snapshot.cycle_sequence,
+            "prepared campaign projection replay moved its session position",
+        )
+        validate_initial_projection(
+            inputs.projection_path,
+            stored["projection"],
+            expected_cycle_sequence=projection_result.snapshot.cycle_sequence,
+            freshness_seconds=config.freshness_seconds,
+            require_fresh=True,
         )
         return dict(stored)
 
@@ -1239,6 +1711,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--objective-sha256", required=True)
     parser.add_argument("--state-dir", required=True, type=_absolute)
     parser.add_argument("--manifest-staging-root", required=True, type=_absolute)
+    parser.add_argument("--projection-path", required=True, type=_absolute)
     parser.add_argument("--operator-id", default="operator")
     parser.add_argument("--verifier-seat", required=True)
     parser.add_argument("--evaluator-path", required=True, type=_absolute)
@@ -1271,6 +1744,7 @@ def _inputs(args: argparse.Namespace) -> RuntimePreparationInputs:
         objective_sha256=args.objective_sha256,
         state_dir=args.state_dir,
         output_root=args.manifest_staging_root,
+        projection_path=args.projection_path,
         operator_id=args.operator_id,
         verifier_seat=args.verifier_seat,
         pins=RuntimeManifestPins(

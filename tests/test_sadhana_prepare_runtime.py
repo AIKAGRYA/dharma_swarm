@@ -9,7 +9,9 @@ from pathlib import Path
 
 import pytest
 
+from api.mission_snapshot_validation import canonical_digest
 from dharma_swarm import mission_control_bootstrap as bootstrap
+from dharma_swarm import mission_control_service as campaign_service
 from dharma_swarm.mission_control_roster import (
     CampaignAgentRoster,
     CampaignAgentSeat,
@@ -91,7 +93,9 @@ def _inputs(
     release_admission_path = tmp_path / "staged-release-admission.v1.json"
     release_admission_path.write_bytes(preparation._canonical_bytes(release_admission))
     release_admission_path.chmod(0o600)
-    state_dir = tmp_path / state_name
+    runtime_root = tmp_path / state_name
+    runtime_root.mkdir(mode=0o700, exist_ok=True)
+    state_dir = runtime_root / "state"
     return preparation.RuntimePreparationInputs(
         release_root=release_root,
         release_sha=release_sha,
@@ -104,6 +108,9 @@ def _inputs(
         objective_sha256=roster.objective_sha256,
         state_dir=state_dir,
         output_root=state_dir / "prepared-runtime-manifests",
+        projection_path=(
+            runtime_root / "projection-source" / preparation.INITIAL_PROJECTION_NAME
+        ),
         operator_id="operator",
         verifier_seat="sadhana-seat-6",
         pins=RuntimeManifestPins(
@@ -129,6 +136,21 @@ def _bytes(
         inputs.state_dir / "receipts" / preparation.PREPARATION_RECEIPT_NAME
     ).read_bytes()
     return manifests, receipt
+
+
+def _projection(inputs: preparation.RuntimePreparationInputs) -> dict[str, object]:
+    return json.loads(inputs.projection_path.read_text(encoding="utf-8"))
+
+
+def _rewrite_projection(
+    inputs: preparation.RuntimePreparationInputs,
+    payload: dict[str, object],
+) -> bytes:
+    payload["projection_content_digest"] = canonical_digest(payload)
+    raw = preparation._canonical_bytes(payload)
+    inputs.projection_path.write_bytes(raw)
+    inputs.projection_path.chmod(0o600)
+    return raw
 
 
 async def _task_ids(inputs: preparation.RuntimePreparationInputs) -> set[str]:
@@ -335,6 +357,8 @@ async def test_every_phase_crash_replays_to_identical_prepared_no_effect_proof(
         "authority_manifest",
         "session_started",
         "session_prepared",
+        "projection_published",
+        "projection_validated",
         "receipt_written",
     )
 
@@ -385,6 +409,220 @@ async def test_every_phase_crash_replays_to_identical_prepared_no_effect_proof(
         )
         assert parameters["session_generation"] == 1
         assert parameters["session_status"] == "paused"
+        projection = _projection(inputs)
+        assert projection["projection_schema_version"] == (
+            preparation.CAMPAIGN_PROJECTION_SCHEMA_VERSION
+        )
+        assert projection["mission_id"] == bootstrap.EXPECTED_CAMPAIGN_ID
+        assert projection["config_digest"] == replayed["session"]["config_digest"]
+        assert projection["generation"] == 1
+        assert projection["cycle_sequence"] >= 1
+        assert projection["campaign_status"] == "paused"
+        assert projection["supervisor_state"] == "not_running"
+        assert projection["writer_lock_held"] is False
+        assert projection["owner_executions"] == []
+        assert replayed["global_dispatch_rows"] == {
+            "before": {"task_claim_ids": [], "delegation_run_ids": []},
+            "after": {"task_claim_ids": [], "delegation_run_ids": []},
+        }
+
+
+@pytest.mark.asyncio
+async def test_replay_refreshes_a_stale_projection_with_one_monotonic_no_effect_cycle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="stale-projection")
+    first_receipt = await preparation.prepare_runtime(inputs)
+    first_projection = _projection(inputs)
+    first_sequence = first_projection["cycle_sequence"]
+    stale_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    first_projection["mission_snapshot"]["observed_at"] = stale_at.isoformat()
+    first_projection["observed_at"] = stale_at.isoformat()
+    first_projection["published_at"] = stale_at.isoformat()
+    first_projection["latest_cycle_at"] = stale_at.isoformat()
+    first_projection["fresh_until"] = (
+        stale_at + timedelta(seconds=inputs.freshness_seconds)
+    ).isoformat()
+    stale_raw = _rewrite_projection(inputs, first_projection)
+
+    replayed = await preparation.prepare_runtime(inputs)
+    refreshed = _projection(inputs)
+
+    assert replayed == first_receipt
+    assert refreshed["cycle_sequence"] == first_sequence + 1
+    assert refreshed["campaign_status"] == "paused"
+    assert refreshed["supervisor_state"] == "not_running"
+    assert refreshed["writer_lock_held"] is False
+    assert refreshed["owner_executions"] == []
+    assert inputs.projection_path.read_bytes() != stale_raw
+    runtime = preparation.RuntimeStateStore(
+        inputs.state_dir / "state" / "runtime.db",
+        include_memory_plane=False,
+    )
+    assert await preparation._global_dispatch_rows(runtime) == {
+        "task_claim_ids": [],
+        "delegation_run_ids": [],
+    }
+    assert await preparation._effect_census(
+        runtime,
+        f"mission_campaign:{bootstrap.EXPECTED_CAMPAIGN_ID}",
+    ) == {kind: 0 for kind in preparation.EFFECT_KINDS}
+
+
+@pytest.mark.asyncio
+async def test_interrupted_running_projection_is_recovered_without_dispatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="interrupted-projection")
+    await preparation.prepare_runtime(inputs)
+    receipt_path = (
+        inputs.state_dir / "receipts" / preparation.PREPARATION_RECEIPT_NAME
+    )
+    receipt_path.unlink()
+    projection = _projection(inputs)
+    previous_sequence = projection["cycle_sequence"]
+    projection["supervisor_state"] = "running"
+    projection["writer_lock_held"] = True
+    projection["proves_process_liveness"] = True
+    _rewrite_projection(inputs, projection)
+
+    replayed = await preparation.prepare_runtime(inputs)
+    recovered = _projection(inputs)
+
+    assert receipt_path.is_file()
+    assert replayed["projection"]["minimum_cycle_sequence"] == 1
+    assert recovered["cycle_sequence"] == previous_sequence + 1
+    assert recovered["campaign_status"] == "paused"
+    assert recovered["supervisor_state"] == "not_running"
+    assert recovered["writer_lock_held"] is False
+    assert recovered["proves_process_liveness"] is False
+    assert recovered["owner_executions"] == []
+
+
+@pytest.mark.asyncio
+async def test_cycle_commit_crash_recovers_from_a_lagging_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="lagging-projection")
+    receipt = await preparation.prepare_runtime(inputs)
+    initial = _projection(inputs)
+    original_publish = campaign_service.publish_campaign_projection
+
+    def crash_before_projection(*args: object, **kwargs: object) -> None:
+        raise InjectedCrash("cycle committed before projection publication")
+
+    monkeypatch.setattr(
+        campaign_service,
+        "publish_campaign_projection",
+        crash_before_projection,
+    )
+    with pytest.raises(InjectedCrash, match="cycle committed"):
+        await preparation.prepare_runtime(inputs)
+    runtime = preparation.RuntimeStateStore(
+        inputs.state_dir / "state" / "runtime.db",
+        include_memory_plane=False,
+    )
+    lagged_session = await runtime.get_session(
+        f"mission_campaign:{bootstrap.EXPECTED_CAMPAIGN_ID}"
+    )
+    assert lagged_session is not None
+    assert lagged_session.metadata["last_cycle_sequence"] == (
+        initial["cycle_sequence"] + 1
+    )
+    assert _projection(inputs)["cycle_sequence"] == initial["cycle_sequence"]
+
+    monkeypatch.setattr(
+        campaign_service,
+        "publish_campaign_projection",
+        original_publish,
+    )
+    replayed = await preparation.prepare_runtime(inputs)
+    recovered = _projection(inputs)
+
+    assert replayed == receipt
+    assert recovered["cycle_sequence"] == initial["cycle_sequence"] + 2
+    assert recovered["campaign_status"] == "paused"
+    assert recovered["supervisor_state"] == "not_running"
+    assert recovered["owner_executions"] == []
+    assert await preparation._global_dispatch_rows(runtime) == {
+        "task_claim_ids": [],
+        "delegation_run_ids": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_foreign_projection_config_is_rejected_without_replacement_or_cycle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="foreign-projection-config")
+    await preparation.prepare_runtime(inputs)
+    projection = _projection(inputs)
+    previous_sequence = projection["cycle_sequence"]
+    projection["config_digest"] = "sha256:" + "f" * 64
+    foreign_raw = _rewrite_projection(inputs, projection)
+
+    with pytest.raises(MissionControlError, match="projection identity conflicts"):
+        await preparation.prepare_runtime(inputs)
+
+    assert inputs.projection_path.read_bytes() == foreign_raw
+    runtime = preparation.RuntimeStateStore(
+        inputs.state_dir / "state" / "runtime.db",
+        include_memory_plane=False,
+    )
+    session = await runtime.get_session(
+        f"mission_campaign:{bootstrap.EXPECTED_CAMPAIGN_ID}"
+    )
+    assert session is not None
+    assert session.metadata["last_cycle_sequence"] == previous_sequence
+    assert await preparation._global_dispatch_rows(runtime) == {
+        "task_claim_ids": [],
+        "delegation_run_ids": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_projection_path_must_be_the_exact_service_owned_sibling(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="foreign-projection-path")
+    foreign = preparation.RuntimePreparationInputs(
+        **{
+            **{field: getattr(inputs, field) for field in inputs.__dataclass_fields__},
+            "projection_path": tmp_path / "other" / "mission-projection.json",
+        }
+    )
+
+    with pytest.raises(MissionControlError, match="canonical service sibling path"):
+        await preparation.prepare_runtime(foreign)
+
+    assert not inputs.state_dir.exists()
+    assert not foreign.projection_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_projection_symlink_is_rejected_without_touching_its_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path, monkeypatch, state_name="projection-symlink")
+    await preparation.prepare_runtime(inputs)
+    target = tmp_path / "projection-target.json"
+    target.write_bytes(inputs.projection_path.read_bytes())
+    target.chmod(0o600)
+    inputs.projection_path.unlink()
+    inputs.projection_path.symlink_to(target)
+    target_before = target.read_bytes()
+
+    with pytest.raises(MissionControlError, match="projection custody is invalid"):
+        await preparation.prepare_runtime(inputs)
+
+    assert inputs.projection_path.is_symlink()
+    assert target.read_bytes() == target_before
 
 
 @pytest.mark.asyncio
@@ -553,6 +791,14 @@ def _valid_receipt() -> tuple[dict[str, object], dict[str, object]]:
     release_input_set_digest = "0" * 64
     preparation_input_digest = preparation._digest(input_set)
     manifest_set_digest = preparation._digest(manifests)
+    projection_path = Path(
+        "/var/lib/dharma-sadhana/projection-source/mission-projection.json"
+    )
+    projection_contract = preparation.initial_projection_contract(
+        path=projection_path,
+        config=config,
+        generation=1,
+    )
     proof = preparation.PreparedNoEffectProof(
         campaign_id="sadhana-10-20260823",
         release_sha=release_sha,
@@ -561,6 +807,7 @@ def _valid_receipt() -> tuple[dict[str, object], dict[str, object]]:
         config_digest=config_digest,
         task_set_digest=preparation._digest(tasks),
         manifest_set_digest=manifest_set_digest,
+        projection_contract_digest=preparation._digest(projection_contract),
         session_generation=1,
         session_status="paused",
     )
@@ -579,6 +826,11 @@ def _valid_receipt() -> tuple[dict[str, object], dict[str, object]]:
             "status": "paused",
             "config_digest": config_digest,
         },
+        "projection": projection_contract,
+        "global_dispatch_rows": {
+            "before": {"task_claim_ids": [], "delegation_run_ids": []},
+            "after": {"task_claim_ids": [], "delegation_run_ids": []},
+        },
     }
     payload["receipt_digest"] = preparation._digest(payload)
     expected: dict[str, object] = {
@@ -588,6 +840,7 @@ def _valid_receipt() -> tuple[dict[str, object], dict[str, object]]:
         "expected_config_digest": config_digest,
         "expected_task_set_digest": preparation._digest(tasks),
         "expected_manifest_set_digest": manifest_set_digest,
+        "expected_projection_path": projection_path,
         "expected_session_generation": 1,
     }
     return payload, expected
