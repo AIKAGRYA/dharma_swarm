@@ -71,7 +71,7 @@
   "session_entry": {
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
-      "python": "3.12.13",
+      "python": "3.13.12",
       "git": "2.50.1",
       "make": "3.81"
     },
@@ -107,6 +107,6 @@
       "This packet does not authorize provider dispatch, account-confirmation promotion, supervisor start, writer failover, campaign activation, or merge."
     ],
     "rollback": "Revert only the standby root-custodied read-only SSH sharing transaction, deterministic loopback Serve backend, source-bound forced key, regressions, and this packet before resealing. Preserve the rejected AGNI evidence; never broaden global secure-parent admission, grant the service write custody, or manually prepublish the route.",
-    "packet_digest": "db44a1c6427f600aa263d474c36384da92958eb093434b814e7bbeeeff192d56"
+    "packet_digest": "58592e95979c7fe46aacdfb0ab1cce5aab9f18f418c4da502226538ef8565379"
   }
 }
