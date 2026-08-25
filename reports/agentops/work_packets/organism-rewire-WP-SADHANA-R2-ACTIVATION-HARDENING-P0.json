@@ -1,0 +1,124 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-ACTIVATION-HARDENING-P0",
+  "base_ref": "f17b34e297a2e48f0e5819873e3f37c77d9f3765",
+  "branch": "agent/sadhana-r2-deploy-blockers-fix-clean-20260825",
+  "worktree": ".",
+  "intent": "Repair five adversarially confirmed SADHANA activation blockers without widening runtime authority: move the typed paused-to-active transition behind the writer lock and exact seven-seat reconciliation; resample time at every authority publication boundary; make standby renewal append-only over an immutable snapshot ledger; bind the authenticated mobile principal transitively into dispatch activation; and seal the supervisor's complete imported environment and credential inventory. Fresh activation additionally requires an exactly empty normal-control inbox and publishes one nonsecret, write-separated boot-epoch activation proof only after the seq2 CAS. Every rejected precondition must preserve the prepared seq1 PAUSED state with zero task claims, delegation runs, seq2 receipt, activation proof, or provider effects; emergency control remains independent.",
+  "allowed_files": [
+    "deploy/sadhana/systemd/dharma-sadhana-supervisor.service.in",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "scripts/runtime/mission_control_campaign.py",
+    "tests/test_mission_control_campaign.py",
+    "tests/test_sadhana_runtime_surfaces.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-ACTIVATION-HARDENING-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/sadhana/README.md",
+    "dharma_swarm/**",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "docs/**",
+    "packages/**",
+    "packages/telos-kernel/**",
+    "pyproject.toml",
+    "scripts/docops/**",
+    "scripts/governance/**",
+    "scripts/governance/hygiene/**",
+    "terminal/**",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-activation-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py tests/test_mission_control_campaign.py tests/test_mission_control_roster.py tests/test_sadhana_runtime_surfaces.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-activation-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py scripts/runtime/mission_control_campaign.py tests/test_sadhana_release.py tests/test_mission_control_campaign.py tests/test_sadhana_runtime_surfaces.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "authority-expiry-ledger-principal-and-import-denials",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'expiry or stop_boundary or snapshot_ledger or principal_binding or supervisor_import or activation_preflight'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ops): harden SADHANA activation authority"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-ACTIVATION-HARDENING-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f17b34e297a2e48f0e5819873e3f37c77d9f3765",
+      "details": []
+    },
+    "interface_mismatches": [
+      "A supervisor ExecStartPre can mutate seq2 before mission_control_campaign acquires the sole-writer lock or reconciles the exact seven-seat roster, so a later lock or authority failure strands false active state.",
+      "Long-running refresh, sync, validation, and dispatch-enable paths reuse one admission timestamp, so proof or campaign windows can expire before the durable authority publication they purport to authorize.",
+      "The renewable standby capacity proof binds only a count of existing snapshots, allowing an immutable snapshot identity or tree to be substituted between renewals without append-only evidence.",
+      "The authenticated mobile probe proves allowlist matching but does not bind the exact operator principal loaded later by the supervisor activation transition.",
+      "Supervisor unit validation admits undeclared EnvironmentFile, Environment, LoadCredential, or PassEnvironment directives that can override the sealed runtime contract after textual required-fragment checks pass.",
+      "The normal-control service starts predispatch, so a queued pause or resume envelope can predate the unique seq2 activation unless the in-lock fresh transition proves the normal inbox exactly empty; the control UID also needs a nonsecret post-seq2 proof it can read without projection or database authority."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "scripts/runtime/mission_control_campaign.py",
+      "dharma_swarm/mission_control_roster.py",
+      "dharma_swarm/mission_control_operator_authority.py",
+      "deploy/sadhana/systemd/dharma-sadhana-supervisor.service.in"
+    ],
+    "honest_blockers": [
+      "This packet proves only local fail-closed activation semantics and performs no VPS, service-manager, provider, transport, public-route, Git remote, or deployment mutation.",
+      "The runtime-prepare unit already passes --projection-path, but the parser implementation remains on sibling commit 44237c9d01013d096c12c67d6adf29241965d364 and is intentionally not copied into this packet.",
+      "A snapshot ledger proves append-only identity and tree continuity under the admitted validator; it does not prove remote disk durability, SSH reachability, future capacity, or a successful restore on AGNI.",
+      "A principal digest is non-secret identity binding only; it is not login liveness, human presence, device possession, or authorization beyond the exact authenticated probe and dispatch marker.",
+      "The activation proof lives under the volatile control runtime intentionally: it is durable across supervisor restarts within one boot, but disappears on reboot so normal controls fail closed until a new governed activation; emergency control never depends on it.",
+      "A clean local closeout does not establish production readiness until the sibling preparation change is integrated and the combined tree passes its full verifier set."
+    ],
+    "rollback": "Stop before dispatch authority, revert this packet and its implementation commit together, and redeploy a newly sealed release. Never resume from a partially activated database: rejected preconditions must leave the prepared generation at seq1 PAUSED with zero claims and runs.",
+    "packet_digest": "be1ba09a4447d6ebfdec421a8760a733a552e6c517ee36b3e36b8cc9d5260a3f"
+  }
+}

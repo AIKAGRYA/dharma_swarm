@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { isAbsolute, normalize } from "node:path";
@@ -10,6 +11,32 @@ import {
 
 export const CONTROL_INTERNAL_URL =
   "http://127.0.0.1:18421/v1/operator-control/requests";
+export const ACCOUNT_UI_CONFIRMATION_INTERNAL_URL =
+  "http://127.0.0.1:18421/v1/account-ui-confirmations";
+export const ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256 =
+  "60996ccfa8de0db715d26ecf062d13604e09ab019c51d9047cb250e39652dad1";
+export const ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_CANONICAL =
+  "schema=dharma.sadhana.account_ui_confirmation_http_binding.v1;method=POST;" +
+  "browser_route=/dharma-internal/account-ui-confirmation;internal_url=" +
+  "http://127.0.0.1:18421/v1/account-ui-confirmations;headers=authorization," +
+  "content-type,origin,tailscale-user-login,x-sadhana-csrf,x-sadhana-release-sha;" +
+  "request_schema=dharma.sadhana.authenticated_account_ui_confirmation_request.v1;" +
+  "request_fields=campaign_id,client_request_id,coarse_pointer_reported," +
+  "dashboard_rendered_reported,document_width_css_px_reported,expires_at," +
+  "explicit_confirmation_gesture_reported,issued_at,schema_version," +
+  "touch_capability_reported,trusted_browser_event_reported," +
+  "viewport_width_css_px_reported,visual_viewport_width_css_px_reported;" +
+  "response_fields=account_authenticated,authority_applied,candidate_recorded," +
+  "dispatch_authorized,human_identity_attested,physical_device_attested,replayed," +
+  "status;http_202=CandidateRecorded<NoAuthority,NoDispatch>;" +
+  "candidate=fixed-path-o_excl;mac=derived-domain-separated-hmac-sha256";
+if (
+  createHash("sha256")
+    .update(ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_CANONICAL, "utf8")
+    .digest("hex") !== ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256
+) {
+  throw new Error("account UI confirmation HTTP binding digest differs");
+}
 export const CONTROL_BODY_LIMIT = 4096;
 export const CONTROL_TIMEOUT_MS = 10_000;
 
@@ -17,6 +44,9 @@ interface BridgeEnvironment {
   SADHANA_CONTROL_INTERNAL_URL?: string;
   SADHANA_CONTROL_BEARER_FILE?: string;
   SADHANA_CONTROL_EXPECTED_ORIGIN?: string;
+  SADHANA_ACCOUNT_UI_CONFIRMATION_INTERNAL_URL?: string;
+  SADHANA_RELEASE_SHA?: string;
+  SADHANA_ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256?: string;
 }
 
 export interface BridgeDependencies {
@@ -200,6 +230,13 @@ function safeAccepted(accepted: RequestAccepted): Response {
   return jsonResponse(202, { ...accepted });
 }
 
+function exactReleaseSha(value: string | undefined): string {
+  if (!value || !/^[0-9a-f]{40}$/.test(value)) {
+    throw new BridgeRejected(503, "control_bridge_unavailable");
+  }
+  return value;
+}
+
 function safeUpstreamRejection(status: number): Response {
   if (status === 409) return reject(409, "idempotency_conflict");
   if (status === 501) {
@@ -270,6 +307,108 @@ export async function handleOperatorControlBridge(
       throw new BridgeRejected(502, "control_upstream_response_invalid");
     }
     return safeAccepted(accepted);
+  } catch (error) {
+    if (error instanceof BridgeRejected) return reject(error.status, error.code);
+    return reject(503, "control_bridge_unavailable");
+  }
+}
+
+export async function handleAccountUiConfirmationBridge(
+  request: Request,
+  dependencies: BridgeDependencies = {},
+): Promise<Response> {
+  if (request.method !== "POST") return reject(405, "method_not_allowed");
+  const environment = dependencies.environment ?? process.env;
+  try {
+    if (
+      environment.SADHANA_ACCOUNT_UI_CONFIRMATION_INTERNAL_URL !==
+        ACCOUNT_UI_CONFIRMATION_INTERNAL_URL ||
+      environment.SADHANA_ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256 !==
+        ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256
+    ) {
+      throw new BridgeRejected(503, "control_bridge_unavailable");
+    }
+    const expectedOrigin = exactHttpsOrigin(
+      environment.SADHANA_CONTROL_EXPECTED_ORIGIN,
+    );
+    const releaseSha = exactReleaseSha(environment.SADHANA_RELEASE_SHA);
+    const bearerPath = exactCredentialPath(
+      environment.SADHANA_CONTROL_BEARER_FILE,
+    );
+    const { login, origin } = validateRequestHeaders(request, expectedOrigin);
+    const body = await boundedBody(request.body, CONTROL_BODY_LIMIT);
+    const bodyBuffer = body.buffer.slice(
+      body.byteOffset,
+      body.byteOffset + body.byteLength,
+    ) as ArrayBuffer;
+    const bearer = await (dependencies.readBearer ?? readBearerCredential)(bearerPath);
+    if (!/^[\x21-\x7e]{32,512}$/.test(bearer)) {
+      throw new BridgeRejected(503, "control_bridge_unavailable");
+    }
+    const upstream = await (dependencies.fetchImpl ?? fetch)(
+      ACCOUNT_UI_CONFIRMATION_INTERNAL_URL,
+      {
+        method: "POST",
+        cache: "no-store",
+        redirect: "error",
+        signal: dependencies.signal ?? AbortSignal.timeout(CONTROL_TIMEOUT_MS),
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "Content-Type": "application/json",
+          Origin: origin,
+          "Tailscale-User-Login": login,
+          "X-Sadhana-CSRF": SADHANA_CONTROL_CSRF,
+          "X-Sadhana-Release-SHA": releaseSha,
+        },
+        body: bodyBuffer,
+      },
+    );
+    if (upstream.status !== 202) {
+      await upstream.body?.cancel().catch(() => undefined);
+      return reject(
+        upstream.status >= 400 && upstream.status <= 599
+          ? upstream.status
+          : 502,
+        "account_ui_confirmation_upstream_rejected",
+      );
+    }
+    const raw = await boundedBody(upstream.body, CONTROL_BODY_LIMIT);
+    let value: unknown;
+    try {
+      value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw));
+    } catch {
+      throw new BridgeRejected(502, "account_ui_confirmation_response_invalid");
+    }
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      Array.isArray(value) ||
+      Object.keys(value as Record<string, unknown>).sort().join("|") !==
+        [
+          "account_authenticated",
+          "authority_applied",
+          "candidate_recorded",
+          "dispatch_authorized",
+          "human_identity_attested",
+          "physical_device_attested",
+          "replayed",
+          "status",
+        ]
+          .sort()
+          .join("|") ||
+      (value as Record<string, unknown>).status !==
+        "account_ui_confirmation_accepted" ||
+      typeof (value as Record<string, unknown>).replayed !== "boolean" ||
+      (value as Record<string, unknown>).account_authenticated !== true ||
+      (value as Record<string, unknown>).candidate_recorded !== true ||
+      (value as Record<string, unknown>).authority_applied !== false ||
+      (value as Record<string, unknown>).dispatch_authorized !== false ||
+      (value as Record<string, unknown>).physical_device_attested !== false ||
+      (value as Record<string, unknown>).human_identity_attested !== false
+    ) {
+      throw new BridgeRejected(502, "account_ui_confirmation_response_invalid");
+    }
+    return jsonResponse(202, value as Record<string, unknown>);
   } catch (error) {
     if (error instanceof BridgeRejected) return reject(error.status, error.code);
     return reject(503, "control_bridge_unavailable");

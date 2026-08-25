@@ -1,0 +1,114 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-MOBILE-BACKEND-GATE-P0",
+  "base_ref": "46950238bbf50107a9f53ae2cee716733f020f4c",
+  "branch": "agent/sadhana-r2-mobile-backend-gate-20260825",
+  "worktree": ".",
+  "intent": "Reject authenticated normal pause and resume requests at the loopback control API until the campaign writer has published one exact post-CAS sequence-2 activation proof. Read that nonsecret boot-epoch proof through no-follow stable custody, bind it to this release and the allowlisted mobile principal hash, and derive a domain-separated normal HMAC subkey from its digest while preserving the admitted exact v1 wire envelope so the campaign writer can reject direct filesystem deposits and old epochs. Leave emergency stop on its existing distinct transport and base key. Missing, malformed, stale, substituted, or raced evidence must create no normal queue candidate.",
+  "allowed_files": [
+    "scripts/runtime/sadhana_control_api.py",
+    "tests/test_sadhana_control_api.py",
+    "dharma_swarm/_mission_control_operator_control_protocol.py",
+    "dharma_swarm/mission_control_operator_control.py",
+    "tests/test_mission_control_operator_control.py",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-MOBILE-BACKEND-GATE-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/runtime/mission_control_campaign.py",
+    "scripts/runtime/sadhana_release.py",
+    "dharma_swarm/mission_control_campaign.py",
+    "dharma_swarm/mission_control_operator_runtime.py",
+    "tests/test_sadhana_release.py",
+    "tests/test_mission_control_campaign.py",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "control-api-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_control_api.py tests/test_mission_control_operator_control.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "control-api-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_control_api.py tests/test_sadhana_control_api.py dharma_swarm/_mission_control_operator_control_protocol.py dharma_swarm/mission_control_operator_control.py tests/test_mission_control_operator_control.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "predispatch-direct-post-and-hostile-proof-rejection",
+      "command": "python -m pytest -q tests/test_sadhana_control_api.py tests/test_mission_control_operator_control.py -k 'predispatch or activation_proof or activation_bound or emergency_at_sequence_one'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(control): gate normal requests on campaign activation"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-MOBILE-BACKEND-GATE-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "46950238bbf50107a9f53ae2cee716733f020f4c",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The mobile UI suppresses normal controls before sequence 2, but an authenticated caller can bypass that client check by posting directly to the same-origin bridge or loopback API.",
+      "The isolated control service cannot and must not open the campaign database or private projection; it needs a writer-published, nonsecret capability projection of the durable sequence-2 receipt.",
+      "The activation projection lives under /run intentionally: reboot deletes its capability while the durable session receipt remains historical, forcing a new governed activation before controls reopen.",
+      "A gate only at HTTP admission is insufficient because a preexisting or directly deposited normal candidate can outlive that check; normal HMAC authentication must use a domain-separated key bound to the current activation proof digest without changing the admitted v1 wire schema."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_control_api.py",
+      "tests/test_sadhana_control_api.py",
+      "dharma_swarm/_mission_control_operator_control_protocol.py",
+      "dharma_swarm/mission_control_operator_control.py",
+      "dharma_swarm/mission_control_operator_state.py"
+    ],
+    "honest_blockers": [
+      "This packet consumes but does not publish the activation proof; final integration must include the release-controller producer contract at the exact fixed path and custody.",
+      "The proof authorizes admission of normal control requests only. It does not prove that a queued request was applied or that its operational effect was observed.",
+      "Emergency stop remains separately authenticated and deliberately confirmed; its request transport does not depend on normal-control activation evidence."
+    ],
+    "rollback": "Stop SADHANA, revert the control API gate, its direct tests, and this packet together. Do not compensate by weakening the UI lock, activation producer custody, mobile identity binding, or emergency transport separation.",
+    "packet_digest": "b8f10bf926de8083b44c59ba5ec5e07b6d27cb60b09192b7c01788229b216e4c"
+  }
+}

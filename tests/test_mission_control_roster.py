@@ -21,7 +21,9 @@ from dharma_swarm.mission_control_roster import (
     ensure_campaign_agent_roster,
     load_campaign_agent_roster,
 )
+from dharma_swarm.mission_control_authority import GovernedCampaignTaskDispatcher
 from dharma_swarm.models import AgentRole, AgentState, AgentStatus, ProviderType
+from dharma_swarm.swarm import SwarmManager
 from scripts.runtime import mission_control_campaign as campaign_cli
 
 
@@ -351,6 +353,46 @@ async def test_partial_spawn_recovery_is_idempotent_and_returns_actual_ids(
     assert {binding.disposition for binding in second.bindings} == {"existing"}
     assert first.to_dict()["dispatch_ready"] is False
     assert first.to_dict()["authority_state"] == "unbound"
+
+
+@pytest.mark.asyncio
+async def test_read_only_boot_contains_swarm_before_exact_campaign_roster(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path, digest = _write_manifest(tmp_path, deepcopy(_payload()))
+    roster = _load(path, digest)
+    state_dir = tmp_path / "mission-state"
+    monkeypatch.setenv("DHARMA_READ_ONLY_BOOT", "1")
+    monkeypatch.delenv("DHARMA_FAST_BOOT", raising=False)
+
+    swarm = SwarmManager(state_dir=state_dir)
+    await swarm.init()
+    try:
+        assert await swarm.list_agents() == []
+        assert await swarm.list_tasks() == []
+        assert swarm._task_board is not None
+        assert swarm._agent_pool is not None
+        assert swarm._orchestrator is not None
+
+        receipt = await ensure_campaign_agent_roster(swarm, roster)
+        states = await swarm.list_agents()
+
+        assert len(states) == len(SEAT_ROWS) == 7
+        assert {(state.name, state.role.value, state.provider, state.model) for state in states} == {
+            (name, role, "ollama", model) for name, role, model, _family in SEAT_ROWS
+        }
+        assert [binding.name for binding in receipt.bindings] == [
+            name for name, _role, _model, _family in SEAT_ROWS
+        ]
+        assert {binding.disposition for binding in receipt.bindings} == {"spawned"}
+        assert await swarm.list_tasks() == []
+
+        governed = GovernedCampaignTaskDispatcher(object(), swarm._task_board)  # type: ignore[arg-type]
+        assert governed._board is swarm._task_board  # noqa: SLF001
+        assert governed._dispatcher is not swarm._orchestrator  # noqa: SLF001
+    finally:
+        await swarm.shutdown()
 
 
 @pytest.mark.asyncio

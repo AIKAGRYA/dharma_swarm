@@ -1,0 +1,118 @@
+{
+  "id": "organism-rewire-WP-SADHANA-R2-ORACLE-CLEAN-HOST-P0",
+  "base_ref": "90bfa435b7e297a516c69b713563fded48828524",
+  "branch": "agent/sadhana-r2-oracle-clean-host-20260825",
+  "worktree": ".",
+  "intent": "Close the clean-host oracle custody deadlock. Prepare the exact persistent oracle roots after static identities exist, create volatile roots through no-follow directory descriptors, apply exact ownership and modes with fchown/fchmod despite systemd UMask, and reject hostile pre-existing links or foreign custody without widening the oracle unit namespace. Preserve the held-out evaluator boundary and root-only receipt membrane.",
+  "allowed_files": [
+    "scripts/runtime/sadhana_oracle_sandbox.py",
+    "tests/test_sadhana_oracle_sandbox.py",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "deploy/sadhana/systemd/dharma-sadhana-oracle-directories.service.in",
+    "reports/agentops/work_packets/organism-rewire-WP-SADHANA-R2-ORACLE-CLEAN-HOST-P0.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/runtime/mission_control_campaign.py",
+    "scripts/runtime/sadhana_prepare_runtime.py",
+    "scripts/runtime/sadhana_snapshot.py",
+    "tests/test_mission_control_campaign.py",
+    "tests/test_sadhana_prepare_runtime.py",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "oracle-and-release-suite",
+      "command": "python -m pytest -q tests/test_sadhana_oracle_sandbox.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 360
+    },
+    {
+      "name": "oracle-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_oracle_sandbox.py scripts/runtime/sadhana_release.py tests/test_sadhana_oracle_sandbox.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "oracle-custody-hostiles",
+      "command": "python -m pytest -q tests/test_sadhana_oracle_sandbox.py tests/test_sadhana_release.py -k 'oracle and (symlink or custody or mode or umask or clean_host)'",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ops): prepare oracle custody on clean hosts"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-SADHANA-R2-ORACLE-CLEAN-HOST-P0",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "90bfa435b7e297a516c69b713563fded48828524",
+      "details": []
+    },
+    "interface_mismatches": [
+      "systemd ReadWritePaths are namespace admission, not directory creation; every non-optional persistent path must exist before the oracle-directory oneshot enters its sandbox.",
+      "mkdir(mode) is filtered by UMask and does not establish ownership. Exact oracle custody requires descriptor-bound fchown/fchmod before validation.",
+      "A hostile pre-existing link or foreign directory must be rejected, not repaired by following or silently taking custody."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_oracle_sandbox.py",
+      "scripts/runtime/sadhana_release.py",
+      "deploy/sadhana/systemd/dharma-sadhana-oracle-directories.service.in",
+      "tests/test_sadhana_oracle_sandbox.py",
+      "tests/test_sadhana_release.py"
+    ],
+    "honest_blockers": [
+      "Local tests cannot prove the rendered unit enters its namespace on Ubuntu systemd 255; live systemd-analyze verification and a clean-host predispatch canary remain required.",
+      "This packet creates custody roots only. It does not execute the held-out evaluator, authorize provider dispatch, publish a Tailscale route, or weaken evaluator/input/verdict separation.",
+      "Concurrent release-controller work also touches sadhana_release.py and its tests; final integration must replay this scoped diff onto the release worker's verified head and rerun all combined gates."
+    ],
+    "rollback": "Stop dispatch and the oracle path/timer/service units, retain all oracle inputs, claims, runs, quarantine entries, terminals, and receipts for forensics, and revert only the clean-host custody preparation code. Never delete or relax a hostile path to make rollback pass.",
+    "packet_digest": "7a93afab97b6a203ac20aefead734cc0e8edc3defd04aa2f9b51b31d385f90c2"
+  }
+}

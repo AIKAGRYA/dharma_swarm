@@ -38,10 +38,13 @@ from dharma_swarm._mission_control_operator_control_fs import (
 )
 from dharma_swarm._mission_control_operator_control_protocol import (
     AUTHORITY_BINDING_SHA256,
+    CAMPAIGN_ACTIVATION_FIELDS,
+    CAMPAIGN_ACTIVATION_SCHEMA,
     CONTROL_HTTP_BINDING_SHA256,
     CONTROL_SCHEMA,
     CONTROL_SEMANTICS_SHA256,
     DEFAULT_APPLIED_INBOX,
+    DEFAULT_CAMPAIGN_ACTIVATION_PROOF,
     DEFAULT_CONTROL_ROOT as DEFAULT_CONTROL_ROOT,
     DEFAULT_EMERGENCY_INBOX as DEFAULT_EMERGENCY_INBOX,
     DEFAULT_INFLIGHT_INBOX,
@@ -84,8 +87,14 @@ from dharma_swarm._mission_control_operator_control_protocol import (
     canonical_json_bytes,
     control_filename,
     decode_and_verify_envelope,
+    decode_untrusted_canonical_envelope,
+    derive_activation_bound_hmac_key,
     read_control_candidate,
+    read_control_candidate_bytes,
     utc_now,
+    current_immutable_release_sha,
+    validate_campaign_activation_payload,
+    validate_campaign_activation_proof,
     validate_operator_login,
 )
 
@@ -226,6 +235,10 @@ class OperatorControlInboxReconciler:
         rejected_inbox: Path = DEFAULT_REJECTED_INBOX,
         secret: bytes,
         max_candidates_per_cycle: int = 128,
+        activation_proof_path: Path | None = None,
+        expected_release_sha: str = "",
+        activation_owner_uid: int | None = None,
+        activation_group_gid: int | None = None,
     ) -> None:
         if not 1 <= max_candidates_per_cycle <= 1024:
             raise ValueError("max_candidates_per_cycle must be between 1 and 1024")
@@ -244,6 +257,86 @@ class OperatorControlInboxReconciler:
         }
         if len(directories) != 4:
             raise ValueError("normal custody directories must be distinct")
+        exact_production_custody = (
+            normal_inbox == DEFAULT_NORMAL_INBOX
+            and inflight_inbox == DEFAULT_INFLIGHT_INBOX
+            and applied_inbox == DEFAULT_APPLIED_INBOX
+            and rejected_inbox == DEFAULT_REJECTED_INBOX
+        )
+        if activation_proof_path is None and exact_production_custody:
+            activation_proof_path = DEFAULT_CAMPAIGN_ACTIVATION_PROOF
+            expected_release_sha = current_immutable_release_sha()
+            activation_owner_uid = os.geteuid()
+        if activation_proof_path is not None:
+            if (
+                not activation_proof_path.is_absolute()
+                or ".." in activation_proof_path.parts
+            ):
+                raise ValueError(
+                    "campaign activation proof path must be absolute and non-traversing"
+                )
+            if not expected_release_sha:
+                raise ValueError("campaign activation proof requires a release SHA")
+        self._activation_proof_path = activation_proof_path
+        self._expected_release_sha = expected_release_sha
+        self._activation_owner_uid = activation_owner_uid
+        self._activation_group_gid = activation_group_gid
+
+    def _read_normal_candidate(
+        self,
+        path: Path,
+        *,
+        now: datetime | None,
+        freshness_policy: FreshnessPolicy,
+    ) -> OperatorControlEnvelope:
+        expected_actions = frozenset({ControlAction.PAUSE, ControlAction.RESUME})
+        if self._activation_proof_path is None:
+            return read_control_candidate(
+                path,
+                secret=self._secret,
+                now=now,
+                expected_actions=expected_actions,
+                freshness_policy=freshness_policy,
+            )
+        raw = read_control_candidate_bytes(path)
+        untrusted = decode_untrusted_canonical_envelope(raw)
+        if untrusted.request.action not in expected_actions:
+            raise ControlSchemaError("control action reached the wrong inbox")
+        first = validate_campaign_activation_proof(
+            self._activation_proof_path,
+            expected_release_sha=self._expected_release_sha,
+            operator_login=untrusted.operator_login,
+            now=now,
+            expected_owner_uid=self._activation_owner_uid,
+            expected_group_gid=self._activation_group_gid,
+        )
+        epoch_key = derive_activation_bound_hmac_key(
+            self._secret, first["receipt_digest"]
+        )
+        envelope = decode_and_verify_envelope(
+            raw,
+            secret=epoch_key,
+            now=now,
+            expected_actions=expected_actions,
+            freshness_policy=freshness_policy,
+        )
+        second = validate_campaign_activation_proof(
+            self._activation_proof_path,
+            expected_release_sha=self._expected_release_sha,
+            operator_login=envelope.operator_login,
+            now=now,
+            expected_owner_uid=self._activation_owner_uid,
+            expected_group_gid=self._activation_group_gid,
+        )
+        if first["receipt_digest"] != second["receipt_digest"]:
+            raise ControlSchemaError(
+                "campaign activation proof changed during normal authentication"
+            )
+        if path.name != control_filename(envelope.request.idempotency_key):
+            raise ControlIdempotencyConflict(
+                "candidate filename does not bind its idempotency key"
+            )
+        return envelope
 
     @staticmethod
     def _matching_names(
@@ -262,9 +355,7 @@ class OperatorControlInboxReconciler:
 
     @classmethod
     def _candidate_names(cls, directory: Path, *, limit: int) -> list[str]:
-        return cls._matching_names(
-            directory, pattern=_CONTROL_FILENAME_RE, limit=limit
-        )
+        return cls._matching_names(directory, pattern=_CONTROL_FILENAME_RE, limit=limit)
 
     @classmethod
     def _claim_names(cls, directory: Path, *, limit: int) -> list[str]:
@@ -279,9 +370,7 @@ class OperatorControlInboxReconciler:
         )
 
     @classmethod
-    def _quarantine_receipt_names(
-        cls, directory: Path, *, limit: int
-    ) -> set[str]:
+    def _quarantine_receipt_names(cls, directory: Path, *, limit: int) -> set[str]:
         return set(
             cls._matching_names(
                 directory,
@@ -304,9 +393,7 @@ class OperatorControlInboxReconciler:
             self._applied_inbox,
             self._rejected_inbox,
         ):
-            for claim_name in self._claim_names(
-                claim_directory, limit=self._max_scan
-            ):
+            for claim_name in self._claim_names(claim_directory, limit=self._max_scan):
                 claim_path = claim_directory / claim_name
                 control_name = _claimed_control_filename(claim_name)
                 try:
@@ -385,9 +472,7 @@ class OperatorControlInboxReconciler:
             if _quarantine_receipt_filename(quarantine_name) in receipts:
                 continue
             results.append(
-                self._record_quarantine_evidence(
-                    self._rejected_inbox / quarantine_name
-                )
+                self._record_quarantine_evidence(self._rejected_inbox / quarantine_name)
             )
         return results
 
@@ -415,11 +500,9 @@ class OperatorControlInboxReconciler:
         """Complete a candidate-first terminal transition after a crash."""
 
         try:
-            envelope = read_control_candidate(
+            envelope = self._read_normal_candidate(
                 path,
-                secret=self._secret,
                 now=now,
-                expected_actions=frozenset({ControlAction.PAUSE, ControlAction.RESUME}),
                 freshness_policy=FreshnessPolicy.AUTHORITY_REPLAY,
             )
         except OperatorControlError as exc:
@@ -547,11 +630,9 @@ class OperatorControlInboxReconciler:
     ) -> ReconcileResult:
         path = self._inflight_inbox / filename
         try:
-            envelope = read_control_candidate(
+            envelope = self._read_normal_candidate(
                 path,
-                secret=self._secret,
                 now=now,
-                expected_actions=frozenset({ControlAction.PAUSE, ControlAction.RESUME}),
                 freshness_policy=FreshnessPolicy.AUTHORITY_REPLAY,
             )
         except OperatorControlError as exc:
@@ -609,9 +690,7 @@ class OperatorControlInboxReconciler:
             application=application,
         )
         try:
-            receipt_path, candidate_path = self._terminalize(
-                path, destination, receipt
-            )
+            receipt_path, candidate_path = self._terminalize(path, destination, receipt)
         except OperatorControlError as exc:
             return self._terminal_move_failure(
                 source=path,
@@ -763,12 +842,8 @@ class OperatorControlInboxReconciler:
         )
         return self._record_quarantine_evidence(quarantine_path)
 
-    def _record_quarantine_evidence(
-        self, quarantine_path: Path
-    ) -> ReconcileResult:
-        control_name, error_code = _quarantined_control_identity(
-            quarantine_path.name
-        )
+    def _record_quarantine_evidence(self, quarantine_path: Path) -> ReconcileResult:
+        control_name, error_code = _quarantined_control_identity(quarantine_path.name)
         digest = ""
         try:
             directory_descriptor = _open_directory_nofollow(quarantine_path.parent)
@@ -812,10 +887,13 @@ class OperatorControlInboxReconciler:
             error_code=error_code,
         )
 
+
 __all__ = (
     "ApplicationStatus",
     "AUTHORITY_BINDING_SHA256",
     "AuthorityApplication",
+    "CAMPAIGN_ACTIVATION_FIELDS",
+    "CAMPAIGN_ACTIVATION_SCHEMA",
     "CONTROL_FILE_MODE",
     "CONTROL_HTTP_BINDING_SHA256",
     "CONTROL_SCHEMA",
@@ -828,6 +906,7 @@ __all__ = (
     "ControlIdempotencyConflict",
     "ControlInboxPublisher",
     "ControlSchemaError",
+    "DEFAULT_CAMPAIGN_ACTIVATION_PROOF",
     "FreshnessPolicy",
     "InboxKind",
     "InboxPublication",
@@ -848,8 +927,14 @@ __all__ = (
     "canonical_json_bytes",
     "control_filename",
     "decode_and_verify_envelope",
+    "decode_untrusted_canonical_envelope",
+    "derive_activation_bound_hmac_key",
+    "current_immutable_release_sha",
     "read_control_candidate",
+    "read_control_candidate_bytes",
     "terminal_filename",
     "utc_now",
+    "validate_campaign_activation_payload",
+    "validate_campaign_activation_proof",
     "validate_operator_login",
 )

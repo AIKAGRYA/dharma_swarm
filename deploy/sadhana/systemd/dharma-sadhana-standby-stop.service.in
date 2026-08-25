@@ -1,0 +1,29 @@
+[Unit]
+Description=Quiet the fenced SADHANA standby receiver at campaign deadline
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-stop --role standby
+ExecStart=+/usr/bin/systemctl disable --now dharma-sadhana-standby.target
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py persist-standby-stop --role standby --release-sha @RELEASE_SHA@
+TimeoutStartSec=60s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+PrivateDevices=true
+PrivateIPC=true
+PrivateNetwork=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ReadWritePaths=/etc/dharma-sadhana/receipts/standby
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+UMask=0077

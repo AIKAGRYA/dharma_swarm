@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -66,7 +68,8 @@ from dharma_swarm.mission_control_operator_runtime import (
     operator_control_reconciler_from_config,
 )
 from dharma_swarm.mission_control_service import CampaignService
-from dharma_swarm.models import TaskStatus
+from dharma_swarm.mission_control_roster import CampaignRosterError
+from dharma_swarm.models import AgentRole, ProviderType, TaskStatus
 from dharma_swarm.operator_core.execution_lease import (
     build_execution_lease,
     content_hash,
@@ -82,6 +85,7 @@ from dharma_swarm.runtime_state import (
 from dharma_swarm.runtime_state import DelegationRun, TaskClaim
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
+from scripts.runtime import mission_control_campaign as campaign_runtime
 
 MISSION_ID = "campaign-alpha"
 
@@ -1577,3 +1581,106 @@ async def test_file_authority_reloads_revocation_before_governed_effect(
     with pytest.raises(MissionControlError, match="revoked"):
         await dispatcher.dispatch(request, governed, admission, envelope)
     assert effect.calls == 0
+
+
+def test_sadhana_runtime_requires_exact_read_only_empty_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = SimpleNamespace(mission_id="sadhana-10-20260823", fast_boot=False)
+    monkeypatch.delenv("DHARMA_READ_ONLY_BOOT", raising=False)
+    monkeypatch.delenv("DHARMA_FAST_BOOT", raising=False)
+    with pytest.raises(MissionControlError, match="read-only empty boot"):
+        campaign_runtime._require_read_only_empty_boot(args)
+
+    monkeypatch.setenv("DHARMA_READ_ONLY_BOOT", "1")
+    campaign_runtime._require_read_only_empty_boot(args)
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    with pytest.raises(MissionControlError, match="read-only empty boot"):
+        campaign_runtime._require_read_only_empty_boot(args)
+    monkeypatch.delenv("DHARMA_FAST_BOOT")
+    args.fast_boot = True
+    with pytest.raises(MissionControlError, match="read-only empty boot"):
+        campaign_runtime._require_read_only_empty_boot(args)
+
+
+def test_sadhana_runtime_requires_complete_activation_credential_set() -> None:
+    fields = {
+        "release_sha": "a" * 40,
+        "dispatch_activation_receipt": "/run/credentials/unit/dispatch",
+        "dashboard_identity_receipt": "/run/credentials/unit/dashboard",
+        "runtime_binding_receipt": "/run/credentials/unit/binding",
+        "operator_login_file": "/run/credentials/unit/login",
+        "control_hmac_key_file": "/run/credentials/unit/hmac",
+        "activation_evidence_path": (
+            "/run/dharma-sadhana/control/activation/campaign-activation.v1.json"
+        ),
+    }
+    args = SimpleNamespace(mission_id="sadhana-10-20260823", **fields)
+    admitted = campaign_runtime._dispatch_activation_paths(args)
+    assert admitted["release_sha"] == "a" * 40
+    assert admitted["activation_evidence_path"] == Path(
+        fields["activation_evidence_path"]
+    )
+
+    args.control_hmac_key_file = ""
+    with pytest.raises(MissionControlError, match="configuration is partial"):
+        campaign_runtime._dispatch_activation_paths(args)
+
+
+@pytest.mark.asyncio
+async def test_sadhana_final_roster_recheck_is_exactly_seven() -> None:
+    seats = tuple(
+        SimpleNamespace(
+            name=f"seat-{index}",
+            role=AgentRole.GENERAL,
+            provider=ProviderType.OLLAMA,
+            model=f"model-{index}:cloud",
+        )
+        for index in range(7)
+    )
+    roster = SimpleNamespace(seats=seats)
+
+    class Swarm:
+        states = [
+            SimpleNamespace(
+                name=seat.name,
+                role=seat.role,
+                provider=seat.provider.value,
+                model=seat.model,
+            )
+            for seat in seats
+        ]
+
+        async def list_agents(self) -> list[Any]:
+            return list(self.states)
+
+    swarm = Swarm()
+    await campaign_runtime._require_exact_final_roster(swarm, roster)
+    swarm.states.append(
+        SimpleNamespace(
+            name="foreign",
+            role=AgentRole.GENERAL,
+            provider=ProviderType.OLLAMA.value,
+            model="foreign:cloud",
+        )
+    )
+    with pytest.raises(CampaignRosterError, match="seven seats"):
+        await campaign_runtime._require_exact_final_roster(swarm, roster)
+
+
+def test_campaign_activation_is_inside_writer_roster_authority_boundary() -> None:
+    source = inspect.getsource(campaign_runtime.run_campaign)
+    ordered = (
+        "_acquire_writer_handoff",
+        "await swarm.init()",
+        "await swarm.list_agents() or await swarm.list_tasks()",
+        "ensure_campaign_agent_roster",
+        "bind_campaign_authority",
+        "_require_exact_final_roster",
+        "activate_campaign_session",
+        "service.run",
+    )
+    positions = [source.index(fragment) for fragment in ordered]
+    assert positions == sorted(positions)
+    assert "start_campaign=False" in source
+    assert "observed_node=" not in source

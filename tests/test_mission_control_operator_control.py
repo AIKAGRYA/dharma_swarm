@@ -24,6 +24,8 @@ from dharma_swarm.mission_control_operator_runtime import (
 from dharma_swarm.mission_control_operator_control import (
     ApplicationStatus,
     AuthorityApplication,
+    CAMPAIGN_ACTIVATION_FIELDS,
+    CAMPAIGN_ACTIVATION_SCHEMA,
     CONTROL_SCHEMA,
     ControlAuthenticationError,
     ControlAction,
@@ -47,13 +49,17 @@ from dharma_swarm.mission_control_operator_control import (
     UnsafeInboxEntry,
     control_filename,
     decode_and_verify_envelope,
+    derive_activation_bound_hmac_key,
     read_control_candidate,
     terminal_filename,
+    validate_campaign_activation_payload,
+    validate_campaign_activation_proof,
 )
 
 NOW = datetime(2026, 8, 23, 0, 0, 30, tzinfo=timezone.utc)
 SECRET = b"operator-control-test-hmac-key-32-bytes-minimum"
 LOGIN = "operator@example.com"
+RELEASE_SHA = "a" * 40
 
 
 def test_public_module_preserves_filesystem_exception_identity() -> None:
@@ -66,6 +72,7 @@ def test_public_module_preserves_filesystem_exception_identity() -> None:
         assert getattr(control_module, name) is getattr(control_fs, name)
     assert callable(control_module.decode_and_verify_envelope)
     assert callable(control_module.OperatorControlInboxReconciler)
+    assert len(CAMPAIGN_ACTIVATION_FIELDS) == 16
 
 
 def test_public_facade_preserves_pre_split_protocol_surface() -> None:
@@ -155,6 +162,57 @@ def inboxes(tmp_path: Path) -> tuple[Path, Path]:
     return normal, emergency
 
 
+def _activation_proof(
+    path: Path, *, sequence: int = 2, config_digit: str = "1"
+) -> dict[str, object]:
+    path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+    path.parent.chmod(0o750)
+    payload: dict[str, object] = {
+        "schema_version": CAMPAIGN_ACTIVATION_SCHEMA,
+        "mission_id": "sadhana-10-20260823",
+        "release_sha": RELEASE_SHA,
+        "config_digest": "sha256:" + config_digit * 64,
+        "campaign_generation": 1,
+        "transition_sequence": sequence,
+        "control_state": "RUNNING",
+        "action": "resume",
+        "dispatch_enable_receipt_digest": "sha256:" + "2" * 64,
+        "account_ui_confirmation_receipt_digest": "sha256:" + "3" * 64,
+        "operator_login_sha256": hashlib.sha256(LOGIN.encode("ascii")).hexdigest(),
+        "authority_receipt_ref": "runtime-receipt:activation-receipt-001",
+        "authority_receipt_sha256": "sha256:" + "4" * 64,
+        "activated_at": _timestamp(NOW),
+        "external_effect_performed": False,
+        "receipt_digest": "",
+    }
+    unsigned = dict(payload)
+    unsigned.pop("receipt_digest")
+    payload["receipt_digest"] = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                unsigned,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+    )
+    path.write_bytes(
+        json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+        + b"\n"
+    )
+    path.chmod(0o640)
+    return payload
+
+
 def test_exact_request_and_envelope_are_canonical_and_authenticated() -> None:
     request = OperatorControlRequest.from_mapping(_request())
     envelope = OperatorControlEnvelope.sign(
@@ -179,6 +237,111 @@ def test_exact_request_and_envelope_are_canonical_and_authenticated() -> None:
     verified = decode_and_verify_envelope(raw, secret=SECRET, now=NOW)
     assert verified == envelope
     assert verified.schema == CONTROL_SCHEMA
+
+
+def test_normal_epoch_subkey_preserves_v1_wire_and_covers_activation() -> None:
+    request = OperatorControlRequest.from_mapping(_request())
+    activation_digest = "sha256:" + "9" * 64
+    epoch_key = derive_activation_bound_hmac_key(SECRET, activation_digest)
+    assert len(epoch_key) == 64
+    assert b"\r" not in epoch_key and b"\n" not in epoch_key
+    envelope = OperatorControlEnvelope.sign(
+        request,
+        operator_login=LOGIN,
+        secret=epoch_key,
+        now=NOW,
+    )
+
+    assert envelope.schema == CONTROL_SCHEMA
+    assert set(envelope.as_dict()) == {
+        "schema",
+        "operator_login",
+        "request",
+        "hmac_sha256",
+    }
+    assert (
+        decode_and_verify_envelope(
+            envelope.canonical_bytes(), secret=epoch_key, now=NOW
+        )
+        == envelope
+    )
+    with pytest.raises(ControlAuthenticationError, match="verification"):
+        decode_and_verify_envelope(
+            secret=SECRET,
+            raw=envelope.canonical_bytes(),
+            now=NOW,
+        )
+    foreign_key = derive_activation_bound_hmac_key(SECRET, "sha256:" + "8" * 64)
+    with pytest.raises(ControlAuthenticationError, match="verification"):
+        decode_and_verify_envelope(
+            envelope.canonical_bytes(), secret=foreign_key, now=NOW
+        )
+
+
+def test_emergency_envelope_remains_exact_v1_on_base_key() -> None:
+    request = OperatorControlRequest.from_mapping(
+        _request(
+            "emergency_stop",
+            request_id="request-emergency-v1",
+            idempotency_key="idempotency-emergency-v1",
+        )
+    )
+    envelope = OperatorControlEnvelope.sign(
+        request,
+        operator_login=LOGIN,
+        secret=SECRET,
+        now=NOW,
+    )
+    assert envelope.schema == CONTROL_SCHEMA
+    assert set(envelope.as_dict()) == {
+        "schema",
+        "operator_login",
+        "request",
+        "hmac_sha256",
+    }
+    assert (
+        decode_and_verify_envelope(envelope.canonical_bytes(), secret=SECRET, now=NOW)
+        == envelope
+    )
+
+
+def test_activation_proof_parser_rejects_sequence_one_and_admits_exact_seq2(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "activation" / "campaign-activation.v1.json"
+    proof = _activation_proof(path)
+    activation_parent = path.parent.stat()
+    assert (
+        validate_campaign_activation_payload(
+            proof,
+            expected_release_sha=RELEASE_SHA,
+            operator_login=LOGIN,
+            now=NOW,
+        )
+        == proof
+    )
+    assert (
+        validate_campaign_activation_proof(
+            path,
+            expected_release_sha=RELEASE_SHA,
+            operator_login=LOGIN,
+            now=NOW,
+            expected_owner_uid=activation_parent.st_uid,
+            expected_group_gid=activation_parent.st_gid,
+        )
+        == proof
+    )
+
+    _activation_proof(path, sequence=1)
+    with pytest.raises(ControlSchemaError, match="differs"):
+        validate_campaign_activation_proof(
+            path,
+            expected_release_sha=RELEASE_SHA,
+            operator_login=LOGIN,
+            now=NOW,
+            expected_owner_uid=activation_parent.st_uid,
+            expected_group_gid=activation_parent.st_gid,
+        )
 
 
 @pytest.mark.parametrize(
@@ -638,6 +801,148 @@ def _authority_application(
         authority_receipt_sha256="sha256:" + "a" * 64 if terminal else "",
         effect_observed=False,
     )
+
+
+async def test_activation_bound_reconciler_rejects_legacy_and_foreign_epochs(
+    inboxes: tuple[Path, Path],
+) -> None:
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    proof_path = normal.parent / "activation" / "campaign-activation.v1.json"
+    proof = _activation_proof(proof_path)
+    activation_parent = proof_path.parent.stat()
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+        activation_proof_path=proof_path,
+        expected_release_sha=RELEASE_SHA,
+        activation_owner_uid=activation_parent.st_uid,
+        activation_group_gid=activation_parent.st_gid,
+    )
+    callback_calls = 0
+
+    async def apply(control, _login, digest):
+        nonlocal callback_calls
+        callback_calls += 1
+        return _authority_application(control, digest)
+
+    legacy = OperatorControlRequest.from_mapping(
+        _request(
+            request_id="request-legacy",
+            idempotency_key="idempotency-legacy",
+        )
+    )
+    ControlInboxPublisher(normal, emergency).publish(
+        legacy,
+        operator_login=LOGIN,
+        secret=SECRET,
+        now=NOW,
+    )
+    [legacy_result] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert legacy_result.status is ReconcileStatus.INVALID
+    assert callback_calls == 0
+
+    foreign = OperatorControlRequest.from_mapping(
+        _request(
+            request_id="request-foreign",
+            idempotency_key="idempotency-foreign",
+        )
+    )
+    ControlInboxPublisher(normal, emergency).publish(
+        foreign,
+        operator_login=LOGIN,
+        secret=derive_activation_bound_hmac_key(SECRET, "sha256:" + "9" * 64),
+        now=NOW,
+    )
+    [foreign_result] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert foreign_result.status is ReconcileStatus.INVALID
+    assert callback_calls == 0
+
+    current = OperatorControlRequest.from_mapping(
+        _request(
+            "resume",
+            request_id="request-current",
+            idempotency_key="idempotency-current",
+        )
+    )
+    ControlInboxPublisher(normal, emergency).publish(
+        current,
+        operator_login=LOGIN,
+        secret=derive_activation_bound_hmac_key(SECRET, str(proof["receipt_digest"])),
+        now=NOW,
+    )
+    [current_result] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+    assert current_result.status is ReconcileStatus.APPLIED
+    assert callback_calls == 1
+
+
+async def test_activation_proof_change_during_reconcile_rejects_before_callback(
+    inboxes: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normal, emergency, inflight, applied, rejected = _normal_custody(inboxes)
+    proof_path = normal.parent / "activation" / "campaign-activation.v1.json"
+    proof = _activation_proof(proof_path)
+    activation_parent = proof_path.parent.stat()
+    reconciler = OperatorControlInboxReconciler(
+        normal_inbox=normal,
+        inflight_inbox=inflight,
+        applied_inbox=applied,
+        rejected_inbox=rejected,
+        secret=SECRET,
+        activation_proof_path=proof_path,
+        expected_release_sha=RELEASE_SHA,
+        activation_owner_uid=activation_parent.st_uid,
+        activation_group_gid=activation_parent.st_gid,
+    )
+    request = OperatorControlRequest.from_mapping(
+        _request(
+            request_id="request-proof-race",
+            idempotency_key="idempotency-proof-race",
+        )
+    )
+    ControlInboxPublisher(normal, emergency).publish(
+        request,
+        operator_login=LOGIN,
+        secret=derive_activation_bound_hmac_key(SECRET, str(proof["receipt_digest"])),
+        now=NOW,
+    )
+    original = control_module.validate_campaign_activation_proof
+    reads = 0
+
+    def replace_between_reads(*args, **kwargs):
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            _activation_proof(proof_path, config_digit="8")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        control_module,
+        "validate_campaign_activation_proof",
+        replace_between_reads,
+    )
+    callback_calls = 0
+
+    async def apply(control, _login, digest):
+        nonlocal callback_calls
+        callback_calls += 1
+        return _authority_application(control, digest)
+
+    [result] = await reconciler.reconcile_once(
+        SupervisorControlCallbacks(apply=apply), now=NOW
+    )
+
+    assert result.status is ReconcileStatus.INVALID
+    assert callback_calls == 0
 
 
 async def test_first_claim_rename_source_substitution_is_quarantined_and_same_key_recovers(

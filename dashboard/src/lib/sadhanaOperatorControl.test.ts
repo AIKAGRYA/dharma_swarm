@@ -5,25 +5,38 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  ACCOUNT_UI_CONFIRMATION_REQUEST_SCHEMA,
+  AccountUiConfirmationDeliveryUnknown,
   buildOperatorControlRequest,
+  buildAccountUiConfirmationRequest,
   classifyControlProgress,
   describeDurableControlEvidence,
   evidenceFromSnapshot,
   isOperatorControlReason,
+  normalOperatorControlsAuthorized,
   OPERATOR_CONTROL_EVIDENCE_SCHEMA,
   OperatorControlDeliveryUnknown,
   parseOperatorControlEvidence,
   parseRequestAccepted,
+  SADHANA_ACCOUNT_UI_CONFIRMATION_ROUTE,
   SADHANA_CONTROL_CSRF,
   SADHANA_CONTROL_ROUTE,
+  submitAccountUiConfirmation,
   submitOperatorControl,
+  type AccountUiConfirmationAccepted,
+  type AccountUiConfirmationRequest,
+  type AccountUiMeasurements,
   type OperatorControlEvidence,
   type PendingControl,
   type RequestAccepted,
 } from "./sadhanaOperatorControl";
 import {
+  ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_CANONICAL,
+  ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256,
+  ACCOUNT_UI_CONFIRMATION_INTERNAL_URL,
   CONTROL_BODY_LIMIT,
   CONTROL_INTERNAL_URL,
+  handleAccountUiConfirmationBridge,
   handleOperatorControlBridge,
   readBearerCredential,
 } from "./sadhanaOperatorControlBridge";
@@ -34,6 +47,8 @@ const BEARER = "operator-bearer-test-value-with-32-bytes";
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const RECEIPT_DIGEST = `sha256:${"b".repeat(64)}`;
 const EFFECT_DIGEST = `sha256:${"c".repeat(64)}`;
+const RELEASE_SHA = "d".repeat(40);
+const ACCOUNT_UI_REQUEST_ID = "123e4567-e89b-42d3-a456-426614174000";
 
 function accepted(overrides: Partial<RequestAccepted> = {}): RequestAccepted {
   return {
@@ -92,6 +107,71 @@ function bridgeEnvironment() {
   };
 }
 
+function accountUiMeasurements(
+  overrides: Partial<AccountUiMeasurements> = {},
+): AccountUiMeasurements {
+  return {
+    viewportWidthCssPx: 390,
+    documentWidthCssPx: 390,
+    visualViewportWidthCssPx: 390,
+    coarsePointer: true,
+    touchCapability: true,
+    trustedBrowserEvent: true,
+    ...overrides,
+  };
+}
+
+function accountUiRequest(): AccountUiConfirmationRequest {
+  return buildAccountUiConfirmationRequest(accountUiMeasurements(), {
+    now: new Date("2026-08-23T01:00:00.000Z"),
+    requestId: ACCOUNT_UI_REQUEST_ID,
+  });
+}
+
+function accountUiAccepted(
+  overrides: Partial<AccountUiConfirmationAccepted> = {},
+): AccountUiConfirmationAccepted {
+  return {
+    status: "account_ui_confirmation_accepted",
+    replayed: false,
+    account_authenticated: true,
+    candidate_recorded: true,
+    authority_applied: false,
+    dispatch_authorized: false,
+    physical_device_attested: false,
+    human_identity_attested: false,
+    ...overrides,
+  };
+}
+
+function accountUiBridgeEnvironment() {
+  return {
+    ...bridgeEnvironment(),
+    SADHANA_ACCOUNT_UI_CONFIRMATION_INTERNAL_URL:
+      ACCOUNT_UI_CONFIRMATION_INTERNAL_URL,
+    SADHANA_ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256:
+      ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256,
+    SADHANA_RELEASE_SHA: RELEASE_SHA,
+  };
+}
+
+function accountUiBridgeRequest(
+  headers: Record<string, string> = {},
+  body = JSON.stringify(accountUiRequest()),
+): Request {
+  return new Request(`${ORIGIN}${SADHANA_ACCOUNT_UI_CONFIRMATION_ROUTE}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: ORIGIN,
+      "Tailscale-User-Login": LOGIN,
+      "X-Sadhana-CSRF": SADHANA_CONTROL_CSRF,
+      ...headers,
+    },
+    body,
+  });
+}
+
 function bridgeRequest(
   headers: Record<string, string> = {},
   body = JSON.stringify({ action: "pause" }),
@@ -130,6 +210,129 @@ test("request builder emits only the exact six fields with a 90-second TTL", () 
   assert.equal(isOperatorControlReason("decomposed e\u0301"), false);
   assert.equal(isOperatorControlReason("hidden\u200dformat"), false);
   assert.equal(isOperatorControlReason("private\ue000use"), false);
+});
+
+test("account UI builder requires the exact 390px coarse-touch trusted click", () => {
+  assert.deepEqual(accountUiRequest(), {
+    schema_version: ACCOUNT_UI_CONFIRMATION_REQUEST_SCHEMA,
+    campaign_id: "sadhana-10-20260823",
+    client_request_id: ACCOUNT_UI_REQUEST_ID,
+    issued_at: "2026-08-23T01:00:00.000Z",
+    expires_at: "2026-08-23T01:01:30.000Z",
+    viewport_width_css_px_reported: 390,
+    document_width_css_px_reported: 390,
+    visual_viewport_width_css_px_reported: 390,
+    coarse_pointer_reported: true,
+    touch_capability_reported: true,
+    trusted_browser_event_reported: true,
+    explicit_confirmation_gesture_reported: true,
+    dashboard_rendered_reported: true,
+  });
+});
+
+test("account UI builder rejects geometry or event drift", () => {
+  for (const drift of [
+    { viewportWidthCssPx: 389 },
+    { documentWidthCssPx: 391 },
+    { visualViewportWidthCssPx: 390.5 },
+    { coarsePointer: false },
+    { touchCapability: false },
+    { trustedBrowserEvent: false },
+  ] satisfies Array<Partial<AccountUiMeasurements>>) {
+    assert.throws(
+      () => buildAccountUiConfirmationRequest(accountUiMeasurements(drift)),
+      /account_ui_confirmation_client_observation_invalid/,
+    );
+  }
+  assert.throws(
+    () =>
+      buildAccountUiConfirmationRequest(accountUiMeasurements(), {
+        now: new Date(Number.NaN),
+      }),
+    /account_ui_confirmation_time_invalid/,
+  );
+  assert.throws(
+    () =>
+      buildAccountUiConfirmationRequest(accountUiMeasurements(), {
+        requestId: "not-a-v4-uuid",
+      }),
+    /account_ui_confirmation_request_id_invalid/,
+  );
+});
+
+test("account UI browser response remains exact candidate-only NoAuthority NoDispatch", async () => {
+  const request = accountUiRequest();
+  let observedUrl = "";
+  let observed: RequestInit | undefined;
+  const result = await submitAccountUiConfirmation(
+    request,
+    async (url, init) => {
+      observedUrl = String(url);
+      observed = init;
+      return Response.json(accountUiAccepted(), { status: 202 });
+    },
+  );
+
+  assert.equal(observedUrl, SADHANA_ACCOUNT_UI_CONFIRMATION_ROUTE);
+  assert.equal(observed?.method, "POST");
+  assert.equal(observed?.cache, "no-store");
+  assert.equal(observed?.credentials, "same-origin");
+  assert.deepEqual(observed?.headers, {
+    "Content-Type": "application/json",
+    "X-Sadhana-CSRF": SADHANA_CONTROL_CSRF,
+  });
+  assert.deepEqual(JSON.parse(String(observed?.body)), request);
+  assert.deepEqual(result, accountUiAccepted());
+  assert.match(
+    ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_CANONICAL,
+    /http_202=CandidateRecorded<NoAuthority,NoDispatch>/,
+  );
+  assert.equal(result.authority_applied, false);
+  assert.equal(result.dispatch_authorized, false);
+  assert.equal(result.physical_device_attested, false);
+  assert.equal(result.human_identity_attested, false);
+});
+
+test("account UI browser rejects response schema or authority drift", async () => {
+  const valid = accountUiAccepted();
+  const invalidResponses: unknown[] = [
+    { ...valid, schema_version: "unexpected" },
+    { ...valid, status: "candidate_recorded" },
+    { ...valid, account_authenticated: false },
+    { ...valid, candidate_recorded: false },
+    { ...valid, authority_applied: true },
+    { ...valid, dispatch_authorized: true },
+    { ...valid, physical_device_attested: true },
+    { ...valid, human_identity_attested: true },
+    { ...valid, replayed: "false" },
+    Object.fromEntries(
+      Object.entries(valid).filter(
+        ([key]) => key !== "human_identity_attested",
+      ),
+    ),
+  ];
+  for (const invalid of invalidResponses) {
+    await assert.rejects(
+      submitAccountUiConfirmation(accountUiRequest(), async () =>
+        Response.json(invalid, { status: 202 }),
+      ),
+      (error: unknown) =>
+        error instanceof AccountUiConfirmationDeliveryUnknown &&
+        error.code === "account_ui_confirmation_delivery_unknown",
+    );
+  }
+});
+
+test("account UI transport failure is typed delivery-unknown", async () => {
+  await assert.rejects(
+    submitAccountUiConfirmation(accountUiRequest(), async () => {
+      throw new TypeError("connection disappeared after the one-shot POST");
+    }),
+    (error: unknown) =>
+      error instanceof AccountUiConfirmationDeliveryUnknown &&
+      error.code === "account_ui_confirmation_delivery_unknown" &&
+      /do not create a new request/.test(error.message),
+  );
 });
 
 test("RequestAccepted parser requires fixed non-application claims and digest", () => {
@@ -214,6 +417,59 @@ test("operator evidence is exact-set, privacy-preserving, and claim-consistent",
       authority_applied_at: null,
     }),
     null,
+  );
+});
+
+test("normal controls require a valid post-preparation transition", () => {
+  const preparedPause = evidence({ transition_sequence: 1 });
+  const activationResume = evidence({
+    action: "resume",
+    control_state: "RUNNING",
+    request_id: "activation-resume-001",
+    idempotency_key: "activation-resume-idempotency-001",
+    transition_sequence: 2,
+  });
+  const laterPause = evidence({ transition_sequence: 3 });
+  const noClaim = {
+    ...evidence(),
+    claim_stage: "none",
+    control_state: "RUNNING",
+    transition_sequence: 0,
+    request_id: "",
+    idempotency_key: "",
+    action: "",
+    source_envelope_sha256: "",
+    authority_receipt_ref: "",
+    authority_receipt_sha256: "",
+    authority_applied_at: null,
+  };
+
+  assert.equal(
+    normalOperatorControlsAuthorized({
+      operator_control_evidence: preparedPause,
+    }),
+    false,
+  );
+  assert.equal(
+    normalOperatorControlsAuthorized({
+      operator_control_evidence: activationResume,
+    }),
+    true,
+  );
+  assert.equal(
+    normalOperatorControlsAuthorized({ operator_control_evidence: laterPause }),
+    true,
+  );
+  assert.equal(normalOperatorControlsAuthorized({}), false);
+  assert.equal(
+    normalOperatorControlsAuthorized({
+      operator_control_evidence: { ...activationResume, unexpected: true },
+    }),
+    false,
+  );
+  assert.equal(
+    normalOperatorControlsAuthorized({ operator_control_evidence: noClaim }),
+    false,
   );
 });
 
@@ -387,6 +643,163 @@ test("bridge forwards only exact allowlisted headers and injects server bearer",
   assert.equal(forwarded?.redirect, "error");
   assert.equal(forwarded?.cache, "no-store");
   assert.deepEqual(await response.json(), accepted());
+});
+
+test("account UI bridge pins endpoint, release, identity, bearer, and body bytes", async () => {
+  const body = JSON.stringify(accountUiRequest());
+  let destination = "";
+  let forwarded: RequestInit | undefined;
+  const response = await handleAccountUiConfirmationBridge(
+    accountUiBridgeRequest(
+      {
+        Authorization: "Bearer browser-forgery",
+        Cookie: "private=cookie",
+        Forwarded: "for=203.0.113.9",
+        "X-Real-IP": "203.0.113.9",
+        "X-Sadhana-Release-SHA": "browser-release-forgery",
+      },
+      body,
+    ),
+    {
+      environment: accountUiBridgeEnvironment(),
+      readBearer: async () => BEARER,
+      signal: AbortSignal.abort(),
+      fetchImpl: async (url, init) => {
+        destination = String(url);
+        forwarded = init;
+        return Response.json(accountUiAccepted(), { status: 202 });
+      },
+    },
+  );
+
+  assert.equal(response.status, 202);
+  assert.equal(destination, ACCOUNT_UI_CONFIRMATION_INTERNAL_URL);
+  assert.equal(forwarded?.method, "POST");
+  assert.equal(forwarded?.cache, "no-store");
+  assert.equal(forwarded?.redirect, "error");
+  assert.deepEqual(
+    Object.keys(forwarded?.headers as Record<string, string>).sort(),
+    [
+      "Authorization",
+      "Content-Type",
+      "Origin",
+      "Tailscale-User-Login",
+      "X-Sadhana-CSRF",
+      "X-Sadhana-Release-SHA",
+    ].sort(),
+  );
+  assert.deepEqual(forwarded?.headers, {
+    Authorization: `Bearer ${BEARER}`,
+    "Content-Type": "application/json",
+    Origin: ORIGIN,
+    "Tailscale-User-Login": LOGIN,
+    "X-Sadhana-CSRF": SADHANA_CONTROL_CSRF,
+    "X-Sadhana-Release-SHA": RELEASE_SHA,
+  });
+  assert.equal(
+    new TextDecoder().decode(forwarded?.body as ArrayBuffer),
+    body,
+  );
+  assert.deepEqual(await response.json(), accountUiAccepted());
+});
+
+test("account UI bridge rejects endpoint, binding, release, header, and bearer drift", async () => {
+  const environmentDrift = [
+    {
+      ...accountUiBridgeEnvironment(),
+      SADHANA_ACCOUNT_UI_CONFIRMATION_INTERNAL_URL:
+        "http://127.0.0.1:18421/v1/account-ui-confirmations/",
+    },
+    {
+      ...accountUiBridgeEnvironment(),
+      SADHANA_ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256: "0".repeat(64),
+    },
+    { ...accountUiBridgeEnvironment(), SADHANA_RELEASE_SHA: "D".repeat(40) },
+  ];
+  for (const environment of environmentDrift) {
+    const response = await handleAccountUiConfirmationBridge(
+      accountUiBridgeRequest(),
+      {
+        environment,
+        readBearer: async () => BEARER,
+        fetchImpl: async () => {
+          throw new Error("invalid environment reached upstream");
+        },
+      },
+    );
+    assert.equal(response.status, 503);
+  }
+
+  const headerDrift: Array<[Record<string, string>, number]> = [
+    [{ Origin: "https://evil.example" }, 403],
+    [{ Origin: `${ORIGIN}, ${ORIGIN}` }, 403],
+    [{ "Tailscale-User-Login": "" }, 403],
+    [{ "Tailscale-User-Login": `${LOGIN},${LOGIN}` }, 403],
+    [{ "X-Sadhana-CSRF": "wrong-campaign" }, 403],
+    [{ "Content-Type": "application/json; charset=utf-8" }, 415],
+  ];
+  for (const [headers, status] of headerDrift) {
+    const response = await handleAccountUiConfirmationBridge(
+      accountUiBridgeRequest(headers),
+      {
+        environment: accountUiBridgeEnvironment(),
+        readBearer: async () => BEARER,
+        fetchImpl: async () => {
+          throw new Error("invalid browser headers reached upstream");
+        },
+      },
+    );
+    assert.equal(response.status, status);
+  }
+
+  const blankBearer = await handleAccountUiConfirmationBridge(
+    accountUiBridgeRequest(),
+    {
+      environment: accountUiBridgeEnvironment(),
+      readBearer: async () => "",
+      fetchImpl: async () => {
+        throw new Error("blank bearer reached upstream");
+      },
+    },
+  );
+  assert.equal(blankBearer.status, 503);
+});
+
+test("account UI bridge rejects every malformed or authority-expanding 202", async () => {
+  const valid = accountUiAccepted();
+  const upstreamBodies: Array<() => Response> = [
+    () => new Response("{", { status: 202 }),
+    () => Response.json({ ...valid, extra: true }, { status: 202 }),
+    () => Response.json({ ...valid, status: "wrong" }, { status: 202 }),
+    () => Response.json({ ...valid, authority_applied: true }, { status: 202 }),
+    () => Response.json({ ...valid, dispatch_authorized: true }, { status: 202 }),
+    () =>
+      Response.json({ ...valid, physical_device_attested: true }, { status: 202 }),
+    () =>
+      Response.json({ ...valid, human_identity_attested: true }, { status: 202 }),
+    () =>
+      Response.json(
+        Object.fromEntries(
+          Object.entries(valid).filter(([key]) => key !== "candidate_recorded"),
+        ),
+        { status: 202 },
+      ),
+  ];
+  for (const upstreamBody of upstreamBodies) {
+    const response = await handleAccountUiConfirmationBridge(
+      accountUiBridgeRequest(),
+      {
+        environment: accountUiBridgeEnvironment(),
+        readBearer: async () => BEARER,
+        fetchImpl: async () => upstreamBody(),
+      },
+    );
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), {
+      status: "request_rejected",
+      error_code: "account_ui_confirmation_response_invalid",
+    });
+  }
 });
 
 test("bridge rejects missing or folded identity, origin, CSRF, and content type", async () => {

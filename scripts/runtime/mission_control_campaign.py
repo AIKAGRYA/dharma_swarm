@@ -357,12 +357,95 @@ def _acquire_writer_handoff(
             time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
 
 
-async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
+def _require_read_only_empty_boot(args: argparse.Namespace) -> None:
+    if args.mission_id != "sadhana-10-20260823":
+        return
+    if (
+        os.environ.get("DHARMA_READ_ONLY_BOOT") != "1"
+        or os.environ.get("DHARMA_FAST_BOOT") is not None
+        or args.fast_boot
+    ):
+        raise MissionControlError(
+            "SADHANA campaign requires the exact read-only empty boot"
+        )
+
+
+def _dispatch_activation_paths(args: argparse.Namespace) -> dict[str, Path | str]:
+    fields = {
+        "release_sha": str(getattr(args, "release_sha", "") or ""),
+        "dispatch_receipt_path": str(
+            getattr(args, "dispatch_activation_receipt", "") or ""
+        ),
+        "dashboard_receipt_path": str(
+            getattr(args, "dashboard_identity_receipt", "") or ""
+        ),
+        "runtime_binding_path": str(
+            getattr(args, "runtime_binding_receipt", "") or ""
+        ),
+        "operator_login_path": str(getattr(args, "operator_login_file", "") or ""),
+        "control_hmac_path": str(getattr(args, "control_hmac_key_file", "") or ""),
+        "activation_evidence_path": str(
+            getattr(args, "activation_evidence_path", "") or ""
+        ),
+    }
+    configured = {key for key, value in fields.items() if value}
+    if (
+        args.mission_id == "sadhana-10-20260823"
+        and not configured
+        and getattr(args, "command", "") == "start"
+    ):
+        # The detached child performs the mandatory run-side admission.  Keep
+        # the start-side command builder secret-free and source-compatible.
+        return {}
+    if args.mission_id == "sadhana-10-20260823" and configured != set(fields):
+        missing = sorted(set(fields) - configured)
+        raise MissionControlError(
+            "SADHANA dispatch activation configuration is partial: "
+            + ",".join(missing)
+        )
+    if not configured:
+        return {}
+    if configured != set(fields):
+        raise MissionControlError("dispatch activation configuration is partial")
+    return {
+        "release_sha": fields["release_sha"],
+        **{
+            key: Path(value).expanduser().absolute()
+            for key, value in fields.items()
+            if key != "release_sha"
+        },
+    }
+
+
+async def _require_exact_final_roster(
+    swarm: Any,
+    roster: CampaignAgentRoster,
+) -> None:
+    states = await swarm.list_agents()
+    expected = {
+        (seat.name, seat.role, seat.provider.value, seat.model)
+        for seat in roster.seats
+    }
+    observed = {
+        (state.name, state.role, state.provider, state.model)
+        for state in states
+    }
+    if len(roster.seats) != 7 or len(states) != 7 or observed != expected:
+        raise CampaignRosterError("campaign final live pool differs from seven seats")
+
+
+async def run_campaign(
+    args: argparse.Namespace,
+    *,
+    clock: Callable[[], datetime] | None = None,
+) -> dict[str, Any]:
     """Boot the real swarm executor and reconcile until stopped or bounded."""
     from dharma_swarm.swarm import SwarmManager
 
     _positive_finite(args.shutdown_timeout, "shutdown_timeout")
     _positive_finite(args.writer_handoff_timeout, "writer_handoff_timeout")
+    _require_read_only_empty_boot(args)
+    activation_paths = _dispatch_activation_paths(args)
     if args.fast_boot:
         os.environ["DHARMA_FAST_BOOT"] = "1"
     state_dir = Path(args.state_dir).expanduser().resolve(strict=False)
@@ -373,14 +456,6 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
         args.mission_id,
         args.observer_health_receipt,
         args.observer_health_receipt_sha256,
-    )
-    operator_control_reconciler = operator_control_reconciler_from_config(
-        args.mission_id,
-        normal_inbox=args.operator_control_normal_inbox,
-        inflight_inbox=args.operator_control_inflight_inbox,
-        applied_inbox=args.operator_control_applied_inbox,
-        rejected_inbox=args.operator_control_rejected_inbox,
-        max_candidates_per_cycle=args.operator_control_max_candidates_per_cycle,
     )
     verifier_seat = _requested_verifier_seat(requested_roster, args.verifier_seat)
     held_out_manifest = _requested_held_out_manifest(args, requested)
@@ -409,6 +484,12 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
     verifier_provider: OllamaProvider | None = None
     try:
         await swarm.init()
+        if args.mission_id == "sadhana-10-20260823" and (
+            await swarm.list_agents() or await swarm.list_tasks()
+        ):
+            raise MissionControlError(
+                "SADHANA read-only boot created an agent or task before roster binding"
+            )
         roster_receipt = await ensure_campaign_agent_roster(
             swarm,
             requested_roster,
@@ -506,7 +587,15 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
             oracle_work_root=oracle_work_root,
             oracle_launcher=oracle_launcher,
         )
-        result = await CampaignService(
+        operator_control_reconciler = operator_control_reconciler_from_config(
+            args.mission_id,
+            normal_inbox=args.operator_control_normal_inbox,
+            inflight_inbox=args.operator_control_inflight_inbox,
+            applied_inbox=args.operator_control_applied_inbox,
+            rejected_inbox=args.operator_control_rejected_inbox,
+            max_candidates_per_cycle=args.operator_control_max_candidates_per_cycle,
+        )
+        service = CampaignService(
             supervisor,
             lock_path=paths.lock_path,
             control_gate_path=paths.control_gate_path,
@@ -515,7 +604,23 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
             candidate_verifier=candidate_verifier,
             activation_barrier=activation_barrier,
             operator_control_reconciler=operator_control_reconciler,
-        ).run(max_cycles=args.cycles, start_campaign=False)
+        )
+        await _require_exact_final_roster(swarm, requested_roster)
+        activation: dict[str, Any] = {}
+        if activation_paths:
+            from scripts.runtime.sadhana_release import (  # noqa: PLC0415
+                activate_campaign_session,
+            )
+
+            activation = await activate_campaign_session(
+                role="writer",
+                state_root=state_dir,
+                control_gate_path=paths.control_gate_path,
+                runtime_store=runtime,
+                clock=clock,
+                **activation_paths,
+            )
+        result = await service.run(max_cycles=args.cycles, start_campaign=False)
         return {
             "status": result.status,
             "completed_cycles": result.completed_cycles,
@@ -524,6 +629,7 @@ async def run_campaign(args: argparse.Namespace) -> dict[str, Any]:
             "projection_path": str(result.projection_path),
             "roster_receipt": (roster_receipt.to_dict()),
             "authority_binding": authority_binding.to_dict(),
+            "dispatch_activation": activation,
             "snapshot": result.snapshot.to_dict(),
         }
     finally:
@@ -680,6 +786,26 @@ def _run_child_command(args: argparse.Namespace, paths: CampaignPaths) -> list[s
         )
     if args.fast_boot:
         command.append("--fast-boot")
+    activation = _dispatch_activation_paths(args)
+    if activation:
+        command.extend(
+            [
+                "--release-sha",
+                str(activation["release_sha"]),
+                "--dispatch-activation-receipt",
+                str(activation["dispatch_receipt_path"]),
+                "--dashboard-identity-receipt",
+                str(activation["dashboard_receipt_path"]),
+                "--runtime-binding-receipt",
+                str(activation["runtime_binding_path"]),
+                "--operator-login-file",
+                str(activation["operator_login_path"]),
+                "--control-hmac-key-file",
+                str(activation["control_hmac_path"]),
+                "--activation-evidence-path",
+                str(activation["activation_evidence_path"]),
+            ]
+        )
     return command
 
 
@@ -898,6 +1024,13 @@ def _add_campaign_config(parser: argparse.ArgumentParser) -> None:
 def _add_run_config(parser: argparse.ArgumentParser) -> None:
     _add_campaign_config(parser)
     add_campaign_runtime_arguments(parser)
+    parser.add_argument("--release-sha", default="")
+    parser.add_argument("--dispatch-activation-receipt", default="")
+    parser.add_argument("--dashboard-identity-receipt", default="")
+    parser.add_argument("--runtime-binding-receipt", default="")
+    parser.add_argument("--operator-login-file", default="")
+    parser.add_argument("--control-hmac-key-file", default="")
+    parser.add_argument("--activation-evidence-path", default="")
 
 
 def build_parser() -> argparse.ArgumentParser:

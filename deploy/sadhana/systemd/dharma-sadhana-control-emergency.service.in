@@ -1,0 +1,37 @@
+[Unit]
+Description=Apply a validated SADHANA emergency stop before terminal receipt
+After=dharma-sadhana-control-directories.service
+
+[Service]
+Type=oneshot
+LoadCredential=control_hmac_key:/etc/dharma-sadhana/credentials/control_hmac_key
+LoadCredential=tailscale_operator_login:/etc/dharma-sadhana/credentials/tailscale_operator_login
+WorkingDirectory=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py apply-emergency-control --role writer --hmac-key-file %d/control_hmac_key --operator-login-file %d/tailscale_operator_login
+TimeoutStartSec=60s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana/credentials
+ReadWritePaths=/run/dharma-sadhana/control/emergency /run/dharma-sadhana/emergency-quarantine /var/lib/dharma-sadhana/emergency-inflight /var/lib/dharma-sadhana/emergency-apply.lock /etc/dharma-sadhana/receipts/control/emergency
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+UMask=0077

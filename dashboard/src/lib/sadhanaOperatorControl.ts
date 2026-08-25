@@ -1,5 +1,9 @@
 export const SADHANA_CONTROL_CSRF = "sadhana-10-20260823";
 export const SADHANA_CONTROL_ROUTE = "/dharma-internal/operator-control";
+export const SADHANA_ACCOUNT_UI_CONFIRMATION_ROUTE =
+  "/dharma-internal/account-ui-confirmation";
+export const ACCOUNT_UI_CONFIRMATION_REQUEST_SCHEMA =
+  "dharma.sadhana.authenticated_account_ui_confirmation_request.v1";
 export const OPERATOR_CONTROL_EVIDENCE_SCHEMA =
   "dharma.sadhana.operator_control_evidence.v1";
 
@@ -19,6 +23,42 @@ export interface OperatorControlRequest {
   issued_at: string;
   expires_at: string;
   reason: string;
+}
+
+export interface AccountUiConfirmationRequest {
+  schema_version: typeof ACCOUNT_UI_CONFIRMATION_REQUEST_SCHEMA;
+  campaign_id: "sadhana-10-20260823";
+  client_request_id: string;
+  issued_at: string;
+  expires_at: string;
+  viewport_width_css_px_reported: 390;
+  document_width_css_px_reported: 390;
+  visual_viewport_width_css_px_reported: 390;
+  coarse_pointer_reported: true;
+  touch_capability_reported: true;
+  trusted_browser_event_reported: true;
+  explicit_confirmation_gesture_reported: true;
+  dashboard_rendered_reported: true;
+}
+
+export interface AccountUiConfirmationAccepted {
+  status: "account_ui_confirmation_accepted";
+  replayed: boolean;
+  account_authenticated: true;
+  candidate_recorded: true;
+  authority_applied: false;
+  dispatch_authorized: false;
+  physical_device_attested: false;
+  human_identity_attested: false;
+}
+
+export interface AccountUiMeasurements {
+  viewportWidthCssPx: number;
+  documentWidthCssPx: number;
+  visualViewportWidthCssPx: number;
+  coarsePointer: boolean;
+  touchCapability: boolean;
+  trustedBrowserEvent: boolean;
 }
 
 export interface RequestAccepted {
@@ -82,6 +122,17 @@ export class OperatorControlDeliveryUnknown extends Error {
       "delivery outcome unknown—reconnect and inspect durable control evidence",
     );
     this.name = "OperatorControlDeliveryUnknown";
+  }
+}
+
+export class AccountUiConfirmationDeliveryUnknown extends Error {
+  readonly code = "account_ui_confirmation_delivery_unknown";
+
+  constructor() {
+    super(
+      "delivery outcome unknown—do not create a new request; inspect the one-shot server receipt",
+    );
+    this.name = "AccountUiConfirmationDeliveryUnknown";
   }
 }
 
@@ -358,6 +409,28 @@ export function evidenceFromSnapshot(snapshot: unknown): OperatorControlEvidence
   return parseOperatorControlEvidence(snapshot.operator_control_evidence);
 }
 
+export function normalOperatorControlsAuthorized(snapshot: unknown): boolean {
+  const evidence = evidenceFromSnapshot(snapshot);
+  return (
+    evidence !== null &&
+    evidence.claim_stage !== "none" &&
+    evidence.transition_sequence >= 2
+  );
+}
+
+export function accountUiConfirmationAuthorized(snapshot: unknown): boolean {
+  const evidence = evidenceFromSnapshot(snapshot);
+  return (
+    evidence !== null &&
+    evidence.claim_stage === "authority_applied" &&
+    evidence.control_state === "PAUSED" &&
+    evidence.action === "pause" &&
+    evidence.campaign_generation === 1 &&
+    evidence.transition_sequence === 1 &&
+    evidence.effect_state === "unobserved"
+  );
+}
+
 function shortRef(value: string): string {
   return value.length > 30 ? `${value.slice(0, 14)}…${value.slice(-10)}` : value;
 }
@@ -476,5 +549,109 @@ export async function submitOperatorControl(
     }
     throw new Error("operator_control_response_mismatch");
   }
+  return accepted;
+}
+
+export function buildAccountUiConfirmationRequest(
+  measurements: AccountUiMeasurements,
+  options: { now?: Date; requestId?: string } = {},
+): AccountUiConfirmationRequest {
+  if (
+    measurements.viewportWidthCssPx !== 390 ||
+    measurements.documentWidthCssPx !== 390 ||
+    measurements.visualViewportWidthCssPx !== 390 ||
+    measurements.coarsePointer !== true ||
+    measurements.touchCapability !== true ||
+    measurements.trustedBrowserEvent !== true
+  ) {
+    throw new Error("account_ui_confirmation_client_observation_invalid");
+  }
+  const now = options.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) {
+    throw new Error("account_ui_confirmation_time_invalid");
+  }
+  const requestId = options.requestId ?? crypto.randomUUID();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId)) {
+    throw new Error("account_ui_confirmation_request_id_invalid");
+  }
+  return {
+    schema_version: ACCOUNT_UI_CONFIRMATION_REQUEST_SCHEMA,
+    campaign_id: "sadhana-10-20260823",
+    client_request_id: requestId,
+    issued_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + 90_000).toISOString(),
+    viewport_width_css_px_reported: 390,
+    document_width_css_px_reported: 390,
+    visual_viewport_width_css_px_reported: 390,
+    coarse_pointer_reported: true,
+    touch_capability_reported: true,
+    trusted_browser_event_reported: true,
+    explicit_confirmation_gesture_reported: true,
+    dashboard_rendered_reported: true,
+  };
+}
+
+function parseAccountUiConfirmationAccepted(
+  value: unknown,
+): AccountUiConfirmationAccepted | null {
+  const fields = [
+    "account_authenticated",
+    "authority_applied",
+    "candidate_recorded",
+    "dispatch_authorized",
+    "human_identity_attested",
+    "physical_device_attested",
+    "replayed",
+    "status",
+  ] as const;
+  if (
+    !isRecord(value) ||
+    !hasExactFields(value, fields) ||
+    value.status !== "account_ui_confirmation_accepted" ||
+    typeof value.replayed !== "boolean" ||
+    value.account_authenticated !== true ||
+    value.candidate_recorded !== true ||
+    value.authority_applied !== false ||
+    value.dispatch_authorized !== false ||
+    value.physical_device_attested !== false ||
+    value.human_identity_attested !== false
+  ) {
+    return null;
+  }
+  return value as unknown as AccountUiConfirmationAccepted;
+}
+
+export async function submitAccountUiConfirmation(
+  request: AccountUiConfirmationRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AccountUiConfirmationAccepted> {
+  let response: Response;
+  try {
+    response = await fetchImpl(SADHANA_ACCOUNT_UI_CONFIRMATION_ROUTE, {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Sadhana-CSRF": SADHANA_CONTROL_CSRF,
+      },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw new AccountUiConfirmationDeliveryUnknown();
+  }
+  const value: unknown = await response.json().catch(() => null);
+  if (response.status !== 202) {
+    if (response.status === 409 || response.status >= 500) {
+      throw new AccountUiConfirmationDeliveryUnknown();
+    }
+    throw new Error(
+      isRecord(value) && typeof value.error_code === "string"
+        ? value.error_code
+        : "account_ui_confirmation_rejected",
+    );
+  }
+  const accepted = parseAccountUiConfirmationAccepted(value);
+  if (!accepted) throw new AccountUiConfirmationDeliveryUnknown();
   return accepted;
 }

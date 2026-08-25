@@ -2,6 +2,7 @@
 
 import { SadhanaOperatorControl } from "@/components/cockpit/SadhanaOperatorControl";
 import { useMissionSarathi } from "@/hooks/useMissionSarathi";
+import { normalOperatorControlsAuthorized } from "@/lib/sadhanaOperatorControl";
 
 const SADHANA_MISSION_ID = "sadhana-10-20260823";
 
@@ -9,6 +10,7 @@ export default function SadhanaControlPage() {
   const { projection, isLoading, sourceErrors } = useMissionSarathi(
     SADHANA_MISSION_ID,
   );
+  const normalControlsDisabled = !normalOperatorControlsAuthorized(projection);
 
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-[30rem] flex-col gap-3">
@@ -22,7 +24,11 @@ export default function SadhanaControlPage() {
           explicitly unproven until a valid projection arrives.
         </p>
       )}
-      <SadhanaOperatorControl snapshot={projection} disabled={isLoading} />
+      <SadhanaOperatorControl
+        snapshot={projection}
+        disabled={isLoading}
+        normalControlsDisabled={normalControlsDisabled}
+      />
     </main>
   );
 }
