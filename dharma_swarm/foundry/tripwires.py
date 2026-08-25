@@ -172,7 +172,16 @@ def scan_tripwires(
     fired: list[str] = []
     details: dict[str, str] = {}
 
-    if not _has_effective_change(candidate.diff):
+    proposal_status = str(candidate.metadata.get("proposal_status", ""))
+    if proposal_status == "provider_error":
+        # Infrastructure failure is not a model no-op. Keeping this typed lets
+        # the daemon alert/fail over without teaching the archive that an empty
+        # transport response was a proposed code change.
+        fired.append("provider_error")
+        details["provider_error"] = str(
+            candidate.metadata.get("provider_error", "routes_exhausted")
+        )
+    elif not _has_effective_change(candidate.diff):
         fired.append("no_op_diff")
         details["no_op_diff"] = "candidate contains no effective content change"
 

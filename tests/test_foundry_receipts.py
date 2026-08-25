@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import difflib
+
+import pytest
 
 from dharma_swarm.foundry.receipts import (
     FoundryReceipt,
+    ReceiptChainError,
     StratifiedFields,
     benchmark_link,
     disclosure_link,
@@ -14,8 +18,13 @@ from dharma_swarm.foundry.receipts import (
     merge_event_link,
     pre_registration_link,
     report_render_link,
+    audit_receipts,
+    quarantine_legacy_state,
+    verify_receipt_chain,
     write_receipt,
 )
+from dharma_swarm.foundry.artifacts import build_lineage
+from dharma_swarm.foundry.target_ingest import compute_tree_digest
 
 
 def _base_receipt() -> FoundryReceipt:
@@ -97,3 +106,156 @@ def test_write_receipt_persists_sealed(tmp_path):
     assert payload["schema_version"] == "foundry_improvement.v1"
     assert payload["sealed_digest"].startswith("sha256:")
     assert payload["stratified"]["domain"] == "external_code_contribution"
+
+
+def test_receipts_are_unique_append_only_and_hash_chained(tmp_path):
+    first_path = write_receipt(_base_receipt(), state_root=tmp_path)
+    second_receipt = _base_receipt()
+    second_receipt.receipt_id = "r2"
+    second_path = write_receipt(second_receipt, state_root=tmp_path)
+
+    assert first_path != second_path
+    assert first_path.exists() and second_path.exists()
+    first = json.loads(first_path.read_text())
+    second = json.loads(second_path.read_text())
+    assert first["sequence"] == 1
+    assert second["sequence"] == 2
+    assert first["prev_receipt_digest"] == "genesis"
+    assert second["prev_receipt_digest"] == first["sealed_digest"]
+    ok, detail = verify_receipt_chain(tmp_path)
+    assert ok, detail
+
+
+def test_duplicate_receipt_identity_is_rejected_before_append(tmp_path):
+    first = write_receipt(_base_receipt(), state_root=tmp_path)
+    with pytest.raises(ReceiptChainError, match="duplicate_receipt_ids"):
+        write_receipt(_base_receipt(), state_root=tmp_path)
+    assert list(tmp_path.glob("*.json")) == [first]
+
+
+def test_receipt_audit_detects_tamper_missing_orphan_and_duplicate(tmp_path):
+    receipt = _base_receipt()
+    receipt.disclosure = disclosure_link(diff_sha256="a" * 64)
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    referenced = artifacts / f"{'a' * 64}.patch"
+    referenced.write_text("referenced", encoding="utf-8")
+    first_path = write_receipt(receipt, state_root=tmp_path / "receipts")
+    second_receipt = _base_receipt()
+    second_receipt.receipt_id = "r2"
+    second_path = write_receipt(second_receipt, state_root=tmp_path / "receipts")
+    referenced.unlink()
+    (artifacts / "orphan.patch").write_text("orphan", encoding="utf-8")
+
+    payload = json.loads(first_path.read_text())
+    payload["candidate_id"] = "tampered"
+    first_path.write_text(json.dumps(payload), encoding="utf-8")
+    second = json.loads(second_path.read_text())
+    second["receipt_id"] = "r1"
+    second_path.write_text(json.dumps(second), encoding="utf-8")
+
+    audit = audit_receipts(tmp_path)
+    assert not audit.ok
+    assert audit.invalid_receipts
+    assert audit.missing_artifacts
+    assert audit.orphan_artifacts
+    assert audit.duplicate_receipt_ids == ("r1",)
+
+
+def test_legacy_receipt_is_compatibility_anchor_not_rewritten(tmp_path):
+    legacy = tmp_path / "old-logical-name.json"
+    legacy.write_text(json.dumps({"receipt_id": "old", "target_id": "t"}))
+    before = legacy.read_bytes()
+
+    path = write_receipt(_base_receipt(), state_root=tmp_path)
+    payload = json.loads(path.read_text())
+    assert payload["sequence"] == 1
+    assert payload["prev_receipt_digest"].startswith("sha256:")
+    assert legacy.read_bytes() == before
+    audit = audit_receipts(tmp_path)
+    assert audit.legacy_receipts == 1
+
+
+def test_malformed_sequence_is_reported_not_raised(tmp_path):
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps({"receipt_id": "bad", "sequence": {"oops": 1}}))
+    audit = audit_receipts(tmp_path)
+    assert not audit.ok
+    assert any("malformed sequence" in item for item in audit.invalid_receipts)
+
+
+def test_orphan_artifact_blocks_new_receipt(tmp_path):
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "orphan.patch").write_text("orphan", encoding="utf-8")
+    with pytest.raises(ReceiptChainError, match="orphan_artifacts"):
+        write_receipt(_base_receipt(), state_root=tmp_path / "receipts")
+
+
+def test_legacy_quarantine_is_lossless_and_leaves_stop_marker(tmp_path):
+    receipts = tmp_path / "receipts"
+    artifacts = tmp_path / "artifacts"
+    receipts.mkdir()
+    artifacts.mkdir()
+    (receipts / "lost.json").write_text(json.dumps({
+        "receipt_id": "lost",
+        "target_id": "t",
+        "disclosure": {"diff_sha256": "b" * 64},
+    }))
+    orphan = artifacts / "orphan.patch"
+    orphan.write_text("preserve me", encoding="utf-8")
+
+    planned = quarantine_legacy_state(tmp_path)
+    assert planned["needed"] and not planned["applied"]
+    assert (receipts / "lost.json").exists() and orphan.exists()
+
+    applied = quarantine_legacy_state(tmp_path, apply=True)
+    assert applied["applied"]
+    assert (tmp_path / "QUARANTINE.json").exists()
+    destinations = [tmp_path / move["destination"] for move in applied["moves"]]
+    assert all(path.exists() for path in destinations)
+    assert any(path.read_text() == "preserve me" for path in destinations)
+    assert audit_receipts(tmp_path).ok
+
+
+def test_authoritative_lineage_can_append_then_delta_tamper_fails_audit(tmp_path):
+    base = tmp_path / "base"
+    seeded = tmp_path / "seeded"
+    for root in (base, seeded):
+        (root / "src").mkdir(parents=True)
+        (root / "src" / "x.py").write_text("VALUE = 1\n", encoding="utf-8")
+    delta = "".join(difflib.unified_diff(
+        ["VALUE = 1\n"], ["VALUE = 2\n"],
+        fromfile="a/src/x.py", tofile="b/src/x.py",
+    ))
+    lineage = build_lineage(
+        state_root=tmp_path / "state",
+        target_id="target",
+        resolved_sha="abc",
+        base_root=base,
+        seeded_root=seeded,
+        base_tree_digest=compute_tree_digest(base, ["src/x.py"]),
+        evolve_file="src/x.py",
+        delta=delta,
+    )
+    receipt = _base_receipt()
+    receipt.receipt_id = "authoritative-unique"
+    receipt.target_id = "target"
+    receipt.artifact_lineage = lineage
+    receipt.disclosure = disclosure_link(diff_sha256=lineage["cumulative_sha256"])
+    write_receipt(
+        receipt,
+        state_root=tmp_path / "state" / "receipts",
+        lineage_base_root=base,
+    )
+    assert audit_receipts(
+        tmp_path / "state", replay_roots={"target": base}
+    ).ok
+
+    delta_path = tmp_path / "state" / lineage["delta_artifact"]
+    delta_path.write_text("tampered\n", encoding="utf-8")
+    audit = audit_receipts(
+        tmp_path / "state", replay_roots={"target": base}
+    )
+    assert not audit.ok
+    assert any("delta artifact sha256 mismatch" in item for item in audit.invalid_receipts)

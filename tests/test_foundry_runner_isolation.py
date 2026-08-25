@@ -25,13 +25,26 @@ def _fake_runner(returncode=0, stdout="ok", stderr="", record=None):
 def test_docker_path_uses_network_none():
     calls: list = []
     result = run_isolated(
-        "pytest -q", "/tmp/wd", IsolationPolicy(),
+        "pytest -q", "/tmp/wd", IsolationPolicy(run_as_user="65534:65534"),
         docker_ok=True, runner=_fake_runner(record=calls),
     )
     assert result.isolation_level == IsolationLevel.DOCKER_NONET.value
     docker_cmd = calls[0]
     assert docker_cmd[:3] == ["docker", "run", "--rm"]
     assert "none" in docker_cmd  # --network none present
+    for expected in (
+        "--read-only",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges:true",
+        "--pids-limit",
+        "--memory-swap",
+        "--tmpfs",
+        "--user",
+        "65534:65534",
+    ):
+        assert expected in docker_cmd
 
 
 def test_degraded_local_when_no_docker():
@@ -53,12 +66,78 @@ def test_blocked_when_no_docker_and_degraded_disallowed():
 
 
 def test_promotion_requires_strong_isolation():
-    strong = RunResult(0, "", "", 1.0, IsolationLevel.DOCKER_NONET.value)
+    controls = {
+        "network_disabled": "true",
+        "readonly_rootfs": "true",
+        "cap_drop_all": "true",
+        "no_new_privileges": "true",
+        "pids_limited": "true",
+        "memory_limited": "true",
+        "memory_swap_limited": "true",
+        "tmpfs_limited": "true",
+        "non_root_user": "true",
+        "workdir_readonly": "true",
+    }
+    strong = RunResult(
+        0, "", "", 1.0, IsolationLevel.DOCKER_NONET.value, details=controls
+    )
     degraded = RunResult(0, "", "", 1.0, IsolationLevel.LOCAL_RESTRICTED.value)
     blocked = RunResult(-1, "", "", 0.0, IsolationLevel.BLOCKED.value, blocked=True)
     assert promotion_allowed(strong) is True
     assert promotion_allowed(degraded) is False  # degraded may explore, not confirm
     assert promotion_allowed(blocked) is False
+
+
+def test_promotion_denied_when_any_declared_docker_control_is_missing():
+    controls = {
+        "network_disabled": "true",
+        "readonly_rootfs": "true",
+        "cap_drop_all": "true",
+        "no_new_privileges": "true",
+        "pids_limited": "true",
+        "memory_limited": "true",
+        "memory_swap_limited": "false",
+        "tmpfs_limited": "true",
+        "non_root_user": "true",
+        "workdir_readonly": "true",
+    }
+    result = RunResult(
+        0, "", "", 1.0, IsolationLevel.DOCKER_NONET.value, details=controls
+    )
+    assert promotion_allowed(result) is False
+
+
+def test_promotion_denied_without_non_root_user_or_with_root_uid():
+    controls = {
+        "network_disabled": "true",
+        "readonly_rootfs": "true",
+        "cap_drop_all": "true",
+        "no_new_privileges": "true",
+        "pids_limited": "true",
+        "memory_limited": "true",
+        "memory_swap_limited": "true",
+        "tmpfs_limited": "true",
+        "non_root_user": "false",
+        "workdir_readonly": "true",
+    }
+    missing = RunResult(
+        0, "", "", 1.0, IsolationLevel.DOCKER_NONET.value, details=controls
+    )
+    assert promotion_allowed(missing) is False
+
+    calls: list = []
+    root_result = run_isolated(
+        "true",
+        "/tmp/wd",
+        IsolationPolicy(run_as_user="0:0", readonly_workdir=True),
+        docker_ok=True,
+        runner=_fake_runner(record=calls),
+    )
+    assert ["--user", "0:0"] == calls[0][calls[0].index("--user"):][:2]
+    assert promotion_allowed(
+        root_result,
+        IsolationPolicy(run_as_user="0:0", readonly_workdir=True),
+    ) is False
 
 
 def test_promotion_denied_on_timeout():

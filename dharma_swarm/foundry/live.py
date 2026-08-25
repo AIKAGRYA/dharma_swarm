@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -39,6 +41,208 @@ PROVIDERS: tuple[tuple[str, str, str, str], ...] = (
     ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", ""),
     ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_NIM_API_KEY", ""),
 )
+
+
+@dataclass(frozen=True)
+class ProviderRoute:
+    """One credential-bound OpenAI-compatible route (the key is never rendered)."""
+
+    name: str
+    base_url: str
+    key: str = field(repr=False)
+    default_model: str = ""
+
+
+@dataclass(frozen=True)
+class ProviderResponse:
+    provider: str
+    model: str
+    content: str
+    total_tokens: int
+
+
+class ProviderCallError(RuntimeError):
+    """Typed, secret-free provider failure used by routing and receipts."""
+
+    def __init__(
+        self,
+        provider: str,
+        category: str,
+        *,
+        retryable: bool,
+        status_code: int | None = None,
+        billable_tokens: int = 0,
+    ) -> None:
+        self.provider = provider
+        self.category = category
+        self.retryable = retryable
+        self.status_code = status_code
+        self.billable_tokens = max(0, int(billable_tokens))
+        status = f" status={status_code}" if status_code is not None else ""
+        super().__init__(f"provider={provider} category={category}{status}")
+
+
+class ProviderExhausted(RuntimeError):
+    """All configured routes failed or had an open circuit."""
+
+    def __init__(self, failures: tuple[ProviderCallError, ...]) -> None:
+        self.failures = failures
+        summary = ", ".join(f"{f.provider}:{f.category}" for f in failures) or "no-route"
+        super().__init__(f"provider routes exhausted ({summary})")
+
+    @property
+    def billable_tokens(self) -> int:
+        return sum(f.billable_tokens for f in self.failures)
+
+
+def _typed_provider_error(provider: str, exc: BaseException) -> ProviderCallError:
+    """Classify an exception without copying response bodies, URLs, or secrets."""
+    if isinstance(exc, ProviderCallError):
+        return exc
+    if isinstance(exc, urllib.error.HTTPError):
+        code = int(exc.code)
+        if code in (401, 403):
+            category, retryable = "authentication", False
+        elif code == 429:
+            category, retryable = "rate_limited", True
+        elif code >= 500:
+            category, retryable = "provider_unavailable", True
+        else:
+            category, retryable = "http_rejected", False
+        return ProviderCallError(provider, category, retryable=retryable, status_code=code)
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return ProviderCallError(provider, "timeout", retryable=True)
+    if isinstance(exc, (urllib.error.URLError, ConnectionError, OSError)):
+        return ProviderCallError(provider, "network", retryable=True)
+    if isinstance(exc, (KeyError, TypeError, ValueError, json.JSONDecodeError)):
+        return ProviderCallError(provider, "invalid_response", retryable=False)
+    return ProviderCallError(provider, "unexpected", retryable=False)
+
+
+@dataclass
+class _Circuit:
+    failures: int = 0
+    opened_at: float = 0.0
+
+
+class ProviderPool:
+    """Bounded failover with a per-route circuit breaker.
+
+    A failed route is opened after ``failure_threshold`` consecutive failures.
+    It is retried only after ``cooldown_seconds``. Failed zero-token calls add
+    exactly zero to ``total_tokens`` and therefore zero to spend accounting.
+    """
+
+    def __init__(
+        self,
+        *,
+        env: dict | None = None,
+        failure_threshold: int = 1,
+        cooldown_seconds: float = 300.0,
+        clock: Callable[[], float] = time.monotonic,
+        chat_caller: Callable[..., tuple[str, int]] | None = None,
+        model_lister: Callable[[ProviderRoute], list[str]] | None = None,
+    ) -> None:
+        source = env if env is not None else os.environ
+        self.routes = tuple(
+            ProviderRoute(name, base, str(source[key_env]), default_model)
+            for name, base, key_env, default_model in PROVIDERS
+            if source.get(key_env)
+        )
+        self.failure_threshold = max(1, int(failure_threshold))
+        self.cooldown_seconds = max(0.0, float(cooldown_seconds))
+        self.clock = clock
+        self.chat_caller = chat_caller or self._call_route
+        self.model_lister = model_lister or (
+            lambda route: list_models(route.base_url, route.key)
+        )
+        self.circuits = {route.name: _Circuit() for route in self.routes}
+        self.total_tokens = 0
+        self.tokens_by_provider: dict[str, int] = {}
+        self.successful_calls = 0
+
+    @staticmethod
+    def _call_route(
+        route: ProviderRoute,
+        model: str,
+        prompt: str,
+        **kwargs,
+    ) -> tuple[str, int]:
+        return call_chat(
+            route.base_url,
+            route.key,
+            model,
+            prompt,
+            provider=route.name,
+            **kwargs,
+        )
+
+    def _is_open(self, route: ProviderRoute) -> bool:
+        circuit = self.circuits[route.name]
+        if circuit.failures < self.failure_threshold:
+            return False
+        if (self.clock() - circuit.opened_at) >= self.cooldown_seconds:
+            circuit.failures = 0
+            circuit.opened_at = 0.0
+            return False
+        return True
+
+    def call(
+        self,
+        prompt: str,
+        *,
+        model_hint: str = "",
+        max_tokens: int = 64,
+        temperature: float = 0.0,
+        timeout: float = 45.0,
+    ) -> ProviderResponse:
+        failures: list[ProviderCallError] = []
+        for route in self.routes:
+            if self._is_open(route):
+                failures.append(
+                    ProviderCallError(route.name, "circuit_open", retryable=True)
+                )
+                continue
+            try:
+                model = (
+                    model_hint
+                    or choose_model(self.model_lister(route))
+                    or route.default_model
+                )
+                if not model:
+                    raise ProviderCallError(
+                        route.name, "no_usable_model", retryable=False
+                    )
+                content, tokens = self.chat_caller(
+                    route,
+                    model,
+                    prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=timeout,
+                )
+            except Exception as exc:  # noqa: BLE001 - classified, bounded failover
+                error = _typed_provider_error(route.name, exc)
+                failures.append(error)
+                self.total_tokens += error.billable_tokens
+                self.tokens_by_provider[route.name] = (
+                    self.tokens_by_provider.get(route.name, 0) + error.billable_tokens
+                )
+                circuit = self.circuits[route.name]
+                circuit.failures += 1
+                circuit.opened_at = self.clock()
+                continue
+            circuit = self.circuits[route.name]
+            circuit.failures = 0
+            circuit.opened_at = 0.0
+            safe_tokens = max(0, int(tokens))
+            self.total_tokens += safe_tokens
+            self.tokens_by_provider[route.name] = (
+                self.tokens_by_provider.get(route.name, 0) + safe_tokens
+            )
+            self.successful_calls += 1
+            return ProviderResponse(route.name, model, content, safe_tokens)
+        raise ProviderExhausted(tuple(failures))
 
 
 @dataclass(frozen=True)
@@ -135,23 +339,26 @@ def choose_model(models: Sequence[str]) -> str:
 
 def call_chat(base_url: str, key: str, model: str, prompt: str, *,
               timeout: float = 45.0, max_tokens: int = 64,
-              temperature: float = 0.0) -> tuple[str, int]:
+              temperature: float = 0.0, provider: str = "unknown") -> tuple[str, int]:
     """Returns (content, total_tokens) — token count straight from the API's usage block.
 
     The tiny default ``max_tokens`` fits the frozen heartbeat benchmark;
     mutation proposals (unified diffs) pass a much larger budget.
     """
-    data = _http_json(
-        f"{base_url}/chat/completions", key,
-        payload={
-            "model": model, "temperature": temperature, "max_tokens": max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        method="POST", timeout=timeout,
-    )
-    content = data["choices"][0]["message"]["content"] or ""
-    tokens = int((data.get("usage") or {}).get("total_tokens") or 0)
-    return content, tokens
+    try:
+        data = _http_json(
+            f"{base_url}/chat/completions", key,
+            payload={
+                "model": model, "temperature": temperature, "max_tokens": max_tokens,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            method="POST", timeout=timeout,
+        )
+        content = data["choices"][0]["message"]["content"] or ""
+        tokens = int((data.get("usage") or {}).get("total_tokens") or 0)
+        return content, tokens
+    except Exception as exc:  # noqa: BLE001 - converted to secret-free typed failure
+        raise _typed_provider_error(provider, exc) from exc
 
 
 @dataclass
@@ -166,6 +373,8 @@ class LiveResult:
     ran_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     total_tokens: int = 0
     est_cost_usd: float = 0.0
+    tokens_by_provider: dict[str, int] = field(default_factory=dict)
+    provider_failures: int = 0
 
 
 def run_live_eval(
@@ -184,40 +393,78 @@ def run_live_eval(
     lister = model_lister or (lambda: list_models(base, key))
     usage_tokens: list[int] = []
 
+    pool = ProviderPool(env=env) if caller is None else None
+    routed: list[tuple[str, str]] = []
+
     def _default_call(m: str, p: str) -> str:
-        text, tokens = call_chat(base, key, m, p)
-        usage_tokens.append(tokens)
-        return text
+        assert pool is not None
+        response = pool.call(p, model_hint=m)
+        usage_tokens.append(response.total_tokens)
+        routed.append((response.provider, response.model))
+        return response.content
 
     call = caller or _default_call
 
     if model is None:
-        model = choose_model(lister()) or default_model
-        if not model:
+        # The provider pool must resolve a model independently per route; a
+        # Moonshot model name is not valid evidence that Zhipu can serve it.
+        model = "" if caller is None and model_lister is None else (
+            choose_model(lister()) or default_model
+        )
+        if caller is not None and not model:
             return LiveResult(name, "none", 0, 0, 0.0, error="no usable chat model listed")
 
     correct = 0
+    provider_failures = 0
     per: list = []
     for task in FROZEN_TASKS:
         try:
             resp = call(model, task.prompt)
             ok = _norm(resp) == task.answer or task.answer in _norm(resp)
-        except Exception as exc:  # noqa: BLE001 - a failed call is a scored miss, not a crash
+        except Exception as exc:  # noqa: BLE001 - typed miss evidence, not a crash
+            if isinstance(exc, ProviderExhausted):
+                provider_failures += 1
             per.append({"prompt": task.prompt, "ok": False, "error": type(exc).__name__})
             continue
         correct += 1 if ok else 0
         per.append({"prompt": task.prompt, "ok": ok})
     n = len(FROZEN_TASKS)
-    tokens = sum(usage_tokens)
+    provider_tokens = (
+        dict(pool.tokens_by_provider)
+        if pool is not None
+        else ({name: sum(usage_tokens)} if usage_tokens else {})
+    )
+    tokens = sum(provider_tokens.values())
+    cost = round(sum(
+        estimate_cost_usd(provider, count)
+        for provider, count in provider_tokens.items()
+    ), 6)
+    if routed:
+        name, model = routed[-1]
     return LiveResult(
         name, model, n, correct, (correct / n) if n else 0.0, per,
-        total_tokens=tokens, est_cost_usd=estimate_cost_usd(name, tokens),
+        total_tokens=tokens, est_cost_usd=cost, tokens_by_provider=provider_tokens,
+        provider_failures=provider_failures,
     )
 
 
 def _latest_receipt(root: Path) -> Path | None:
-    receipts = sorted(root.glob(f"{BENCHMARK_ID}_*.json"))
-    return receipts[-1] if receipts else None
+    records = _live_records(root)
+    return records[-1][0] if records else None
+
+
+def _live_records(root: Path) -> list[tuple[Path, dict]]:
+    records: list[tuple[Path, dict]] = []
+    for path in sorted(root.glob(f"{BENCHMARK_ID}_*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            data = {}
+        records.append((path, data))
+    legacy = [item for item in records if int(item[1].get("sequence", 0) or 0) <= 0]
+    chained = [item for item in records if int(item[1].get("sequence", 0) or 0) > 0]
+    chained.sort(key=lambda item: int(item[1]["sequence"]))
+    return legacy + chained
 
 
 def _chain_prev_digest(root: Path) -> str:
@@ -229,39 +476,51 @@ def _chain_prev_digest(root: Path) -> str:
     docs/foundry/ — local disk is still rewritable wholesale; ring 3 anchors
     in venues we don't control remain the strongest link).
     """
-    latest = _latest_receipt(root)
-    if latest is None:
+    records = _live_records(root)
+    if not records:
         return "genesis"
-    try:
-        return json.loads(latest.read_text(encoding="utf-8")).get("digest", "genesis")
-    except (OSError, ValueError):
-        return "genesis"
+    return str(records[-1][1].get("digest", "genesis"))
 
 
 def write_live_receipt(result: LiveResult, *, state_root: Path) -> Path:
     from dharma_swarm.foundry.evaluator import canonical_digest
+    from dharma_swarm.foundry.receipts import ReceiptChainError, _chain_lock
 
     root = Path(state_root) / "live_eval"
     root.mkdir(parents=True, exist_ok=True)
-    stamp = result.ran_at.replace(":", "").replace("-", "")[:15]
-    path = root / f"{BENCHMARK_ID}_{stamp}.json"
-    payload = {
-        "benchmark": BENCHMARK_ID,
-        "provider": result.provider,
-        "model": result.model,
-        "tasks": result.tasks,
-        "correct": result.correct,
-        "accuracy": result.accuracy,
-        "per_task": result.per_task,
-        "error": result.error,
-        "ran_at": result.ran_at,
-        "total_tokens": result.total_tokens,
-        "est_cost_usd_upper_bound": result.est_cost_usd,
-        "prev_digest": _chain_prev_digest(root),
-    }
-    payload["digest"] = canonical_digest(payload)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return path
+    with _chain_lock(root):
+        ok, detail = verify_live_chain(Path(state_root))
+        if not ok:
+            raise ReceiptChainError(f"refusing to append live receipt: {detail}")
+        records = _live_records(root)
+        sequences = [int(data.get("sequence", 0) or 0) for _, data in records]
+        sequence = max(sequences, default=0) + 1
+        stamp = result.ran_at.replace(":", "").replace("-", "")[:15]
+        payload = {
+            "benchmark": BENCHMARK_ID,
+            "sequence": sequence,
+            "provider": result.provider,
+            "model": result.model,
+            "tasks": result.tasks,
+            "correct": result.correct,
+            "accuracy": result.accuracy,
+            "per_task": result.per_task,
+            "error": result.error,
+            "ran_at": result.ran_at,
+            "total_tokens": result.total_tokens,
+            "est_cost_usd_upper_bound": result.est_cost_usd,
+            "tokens_by_provider": result.tokens_by_provider,
+            "prev_digest": _chain_prev_digest(root),
+        }
+        payload["digest"] = canonical_digest(payload)
+        short = payload["digest"].removeprefix("sha256:")[:16]
+        path = root / f"{BENCHMARK_ID}_{sequence:08d}__{stamp}__{short}.json"
+        with path.open("x", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        return path
 
 
 def verify_live_chain(state_root: Path) -> tuple[bool, str]:
@@ -273,15 +532,25 @@ def verify_live_chain(state_root: Path) -> tuple[bool, str]:
     from dharma_swarm.foundry.evaluator import canonical_digest
 
     root = Path(state_root) / "live_eval"
-    receipts = sorted(root.glob(f"{BENCHMARK_ID}_*.json"))
+    receipts = _live_records(root)
     expected_prev = "genesis"
-    for path in receipts:
-        data = json.loads(path.read_text(encoding="utf-8"))
+    expected_sequence = 1
+    for path, data in receipts:
+        if not data:
+            return False, f"unreadable receipt at {path.name}"
         claimed = data.get("digest", "")
         if "prev_digest" not in data:
             # Pre-chain receipt (before this feature): treat as chain genesis.
             expected_prev = claimed or "genesis"
             continue
+        sequence = int(data.get("sequence", 0) or 0)
+        if sequence > 0:
+            if sequence != expected_sequence:
+                return False, (
+                    f"chain break at {path.name}: sequence "
+                    f"expected={expected_sequence} actual={sequence}"
+                )
+            expected_sequence += 1
         if data["prev_digest"] != expected_prev:
             return False, f"chain break at {path.name}: prev_digest mismatch"
         body = {k: v for k, v in data.items() if k != "digest"}
@@ -309,7 +578,8 @@ def live_daemon_cycle(target_id: str, generations: int, budget_cap: float,
     return CampaignResult(
         target_id=f"live:{result.provider}:{result.model}",
         generations_run=1,
-        proposed=result.tasks,
+        proposed=max(0, result.tasks - result.provider_failures),
+        provider_failures=result.provider_failures,
         ring1_wins=result.correct,
         ring2_checked=result.tasks,
         ring2_survivors=result.correct,

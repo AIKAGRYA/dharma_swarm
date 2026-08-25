@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from dharma_swarm.foundry.campaign import CampaignConfig, dry_run_campaign, run_campaign
@@ -22,6 +20,10 @@ def test_registry_has_ai_native_first_targets():
     for spec in TARGET_REGISTRY.values():
         assert spec.ai_policy == "native"
         assert spec.license.startswith("Apache")
+    assert (
+        TARGET_REGISTRY["openevolve-circle-packing"].sha
+        == "411fb59c886c18704caaffb611e17cf9e7d824d2"
+    )
 
 
 def test_do_not_touch_blocks_banned_repos():
@@ -47,7 +49,7 @@ def test_run_campaign_refuses_forbidden_target():
         )
 
 
-def test_dry_run_campaign_produces_receipts(tmp_path):
+def test_dry_run_campaign_blocks_confirmation_receipts_without_isolation_proof(tmp_path):
     spec = TARGET_REGISTRY["openevolve-mlx"]
     result = dry_run_campaign(
         spec, config=CampaignConfig(generations=4, per_generation=6), state_root=tmp_path
@@ -57,15 +59,12 @@ def test_dry_run_campaign_produces_receipts(tmp_path):
     assert result.proposed > 0
     assert result.ring1_wins > 0
     assert result.best_fitness > 0
-    # ring-2 survivors mint lab-local receipts
-    assert result.ring2_survivors == len(result.receipt_ids)
-    if result.receipt_ids:
-        receipt_file = tmp_path / "receipts" / f"{result.receipt_ids[0]}.json"
-        payload = json.loads(receipt_file.read_text())
-        assert payload["schema_version"] == "foundry_improvement.v1"
-        # lab-local: NOT externally confirmed yet
-        assert payload["externally_confirmed"] is False
-        assert payload["stratified"]["domain"] == "external_code_contribution"
+    # Synthetic evaluators can exercise the search, but cannot coerce their
+    # positive score into a ring-2 confirmation receipt.
+    assert result.ring2_survivors == 0
+    assert result.ring2_promotion_blocked > 0
+    assert result.receipt_ids == []
+    assert not (tmp_path / "receipts").exists()
 
 
 def test_dry_run_spend_within_budget(tmp_path):
@@ -93,37 +92,16 @@ def test_win_floor_blocks_baseline_reproduction(tmp_path):
     assert result2.ring1_wins > 0
 
 
-def test_survivor_artifacts_persisted(tmp_path):
-    # The kimi-k3-5003 lesson: a receipt without its diff is unshippable.
-    import hashlib
-    import json as _json
-    from pathlib import Path
+def test_unproven_survivors_cannot_persist_promotion_artifacts(tmp_path):
     from dharma_swarm.foundry.campaign import CampaignConfig, dry_run_campaign
     from dharma_swarm.foundry.targets import T0_OPENEVOLVE_CPU
 
     result = dry_run_campaign(T0_OPENEVOLVE_CPU,
                               config=CampaignConfig(generations=3),
                               state_root=tmp_path)
-    assert result.ring2_survivors > 0
-    assert result.artifact_paths, "survivors must persist their diffs"
-    for artifact in result.artifact_paths:
-        p = Path(artifact)
-        assert p.exists()
-        # artifact filename == sha256 of its contents (byte-for-byte match)
-        assert p.stem == hashlib.sha256(p.read_text().encode("utf-8")).hexdigest()
-    # every receipt's diff_sha256 has its artifact on disk
-    for rid in result.receipt_ids:
-        # receipt filenames are sanitized; scan the receipts dir instead
-        pass
-    receipts_dir = tmp_path / "receipts"
-    shas = set()
-    for rp in receipts_dir.glob("*.json"):
-        payload = _json.loads(rp.read_text())
-        sha = payload.get("disclosure", {}).get("diff_sha256", "")
-        if sha:
-            shas.add(sha)
-    artifact_shas = {Path(a).stem for a in result.artifact_paths}
-    assert shas <= artifact_shas
+    assert result.ring2_promotion_blocked > 0
+    assert result.ring2_survivors == 0
+    assert result.artifact_paths == []
 
 
 def test_trip_reasons_aggregated(tmp_path):

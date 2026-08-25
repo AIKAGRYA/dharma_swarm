@@ -29,9 +29,12 @@ generations per day before any per-token spend.
    (up to 5,000 on request). Hosts Nemotron 3.5 Lightning and others.
    <https://build.nvidia.com> · key goes in `NVIDIA_NIM_API_KEY`.
 
-Keys are stored as Cloud Agent secrets (Dashboard > Cloud Agents > Secrets),
-never in the repo. If a key is missing the Foundry simply uses fewer lanes; it
-never stops.
+For the direct paid fallback requested for the VPS, also provision
+`MOONSHOT_API_KEY` and `ZHIPU_API_KEY`. Keys belong in the root-owned systemd
+EnvironmentFile described in `docs/foundry/RUNNING_NONSTOP.md`, never in the
+repo. Individual missing routes reduce capacity; if every configured route
+fails for three bounded no-proposal cycles, the Foundry persists a terminal
+KILL instead of pretending to be productive.
 
 ## 2. Ratify the revenue wedge (one decision)
 
@@ -60,7 +63,9 @@ theme. This is a lottery-ticket, not load-bearing to the plan.
 
 - No coding, ever.
 - No writing work packets — the Foundry lane emits its own.
-- No running servers or daemons — the CI lane runs on a schedule.
+- One explicit VPS deployment/reconciliation is required; use the versioned
+  installer and legacy-quarantine procedure in `docs/foundry/RUNNING_NONSTOP.md`.
+  After that, systemd and the repository-owned status cron supervise it.
 - No live-capital account and no trading account — the Foundry never trades.
 - Live capital, if ever, comes last and only by a separate explicit grant.
 

@@ -1,0 +1,110 @@
+{
+  "allowed_files": [
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**",
+    "tests/test_foundry_*.py",
+    "docs/foundry/**",
+    "reports/agentops/work_packets/foundry-humming-WP-2026-08-25.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "310d8a6de35114e261b404e345c108ee5e833a0c",
+  "branch": "codex/foundry-humming-20260825",
+  "commit": {
+    "allowed": true,
+    "message": "foundry: harden continuous verified evolution"
+  },
+  "forbidden_files": [
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/lab_supervisor/**",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/telos_gates.py",
+    "scripts/governance/**",
+    "scripts/runtime/**",
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests -k foundry",
+      "expected_exit": 0,
+      "name": "foundry-regression-suite",
+      "timeout_seconds": 900
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_pilot.py",
+      "expected_exit": 0,
+      "name": "five-run-hermetic-pilot",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "foundry-humming-WP-2026-08-25",
+  "intent": "Repair the Sublimation Foundry so provider failures are typed and fail over without false no-op proposals or phantom spend; persist terminal kill state across restarts; represent survivor artifacts as replay-verifiable cumulative lineage; make receipts unique and append-only with legacy migration and integrity diagnostics; require an isolation proof before ring-2 promotion; ship truthful systemd semantics, dependency/status helpers, and a zero-spend five-run hermetic pilot. This packet does not authorize live provider calls, deployment, VPS mutation, pushing, or promotion from local evidence.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_live.py -k test_name_that_must_not_exist",
+      "expected_exit": 5,
+      "name": "empty-selection-remains-red",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/foundry/live.py",
+      "dharma_swarm/foundry/daemon.py",
+      "dharma_swarm/foundry/oracle_evaluator.py",
+      "dharma_swarm/foundry/receipts.py",
+      "scripts/foundry/foundry_daemon.py"
+    ],
+    "collision": {
+      "checked_at_sha": "310d8a6de35114e261b404e345c108ee5e833a0c",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Hermetic tests and the bounded pilot prove control-flow and evidence semantics only; they do not prove live model quality, provider availability, or production throughput.",
+      "No deployment or VPS mutation is authorized in this packet; the operator must install the versioned service after review.",
+      "Local isolation evidence cannot authorize external confirmation, guardian quorum, merge, or production promotion."
+    ],
+    "interface_mismatches": [
+      "Provider exceptions are currently converted to empty content and then mislabeled as no_op_diff, preventing the configured fallback route from running.",
+      "Survivors currently retain only the latest delta, while later runs seed from a compounded tree; a fresh checkout cannot replay the claimed artifact from that delta alone.",
+      "Receipt filenames can collide and overwrite prior evidence; legacy receipt directories need compatibility reads plus missing/orphan detection.",
+      "The daemon exits on a terminal kill metric but Restart=always revives it, and the terminal decision is not persisted independently of the process.",
+      "Promotion metadata records degraded isolation but does not make isolation proof a non-coercible prerequisite for ring-2 confirmation."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "40be882ce918524654df14040741cddd917ec9bca0ea448dcb6a2b801d47de71",
+    "rollback": "Revert the scoped commit and reinstall the prior Foundry service unit. Runtime receipts remain append-only evidence and must not be deleted during rollback.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-2026-08-25"
+  },
+  "worktree": "."
+}

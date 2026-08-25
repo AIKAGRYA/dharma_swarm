@@ -16,7 +16,7 @@ Claude-Max subscription marginal) are charged at $0.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # roles
 ROLE_MASS = "mass"      # high-volume cheap/free breadth generators

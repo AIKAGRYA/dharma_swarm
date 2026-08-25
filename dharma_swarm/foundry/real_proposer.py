@@ -24,7 +24,11 @@ from typing import Callable
 
 from dharma_swarm.foundry.army import ArmyModel
 from dharma_swarm.foundry.evaluator import Candidate
-from dharma_swarm.foundry.live import call_chat, choose_model, list_models, pick_provider
+from dharma_swarm.foundry.live import (
+    ProviderExhausted,
+    ProviderPool,
+    _typed_provider_error,
+)
 from dharma_swarm.foundry.loop import ProposeFn
 
 _DIFF_FENCE_RE = re.compile(r"```(?:diff|patch)?\s*\n(.*?)```", re.DOTALL)
@@ -90,24 +94,32 @@ def real_proposer(
     """
     pinned_root = Path(pinned_root)
     resolved: dict[str, str] = {}
-    usage = {"tokens": 0, "calls": 0}
+    usage = {"tokens": 0, "calls": 0, "failed_calls": 0, "tokens_by_provider": {}}
+    pool = ProviderPool(env=env) if caller is None else None
 
     def _default_caller(model_hint: str, prompt: str) -> str:
-        if "model" not in resolved:
-            picked = pick_provider(env)
-            if picked is None:
-                raise RuntimeError("no provider key present for real proposer")
-            name, base, key, default_model = picked
-            resolved["provider"] = name
-            resolved["base"] = base
-            resolved["key"] = key
-            resolved["model"] = choose_model(list_models(base, key)) or default_model
-        text, tokens = call_chat(resolved["base"], resolved["key"], resolved["model"],
-                                 prompt, max_tokens=PROPOSAL_MAX_TOKENS,
-                                 temperature=0.7, timeout=120.0)
-        usage["tokens"] += tokens
+        assert pool is not None
+        before = dict(pool.tokens_by_provider)
+        try:
+            response = pool.call(
+                prompt,
+                max_tokens=PROPOSAL_MAX_TOKENS,
+                temperature=0.7,
+                timeout=120.0,
+            )
+        finally:
+            # Include every route attempted, not only the route that finally
+            # succeeded. A provider may report billable tokens before failover.
+            by_provider = usage["tokens_by_provider"]
+            for provider, total in pool.tokens_by_provider.items():
+                delta = total - before.get(provider, 0)
+                if delta > 0:
+                    by_provider[provider] = by_provider.get(provider, 0) + delta
+                    usage["tokens"] += delta
+        resolved["provider"] = response.provider
+        resolved["model"] = response.model
         usage["calls"] += 1
-        return text
+        return response.content
 
     call = caller or _default_caller
 
@@ -122,10 +134,47 @@ def real_proposer(
             )
             try:
                 reply = call(model.id, prompt)
-            except Exception as exc:  # noqa: BLE001 — a dead lane is a zero, not a crash
+            except ProviderExhausted as exc:
+                usage["failed_calls"] += 1
+                if pool is None:
+                    usage["tokens"] += exc.billable_tokens
+                    by_provider = usage["tokens_by_provider"]
+                    for failure in exc.failures:
+                        by_provider[failure.provider] = (
+                            by_provider.get(failure.provider, 0)
+                            + failure.billable_tokens
+                        )
                 return Candidate(candidate_id=f"{model.id}-{seed}", target_id=target_id,
                                  diff="", origin_model=model.id, parent_id=parent_id,
-                                 metadata={"proposer_error": type(exc).__name__})
+                                 metadata={
+                                     "proposal_status": "provider_error",
+                                     "provider_error": "routes_exhausted",
+                                     "provider_failures": tuple(
+                                         f"{failure.provider}:{failure.category}"
+                                         for failure in exc.failures
+                                     ),
+                                     "billable_tokens": exc.billable_tokens,
+                                     "budget_chargeable": exc.billable_tokens > 0,
+                                 })
+            except Exception as exc:  # injected callers still become typed evidence
+                usage["failed_calls"] += 1
+                failure = _typed_provider_error("injected", exc)
+                usage["tokens"] += failure.billable_tokens
+                by_provider = usage["tokens_by_provider"]
+                by_provider[failure.provider] = (
+                    by_provider.get(failure.provider, 0) + failure.billable_tokens
+                )
+                return Candidate(candidate_id=f"{model.id}-{seed}", target_id=target_id,
+                                 diff="", origin_model=model.id, parent_id=parent_id,
+                                 metadata={
+                                     "proposal_status": "provider_error",
+                                     "provider_error": failure.category,
+                                     "provider_failures": (
+                                         f"{failure.provider}:{failure.category}",
+                                     ),
+                                     "billable_tokens": failure.billable_tokens,
+                                     "budget_chargeable": failure.billable_tokens > 0,
+                                 })
             diff = extract_unified_diff(reply)
             failure = check_applies(pinned_root, diff, runner)
             if failure is None:
@@ -133,14 +182,18 @@ def real_proposer(
                     candidate_id=f"{model.id}-{seed}", target_id=target_id,
                     diff=diff, origin_model=model.id, parent_id=parent_id,
                     metadata={"routed_model": resolved.get("model", "injected"),
-                              "provider": resolved.get("provider", "injected")},
+                              "provider": resolved.get("provider", "injected"),
+                              "proposal_status": "ok",
+                              "budget_chargeable": True},
                 )
             feedback = (f"\nYOUR PREVIOUS DIFF FAILED TO APPLY: {failure}\n"
                         "Re-emit a corrected unified diff with accurate context lines.")
         # Both attempts failed: empty diff -> no_op_diff tripwire zeroes it.
         return Candidate(candidate_id=f"{model.id}-{seed}", target_id=target_id,
                          diff="", origin_model=model.id, parent_id=parent_id,
-                         metadata={"proposer_failed": "diff did not apply after retry"})
+                         metadata={"proposer_failed": "diff did not apply after retry",
+                                   "proposal_status": "invalid_diff",
+                                   "budget_chargeable": True})
 
     # Honest spend accounting: the campaign CLI reads these after the run and
     # prices tokens at the provider's upper-bound rate (same doctrine as the

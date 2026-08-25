@@ -22,6 +22,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from dharma_swarm.foundry.daemon import DaemonConfig, run_daemon, state_json  # noqa: E402
 from dharma_swarm.foundry.targets import TARGET_REGISTRY  # noqa: E402
 
+TERMINAL_KILL_EXIT = 42
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -31,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--interval-seconds", type=float, default=300.0)
     parser.add_argument("--max-cycles", type=int, default=0, help="0 = run forever until a HALT")
     parser.add_argument("--budget", type=float, default=300.0)
+    parser.add_argument(
+        "--cycle-budget",
+        type=float,
+        default=5.0,
+        help="maximum durably reserved provider liability per live/campaign cycle",
+    )
     parser.add_argument("--state-root", default=None)
     parser.add_argument("--idle-on-stop", action="store_true",
                         help="idle (sleep + re-check) on STOP file / budget cap instead of "
@@ -55,12 +63,14 @@ def main(argv: list[str] | None = None) -> int:
         interval_seconds=args.interval_seconds,
         max_cycles=args.max_cycles,
         budget_cap_usd=args.budget,
+        cycle_budget_cap_usd=args.cycle_budget,
         state_root=args.state_root,
         idle_on_stop=args.idle_on_stop,
+        mode=args.mode,
     )
     state = run_daemon(config) if cycle_fn is None else run_daemon(config, cycle_fn=cycle_fn)
     print(state_json(state))
-    return 0
+    return TERMINAL_KILL_EXIT if state.terminal_kill else 0
 
 
 if __name__ == "__main__":

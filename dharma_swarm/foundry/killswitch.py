@@ -14,12 +14,17 @@ that is enforced in the workflow, not here.
 
 from __future__ import annotations
 
+import json
+import os
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from dharma_swarm.holon_killswitch import is_kill_requested, read_kill
 
 FOUNDRY_HOLON = "sublimation-foundry"
 _STOP_FILE = Path.home() / ".dharma" / "foundry" / "STOP"
+_KILL_FILE = "KILL.json"
 
 
 class FoundryStopped(RuntimeError):
@@ -32,11 +37,92 @@ def _stop_file(state_root: Path | None = None) -> Path:
     return _STOP_FILE
 
 
+def terminal_kill_file(state_root: Path | None = None) -> Path:
+    root = Path(state_root) if state_root is not None else _STOP_FILE.parent
+    return root / _KILL_FILE
+
+
+def read_terminal_kill(state_root: Path | None = None) -> dict[str, Any] | None:
+    path = terminal_kill_file(state_root)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return {
+            "schema_version": "foundry_terminal_kill.corrupt",
+            "category": "corrupt_kill_marker",
+            "reason": f"terminal KILL marker unreadable ({type(exc).__name__})",
+        }
+    if not isinstance(payload, dict):
+        return {
+            "schema_version": "foundry_terminal_kill.corrupt",
+            "category": "corrupt_kill_marker",
+            "reason": "terminal KILL marker is not an object",
+        }
+    return payload
+
+
+def persist_terminal_kill(
+    state_root: Path,
+    *,
+    category: str,
+    reason: str,
+    evidence: dict[str, Any] | None = None,
+) -> Path:
+    """Persist the first terminal verdict; later restarts cannot erase it."""
+    path = terminal_kill_file(state_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "foundry_terminal_kill.v1",
+        "category": category,
+        "reason": reason,
+        "evidence": evidence or {},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError:
+        # Terminal means terminal: preserve the original causal receipt.
+        return path
+    return path
+
+
+def has_terminal_kill(state_root: Path | None = None) -> bool:
+    return terminal_kill_file(state_root).exists()
+
+
+def _quarantine_files(state_root: Path | None = None) -> tuple[Path, Path]:
+    root = Path(state_root) if state_root is not None else _STOP_FILE.parent
+    return root / "QUARANTINE.json", root / "QUARANTINE"
+
+
 def is_stopped(*, agents_root: Path | None = None, state_root: Path | None = None) -> bool:
-    return is_kill_requested(FOUNDRY_HOLON, agents_root) or _stop_file(state_root).exists()
+    return (
+        has_terminal_kill(state_root)
+        or any(path.exists() for path in _quarantine_files(state_root))
+        or is_kill_requested(FOUNDRY_HOLON, agents_root)
+        or _stop_file(state_root).exists()
+    )
 
 
 def stop_reason(*, agents_root: Path | None = None, state_root: Path | None = None) -> str:
+    terminal = read_terminal_kill(state_root)
+    if terminal:
+        return (
+            f"terminal KILL [{terminal.get('category', 'unknown')}]: "
+            f"{terminal.get('reason') or '(no reason given)'}"
+        )
+    quarantine = next(
+        (path for path in _quarantine_files(state_root) if path.exists()),
+        None,
+    )
+    if quarantine is not None:
+        return f"evidence quarantine requires operator review: {quarantine}"
     if _stop_file(state_root).exists():
         return f"operator STOP file present: {_stop_file(state_root)}"
     marker = read_kill(FOUNDRY_HOLON, agents_root)

@@ -37,6 +37,7 @@ from typing import Callable
 
 from dharma_swarm.foundry.evaluator import Candidate, EvalMetrics
 from dharma_swarm.foundry.runner_isolation import (
+    IsolationProof,
     IsolationPolicy,
     RunResult,
     promotion_allowed,
@@ -170,8 +171,34 @@ def loose_apply(tree: Path, diff: str) -> str | None:
         # a scoring risk — the oracle, tamper digest, and win floor all sit
         # downstream, so a wrongly-placed hunk just scores zero.
         if best_score < 0.85:
-            return f"loose_apply: old-block not found (best similarity {best_score:.2f} < 0.85)"
-        lines = lines[:best_i] + new + lines[best_i + len(old):]
+            # A short hunk may have drifted context but still carry one exact,
+            # unique change anchor. Derive the changed segment from old->new
+            # and accept it only when it occurs exactly once in the real file.
+            matcher = difflib.SequenceMatcher(None, old, new, autojunk=False)
+            changes = [opcode for opcode in matcher.get_opcodes() if opcode[0] != "equal"]
+            if len(changes) != 1:
+                return (
+                    "loose_apply: old-block not found "
+                    f"(best similarity {best_score:.2f} < 0.85)"
+                )
+            _, old_start, old_end, new_start, new_end = changes[0]
+            anchor = old[old_start:old_end]
+            replacement = new[new_start:new_end]
+            if not anchor:
+                return "loose_apply: pure-insert hunk without unique anchor"
+            matches = [
+                i for i in range(0, len(lines) - len(anchor) + 1)
+                if lines[i:i + len(anchor)] == anchor
+            ]
+            if len(matches) != 1:
+                return (
+                    "loose_apply: changed segment is not uniquely anchored "
+                    f"(matches={len(matches)})"
+                )
+            anchor_i = matches[0]
+            lines = lines[:anchor_i] + replacement + lines[anchor_i + len(anchor):]
+        else:
+            lines = lines[:best_i] + new + lines[best_i + len(old):]
 
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return None
@@ -248,13 +275,33 @@ def apply_diff(tree: Path, diff: str,
             return None if rc == 0 else f"apply failed: {err}"
 
         # Fallback: fuzz-tolerant patch(1).
-        rc, err_patch = _run(["patch", "-p1", "--forward", "--fuzz=3", "--dry-run",
+        # Use short POSIX/BSD-compatible flags: macOS patch rejects or behaves
+        # differently with GNU long options (``--forward --fuzz --dry-run``).
+        rc, err_patch = _run(["patch", "-p1", "-N", "-F", "3", "-C",
                               "-d", str(tree), "-i", patch_path])
         if rc != 0:
-            return f"apply --check failed: {err_git} | patch fallback: {err_patch}"
+            # Interior context drift is beyond patch(1)'s edge-fuzz model. The
+            # bounded single-file loose applier is the final portable path; a
+            # check runs against a disposable copy and never mutates ``tree``.
+            if check_only:
+                probe = Path(tempfile.mkdtemp(prefix="foundry_apply_check_"))
+                try:
+                    shutil.rmtree(probe)
+                    shutil.copytree(tree, probe)
+                    loose_error = loose_apply(probe, diff)
+                finally:
+                    shutil.rmtree(probe, ignore_errors=True)
+            else:
+                loose_error = loose_apply(tree, diff)
+            if loose_error is None:
+                return None
+            return (
+                f"apply --check failed: {err_git} | patch fallback: {err_patch} | "
+                f"{loose_error}"
+            )
         if check_only:
             return None
-        rc, err = _run(["patch", "-p1", "--forward", "--fuzz=3",
+        rc, err = _run(["patch", "-p1", "-N", "-F", "3",
                         "-d", str(tree), "-i", patch_path])
         return None if rc == 0 else f"patch apply failed: {err}"
     except (subprocess.SubprocessError, OSError) as exc:
@@ -280,6 +327,7 @@ class OracleEvaluator:
     baseline: EvalMetrics | None = None
     last_isolation_level: str = ""
     last_promotion_allowed: bool = False
+    last_isolation_proof: IsolationProof | None = None
     _oracle_digest_baseline: str = ""
 
     def _scratch(self) -> Path:
@@ -317,7 +365,8 @@ class OracleEvaluator:
         result = run_isolated(self.oracle_cmd, str(tree), self.policy,
                               docker_ok=self.docker_ok, runner=self.runner)
         self.last_isolation_level = result.isolation_level
-        self.last_promotion_allowed = promotion_allowed(result)
+        self.last_isolation_proof = IsolationProof.from_result(result, self.policy)
+        self.last_promotion_allowed = promotion_allowed(result, self.policy)
         return result
 
     def prepare(self) -> None:
@@ -376,6 +425,7 @@ class OracleEvaluator:
                          "promotion_allowed": 1.0 if self.last_promotion_allowed else 0.0},
                 wall_clock_s=metrics.wall_clock_s,
                 notes=(metrics.notes + f" | isolation={self.last_isolation_level}").strip(" |"),
+                isolation_proof=self.last_isolation_proof,
             )
         finally:
             shutil.rmtree(tree, ignore_errors=True)

@@ -56,6 +56,8 @@ class GenerationReport:
     spend_usd: float = 0.0
     ring2_checked: int = 0
     ring2_survivors: int = 0
+    ring2_promotion_blocked: int = 0
+    provider_failures: int = 0
     survival_rates: list[float] = field(default_factory=list)
     trip_reasons: dict[str, int] = field(default_factory=dict)
 
@@ -90,7 +92,9 @@ class FoundryLoop:
     def __post_init__(self) -> None:
         self.evaluator.prepare()
 
-    def _ring1(self, candidate: Candidate, seed: int) -> tuple[float, TripwireReport, tuple[str, ...]]:
+    def _ring1(
+        self, candidate: Candidate, seed: int
+    ) -> tuple[float, TripwireReport, tuple[str, ...], bool, dict | None]:
         report = scan_tripwires(candidate, allowed_paths=self.allowed_paths)
         receipt = blind_evaluate(self.evaluator, candidate, seed=seed,
                                  tripwires_fired=report.fired)
@@ -106,7 +110,13 @@ class FoundryLoop:
             if det or tim:
                 receipt = blind_evaluate(self.evaluator, candidate, seed=seed,
                                          tripwires_fired=tuple(fired))
-        return receipt.fitness, report, tuple(fired)
+        return (
+            receipt.fitness,
+            report,
+            tuple(fired),
+            receipt.promotion_allowed,
+            receipt.isolation_proof,
+        )
 
     def run_generation(self, generation: int) -> GenerationReport:
         killswitch.check(agents_root=self.agents_root, state_root=self.state_root)
@@ -115,15 +125,28 @@ class FoundryLoop:
                                  seed=generation)
         parent = self.grid.best()
         parent_id = parent.candidate_id if parent else None
-        new_wins: list[tuple[Candidate, float]] = []
+        new_wins: list[tuple[Candidate, float, bool, dict | None]] = []
 
         for i, model in enumerate(models):
             if not self.budget.can_afford(model):
                 continue  # metered lane out of budget; free lanes still run
             candidate = self.propose_fn(model, parent_id, generation * 1000 + i)
-            report.spend_usd += self.budget.charge(model)
+            # A failed zero-token provider attempt is typed transport evidence,
+            # not a billable mutation. Successful/possibly-billable attempts
+            # retain the conservative roster charge; exact token spend is
+            # reconciled by the real campaign wrapper.
+            if candidate.metadata.get("budget_chargeable", True):
+                report.spend_usd += self.budget.charge(model)
+            if candidate.metadata.get("proposal_status") == "provider_error":
+                report.provider_failures += 1
+                report.trip_reasons["provider_error"] = (
+                    report.trip_reasons.get("provider_error", 0) + 1
+                )
+                continue
             report.proposed += 1
-            fitness, _, fired = self._ring1(candidate, seed=generation)
+            fitness, _, fired, ring1_promotion, ring1_proof = self._ring1(
+                candidate, seed=generation
+            )
             if fired:
                 report.tripwire_trips += 1
                 for reason in fired:
@@ -132,22 +155,26 @@ class FoundryLoop:
                 report.ring1_wins += 1
                 if self.grid.add(self.descriptor_fn(candidate), candidate.candidate_id,
                                  fitness, {"origin_model": model.id}):
-                    new_wins.append((candidate, fitness))
+                    new_wins.append((candidate, fitness, ring1_promotion, ring1_proof))
 
         # Ring 2: re-verify newly promoted elites on held-out workloads.
         if self.heldout_evaluators:
-            for candidate, fitness in new_wins:
+            for candidate, fitness, ring1_promotion, ring1_proof in new_wins:
                 outcome = run_heldout(
                     candidate, self.heldout_evaluators,
                     in_loop_fitness=fitness, seed=generation,
                     survival_threshold=self.survival_threshold,
+                    in_loop_promotion_allowed=ring1_promotion,
+                    in_loop_isolation_proof=ring1_proof,
                 )
                 report.ring2_checked += 1
                 report.survival_rates.append(outcome.survival_rate)
-                if outcome.survived:
+                if outcome.survived and outcome.promotion_allowed:
                     report.ring2_survivors += 1
                     if self.on_survivor is not None:
                         self.on_survivor(candidate, fitness, outcome)
+                elif outcome.survived:
+                    report.ring2_promotion_blocked += 1
 
         report.grid_coverage = self.grid.coverage()
         best = self.grid.best()

@@ -1,0 +1,261 @@
+"""Cumulative, replay-verified Foundry artifact lineage.
+
+Every promoted candidate stores both its per-cycle delta and a cumulative patch
+from the immutable upstream base.  The manifest binds base tree, parent,
+delta, cumulative bytes, and the replayed candidate tree.  A mismatch is a
+terminal replication failure; callers must never silently reset to a clean
+tree and continue claiming a compound campaign.
+"""
+
+from __future__ import annotations
+
+import difflib
+import hashlib
+import json
+import os
+import shutil
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from dharma_swarm.foundry.evaluator import canonical_digest
+from dharma_swarm.foundry.oracle_evaluator import apply_diff
+from dharma_swarm.foundry.target_ingest import compute_tree_digest
+
+LINEAGE_SCHEMA = "foundry_artifact_lineage.v1"
+
+
+class ArtifactReplayError(RuntimeError):
+    """A promoted artifact cannot be reproduced from its declared base."""
+
+
+@dataclass(frozen=True)
+class PriorArtifact:
+    path: Path
+    metric: float
+    manifest_path: Path | None = None
+    manifest: dict[str, Any] | None = None
+
+    def __iter__(self):
+        """Compatibility with the historic ``(path, metric)`` return shape."""
+        yield self.path
+        yield self.metric
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _copy_tree(source: Path) -> Path:
+    work = Path(tempfile.mkdtemp(prefix="foundry_lineage_"))
+    shutil.rmtree(work)
+    shutil.copytree(
+        source,
+        work,
+        ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv"),
+    )
+    return work
+
+
+def _cumulative_patch(base_root: Path, candidate_root: Path, evolve_file: str) -> str:
+    base_path = base_root / evolve_file
+    candidate_path = candidate_root / evolve_file
+    if not base_path.is_file() or not candidate_path.is_file():
+        raise ArtifactReplayError(f"evolve file missing during lineage build: {evolve_file}")
+    try:
+        base_lines = base_path.read_text(encoding="utf-8").splitlines(keepends=True)
+        candidate_lines = candidate_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    except UnicodeDecodeError as exc:
+        raise ArtifactReplayError("binary evolve files are unsupported") from exc
+    patch = "".join(
+        difflib.unified_diff(
+            base_lines,
+            candidate_lines,
+            fromfile=f"a/{evolve_file}",
+            tofile=f"b/{evolve_file}",
+        )
+    )
+    if not patch:
+        raise ArtifactReplayError("promoted candidate is identical to immutable base")
+    return patch if patch.endswith("\n") else patch + "\n"
+
+
+def _write_immutable(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("xb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError:
+        if path.read_bytes() != data:
+            raise ArtifactReplayError(f"content-address collision at {path}")
+
+
+def verify_lineage(
+    base_root: Path,
+    manifest: dict[str, Any],
+    *,
+    artifact_path: Path,
+    delta_path: Path | None = None,
+    expected_parent_artifact_sha256: str | None = None,
+) -> str:
+    """Replay a cumulative patch from its exact base and verify the final tree."""
+    required = {
+        "schema_version",
+        "base_tree_digest",
+        "delta_sha256",
+        "cumulative_sha256",
+        "candidate_tree_digest",
+        "evolve_file",
+        "parent_artifact_sha256",
+        "parent_candidate_tree_digest",
+    }
+    missing = sorted(required - manifest.keys())
+    if missing:
+        raise ArtifactReplayError(f"lineage manifest missing fields: {', '.join(missing)}")
+    if manifest["schema_version"] != LINEAGE_SCHEMA:
+        raise ArtifactReplayError(f"unsupported lineage schema: {manifest['schema_version']}")
+    claimed_lineage = str(manifest.get("lineage_digest", ""))
+    lineage_body = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"lineage_digest", "manifest_path"}
+    }
+    if not claimed_lineage or canonical_digest(lineage_body) != claimed_lineage:
+        raise ArtifactReplayError("lineage manifest digest mismatch")
+    declared_parent = str(manifest.get("parent_artifact_sha256", ""))
+    parent_tree = str(manifest.get("parent_candidate_tree_digest", ""))
+    if bool(declared_parent) != bool(parent_tree):
+        raise ArtifactReplayError("parent artifact/tree relation is incomplete")
+    if (
+        expected_parent_artifact_sha256 is not None
+        and declared_parent != expected_parent_artifact_sha256
+    ):
+        raise ArtifactReplayError(
+            "parent artifact relation mismatch: "
+            f"expected={expected_parent_artifact_sha256 or 'genesis'} "
+            f"actual={declared_parent or 'genesis'}"
+        )
+    evolve_file = str(manifest["evolve_file"])
+    actual_base = compute_tree_digest(Path(base_root), [evolve_file])
+    if actual_base != manifest["base_tree_digest"]:
+        raise ArtifactReplayError(
+            "seed base tree mismatch: "
+            f"expected={manifest['base_tree_digest']} actual={actual_base}"
+        )
+    try:
+        artifact_bytes = Path(artifact_path).read_bytes()
+    except OSError as exc:
+        raise ArtifactReplayError(f"cumulative artifact missing: {artifact_path}") from exc
+    if sha256_bytes(artifact_bytes) != manifest["cumulative_sha256"]:
+        raise ArtifactReplayError("cumulative artifact sha256 mismatch")
+    if delta_path is None:
+        foundry_root = Path(artifact_path).resolve().parent.parent
+        raw_delta = Path(str(manifest.get("delta_artifact", "")))
+        delta_path = raw_delta if raw_delta.is_absolute() else foundry_root / raw_delta
+    try:
+        delta_bytes = Path(delta_path).read_bytes()
+    except OSError as exc:
+        raise ArtifactReplayError(f"delta artifact missing: {delta_path}") from exc
+    if sha256_bytes(delta_bytes) != manifest["delta_sha256"]:
+        raise ArtifactReplayError("delta artifact sha256 mismatch")
+
+    work = _copy_tree(Path(base_root))
+    try:
+        failure = apply_diff(work, artifact_bytes.decode("utf-8"))
+        if failure is not None:
+            raise ArtifactReplayError(f"cumulative artifact replay failed: {failure}")
+        actual_candidate = compute_tree_digest(work, [evolve_file])
+        if actual_candidate != manifest["candidate_tree_digest"]:
+            raise ArtifactReplayError(
+                "replayed candidate tree mismatch: "
+                f"expected={manifest['candidate_tree_digest']} actual={actual_candidate}"
+            )
+        return actual_candidate
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def build_lineage(
+    *,
+    state_root: Path,
+    target_id: str,
+    resolved_sha: str,
+    base_root: Path,
+    seeded_root: Path,
+    base_tree_digest: str,
+    evolve_file: str,
+    delta: str,
+    parent_artifact_sha256: str = "",
+    parent_candidate_tree_digest: str = "",
+) -> dict[str, Any]:
+    """Persist delta+cumulative+manifest only after an exact replay succeeds."""
+    actual_base = compute_tree_digest(Path(base_root), [evolve_file])
+    if actual_base != base_tree_digest:
+        raise ArtifactReplayError(
+            f"lineage base changed before build: expected={base_tree_digest} actual={actual_base}"
+        )
+    seeded_digest = compute_tree_digest(Path(seeded_root), [evolve_file])
+    if parent_artifact_sha256:
+        if not parent_candidate_tree_digest:
+            raise ArtifactReplayError("authoritative parent lacks candidate tree digest")
+        if seeded_digest != parent_candidate_tree_digest:
+            raise ArtifactReplayError(
+                "seeded tree does not match declared parent candidate tree"
+            )
+    elif parent_candidate_tree_digest:
+        raise ArtifactReplayError("parent candidate tree declared without parent artifact")
+    elif seeded_digest != base_tree_digest:
+        raise ArtifactReplayError("genesis lineage seeded tree differs from immutable base")
+    delta_bytes = delta.encode("utf-8")
+    delta_sha = sha256_bytes(delta_bytes)
+    candidate_root = _copy_tree(Path(seeded_root))
+    try:
+        failure = apply_diff(candidate_root, delta)
+        if failure is not None:
+            raise ArtifactReplayError(f"promoted delta failed to apply: {failure}")
+        cumulative = _cumulative_patch(Path(base_root), candidate_root, evolve_file)
+        cumulative_bytes = cumulative.encode("utf-8")
+        cumulative_sha = sha256_bytes(cumulative_bytes)
+        candidate_digest = compute_tree_digest(candidate_root, [evolve_file])
+    finally:
+        shutil.rmtree(candidate_root, ignore_errors=True)
+
+    foundry_root = Path(state_root)
+    delta_path = foundry_root / "artifacts" / "deltas" / f"{delta_sha}.patch"
+    cumulative_path = foundry_root / "artifacts" / f"{cumulative_sha}.patch"
+    _write_immutable(delta_path, delta_bytes)
+    _write_immutable(cumulative_path, cumulative_bytes)
+
+    body: dict[str, Any] = {
+        "schema_version": LINEAGE_SCHEMA,
+        "target_id": target_id,
+        "resolved_sha": resolved_sha,
+        "base_tree_digest": base_tree_digest,
+        "parent_artifact_sha256": parent_artifact_sha256,
+        "parent_candidate_tree_digest": parent_candidate_tree_digest,
+        "delta_sha256": delta_sha,
+        "cumulative_sha256": cumulative_sha,
+        "candidate_tree_digest": candidate_digest,
+        "evolve_file": evolve_file,
+        "delta_artifact": str(delta_path.relative_to(foundry_root)),
+        "cumulative_artifact": str(cumulative_path.relative_to(foundry_root)),
+        "replay_verified": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    body["lineage_digest"] = canonical_digest(body)
+    manifest_path = (
+        foundry_root
+        / "artifacts"
+        / "manifests"
+        / f"{body['lineage_digest'].removeprefix('sha256:')}.json"
+    )
+    body["manifest_path"] = str(manifest_path.relative_to(foundry_root))
+    # manifest_path is a locator, not part of the sealed lineage body.
+    manifest_bytes = (json.dumps(body, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    _write_immutable(manifest_path, manifest_bytes)
+    verify_lineage(base_root, body, artifact_path=cumulative_path)
+    return body

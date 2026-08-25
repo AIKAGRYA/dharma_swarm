@@ -42,7 +42,8 @@ selection is cancer.
 
 ## Standing orders for the Foundry specifically
 
-- The daemon runs continuously, report-only, within its budget cap and
+- Once the versioned service is explicitly deployed and its status audit is
+  green, the daemon runs continuously, report-only, within its budget cap and
   kill-metrics. It never selects on money and never lights a
   self-modification fuse (One Wire: N≥5 external receipts, M≥3 domains,
   operator-granted — never self-granted).
@@ -58,12 +59,12 @@ selection is cancer.
 Inherits the dead-man's-switch pattern (`docs/telos-engine/03_SELF_EVOLVING_ARCH.md`).
 
 - **Operator silent > 7 days:** no new outreach, no budget increases, no new
-  target admissions. Daemon continues report-only. Walking Brief keeps
-  posting.
+  target admissions. A healthy deployed daemon may continue report-only; a
+  KILL/quarantine remains stopped. Walking Brief keeps posting.
 - **Operator silent > 30 days:** outreach lane sealed entirely; any pending
-  One Wire grant proposals expire; the daemon continues within existing caps
-  (it is designed to be safe unattended). Sessions may fix breakage and keep
-  receipts flowing; they may not expand scope.
+  One Wire grant proposals expire; a healthy deployed daemon may continue
+  within existing caps. Sessions may fix breakage and keep receipts flowing;
+  they may not clear terminal evidence or expand scope without authority.
 - **Operator returns:** read `docs/foundry/OPERATOR_RESUME_KIT.md` (one
   screen), then the latest Walking Brief. The system owes the operator a
   true account of everything that happened in the gap — that account is the

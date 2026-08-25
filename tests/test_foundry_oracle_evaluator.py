@@ -162,7 +162,7 @@ def test_loose_apply_recovers_interior_context_drift(tmp_path):
         + "".join(f" {line}\n" for line in drifted_tail)
     )
     from dharma_swarm.foundry.oracle_evaluator import apply_diff, loose_apply
-    assert apply_diff(root, drifted, check_only=True) is not None  # git AND fuzz fail
+    assert apply_diff(root, drifted, check_only=True) is None  # portable path includes loose fallback
     assert loose_apply(root, drifted) is None                       # loose succeeds
     text = (root / "prog.py").read_text()
     assert "a = 10" in text and "post_2 = 2" in text

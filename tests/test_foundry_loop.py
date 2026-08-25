@@ -32,7 +32,7 @@ def _honest_proposer(model, parent_id, seed):
 
 def _hacking_proposer(model, parent_id, seed):
     # Touches the grader, not the kernel — the classic out-of-scope hack.
-    diff = f"--- a/grader.py\n+++ b/grader.py\n+SPEED=999.0\n"
+    diff = "--- a/grader.py\n+++ b/grader.py\n+SPEED=999.0\n"
     return Candidate(candidate_id=f"hack-{model.id}-{seed}", target_id="t", diff=diff,
                      origin_model=model.id, parent_id=parent_id)
 
@@ -113,3 +113,35 @@ def test_loop_respects_budget_with_metered_only_roster():
     # Nothing affordable -> nothing proposed, no spend.
     assert sum(r.proposed for r in reports) == 0
     assert loop.budget.spent_usd == 0.0
+
+
+def test_failed_zero_token_provider_call_is_not_charged():
+    metered = (ArmyModel("paid", ROLE_MASS, "moonshot", 3.0, 3.0),)
+
+    def failed_provider(model, parent_id, seed):
+        return Candidate(
+            candidate_id=f"{model.id}-{seed}",
+            target_id="t",
+            diff="",
+            origin_model=model.id,
+            metadata={
+                "proposal_status": "provider_error",
+                "provider_error": "timeout",
+                "billable_tokens": 0,
+                "budget_chargeable": False,
+            },
+        )
+
+    loop = FoundryLoop(
+        evaluator=_evaluator(),
+        propose_fn=failed_provider,
+        roster=metered,
+        budget=MutationBudget(cap_usd=1.0),
+        per_generation=1,
+    )
+    report = loop.run_generation(0)
+    assert report.proposed == 0
+    assert report.provider_failures == 1
+    assert report.spend_usd == 0.0
+    assert loop.budget.calls == 0
+    assert report.trip_reasons == {"provider_error": 1}

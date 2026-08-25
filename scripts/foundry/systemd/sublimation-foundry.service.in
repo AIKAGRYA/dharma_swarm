@@ -1,0 +1,50 @@
+[Unit]
+Description=Sublimation Foundry unattended campaign
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+StartLimitIntervalSec=900
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=@@USER@@
+Group=@@USER@@
+SupplementaryGroups=docker
+WorkingDirectory=@@REPO@@
+Environment=PYTHONUNBUFFERED=1
+Environment=FOUNDRY_REPO_ROOT=@@REPO@@
+Environment=FOUNDRY_STATE_ROOT=@@STATE_ROOT@@
+Environment=FOUNDRY_PYTHON=@@PYTHON@@
+EnvironmentFile=-/etc/dharma-foundry/foundry.env
+ExecStart=@@PYTHON@@ @@REPO@@/scripts/foundry/foundry_daemon.py --mode campaign --targets openevolve-circle-packing --max-cycles 0 --cycle-generations 3 --interval-seconds 300 --budget 300 --cycle-budget 5 --state-root @@STATE_ROOT@@ --idle-on-stop
+Restart=on-failure
+RestartPreventExitStatus=42
+RestartSec=30
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=90
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=@@STATE_ROOT@@
+MemoryMax=2G
+TasksMax=256
+LimitNOFILE=4096
+LimitFSIZE=1G
+
+[Install]
+WantedBy=multi-user.target
