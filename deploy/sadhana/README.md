@@ -309,7 +309,10 @@ converges only uv 0.11.2's exact empty `.venv/.lock` inode from `0666` to
 owner-private `0600` before trusted candidate reads. It rejects every broken
 or venv-escaping link. After the final tracked-checkout proof and second
 solo-process proof, it removes only pinned Next 16.3.0's exact 288-byte ignored
-`dashboard/next-env.d.ts` declaration before Git metadata removal; arbitrary
+`dashboard/next-env.d.ts` declaration. It then admits pinned uv 0.11.2's exact
+ignored six-file `dharma_swarm.egg-info` directory by producer-specific modes,
+sizes, bytes, ownership, and single-link custody, and removes only those bound
+inodes and their exact directory before Git metadata removal; arbitrary
 source-root output remains rejected. It then renders exact-SHA units. There is no
 `deploy --activate` option: deployment stages and completes
 only the no-effect preparation boundary. After installing the writer unit it
