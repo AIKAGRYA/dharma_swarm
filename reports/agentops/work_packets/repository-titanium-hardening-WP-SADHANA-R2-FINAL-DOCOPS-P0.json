@@ -1,9 +1,9 @@
 {
   "id": "repository-titanium-hardening-WP-SADHANA-R2-FINAL-DOCOPS-P0",
-  "base_ref": "634ee3cd8395a39788a004d3b378f0a3e76f2fa7",
+  "base_ref": "e5a174461f62f4ffdb86b01979cfebc36a6312a0",
   "branch": "agent/sadhana-vps-mobile-release-r2-truthfix-final-20260826",
   "worktree": ".",
-  "intent": "Regenerate only the repository-owned DocOps inventory and asserted manifest counts from the exact SADHANA R2 isolated-build manifest-custody truth-fix tree. Preserve doctrine and authority relationships; this packet is mechanical count convergence, not release approval, runtime evidence, deployment activation, or an authority promotion.",
+  "intent": "Regenerate only the repository-owned DocOps inventory and asserted manifest counts from the exact SADHANA R2 pinned-uv traversal truth-fix tree. Preserve doctrine and authority relationships; this packet is mechanical count convergence, not release approval, runtime evidence, deployment activation, or an authority promotion.",
   "allowed_files": [
     "docs/docops/AUTO_INVENTORY.md",
     "docs/governance/SOVEREIGN_MANIFEST.md",
@@ -52,8 +52,8 @@
       "timeout_seconds": 300
     },
     {
-      "name": "c5-to-head-diff-check",
-      "command": "git diff --check 634ee3cd8395a39788a004d3b378f0a3e76f2fa7 HEAD",
+      "name": "c7-to-head-diff-check",
+      "command": "git diff --check e5a174461f62f4ffdb86b01979cfebc36a6312a0 HEAD",
       "expected_exit": 0,
       "timeout_seconds": 120
     }
@@ -93,11 +93,11 @@
     "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "634ee3cd8395a39788a004d3b378f0a3e76f2fa7",
+      "checked_at_sha": "e5a174461f62f4ffdb86b01979cfebc36a6312a0",
       "details": []
     },
     "interface_mismatches": [
-      "The isolated-build manifest-custody truth fix changes tracked implementation, tests, and packet metrics after the previous generated DocOps snapshot, so the asserted inventory must be regenerated from exact commit 634ee3cd8395a39788a004d3b378f0a3e76f2fa7.",
+      "The pinned-uv traversal truth fix changes tracked implementation, tests, and packet metrics after the previous generated DocOps snapshot, so the asserted inventory must be regenerated from exact commit e5a174461f62f4ffdb86b01979cfebc36a6312a0.",
       "The existing DocOps generator is the sole deterministic writer for both affected documents; manual count edits or advisory-mode verification would create competing truth."
     ],
     "closest_existing_implementation": [
@@ -106,10 +106,10 @@
       "docs/governance/SOVEREIGN_MANIFEST.md"
     ],
     "honest_blockers": [
-      "Generated count convergence proves only that these two documents match the tracked manifest-custody-fix tree; it does not independently approve, deploy, activate, or prove the SADHANA runtime.",
+      "Generated count convergence proves only that these two documents match the tracked pinned-uv-traversal-fix tree; it does not independently approve, deploy, activate, or prove the SADHANA runtime.",
       "No provider, transport, VPS, service, route, credential, release seal, or Git remote is mutated by this packet."
     ],
     "rollback": "Regenerate both documents from the restored tracked tree. Never hand-edit asserted counts, append duplicate rows, weaken strict verification, or treat generated totals as runtime evidence.",
-    "packet_digest": "5a3d58bd41dc22ae1e64ecfd63b498256c928265750ed524e8a75dc29d2e9ca6"
+    "packet_digest": "a074417b848f9776f6e756e72609792bc49b4a5f65527aab9fbb37eab75bced2"
   }
 }
