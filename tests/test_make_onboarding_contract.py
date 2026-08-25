@@ -75,7 +75,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
     write.  A shared local clone avoids copying the repository object store.
     """
     subprocess.run(
-        ["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
+        ["git", *_GIT_NO_AUTO_MAINTENANCE, "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
         check=True,
         timeout=120,
     )

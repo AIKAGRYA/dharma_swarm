@@ -29,7 +29,7 @@ spec.loader.exec_module(og)
 def _copy_tracked_checkout(destination: Path) -> None:
     """Create a genuine clean Git checkout of the current implementation."""
     subprocess.run(
-        ["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
+        ["git", *_GIT_NO_AUTO_MAINTENANCE, "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
         check=True,
         timeout=120,
     )
@@ -194,7 +194,7 @@ def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
     for relative in expected:
         (checkout / relative).unlink()
     subprocess.run(
-        ["git", "-C", str(checkout), "add", "-A"],
+        ["git", "-C", str(checkout), *_GIT_NO_AUTO_MAINTENANCE, "add", "-A"],
         check=True,
         timeout=30,
     )
@@ -203,6 +203,7 @@ def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
             "git",
             "-C",
             str(checkout),
+            *_GIT_NO_AUTO_MAINTENANCE,
             "-c",
             "user.name=Orientation Graph Test",
             "-c",
