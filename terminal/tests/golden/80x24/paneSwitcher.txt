@@ -1,7 +1,6 @@
- ◆ DHARMA HELM  /  CONVERSATION  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · ◆ Conv · · Acti · · Evid · · Syst
+ ◆ DHARMA HELM / CONVERSATION · dharma_swarm                          ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  ◆ Conv  · Acti  · Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 OVERLAY / TEMPORARY
@@ -15,6 +14,7 @@ OVERLAY / TEMPORARY
 │ • 4. Commands · commands                                                     │
 │ • 5. Models · models                                                         │
 │ • 6. Ontology · ontology                                                     │
+│                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated idle

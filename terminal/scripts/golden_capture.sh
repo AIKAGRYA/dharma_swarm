@@ -74,17 +74,17 @@ OVERLAY_TIMEOUT=${GOLDEN_OVERLAY_TIMEOUT:-25}
 marker_for() {
   case $1 in
     chat) printf 'F2 unfolds the Whole Helm' ;;  # Quiet Field welcome line 2 (mockContent.ts)
-    mission) printf 'One state model. One bridge.' ;;
-    repo) printf 'Workspace snapshot' ;;
-    commands) printf 'Command graph' ;;
-    models) printf 'Model policy' ;;
-    ontology) printf 'Ontology snapshot' ;;
-    runtime) printf 'Runtime Snapshot' ;;
-    sessions) printf '0 shown of 0' ;;
-    approvals) printf 'provisional-live' ;;
-    control) printf 'Control Snapshot' ;;
-    agents) printf 'route profiles' ;;
-    evolution) printf 'Cascade and self-improvement' ;;
+    mission) printf 'Mission Control' ;;
+    repo) printf 'workspace owner' ;;
+    commands) printf 'local command catalog' ;;
+    models) printf 'route policy owner' ;;
+    ontology) printf 'ontology owner' ;;
+    runtime) printf 'runtime owner' ;;
+    sessions) printf 'session owner' ;;
+    approvals) printf 'permission owner' ;;
+    control) printf 'control owner' ;;
+    agents) printf 'agent-route owner' ;;
+    evolution) printf 'evolution owner' ;;
     modelPicker) printf 'No model targets loaded.' ;;
     paneSwitcher) printf '1. Chat' ;;  # The selected row must remain visible at every governed size.
     *) return 1 ;;

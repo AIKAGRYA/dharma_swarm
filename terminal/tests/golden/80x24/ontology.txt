@@ -1,15 +1,15 @@
- ◆ DHARMA HELM  /  EVIDENCE  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · · Conv · · Acti · ◆ Evid · · Syst
+ ◆ DHARMA HELM / EVIDENCE · dharma_swarm                              ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  · Conv  · Acti  ◆ Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Ontology                                                                     │
 │ Shared world model, foundations, and semantic frame updates.                 │
 │                                                                              │
-│ Ontology snapshot loading...                                                 │
-│ The shell should surface DHARMA concepts, not just provider chat.            │
+│ ?[?] UNKNOWN · ontology owner projection not observed.                       │
+│ No concept freshness or authority is inferred from local labels.             │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

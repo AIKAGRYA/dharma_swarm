@@ -105,6 +105,7 @@ async function renderShellAt(
   rows: number,
   settled: (frame: string) => boolean,
   layoutCommand: string | null = "/cockpit",
+  followupInputs: string[] = [],
 ): Promise<string> {
   // Deterministic offline: the spawn fails instantly, so bridgeStatus reaches
   // "offline" within the poll budget.
@@ -144,6 +145,10 @@ async function renderShellAt(
       await Bun.sleep(50);
       stdin.write("\r");
     }
+    for (const input of followupInputs) {
+      await Bun.sleep(50);
+      stdin.write(input);
+    }
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline && !settled(stripAnsi(rendered))) {
       await Bun.sleep(50);
@@ -172,7 +177,10 @@ test("80x24 uses the compact Quiet Field without losing Helm truth", async () =>
   for (const label of ["F5", "G56", "G46", "FU", "K3", "O50", "O48"]) {
     expect(frame).toContain(`${label} ?`);
   }
-  expect(frame).not.toContain("OFFLINE");
+  expect(frame).toContain("○ OFFLINE");
+  expect(frame).toContain("? UNVERIFIED");
+  expect(frame).toContain("PROJECTION");
+  expect(frame).toContain("■");
   expect(frame).toContain("Home");
   expect(frame).toContain("Conv");
   expect(frame).toContain("Acti");
@@ -240,6 +248,20 @@ test("120x30 and larger use the 45/35/20 panorama", async () => {
   expect(frame).not.toContain("DHARMA TERMINAL");
 });
 
+test("120x40 keeps overlays wide even when the underlying structured facet is context-compact", async () => {
+  const frame = await renderShellAt(
+    120,
+    40,
+    (current) => current.includes("Model Picker"),
+    "/cockpit",
+    ["\u001b", "\u0012", "\u0010"], // Esc navigation, ^R repo, ^P routes
+  );
+
+  expect(frame).toContain("Model Picker");
+  expect(frame).toContain("HELM  /  EVIDENCE");
+  expect(frame).toContain("Enter apply | Esc close | j/k or arrows move | 1-9 direct");
+}, 10_000);
+
 test("120x30 causal proof keeps newest high-volume event titles and summaries intact", async () => {
   const events = Array.from({length: 15}, (_, index) => ({
     id: `event-${index}`,
@@ -273,7 +295,7 @@ test("120x30 causal proof keeps newest high-volume event titles and summaries in
     expect(frame).toContain("event 14");
     expect(frame).toContain("summary 14");
     expect(frame).toContain("event 13");
-    expect(frame).toContain("15 canonical events");
+    expect(frame).toContain("NO VERDICT · 15 evt");
   } finally {
     instance.unmount();
     instance.cleanup();

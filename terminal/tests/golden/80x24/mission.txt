@@ -1,20 +1,20 @@
- ◆ DHARMA HELM  /  HOME  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- ◆ Home · · Conv · · Acti · · Evid · · Syst
+ ◆ DHARMA HELM / HOME · dharma_swarm                                  ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ ◆ Home  · Conv  · Acti  · Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Mission                                                                      │
 │ Bootstrap framing, intent routing, and session launch context.               │
 │                                                                              │
-│ ◆ Operator Shell                                                             │
-│ ◇ Goal                                                                       │
-│ Provide one clean operator shell with continuity, visible execution, and     │
-│ repo-aware state.                                                            │
-│ ◇ Principles                                                                 │
-│ One state model. One bridge. Visible tools. Minimal chrome. No duplicate     │
-│ output.                                                                      │
+│ ?[?] UNKNOWN · Mission Control projection not observed.                      │
+│ No live mission, task, or execution state is claimed in this frame.          │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated idle

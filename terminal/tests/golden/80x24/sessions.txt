@@ -1,16 +1,16 @@
- ◆ DHARMA HELM  /  CONVERSATION  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · ◆ Conv · · Acti · · Evid · · Syst
+ ◆ DHARMA HELM / CONVERSATION · dharma_swarm                          ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  ◆ Conv  · Acti  · Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Sessions                                                                     │
-│ 0 shown of 0 | rows 0 | next fresh | j/k select | Enter detail | r resume |… │
+│ ?[?] UNKNOWN · session owner projection absent                               │
 │                                                                              │
 │  Catalog                    Drilldown                                        │
 │  id · route · status        identity, replay, and typed conversation         │
-│  No sessions.               No selected session.                             │
+│  No current session         No selected session.                             │
+│  projection.                                                                 │
 │                                                                              │
 │                                                                              │
 │                                                                              │

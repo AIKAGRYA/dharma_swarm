@@ -1,5 +1,5 @@
  ◆ DHARMA HELM  /  ACTIVITY  ·  dharma_swarm                                      100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   ◆ Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
@@ -7,16 +7,16 @@
 ┌────────────────────────────────────────┐CONTEXT / ORGANISM
 │ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
 │  Dharma Helm · Quiet Field             ││ Approvals                                              │
-│  Type a message below · F2 unfolds     ││ provisional-live | pending 0 | tracked 0               │
-│  the Whole Helm                        ││                                                        │
-│                                        ││  Queue               Selected                          │
-│                                        ││  pending-first       decision, resolution, and runtime │
-│                                        ││  operator             trace                            │
-│                                        ││  decisions           No selected approval.             │
-│                                        ││  No approvals.                                         │
+│  Type a message below · F2 unfolds     ││ ?[?] UNKNOWN · permission owner projection absent      │
+│  the Whole Helm                        ││ ▣ HELD · fresh owner history required                  │
 │                                        ││                                                        │
+│                                        ││  Queue                                                 │
+│                                        ││  pending-first operator decisions                      │
+│                                        ││  No current permission projection.                     │
 │                                        ││                                                        │
-│                                        ││                                                        │
+│                                        ││  Selected                                              │
+│                                        ││  decision, resolution, and runtime trace               │
+│                                        ││  No selected approval.                                 │
 │                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │

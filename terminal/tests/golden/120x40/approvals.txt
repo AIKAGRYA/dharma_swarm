@@ -1,26 +1,24 @@
  ◆ DHARMA HELM  /  ACTIVITY  ·  dharma_swarm                                                          120×40 · panorama
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   ◆ Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
 ┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
 │ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
-│  Dharma Helm · Quiet Field                         ││ Approvals                              ││ correlated events ·… │
-│  Type a message below · F2 unfolds the Whole Helm  ││ provisional-live | pending 0 | tracked ││                      │
-│                                                    ││  0                                     ││ ✖ bridge stdin is u… │
+│  Dharma Helm · Quiet Field                         ││ Approvals                              ││ owner-correlated fe… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ ?[?] UNKNOWN · permission owner        ││                      │
+│                                                    ││ projection absent                      ││ ✖ FAILED             │
+│                                                    ││ ▣ HELD · fresh owner history required  ││ bridge stdin is una… │
 │                                                    ││                                        ││                      │
-│                                                    ││  Queue         Selected                ││                      │
-│                                                    ││  pending-fir   decision, resolution,   ││                      │
-│                                                    ││  st operator   and runtime trace       ││                      │
-│                                                    ││   decisions    No selected approval.   ││                      │
+│                                                    ││  Queue                                 ││                      │
+│                                                    ││  pending-first operator decisions      ││                      │
+│                                                    ││  No current permission projection.     ││                      │
 │                                                    ││                                        ││                      │
-│                                                    ││  No                                    ││                      │
-│                                                    ││  approvals.                            ││                      │
-│                                                    ││                                        ││                      │
-│                                                    ││                                        ││                      │
-│                                                    ││                                        ││                      │
-│                                                    ││                                        ││                      │
+│                                                    ││  Selected                              ││                      │
+│                                                    ││  decision, resolution, and runtime     ││                      │
+│                                                    ││  trace                                 ││                      │
+│                                                    ││  No selected approval.                 ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
@@ -31,7 +29,9 @@
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
-│                                                    ││                                        ││ 1 canonical events … │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││ NO VERDICT · 1 evt   │
 └────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮

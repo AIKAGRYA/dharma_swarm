@@ -22,6 +22,7 @@ type Props = {
   activeTab: TabSpec | undefined;
   modelChoices: RouteTarget[];
   compact: boolean;
+  contextualCompact: boolean;
   scrollOffset: number;
   windowSize: number;
   repoPreview?: TabPreview;
@@ -54,7 +55,11 @@ export function ActiveFacet(props: Props): React.ReactElement {
       />
     );
   }
-  if (props.compact && activeTab && (activeTab.kind === "repo" || activeTab.kind === "control" || activeTab.kind === "runtime")) {
+  if (
+    (props.compact || props.contextualCompact)
+    && activeTab
+    && (activeTab.kind === "repo" || activeTab.kind === "control" || activeTab.kind === "runtime")
+  ) {
     const sections = activeTab.kind === "repo"
       ? buildRepoPaneSections(props.repoPreview, activeTab.lines, props.controlPreview, controlLines)
       : activeTab.kind === "runtime"
@@ -105,7 +110,15 @@ export function ActiveFacet(props: Props): React.ReactElement {
     );
   }
   if (activeTab?.kind === "approvals") {
-    return <ApprovalsPane title={activeTab.title} approvalPane={state.approvalPane} />;
+    return (
+      <ApprovalsPane
+        title={activeTab.title}
+        approvalPane={state.approvalPane}
+        authorityObserved={state.authoritativeSurfaces.approvals}
+        bridgeStatus={state.bridgeStatus}
+        compact={props.contextualCompact}
+      />
+    );
   }
   if (activeTab?.kind === "sessions") {
     return (
@@ -113,6 +126,9 @@ export function ActiveFacet(props: Props): React.ReactElement {
         title={activeTab.title}
         sessionPane={state.sessionPane}
         sessionContinuity={state.sessionContinuity}
+        authorityObserved={state.authoritativeSurfaces.sessions}
+        bridgeStatus={state.bridgeStatus}
+        compact={props.contextualCompact}
       />
     );
   }
@@ -122,6 +138,9 @@ export function ActiveFacet(props: Props): React.ReactElement {
         title={activeTab.title}
         lines={activeTab.lines}
         selectedRouteIndex={state.paneFocusIndices[activeTab.id] ?? 0}
+        authorityObserved={state.authoritativeSurfaces.agents}
+        bridgeStatus={state.bridgeStatus}
+        compact={props.contextualCompact}
       />
     );
   }

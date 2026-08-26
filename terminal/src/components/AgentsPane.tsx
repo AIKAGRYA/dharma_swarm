@@ -1,7 +1,8 @@
 import React from "react";
 import {Box, Text} from "ink";
 
-import type {TranscriptLine} from "../types";
+import {ownerProjectionModality} from "../nihonga/projectionModality.ts";
+import type {BridgeStatus, TranscriptLine} from "../types";
 import {THEME} from "../theme";
 
 type AgentRouteCard = {
@@ -23,6 +24,9 @@ type Props = {
   title: string;
   lines: TranscriptLine[];
   selectedRouteIndex?: number;
+  authorityObserved: boolean;
+  bridgeStatus: BridgeStatus;
+  compact?: boolean;
 };
 
 function parseAgentRouteCards(lines: TranscriptLine[]): AgentRouteCard[] {
@@ -66,22 +70,37 @@ function clampIndex(index: number, count: number): number {
   return Math.min(Math.max(index, 0), count - 1);
 }
 
-export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React.ReactElement {
+export function AgentsPane({title, lines, selectedRouteIndex = 0, authorityObserved, bridgeStatus, compact = false}: Props): React.ReactElement {
   const routes = parseAgentRouteCards(lines);
   const openclaw = parseOpenClawSummary(lines);
   const activeIndex = clampIndex(selectedRouteIndex, routes.length);
   const selected = routes[activeIndex];
+  const retained = routes.length > 0 || Object.values(openclaw).some((value) => value !== "n/a");
+  const modality = ownerProjectionModality({
+    bridgeStatus,
+    authorityObserved,
+    hasRetainedProjection: retained,
+  });
+  const modalityLabel = modality === "observed"
+    ? "◉ OBSERVED · route intents · configured ≠ contacted"
+    : modality === "stale"
+      ? "~ STALE · retained route projection · no liveness implied"
+      : "?[?] UNKNOWN · agent-route owner projection absent";
 
   return (
     <Box flexGrow={1} borderStyle="round" borderColor={THEME.ridge} paddingX={1} flexDirection="column">
       <Text color={THEME.wave} bold>{title}</Text>
-      <Text color={THEME.stone}>route profiles and execution posture | j/k or ↑/↓ select route</Text>
-      <Box marginTop={1}>
-        <Box width="35%" flexDirection="column" paddingX={1}>
+      <Text color={THEME.stone}>
+        {modalityLabel}{compact ? "" : " · j/k select"}
+      </Text>
+      <Box marginTop={1} flexDirection={compact ? "column" : "row"}>
+        <Box width={compact ? undefined : "35%"} flexDirection="column" paddingX={1}>
           <Text color={THEME.mist} bold>Routes</Text>
           <Text color={THEME.stone}>typed routing intents</Text>
           {routes.length === 0 ? (
-            <Text color={THEME.stone}>No typed agent routes yet.</Text>
+            <Text color={THEME.stone}>
+              {modality === "observed" ? "No routes in the observed projection." : "No current owner projection."}
+            </Text>
           ) : (
             routes.slice(0, 12).map((route, index) => {
               const active = index === activeIndex;
@@ -99,7 +118,13 @@ export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React
             })
           )}
         </Box>
-        <Box width="65%" marginLeft={1} flexDirection="column" paddingX={1}>
+        <Box
+          width={compact ? undefined : "65%"}
+          marginLeft={compact ? 0 : 1}
+          marginTop={compact ? 1 : 0}
+          flexDirection="column"
+          paddingX={1}
+        >
           <Text color={THEME.mist} bold>Route brief</Text>
           <Text color={THEME.stone}>selected route plus OpenClaw envelope</Text>
           {!selected ? (
@@ -112,8 +137,16 @@ export function AgentsPane({title, lines, selectedRouteIndex = 0}: Props): React
             </>
           )}
           <Text color={THEME.mist} bold>OpenClaw</Text>
-          <Text color={THEME.stone}>present {openclaw.present} | readable {openclaw.readable}</Text>
-          <Text color={THEME.stone}>agents {openclaw.agents} | providers {openclaw.providers}</Text>
+          {modality === "observed" ? (
+            <>
+              <Text color={THEME.stone}>present {openclaw.present} | readable {openclaw.readable}</Text>
+              <Text color={THEME.stone}>agents {openclaw.agents} | providers {openclaw.providers}</Text>
+            </>
+          ) : modality === "stale" && retained ? (
+            <Text color={THEME.stone}>retained projection · do not infer current state</Text>
+          ) : (
+            <Text color={THEME.stone}>owner projection absent</Text>
+          )}
         </Box>
       </Box>
     </Box>

@@ -1,14 +1,14 @@
- ◆ DHARMA HELM  /  HOME  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- ◆ Home · · Conv · · Acti · · Evid · · Syst
+ ◆ DHARMA HELM / HOME · dharma_swarm                                  ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ ◆ Home  · Conv  · Acti  · Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Control · Control Snapshot                                                   │
 │ 1/1 sections · j/k select                                                    │
 │                                                                              │
-│ Control-plane snapshot loading...                                            │
+│ ?[?] UNKNOWN · control owner projection not observed.                        │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

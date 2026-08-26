@@ -1,5 +1,5 @@
  ◆ DHARMA HELM  /  EVIDENCE  ·  dharma_swarm                                      100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   · Activity   ◆ Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
@@ -10,9 +10,9 @@
 │  Type a message below · F2 unfolds     ││ Shared world model, foundations, and semantic frame    │
 │  the Whole Helm                        ││ updates.                                               │
 │                                        ││                                                        │
-│                                        ││ Ontology snapshot loading...                           │
-│                                        ││ The shell should surface DHARMA concepts, not just     │
-│                                        ││ provider chat.                                         │
+│                                        ││ ?[?] UNKNOWN · ontology owner projection not observed. │
+│                                        ││ No concept freshness or authority is inferred from     │
+│                                        ││ local labels.                                          │
 │                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │

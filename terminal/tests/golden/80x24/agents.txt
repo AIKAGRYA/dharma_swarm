@@ -1,19 +1,19 @@
- ◆ DHARMA HELM  /  ACTIVITY  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · · Conv · ◆ Acti · · Evid · · Syst
+ ◆ DHARMA HELM / ACTIVITY · dharma_swarm                              ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  · Conv  ◆ Acti  · Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Agents                                                                       │
-│ route profiles and execution posture | j/k or ↑/↓ select route               │
+│ ?[?] UNKNOWN · agent-route owner projection absent · j/k select              │
 │                                                                              │
 │  Routes                     Route brief                                      │
 │  typed routing intents      selected route plus OpenClaw envelope            │
-│  No typed agent routes      No selected route.                               │
-│  yet.                       OpenClaw                                         │
-│                             present n/a | readable n/a                       │
-│                             agents n/a | providers n/a                       │
+│  No current owner           No selected route.                               │
+│  projection.                OpenClaw                                         │
+│                             owner projection absent                          │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯

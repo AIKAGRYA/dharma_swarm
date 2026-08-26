@@ -1,5 +1,5 @@
  ◆ DHARMA HELM  /  SYSTEM  ·  dharma_swarm                                        100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   · Activity   · Evidence   ◆ System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
@@ -9,10 +9,10 @@
 │  Dharma Helm · Quiet Field             ││ Commands                                               │
 │  Type a message below · F2 unfolds     ││ Registered command graph and operational affordances.  │
 │  the Whole Helm                        ││                                                        │
-│                                        ││ Command graph loading...                               │
-│                                        ││ Plain language should resolve into Dharma-native       │
-│                                        ││ commands when confidence is high.                      │
-│                                        ││                                                        │
+│                                        ││ STATIC GUIDE · local command catalog; execution state  │
+│                                        ││ UNKNOWN.                                               │
+│                                        ││ A listed command grants no authority and proves no     │
+│                                        ││ effect.                                                │
 │                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │

@@ -1,5 +1,5 @@
  ◆ DHARMA HELM  /  SYSTEM  ·  dharma_swarm                                        100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   · Activity   · Evidence   ◆ System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
@@ -9,8 +9,8 @@
 │  Dharma Helm · Quiet Field             ││ Models                                                 │
 │  Type a message below · F2 unfolds     ││ Structured operator transcript.                        │
 │  the Whole Helm                        ││                                                        │
-│                                        ││ Model policy loading...                                │
-│                                        ││                                                        │
+│                                        ││ ?[?] UNVERIFIED · route policy owner projection not    │
+│                                        ││ observed.                                              │
 │                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │

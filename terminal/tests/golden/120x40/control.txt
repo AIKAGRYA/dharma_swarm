@@ -1,27 +1,16 @@
  ◆ DHARMA HELM  /  HOME  ·  dharma_swarm                                                              120×40 · panorama
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ◆ Home   · Conversation   · Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
 ┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
 │ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
-│  Dharma Helm · Quiet Field                         ││ Control                                ││ correlated events ·… │
-│  Type a message below · F2 unfolds the Whole Helm  ││ control summary, loop health, and next ││                      │
-│                                                    ││  action | j/k or ↑/↓ move between      ││ ✖ bridge stdin is u… │
-│                                                    ││ sections                               ││                      │
-│                                                    ││                                        ││                      │
-│                                                    ││  Sections      Control Snapshot        ││                      │
-│                                                    ││  control       selected control card   ││                      │
-│                                                    ││  loop cards    Control-plane snapshot  ││                      │
-│                                                    ││                loading...              ││                      │
-│                                                    ││  ▶ Control                             ││                      │
-│                                                    ││  Snapshot                              ││                      │
-│                                                    ││    1 rows                              ││                      │
-│                                                    ││    Control-p                           ││                      │
-│                                                    ││  lane                                  ││                      │
-│                                                    ││  snapshot                              ││                      │
-│                                                    ││  loading...                            ││                      │
+│  Dharma Helm · Quiet Field                         ││ Control · Control Snapshot             ││ owner-correlated fe… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ 1/1 sections · j/k select              ││                      │
+│                                                    ││                                        ││ ✖ FAILED             │
+│                                                    ││ ?[?] UNKNOWN · control owner           ││ bridge stdin is una… │
+│                                                    ││ projection not observed.               ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
@@ -31,7 +20,18 @@
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
-│                                                    ││                                        ││ 1 canonical events … │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││ NO VERDICT · 1 evt   │
 └────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮

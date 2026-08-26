@@ -1,25 +1,25 @@
  ◆ DHARMA HELM  /  HOME  ·  dharma_swarm                                          100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  ◆ Home   · Conversation   · Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ┌────────────────────────────────────────┐CONTEXT / ORGANISM
 │ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
-│  Dharma Helm · Quiet Field             ││ Control                                                │
-│  Type a message below · F2 unfolds     ││ control summary, loop health, and next action | j/k or │
-│  the Whole Helm                        ││  ↑/↓ move between sections                             │
+│  Dharma Helm · Quiet Field             ││ Control · Control Snapshot                             │
+│  Type a message below · F2 unfolds     ││ 1/1 sections · j/k select                              │
+│  the Whole Helm                        ││                                                        │
+│                                        ││ ?[?] UNKNOWN · control owner projection not observed.  │
 │                                        ││                                                        │
-│                                        ││  Sections            Control Snapshot                  │
-│                                        ││  control loop        selected control card             │
-│                                        ││  cards               Control-plane snapshot loading... │
 │                                        ││                                                        │
-│                                        ││  ▶ Control                                             │
-│                                        ││  Snapshot                                              │
-│                                        ││    1 rows                                              │
-│                                        ││    Control-plane                                       │
-│                                        ││  snapshot                                              │
-│                                        ││  loading...                                            │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │
 └────────────────────────────────────────┘╰────────────────────────────────────────────────────────╯

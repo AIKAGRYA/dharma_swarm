@@ -2,6 +2,7 @@ import React from "react";
 import {Box, Text} from "ink";
 
 import type {BridgeStatus, RouteState} from "../types";
+import {routeStatePresentation} from "../routePresentation.ts";
 import {THEME} from "../theme";
 import {HELM_PLACES, type HelmPlace, type HelmViewportProfile, placeLabel} from "./shellModel";
 
@@ -17,7 +18,7 @@ type RoomBandProps = {
 };
 
 function bridgeGlyph(status: BridgeStatus): {glyph: string; color: string} {
-  if (status === "connected") return {glyph: "●", color: THEME.moss};
+  if (status === "connected") return {glyph: "●", color: THEME.wave};
   if (status === "degraded") return {glyph: "⚠", color: THEME.persimmon};
   if (status === "booting") return {glyph: "◌", color: THEME.parchment};
   return {glyph: "○", color: THEME.ink};
@@ -31,6 +32,33 @@ export function NihongaRoomBand(props: RoomBandProps): React.ReactElement {
   const bridge = bridgeGlyph(props.bridgeStatus);
   const compact = props.profile === "compact" || props.profile === "survival";
   const displayedRouteState = routeStateForBridge(props.bridgeStatus, props.routeState);
+  const route = routeStatePresentation(displayedRouteState);
+  if (compact) {
+    return (
+      <Box flexDirection="column" flexShrink={0}>
+        <Box paddingX={1} justifyContent="space-between">
+          <Text wrap="truncate-end">
+            <Text color={THEME.wave} bold>◆ DHARMA HELM</Text>
+            <Text color={THEME.ink}>{" / "}</Text>
+            <Text color={THEME.foam} bold>{placeLabel(props.place).toUpperCase()}</Text>
+            <Text color={THEME.ink}>{" · "}</Text>
+            <Text color={THEME.stone}>{props.workspace}</Text>
+          </Text>
+          <Text color={bridge.color}>{bridge.glyph} {props.bridgeStatus.toUpperCase()}</Text>
+        </Box>
+        <Box paddingX={1}>
+          <Text wrap="truncate-end">
+            <Text color={THEME.stone}>route </Text>
+            <Text color={THEME.parchment}>{props.routeLabel}</Text>
+            <Text color={THEME.ink}>{" · "}</Text>
+            <Text color={route.color}>{route.glyph} {route.word}</Text>
+            <Text color={THEME.ink}>{" · "}</Text>
+            <Text color={THEME.stone}>PROJECTION</Text>
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
   return (
     <Box flexDirection="column" flexShrink={0}>
       <Box paddingX={1} justifyContent="space-between">
@@ -48,8 +76,8 @@ export function NihongaRoomBand(props: RoomBandProps): React.ReactElement {
           <Text color={bridge.color}>{bridge.glyph} {props.bridgeStatus}</Text>
           <Text color={THEME.ink}>{"  ·  "}</Text>
           <Text color={THEME.parchment}>{props.routeLabel}</Text>
-          <Text color={THEME.stone}> [{displayedRouteState}]</Text>
-          {!compact ? <Text color={THEME.ink}>{"  ·  projection only · owner truth preserved"}</Text> : null}
+          <Text color={route.color}> [{route.glyph} {route.word}]</Text>
+          <Text color={THEME.ink}>{"  ·  PROJECTION · owner truth preserved"}</Text>
         </Text>
       </Box>
       <Text color={THEME.river}>{"─".repeat(Math.max(props.width, 1))}</Text>
@@ -63,7 +91,7 @@ export function PlaceCompass({active, compact = false}: {active: HelmPlace; comp
       <Text wrap="truncate-end">
         {HELM_PLACES.map((place, index) => (
           <React.Fragment key={place}>
-            {index > 0 ? <Text color={THEME.ink}>{compact ? " · " : "   "}</Text> : null}
+            {index > 0 ? <Text color={THEME.ink}>{compact ? "  " : "   "}</Text> : null}
             <Text color={place === active ? THEME.wave : THEME.stone} bold={place === active}>
               {place === active ? "◆ " : "· "}{compact ? placeLabel(place).slice(0, 4) : placeLabel(place)}
             </Text>

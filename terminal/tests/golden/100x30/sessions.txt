@@ -1,28 +1,28 @@
  ◆ DHARMA HELM  /  CONVERSATION  ·  dharma_swarm                                  100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   ◆ Conversation   · Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
-┌────────────────────────────────────────────────────────┐CONTEXT / ORGANISM
-│ CONVERSATION / INTENT                                  │╭────────────────────────────────────────╮
-│  Dharma Helm · Quiet Field                             ││ Sessions                               │
-│  Type a message below · F2 unfolds the Whole Helm      ││ 0 shown of 0 | rows 0 | next fresh | … │
-│                                                        ││                                        │
-│                                                        ││  Catalog       Drilldown               │
-│                                                        ││  id · route…   identity, replay, and … │
-│                                                        ││  No            No selected session.    │
-│                                                        ││  sessions.                             │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-│                                                        ││                                        │
-└────────────────────────────────────────────────────────┘╰────────────────────────────────────────╯
+┌────────────────────────────────────────┐CONTEXT / ORGANISM
+│ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
+│  Dharma Helm · Quiet Field             ││ Sessions                                               │
+│  Type a message below · F2 unfolds     ││ ?[?] UNKNOWN · session owner projection absent         │
+│  the Whole Helm                        ││ ▣ HELD · fresh catalog required to resume              │
+│                                        ││                                                        │
+│                                        ││  Catalog                                               │
+│                                        ││  id · route · status                                   │
+│                                        ││  No current session projection.                        │
+│                                        ││                                                        │
+│                                        ││  Drilldown                                             │
+│                                        ││  identity, replay, and typed conversation              │
+│                                        ││  No selected session.                                  │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+│                                        ││                                                        │
+└────────────────────────────────────────┘╰────────────────────────────────────────────────────────╯
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                     idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >  Navigation active · Esc returns to composer                                                   │

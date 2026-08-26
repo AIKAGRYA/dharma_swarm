@@ -38,20 +38,30 @@ function activityEntriesForPane(paneKind: PaneKind, entries: ActivityEntry[]): A
   return entries;
 }
 
-function colorForKind(kind: ActivityEntry["kind"]): string {
-  switch (kind) {
+function colorForEntry(entry: ActivityEntry): string {
+  if (entry.kind === "error" || entry.phase === "failed") {
+    return THEME.vermilion;
+  }
+  if (entry.phase === "complete") {
+    return THEME.pine;
+  }
+  if (entry.phase === "running") {
+    return THEME.crest;
+  }
+  if (entry.phase === "queued") {
+    return THEME.stone;
+  }
+  switch (entry.kind) {
     case "thinking":
       return THEME.stone;
     case "pivot":
       return THEME.parchment;
     case "tool":
-      return THEME.moss;
+      return THEME.parchment;
     case "approval":
       return THEME.vermilion;
     case "task":
       return THEME.wave;
-    case "error":
-      return THEME.vermilion;
     default:
       return THEME.pine;
   }
@@ -84,7 +94,7 @@ function glyphForEntry(entry: ActivityEntry): string {
     return "!";
   }
   if (entry.phase === "complete") {
-    return "✓";
+    return "■";
   }
   if (entry.phase === "queued") {
     return "○";
@@ -190,7 +200,7 @@ export function ActivityPane({title, paneKind, feed, scrollOffset = 0, windowSiz
             </Text>
             {(feed.visibilityMode === "expanded" ? group.entries : group.entries.slice(0, 1)).map((entry) => (
               <Box key={entry.id} flexDirection="column" marginTop={1} paddingLeft={1}>
-                <Text color={colorForKind(entry.kind)} bold>
+                <Text color={colorForEntry(entry)} bold>
                   {glyphForEntry(entry)} {labelForKind(entry.kind)}
                   <Text color={THEME.foam}> {"  "}{entry.title}</Text>
                 </Text>

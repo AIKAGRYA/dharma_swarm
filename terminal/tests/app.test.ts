@@ -18,6 +18,7 @@ import {
   handshakeBackoffDelayMs,
   authoritativeResyncComplete,
   authoritativeResyncStatus,
+  authoritativeSurfaceForRefresh,
   buildOperatorSummaryItems,
   commandRunEventFromPaneAction,
   controlPanePreview,
@@ -1766,7 +1767,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
   });
 
   test("uses typed session payloads when the bridge emits a payload-first sessions refresh", () => {
-    const actions = surfaceRefreshActionsForBridgeEvent({
+    const event = {
       type: "action.result",
       action_type: "surface.refresh",
       surface: "sessions",
@@ -1791,14 +1792,41 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
           },
         ],
       },
-    }, undefined, undefined, initialState.sessionPane);
+    } as const;
+    const actions = surfaceRefreshActionsForBridgeEvent(event, undefined, undefined, initialState.sessionPane);
 
     const state = applyActions(initialState, actions);
     const sessionsTab = state.tabs.find((tab) => tab.id === "sessions");
 
     expect(actions.some((action) => action.type === "session.catalog.set")).toBe(true);
+    expect(authoritativeSurfaceForRefresh(event, actions)).toBe("sessions");
     expect(sessionsTab?.preview?.["Latest session"]).toBe("sess_456");
     expect(sessionsTab?.lines.some((line) => line.text.includes("claude:claude-opus-4-6"))).toBe(true);
+  });
+
+  test("does not promote malformed owner refreshes into current authority", () => {
+    const malformedSessions = {
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "sessions",
+      output: "session-looking prose is display-only",
+    } as const;
+    const malformedAgents = {
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "agents",
+      output: "route-looking prose is display-only",
+    } as const;
+    const malformedModels = {
+      type: "action.result",
+      action_type: "surface.refresh",
+      surface: "models",
+      policy: {provider: "codex", model: "gpt-5.5"},
+    } as const;
+
+    expect(authoritativeSurfaceForRefresh(malformedSessions, [])).toBeUndefined();
+    expect(authoritativeSurfaceForRefresh(malformedAgents, [])).toBeUndefined();
+    expect(authoritativeSurfaceForRefresh(malformedModels, [])).toBeUndefined();
   });
 });
 

@@ -514,7 +514,7 @@ function stepGlyph(phase: ActivityPhase): string {
     return "!";
   }
   if (phase === "complete") {
-    return "✓";
+    return "■";
   }
   if (phase === "queued") {
     return "○";
@@ -815,7 +815,8 @@ export function latestChatTurnRoute(events: CanonicalExecutionEvent[]): string |
 }
 
 // FACE-1 zen-pure: one quiet line per turn — waiting is "… thinking · <route>"
-// (no step counts, no glyph flicker), completion is "✓ <n>s · <route> · ^T details".
+// (no step counts, no glyph flicker), completion is
+// "■ <n>s · <route> · ^T details". ✓ remains verifier-only.
 function turnSummaryText(turn: ChatTurn, route: string, expanded: boolean): string {
   const hint = expanded ? "^T collapse" : "^T details";
   if (turn.phase === "queued") {
@@ -831,7 +832,7 @@ function turnSummaryText(turn: ChatTurn, route: string, expanded: boolean): stri
     return `⊘ cancelled · ${route} · ${hint}`;
   }
   const seconds = turnDurationSeconds(turn);
-  return `✓ ${seconds === undefined ? "done" : `${seconds}s`} · ${route} · ${hint}`;
+  return `■ ${seconds === undefined ? "done" : `${seconds}s`} · ${route} · ${hint}`;
 }
 
 // F-172: the response is the star, the trace is one collapsed summary line beneath it.
@@ -910,7 +911,7 @@ export function projectPaneLines(paneKind: Extract<PaneKind, "thinking" | "tools
         return [line("tool", `⠋ ${event.summary ?? event.title}`, event.timestamp)];
       }
       if (event.kind === "tool_result") {
-        return [line("tool", `${event.phase === "failed" ? "!" : "✓"} ${event.title}: ${event.summary ?? event.content ?? "no output"}`, event.timestamp)];
+        return [line("tool", `${event.phase === "failed" ? "!" : "■"} ${event.title}: ${event.summary ?? event.content ?? "no output"}`, event.timestamp)];
       }
       if (event.kind === "approval" || event.kind === "error") {
         return [line(event.kind === "error" ? "error" : "system", `${event.title}${event.summary ? ` | ${event.summary}` : ""}`, event.timestamp)];

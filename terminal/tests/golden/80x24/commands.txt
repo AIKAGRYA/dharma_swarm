@@ -1,16 +1,16 @@
- ◆ DHARMA HELM  /  SYSTEM  ·  dharma_swarm
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · · Conv · · Acti · · Evid · ◆ Syst
+ ◆ DHARMA HELM / SYSTEM · dharma_swarm                                ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  · Conv  · Acti  · Evid  ◆ Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Commands                                                                     │
 │ Registered command graph and operational affordances.                        │
 │                                                                              │
-│ Command graph loading...                                                     │
-│ Plain language should resolve into Dharma-native commands when confidence is │
-│  high.                                                                       │
+│ STATIC GUIDE · local command catalog; execution state UNKNOWN.               │
+│ A listed command grants no authority and proves no effect.                   │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │
