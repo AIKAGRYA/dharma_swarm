@@ -1134,7 +1134,7 @@ autocatalytic_portfolio:
       ordinal: 2
       label: "Persistent Agent / Sarathi Runtime"
       role: "Turn grounded signals and loop debt into prioritized, identity-bound work."
-      project_bindings: [organism-rewire-2026-07, loop-closure-2026-06]
+      project_bindings: [organism-rewire-2026-07]
       authority: local_evidence
       input_signal: grounded_signal
       cross_inputs:
@@ -1180,7 +1180,7 @@ autocatalytic_portfolio:
       ordinal: 4
       label: "Cybernetic Supervision & Loop Closure"
       role: "Diagnose receipt-backed execution gaps and keep stalled loops visible."
-      project_bindings: [loop-closure-2026-06]
+      project_bindings: [organism-rewire-2026-07]
       authority: local_evidence
       input_signal: execution_receipt
       output_signal: closure_gap
@@ -1201,7 +1201,7 @@ autocatalytic_portfolio:
       ordinal: 5
       label: "Live Evaluation & Routing Feedback"
       role: "Measure candidate responses under parity and select a bounded experiment."
-      project_bindings: [orchestration-arena-v1-2026-06]
+      project_bindings: [dharmagraph-engine-2026-07]
       authority: local_evidence
       input_signal: closure_gap
       output_signal: selected_experiment
@@ -1222,7 +1222,7 @@ autocatalytic_portfolio:
       ordinal: 6
       label: "Chamber Research & Evolution"
       role: "Turn selected experiments into falsifiable, source-resolvable change proposals."
-      project_bindings: [hyperbolic-time-chamber-2026-07]
+      project_bindings: [dharmagraph-engine-2026-07]
       authority: local_evidence
       input_signal: selected_experiment
       cross_inputs:
@@ -1245,7 +1245,7 @@ autocatalytic_portfolio:
       ordinal: 7
       label: "Assurance & Merge Membrane"
       role: "Bind claims to evidence, verify CI truth, and integrate only authorized changes."
-      project_bindings: [sovereign-safety-tcb-2026-07, repository-titanium-hardening-2026-07, merge-master-mike-d4-2026-06]
+      project_bindings: [organism-rewire-2026-07, dharmagraph-engine-2026-07]
       authority: local_evidence
       input_signal: proposed_change
       output_signal: verified_release
@@ -1269,7 +1269,7 @@ autocatalytic_portfolio:
       ordinal: 8
       label: "Operator Experience Membrane"
       role: "Project verified releases into legible, explicitly authorized operator actions."
-      project_bindings: [helm-worldclass-terminal-2026-06]
+      project_bindings: [organism-rewire-2026-07]
       authority: projection_only
       input_signal: verified_release
       output_signal: authorized_action
@@ -1312,7 +1312,7 @@ autocatalytic_portfolio:
       ordinal: 10
       label: "Learning & Promotion Membrane"
       role: "Promote verified outcomes into bounded feedback without self-certification."
-      project_bindings: [orchestration-arena-v1-2026-06, organism-rewire-2026-07]
+      project_bindings: [organism-rewire-2026-07, dharmagraph-engine-2026-07]
       authority: projection_only
       input_signal: external_outcome
       output_signal: promoted_feedback

@@ -6,7 +6,7 @@ authority: local_evidence
 
 # Cybernetic Supervision and Loop Closure
 
-Producer: the Cybernetics Codex inspects receipts and loop state; its audit is deliberately read-only. This node is bound to `loop-closure-2026-06`.
+Producer: the Cybernetics Codex inspects receipts and loop state; its audit is deliberately read-only. This node is bound to `organism-rewire-2026-07`; the retired Loop Closure track remains historical evidence, not an active binding.
 
 Contract: consume `execution_receipt`; apply `diagnose_closure`; emit `closure_gap` to [Live Evaluation & Routing Feedback](arena_selection.md).
 

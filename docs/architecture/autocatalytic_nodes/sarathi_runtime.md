@@ -6,7 +6,7 @@ authority: local_evidence
 
 # Persistent Agent / Sarathi Runtime
 
-Producer: the Sarathi wake daemon consumes grounded signals and the read-only cybernetic audit backlog. It is bound to `organism-rewire-2026-07` and `loop-closure-2026-06`.
+Producer: the Sarathi wake daemon consumes grounded signals and the read-only cybernetic audit backlog. It is bound to `organism-rewire-2026-07`, the retained substrate-nativeness lane after the WIP reset.
 
 Contract: consume `grounded_signal`; apply `prioritize_grounded_work`; emit `prioritized_work` to [DharmaGraph Durable Execution](dharmagraph_execution.md).
 
