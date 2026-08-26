@@ -587,12 +587,48 @@ raise SystemExit(rsi_cli.main(['doctor']))
     assert "traceback" not in result.stderr.lower()
 
 
-def test_newrun_execute_refuses_dirty_nonrelease_source_before_live_imports() -> None:
+def test_newrun_execute_refuses_dirty_nonrelease_source_before_live_imports(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "nonrelease-source"
+    source.mkdir()
+    subprocess.run(["git", "init", "-q", str(source)], check=True)
+    subprocess.run(
+        ["git", "-C", str(source), "config", "user.email", "rsi-test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(source), "config", "user.name", "RSI Test"],
+        check=True,
+    )
+    marker = source / "marker.txt"
+    marker.write_text("committed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(source), "add", "marker.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(source), "commit", "-q", "-m", "fixture"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source),
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/AIKAGRYA/dharma_swarm.git",
+        ],
+        check=True,
+    )
+    marker.write_text("dirty\n", encoding="utf-8")
+
     result = _invoke(
         MODULE_COMMAND,
         "newrun",
         "--preset",
         "fast",
+        "--source-repo",
+        str(source),
         "--execute",
         "--json",
     )
