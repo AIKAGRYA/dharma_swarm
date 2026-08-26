@@ -21,6 +21,8 @@ def test_a2a_inbox_bridge_start_script_uses_receipt_bridge_not_ad_hoc_bus() -> N
 
     assert "scripts/runtime/a2a_inbox_bridge.py" in text
     assert "uv run --with nats-py" in text
+    assert "PYTHONDONTWRITEBYTECODE=1" in text
+    assert "python -B scripts/runtime/a2a_inbox_bridge.py" in text
     assert "--loop --suppress-no-messages" in text
     assert "dharma_a2a_inbox_bridge_hermes_m5" in text
 
