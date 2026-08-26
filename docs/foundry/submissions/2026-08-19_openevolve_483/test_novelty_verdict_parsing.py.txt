@@ -1,5 +1,5 @@
 """
-Tests for novelty-judge response parsing (issue #483).
+Upstream-only test fixture for novelty-judge response parsing (issue #483).
 
 The prompt in openevolve/novelty_judge.py instructs the model to respond with
 NOVEL or NOT_NOVEL (underscore). The previous inline parser searched for

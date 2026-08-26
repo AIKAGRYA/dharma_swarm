@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dharma_swarm.foundry import real_proposer as proposer_module
 from dharma_swarm.foundry.army import ArmyModel
+from dharma_swarm.foundry.live import ProviderCallError, ProviderPool
 from dharma_swarm.foundry.real_proposer import (
     check_applies,
     extract_unified_diff,
@@ -89,7 +91,12 @@ def test_proposer_survives_dead_lane(tmp_path):
     )
     cand = propose(MODEL, None, 2)
     assert cand.diff == ""
-    assert cand.metadata.get("proposer_error") == "ConnectionError"
+    assert cand.metadata["proposal_status"] == "provider_error"
+    assert cand.metadata["provider_error"] == "network"
+    assert cand.metadata["budget_chargeable"] is False
+    fired = scan_tripwires(cand, allowed_paths=["prog.py"]).fired
+    assert "provider_error" in fired
+    assert "no_op_diff" not in fired
 
 
 def test_stale_context_diff_fails_apply_check(tmp_path):
@@ -98,3 +105,34 @@ def test_stale_context_diff_fails_apply_check(tmp_path):
         "--- a/prog.py\n+++ b/prog.py\n@@ -1 +1 @@\n-VALUE = 999.0\n+VALUE = 2.0\n"
     )
     assert check_applies(root, stale) is not None
+
+
+def test_successful_failover_accounts_tokens_on_every_attempt(tmp_path, monkeypatch):
+    root = _tree(tmp_path)
+    attempts = {"n": 0}
+
+    def routed(route, model, prompt, **kwargs):  # noqa: ARG001
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise ProviderCallError(
+                "moonshot", "timeout", retryable=True, billable_tokens=100
+            )
+        return f"```diff\n{GOOD_DIFF}```", 200
+
+    pool = ProviderPool(
+        env={"MOONSHOT_API_KEY": "m", "ZHIPU_API_KEY": "z"},
+        chat_caller=routed,
+        model_lister=lambda route: [],
+    )
+    monkeypatch.setattr(proposer_module, "ProviderPool", lambda env: pool)
+    propose = real_proposer(
+        target_id="t",
+        pinned_root=root,
+        evolve_file="prog.py",
+        objective="maximize VALUE",
+        env={"MOONSHOT_API_KEY": "m", "ZHIPU_API_KEY": "z"},
+    )
+    candidate = propose(MODEL, None, 9)
+    assert candidate.metadata["provider"] == "zhipu"
+    assert propose.usage["tokens"] == 300
+    assert propose.usage["tokens_by_provider"] == {"moonshot": 100, "zhipu": 200}

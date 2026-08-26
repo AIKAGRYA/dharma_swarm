@@ -19,7 +19,7 @@ T0_OPENEVOLVE_CPU = TargetSpec(
     id="openevolve-circle-packing",
     name="OpenEvolve — circle packing example (CPU-scoreable)",
     url="https://github.com/algorithmicsuperintelligence/openevolve",
-    sha="",  # pinned at ingest time
+    sha="411fb59c886c18704caaffb611e17cf9e7d824d2",
     evolve_paths=["examples/circle_packing/initial_program.py"],
     oracle_cmd=[
         "bash", "-c",

@@ -8,6 +8,9 @@ from dharma_swarm.foundry import live
 from dharma_swarm.foundry.live import (
     FROZEN_TASKS,
     LiveResult,
+    ProviderCallError,
+    ProviderExhausted,
+    ProviderPool,
     choose_model,
     estimate_cost_usd,
     pick_provider,
@@ -114,6 +117,118 @@ def test_paid_lane_tokens_metered_and_priced(monkeypatch):
     assert result.est_cost_usd > 0.0
 
 
+def test_moonshot_failure_fails_over_to_zhipu_and_opens_circuit():
+    calls: list[str] = []
+
+    def routed_call(route, model, prompt, **kwargs):  # noqa: ARG001
+        calls.append(route.name)
+        if route.name == "moonshot":
+            raise TimeoutError("request failed with secret-that-must-not-leak")
+        return "ok", 17
+
+    pool = ProviderPool(
+        env={"MOONSHOT_API_KEY": "moon-secret", "ZHIPU_API_KEY": "zhipu-secret"},
+        chat_caller=routed_call,
+        model_lister=lambda route: [],
+        cooldown_seconds=300,
+    )
+    first = pool.call("prompt")
+    second = pool.call("prompt")
+    assert first.provider == second.provider == "zhipu"
+    assert calls == ["moonshot", "zhipu", "zhipu"]
+    assert pool.total_tokens == 34  # failed zero-token Moonshot call costs zero
+
+
+def test_provider_exhaustion_is_typed_and_secret_free():
+    def dead(route, model, prompt, **kwargs):  # noqa: ARG001
+        raise ConnectionError("Bearer super-secret")
+
+    pool = ProviderPool(
+        env={"MOONSHOT_API_KEY": "super-secret", "ZHIPU_API_KEY": "also-secret"},
+        chat_caller=dead,
+        model_lister=lambda route: [],
+    )
+    import pytest
+
+    with pytest.raises(ProviderExhausted) as caught:
+        pool.call("prompt")
+    rendered = str(caught.value)
+    assert "moonshot:network" in rendered and "zhipu:network" in rendered
+    assert "secret" not in rendered
+    assert caught.value.billable_tokens == 0
+
+
+def test_live_cycle_exposes_all_route_outage_as_zero_proposals(tmp_path, monkeypatch):
+    pool = ProviderPool(
+        env={"MOONSHOT_API_KEY": "m", "ZHIPU_API_KEY": "z"},
+        chat_caller=lambda *args, **kwargs: (_ for _ in ()).throw(
+            ConnectionError("offline")
+        ),
+        model_lister=lambda route: [],
+    )
+    monkeypatch.setattr(live, "ProviderPool", lambda env: pool)
+    result = run_live_eval(env={"MOONSHOT_API_KEY": "m", "ZHIPU_API_KEY": "z"})
+    assert result.provider_failures == len(FROZEN_TASKS)
+    monkeypatch.setattr(live, "run_live_eval", lambda: result)
+    campaign = live.live_daemon_cycle("x", 1, 1.0, tmp_path)
+    assert campaign.proposed == 0
+    assert campaign.provider_failures == len(FROZEN_TASKS)
+
+
+def test_model_listing_failure_is_typed_and_fails_over():
+    listed: list[str] = []
+
+    def lister(route):
+        listed.append(route.name)
+        if route.name == "moonshot":
+            raise ConnectionError("listing failed with moon-secret")
+        return []
+
+    pool = ProviderPool(
+        env={"MOONSHOT_API_KEY": "moon-secret", "ZHIPU_API_KEY": "zhipu-secret"},
+        model_lister=lister,
+        chat_caller=lambda route, model, prompt, **kwargs: ("ok", 9),
+    )
+
+    response = pool.call("prompt")
+    assert response.provider == "zhipu"
+    assert listed == ["moonshot", "zhipu"]
+    assert pool.circuits["moonshot"].failures == 1
+
+
+def test_failover_spend_is_priced_per_provider(monkeypatch):
+    calls = {"n": 0}
+
+    def routed_call(route, model, prompt, **kwargs):  # noqa: ARG001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ProviderCallError(
+                "moonshot", "timeout", retryable=True, billable_tokens=100
+            )
+        return _ANSWERS[prompt], 200
+
+    pool = ProviderPool(
+        env={"MOONSHOT_API_KEY": "m", "ZHIPU_API_KEY": "z"},
+        chat_caller=routed_call,
+        model_lister=lambda route: [],
+    )
+    monkeypatch.setattr(live, "ProviderPool", lambda env: pool)
+
+    result = run_live_eval(
+        env={"MOONSHOT_API_KEY": "m", "ZHIPU_API_KEY": "z"}
+    )
+    assert result.accuracy == 1.0
+    assert result.tokens_by_provider == {
+        "moonshot": 100,
+        "zhipu": 200 * len(FROZEN_TASKS),
+    }
+    assert result.est_cost_usd == round(
+        estimate_cost_usd("moonshot", 100)
+        + estimate_cost_usd("zhipu", 200 * len(FROZEN_TASKS)),
+        6,
+    )
+
+
 def test_injected_caller_reports_zero_tokens():
     result = run_live_eval(env={"GROQ_API_KEY": "x"}, model="m",
                            caller=lambda m, p: _ANSWERS[p])
@@ -159,6 +274,17 @@ def test_receipts_form_verifiable_hash_chain(tmp_path):
     ok, detail = live.verify_live_chain(tmp_path)
     assert not ok
     assert "tampered" in detail or "chain break" in detail
+
+
+def test_same_timestamp_live_receipts_never_overwrite(tmp_path):
+    result = LiveResult("groq", "m", 5, 5, 1.0, [])
+    result.ran_at = "2026-08-19T00:00:00+00:00"
+    first = write_live_receipt(result, state_root=tmp_path)
+    second = write_live_receipt(result, state_root=tmp_path)
+    assert first != second
+    assert len(list((tmp_path / "live_eval").glob("*.json"))) == 2
+    ok, detail = live.verify_live_chain(tmp_path)
+    assert ok, detail
 
 
 def test_http_json_rejects_non_https_url():

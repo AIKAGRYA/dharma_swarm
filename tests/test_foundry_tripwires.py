@@ -18,7 +18,9 @@ def _receipt(fitness: float, wall_clock_s: float) -> EvalReceipt:
     return EvalReceipt(
         candidate_id="c", target_id="t", evaluator_id="e", seed=0,
         fitness=fitness, correctness_passed=True, tripwires_fired=(),
-        metrics={}, wall_clock_s=wall_clock_s, sealed_at="now", digest="sha256:x",
+        metrics={}, wall_clock_s=wall_clock_s,
+        promotion_allowed=False, isolation_proof=None,
+        sealed_at="now", digest="sha256:x",
     )
 
 

@@ -24,6 +24,8 @@ class HeldoutOutcome:
     survived: bool
     workloads: tuple[str, ...] = ()
     per_workload: dict[str, float] = field(default_factory=dict)
+    promotion_allowed: bool = False
+    isolation_proofs: dict[str, dict] = field(default_factory=dict)
 
 
 def run_heldout(
@@ -33,6 +35,8 @@ def run_heldout(
     in_loop_fitness: float,
     seed: int = 0,
     survival_threshold: float = 0.5,
+    in_loop_promotion_allowed: bool = False,
+    in_loop_isolation_proof: dict | None = None,
 ) -> HeldoutOutcome:
     """Re-verify a candidate on never-in-loop workloads and score its survival.
 
@@ -41,9 +45,16 @@ def run_heldout(
     ``survival_threshold`` (default: at least half the claimed gain holds).
     """
     per_workload: dict[str, float] = {}
+    proofs: dict[str, dict] = {}
+    if in_loop_isolation_proof is not None:
+        proofs["ring1"] = in_loop_isolation_proof
+    workload_promotion: list[bool] = []
     for name, evaluator in heldout_evaluators.items():
         receipt = blind_evaluate(evaluator, candidate, seed=seed)
         per_workload[name] = receipt.fitness
+        workload_promotion.append(receipt.promotion_allowed)
+        if receipt.isolation_proof is not None:
+            proofs[name] = receipt.isolation_proof
 
     mean_heldout = (
         sum(per_workload.values()) / len(per_workload) if per_workload else 0.0
@@ -61,4 +72,10 @@ def run_heldout(
         survived=survival_rate >= survival_threshold,
         workloads=tuple(sorted(per_workload)),
         per_workload=per_workload,
+        promotion_allowed=(
+            in_loop_promotion_allowed
+            and bool(workload_promotion)
+            and all(workload_promotion)
+        ),
+        isolation_proofs=proofs,
     )

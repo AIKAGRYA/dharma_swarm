@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import hashlib
 import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from dharma_swarm.foundry.army import MutationBudget
 from dharma_swarm.foundry.evaluator import Candidate, CallableEvaluator, Evaluator, EvalMetrics
@@ -55,6 +57,8 @@ class CampaignResult:
     tripwire_trips: int = 0
     ring2_checked: int = 0
     ring2_survivors: int = 0
+    ring2_promotion_blocked: int = 0
+    provider_failures: int = 0
     best_fitness: float = 0.0
     mean_survival: float = 0.0
     spend_usd: float = 0.0
@@ -77,6 +81,8 @@ def run_campaign(
     tree_digest: str = "sha256:UNPINNED",
     resolved_sha: str = "",
     isolation_level: str = "local_restricted",
+    artifact_builder: Callable[[Candidate], dict] | None = None,
+    lineage_base_root: Path | None = None,
 ) -> CampaignResult:
     """Run a bounded campaign against ``spec`` and mint ring-1/2 receipts.
 
@@ -94,23 +100,30 @@ def run_campaign(
 
     survival_by_candidate: dict[str, HeldoutOutcome] = {}
 
-    def _persist_artifact(candidate: Candidate, diff_sha: str) -> None:
-        """A receipt without its artifact is unshippable (the kimi-k3-5003
-        lesson, 2026-08-19: a +0.102 receipt whose diff was lost). Survivor
-        diffs are persisted keyed by their sha so every receipt can be
-        re-verified byte-for-byte."""
-        root = (Path(state_root) if state_root else Path.home() / ".dharma" / "foundry") / "artifacts"
-        root.mkdir(parents=True, exist_ok=True)
-        path = root / f"{diff_sha}.patch"
-        path.write_text(candidate.diff, encoding="utf-8")
-        result.artifact_paths.append(str(path))
-
     def _on_survivor(candidate: Candidate, fitness: float, outcome: HeldoutOutcome) -> None:
         survival_by_candidate[candidate.candidate_id] = outcome
-        diff_sha = hashlib.sha256(candidate.diff.encode("utf-8")).hexdigest()
-        _persist_artifact(candidate, diff_sha)
+        if artifact_builder is None:
+            raise RuntimeError(
+                "ring-2 promotion requires a cumulative replay artifact builder"
+            )
+        delta_sha = hashlib.sha256(candidate.diff.encode("utf-8")).hexdigest()
+        artifact_lineage = artifact_builder(candidate)
+        diff_sha = str(artifact_lineage.get("cumulative_sha256", delta_sha))
+        cumulative_path = artifact_lineage.get("cumulative_artifact")
+        if cumulative_path:
+            root = Path(state_root) if state_root else Path.home() / ".dharma" / "foundry"
+            path = Path(str(cumulative_path))
+            result.artifact_paths.append(str(path if path.is_absolute() else root / path))
+        proof_levels = sorted({
+            str(proof.get("isolation_level", "unknown"))
+            for proof in outcome.isolation_proofs.values()
+        })
+        measured_isolation = "+".join(proof_levels) if proof_levels else "unproven"
         receipt = FoundryReceipt(
-            receipt_id=f"{spec.id}-{candidate.candidate_id}",
+            receipt_id=(
+                f"{spec.id}-{candidate.candidate_id}-{diff_sha[:16]}-"
+                f"{uuid.uuid4().hex[:12]}"
+            ),
             target_id=spec.id,
             candidate_id=candidate.candidate_id,
             stratified=StratifiedFields(
@@ -129,15 +142,21 @@ def run_campaign(
                 baseline_metric=config.baseline_metric, candidate_metric=fitness,
                 runs=1 + len(outcome.workloads),
                 coefficient_of_variation=0.0, repro_cmd=spec.oracle_cmd,
-                isolation_level=isolation_level,
+                isolation_level=measured_isolation,
+                isolation_proofs=outcome.isolation_proofs,
             ),
             disclosure=disclosure_link(
                 ai_assisted=True, duplicate_checked=True,
                 test_results=f"ring-2 survival_rate={outcome.survival_rate:.3f}",
                 diff_sha256=diff_sha,
             ),
+            artifact_lineage=artifact_lineage,
         )
-        write_receipt(receipt, state_root=(Path(state_root) / "receipts") if state_root else None)
+        write_receipt(
+            receipt,
+            state_root=(Path(state_root) / "receipts") if state_root else None,
+            lineage_base_root=lineage_base_root,
+        )
         result.receipt_ids.append(receipt.receipt_id)
 
     loop = FoundryLoop(
@@ -161,12 +180,14 @@ def run_campaign(
     result.generations_run = len(reports)
     result.proposed = sum(r.proposed for r in reports)
     result.ring1_wins = sum(r.ring1_wins for r in reports)
+    result.provider_failures = sum(r.provider_failures for r in reports)
     result.tripwire_trips = sum(r.tripwire_trips for r in reports)
     for r in reports:
         for reason, n in r.trip_reasons.items():
             result.trip_reasons[reason] = result.trip_reasons.get(reason, 0) + n
     result.ring2_checked = sum(r.ring2_checked for r in reports)
     result.ring2_survivors = sum(r.ring2_survivors for r in reports)
+    result.ring2_promotion_blocked = sum(r.ring2_promotion_blocked for r in reports)
     result.spend_usd = round(sum(r.spend_usd for r in reports), 6)
     best = loop.grid.best()
     result.best_fitness = best.fitness if best else 0.0

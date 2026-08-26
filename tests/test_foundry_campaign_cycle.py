@@ -6,7 +6,12 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
+from dharma_swarm.foundry.artifacts import ArtifactReplayError
+from dharma_swarm.foundry import campaign_cycle
 from dharma_swarm.foundry.campaign_cycle import best_prior_artifact
+from dharma_swarm.foundry.runner_isolation import StrongIsolationUnavailable
 
 
 def _mint(root: Path, target_id: str, metric: float, diff: str) -> None:
@@ -41,12 +46,27 @@ def test_best_prior_artifact_requires_artifact_on_disk(tmp_path):
         "benchmark": {"candidate_metric": 9.9},
         "disclosure": {"diff_sha256": "deadbeef" * 8},
     }), encoding="utf-8")
-    best = best_prior_artifact(tmp_path, "t1")
-    assert best is not None and best[1] == 0.40
+    with pytest.raises(ArtifactReplayError, match="missing artifact"):
+        best_prior_artifact(tmp_path, "t1")
 
 
 def test_best_prior_artifact_none_when_empty(tmp_path):
     assert best_prior_artifact(tmp_path, "t1") is None
+
+
+def test_unattended_campaign_never_falls_back_to_host_without_docker(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(campaign_cycle, "docker_available", lambda: False)
+    monkeypatch.setattr(
+        campaign_cycle,
+        "ingest",
+        lambda *args, **kwargs: pytest.fail("must block before target materialization"),
+    )
+    with pytest.raises(StrongIsolationUnavailable):
+        campaign_cycle.real_campaign_cycle(
+            "openevolve-circle-packing", 1, 0.0, tmp_path
+        )
 
 
 def test_daemon_idles_on_stop_and_resumes(tmp_path):

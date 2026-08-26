@@ -187,7 +187,10 @@ def cmd_run_real(args: argparse.Namespace) -> int:
         "tree_digest": pinned.tree_digest,
         "proposer_provider": provider,
         "proposer_tokens": usage["tokens"],
-        "proposer_est_cost_usd_upper_bound": estimate_cost_usd(provider, usage["tokens"]),
+        "proposer_est_cost_usd_upper_bound": round(sum(
+            estimate_cost_usd(route, tokens)
+            for route, tokens in usage.get("tokens_by_provider", {provider: usage["tokens"]}).items()
+        ), 6),
     }, indent=2))
     return 0
 

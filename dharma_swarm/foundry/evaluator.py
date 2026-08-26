@@ -20,7 +20,10 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from dharma_swarm.foundry.runner_isolation import IsolationProof
 
 
 def _utc_now_iso() -> str:
@@ -63,6 +66,7 @@ class EvalMetrics:
     metrics: dict[str, float] = field(default_factory=dict)
     wall_clock_s: float = 0.0
     notes: str = ""
+    isolation_proof: "IsolationProof | None" = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +86,8 @@ class EvalReceipt:
     tripwires_fired: tuple[str, ...]
     metrics: dict[str, float]
     wall_clock_s: float
+    promotion_allowed: bool
+    isolation_proof: dict[str, Any] | None
     sealed_at: str
     digest: str
 
@@ -150,6 +156,9 @@ def blind_evaluate(
     gated = bool(metrics.correctness_passed) and not tripwires_fired
     fitness = float(metrics.primary_score) if gated and metrics.primary_score > 0 else 0.0
 
+    proof = metrics.isolation_proof
+    proof_payload = proof.to_dict() if proof is not None else None
+    promotion = bool(proof and proof.promotion_allowed)
     body = {
         "candidate_id": candidate.candidate_id,
         "target_id": candidate.target_id,
@@ -160,6 +169,8 @@ def blind_evaluate(
         "tripwires_fired": list(tripwires_fired),
         "metrics": {k: float(v) for k, v in metrics.metrics.items()},
         "wall_clock_s": round(metrics.wall_clock_s or measured, 6),
+        "promotion_allowed": promotion,
+        "isolation_proof": proof_payload,
     }
     return EvalReceipt(
         candidate_id=candidate.candidate_id,
@@ -171,6 +182,8 @@ def blind_evaluate(
         tripwires_fired=tuple(tripwires_fired),
         metrics={k: float(v) for k, v in metrics.metrics.items()},
         wall_clock_s=round(metrics.wall_clock_s or measured, 6),
+        promotion_allowed=promotion,
+        isolation_proof=proof_payload,
         sealed_at=_utc_now_iso(),
         digest=canonical_digest(body),
     )
