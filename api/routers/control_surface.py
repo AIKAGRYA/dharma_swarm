@@ -7,6 +7,7 @@ GET  /api/control-surface/ds-goal/cards   -> ds-goal ledgers as BoardStore cards
 GET  /api/control-surface/agentops/cards  -> AgentOps work packets as BoardStore cards (envelope)
 GET  /api/control-surface/a2a/cards       -> A2A receipts as BoardStore cards (envelope)
 GET  /api/control-surface/semantic-receipts/cards -> SemanticReceipt artifacts as BoardStore cards (envelope)
+GET  /api/control-surface/missions/{id}/snapshot -> one injected read-only MissionSnapshot
 POST /api/control-surface/rows/{id}/handoff-prompt -> agent handoff prompt
 GET  /api/control-surface/stream          -> SSE stream of updated rows
 
@@ -17,14 +18,17 @@ runtime/code/evidence adapters.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
+import re
 import threading
 import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
@@ -45,6 +49,8 @@ _DS_GOAL_CARD_LOADER: Any | None = None
 _AGENTOPS_CARD_LOADER: Any | None = None
 _A2A_SEND_CARD_LOADER: Any | None = None
 _SEMANTIC_RECEIPT_CARD_LOADER: Any | None = None
+_MISSION_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}")
+_MISSION_AUTHORITY = "TaskBoard+RuntimeStateStore"
 
 
 def _get_envelope_types() -> tuple[Any, Any, Any]:
@@ -168,6 +174,51 @@ def _find_row_object(row_id: str, *, memory_depth: str = "snapshot"):  # noqa: A
         if row.id == row_id:
             return row
     return None
+
+
+def _mission_snapshot_projection(
+    mission_id: str,
+    *,
+    state: str,
+    snapshot: dict[str, Any] | None = None,
+    runtime_projection_mode: str = "unavailable",
+) -> dict[str, Any]:
+    """Build a non-promotional read model for one explicit mission."""
+    return {
+        "schema_version": "dharma.control_surface.mission_snapshot_projection.v1",
+        "mission_id": mission_id,
+        "state": state,
+        "authority": _MISSION_AUTHORITY,
+        "source_mode": "injected_read_only",
+        "runtime_projection_mode": runtime_projection_mode,
+        "simulation": False,
+        "snapshot": snapshot,
+        # Lifecycle rows, leases, heartbeats, acks, and receipts do not prove
+        # that an executor process is alive at observation time.
+        "proves_executor_liveness": False,
+    }
+
+
+def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]:
+    """Validate a provider result against the public MissionSnapshot shape."""
+    projected = jsonable_encoder(snapshot)
+    if not isinstance(projected, dict):
+        raise TypeError("mission snapshot provider returned a non-object")
+    mission = projected.get("mission")
+    if not isinstance(mission, dict) or mission.get("mission_id") != mission_id:
+        raise ValueError("mission snapshot identity does not match the request")
+    for field in ("tasks", "attempts", "leases", "receipts"):
+        if not isinstance(projected.get(field), list):
+            raise TypeError(f"mission snapshot field {field!r} must be a list")
+    if not isinstance(projected.get("reconciliation"), str):
+        raise TypeError("mission snapshot reconciliation must be a string")
+    if not isinstance(projected.get("observed_at"), str):
+        raise TypeError("mission snapshot observed_at must be an ISO timestamp")
+    if projected.get("authority") != _MISSION_AUTHORITY:
+        raise ValueError("mission snapshot authority is not canonical")
+    if projected.get("proves_executor_liveness") is not False:
+        raise ValueError("mission snapshot cannot claim executor liveness")
+    return projected
 
 
 @router.get("/summary")
@@ -387,6 +438,95 @@ def control_surface_semantic_receipt_cards(
                 "cards": [],
             },
             [{"source": "semantic_receipt_cards", "error": str(e)}],
+        )
+
+
+@router.get("/missions/{mission_id}/snapshot")
+async def control_surface_mission_snapshot(
+    mission_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Project one canonical MissionSnapshot through an injected reader only.
+
+    A request never constructs MissionControl, TaskBoard, RuntimeStateStore,
+    an MCP client, or a background worker. The embedding application must
+    explicitly supply its already-governed read-only provider.
+    """
+    mission_id = mission_id.strip()
+    if _MISSION_IDENTIFIER.fullmatch(mission_id) is None:
+        raise HTTPException(
+            status_code=422,
+            detail="mission_id must be a bounded identifier",
+        )
+
+    provider = getattr(request.app.state, "mission_snapshot_provider", None)
+    if provider is None:
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="uninitialized"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": "read-only provider is not injected",
+                }
+            ],
+        )
+
+    reader = getattr(provider, "get_snapshot", None)
+    if reader is None and callable(provider):
+        reader = provider
+    if not callable(reader):
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="unknown"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": "injected provider has no read-only get_snapshot callable",
+                }
+            ],
+        )
+
+    try:
+        candidate = reader(mission_id)
+        snapshot = await candidate if inspect.isawaitable(candidate) else candidate
+        if snapshot is None:
+            return _build_envelope(
+                _mission_snapshot_projection(mission_id, state="unknown"),
+                [
+                    {
+                        "source": "mission_snapshot",
+                        "error": "canonical state was not observed for this mission",
+                    }
+                ],
+            )
+        projected = _project_injected_snapshot(snapshot, mission_id)
+        provider_mode = getattr(provider, "runtime_projection_mode", None)
+        runtime_projection_mode = (
+            provider_mode
+            if provider_mode in {"immutable_copy", "owner_supplied_read_only"}
+            else "unavailable"
+        )
+        return _build_envelope(
+            _mission_snapshot_projection(
+                mission_id,
+                state="observed",
+                snapshot=projected,
+                runtime_projection_mode=runtime_projection_mode,
+            )
+        )
+    except Exception as exc:
+        logger.warning(
+            "mission snapshot provider failed for explicit mission %r (%s)",
+            mission_id,
+            type(exc).__name__,
+        )
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="unknown"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": f"read failed ({type(exc).__name__})",
+                }
+            ],
         )
 
 
