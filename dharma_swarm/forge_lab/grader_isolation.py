@@ -138,10 +138,15 @@ def recreate_isolated_container(
     logger: Any,
     nocache: bool,
     force_rebuild: bool = False,
+    *,
+    docker_user: str | None = None,
 ) -> Any:
     """Build/pull officially, then recreate the stopped container offline."""
 
-    from swebench.harness.constants import DOCKER_USER
+    if docker_user is None:
+        from swebench.harness.constants import DOCKER_USER
+
+        docker_user = DOCKER_USER
 
     original = original_builder(
         test_spec,
@@ -156,7 +161,7 @@ def recreate_isolated_container(
         isolated = client.containers.create(
             image=test_spec.instance_image_key,
             name=test_spec.get_instance_container_name(run_id),
-            user=DOCKER_USER,
+            user=docker_user,
             detach=True,
             command="tail -f /dev/null",
             platform=test_spec.platform,
