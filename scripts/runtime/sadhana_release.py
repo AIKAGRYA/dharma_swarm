@@ -13660,13 +13660,26 @@ def _unit_inactive(
     *,
     runner: Callable[..., subprocess.CompletedProcess[str]],
 ) -> bool:
+    if unit.endswith(".service"):
+        requested_properties = (
+            "--property=LoadState",
+            "--property=ActiveState",
+            "--property=MainPID",
+        )
+        expected_main_pid = "0"
+    elif unit.endswith((".path", ".target", ".timer")):
+        requested_properties = (
+            "--property=LoadState",
+            "--property=ActiveState",
+        )
+        expected_main_pid = None
+    else:
+        return False
     result = runner(
         (
             SYSTEMCTL_PATH,
             "show",
-            "--property=LoadState",
-            "--property=ActiveState",
-            "--property=MainPID",
+            *requested_properties,
             unit,
         ),
         cwd=Path("/"),
@@ -13678,14 +13691,16 @@ def _unit_inactive(
         if not separator or key in properties:
             return False
         properties[key] = value
+    expected = {
+        "LoadState": "loaded",
+        "ActiveState": properties.get("ActiveState", ""),
+    }
+    if expected_main_pid is not None:
+        expected["MainPID"] = expected_main_pid
     return (
         result.returncode == 0
-        and properties
-        == {
-            "LoadState": "loaded",
-            "ActiveState": properties.get("ActiveState", ""),
-            "MainPID": "0",
-        }
+        and not result.stderr
+        and properties == expected
         and properties["ActiveState"] in {"inactive", "failed"}
     )
 

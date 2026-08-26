@@ -4894,10 +4894,11 @@ def test_rollback_requires_runner_observed_static_dispatch_on_initial_and_replay
             effects.append(command)
             return subprocess.CompletedProcess(argv, 0, "", "")
         if command[1] == "show":
+            main_pid = "MainPID=0\n" if command[-1].endswith(".service") else ""
             return subprocess.CompletedProcess(
                 argv,
                 0,
-                "LoadState=loaded\nActiveState=inactive\nMainPID=0\n",
+                f"{main_pid}LoadState=loaded\nActiveState=inactive\n",
                 "",
             )
         if command[1] == "is-enabled":
@@ -6058,7 +6059,10 @@ def test_control_credential_stdin_install_is_exact_idempotent_and_private(
         )
 
 
-def test_failed_systemd_unit_with_zero_main_pid_is_proven_stopped() -> None:
+def test_failed_systemd_unit_with_zero_main_pid_is_proven_stopped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def runner(
         _command: tuple[str, ...],
         **_kwargs: object,
@@ -6084,6 +6088,88 @@ def test_failed_systemd_unit_with_zero_main_pid_is_proven_stopped() -> None:
         )
 
     assert not release._unit_inactive("example.service", runner=running)
+
+    def missing_main_pid(
+        _command: tuple[str, ...],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="LoadState=loaded\nActiveState=inactive\n",
+            stderr="",
+        )
+
+    assert not release._unit_inactive("example.service", runner=missing_main_pid)
+
+    def nonprocess_runner(
+        command: tuple[str, ...],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        assert "--property=MainPID" not in command
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="LoadState=loaded\nActiveState=inactive\n",
+            stderr="",
+        )
+
+    for unit in ("example.path", "example.target", "example.timer"):
+        assert release._unit_inactive(unit, runner=nonprocess_runner)
+
+    def unsupported_runner(
+        _command: tuple[str, ...],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("unsupported unit interface must fail before inspection")
+
+    assert not release._unit_inactive("example.socket", runner=unsupported_runner)
+
+    os.chmod(tmp_path, 0o700)
+    intent_path = tmp_path / "standby-intent.json"
+    monkeypatch.setattr(release, "WRITER_MARKER", tmp_path / "writer-enabled")
+    monkeypatch.setattr(
+        release,
+        "_require_standby_tailscale_route_absent",
+        lambda **_kwargs: None,
+    )
+    commands: list[tuple[str, ...]] = []
+
+    def standby_runner(
+        argv: tuple[str, ...],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        command = tuple(argv)
+        commands.append(command)
+        if command[1] == "show":
+            main_pid = "MainPID=0\n" if command[-1].endswith(".service") else ""
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                f"{main_pid}LoadState=loaded\nActiveState=inactive\n",
+                "",
+            )
+        if command[1] == "is-enabled":
+            return subprocess.CompletedProcess(argv, 1, "disabled\n", "")
+        raise AssertionError(f"unexpected systemd command: {command!r}")
+
+    intent, created = release._standby_activation_intent(
+        release_sha="a" * 40,
+        staged_release_admission_receipt_digest="sha256:" + "7" * 64,
+        preactivation_clock_proof_receipt_digest="sha256:" + "8" * 64,
+        path=intent_path,
+        runner=standby_runner,
+        observed=datetime(2026, 8, 23, 1, tzinfo=timezone.utc),
+        expected_root_uid=os.geteuid(),
+        expected_root_gid=os.getegid(),
+    )
+    assert created is True
+    assert intent["standby_target_inactive_before"] is True
+    assert intent["standby_stop_timer_inactive_before"] is True
+    show_commands = [command for command in commands if command[1] == "show"]
+    assert "--property=MainPID" not in show_commands[0]
+    assert "--property=MainPID" not in show_commands[1]
+    assert "--property=MainPID" in show_commands[2]
 
 
 def test_predispatch_refresh_expiry_stop_boundary_restarts_and_expires_closed(
