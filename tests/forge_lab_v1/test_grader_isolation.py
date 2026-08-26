@@ -101,6 +101,7 @@ def test_official_container_is_recreated_offline_with_empty_host_environment() -
         "run-1",
         SimpleNamespace(),
         False,
+        docker_user="root",
     )
 
     assert result is isolated
@@ -145,6 +146,7 @@ def test_isolation_attestation_failure_removes_candidate_container(
             "run-2",
             SimpleNamespace(),
             False,
+            docker_user="root",
         )
     assert container.removed is True
 
@@ -163,5 +165,6 @@ def test_missing_resource_or_privilege_control_blocks_promotion() -> None:
             "run-3",
             SimpleNamespace(),
             False,
+            docker_user="root",
         )
     assert container.removed is True

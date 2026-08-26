@@ -111,7 +111,10 @@ def test_launcher_exports_custom_base_as_reported_identity(tmp_path: Path) -> No
     env["RSI_LAB_BASE"] = str(base)
     env["RSI_LAB_REPO"] = ""
     env["RSI_LAB_PYTHON"] = sys.executable
-    env["RSI_LAB_PYDEPS"] = str(base / "pydeps")
+    # The release verifier intentionally keeps third-party packages outside the
+    # immutable repo. Point the nested launcher at the verifier's actual
+    # dependency root instead of a host-local virtualenv assumption.
+    env["RSI_LAB_PYDEPS"] = str(Path(pytest.__file__).resolve().parent.parent)
     env["RSI_LAB_DEV_SOURCE"] = "1"
 
     result = subprocess.run(
