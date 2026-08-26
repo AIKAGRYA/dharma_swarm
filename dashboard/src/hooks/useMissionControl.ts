@@ -45,8 +45,8 @@ export function isMissionIdentifier(value: string): boolean {
   return MISSION_ID_PATTERN.test(value);
 }
 
-export function useMissionControl(missionId: string) {
-  const enabled = isMissionIdentifier(missionId);
+export function useMissionControl(missionId: string, queryEnabled = true) {
+  const enabled = queryEnabled && isMissionIdentifier(missionId);
   const query = useQuery<ControlSurfaceEnvelope<MissionSnapshotProjection>>({
     queryKey: ["mission-control-snapshot", missionId],
     enabled,

@@ -7,6 +7,7 @@ const apiProxyTarget =
   process.env.DHARMA_API_PROXY_URL ?? "http://127.0.0.1:8420";
 
 const nextConfig: NextConfig = {
+  agentRules: false,
   turbopack: {
     root: path.resolve(__dirname),
   },

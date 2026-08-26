@@ -234,7 +234,10 @@ export function MissionControlDeck() {
     serverLocationSearch,
   );
   const showSimulation = simulationOverride ?? new URLSearchParams(locationSearch).get("mc_demo") === "1";
-  const { projection, sourceErrors, isLoading, error, refetch, enabled } = useMissionControl(missionId);
+  const { projection, sourceErrors, isLoading, error, refetch, enabled } = useMissionControl(
+    missionId,
+    !showSimulation,
+  );
 
   const observed = !showSimulation && projection?.state === "observed" && projection.snapshot;
   const snapshot = showSimulation ? PROTOTYPE_SNAPSHOT : observed || null;
