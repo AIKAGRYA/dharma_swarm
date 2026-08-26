@@ -1,0 +1,41 @@
+{
+  "schema": "dharma.mac_active_programs.focus_reset_ratification.v1",
+  "observed_at": "2026-08-27T00:33:05+09:00",
+  "authority": {
+    "kind": "session_entry_ratification",
+    "work_packet": "reports/agentops/work_packets/fleet-advancement-WP-FOCUS-RESET-20260827.json",
+    "packet_digest": "bc924cc8fd200b15bbc05a7fa45ac2fa2ec484995c0b21041f6be0824dc80ba3",
+    "base_ref": "17e04edea2280cc03a237e8221e7f1b09f16d78f",
+    "preflight_report": "/private/tmp/dharma-agentops-501/reports/agentops/fleet-advancement-WP-FOCUS-RESET-20260827/preflight-17e04edea2280cc03a237e8221e7f1b09f16d78f/report.json"
+  },
+  "claim": {
+    "modality": "verified_local_governance_state",
+    "active_lane_ids": [
+      "fleet-advancement-2026-08",
+      "sadhana-10-day-program-2026-08",
+      "rsi-lab-meghadharma-2026-08",
+      "sublimation-forge-2026-08"
+    ],
+    "active_lane_count": 4,
+    "prototype_deliverables_are_extra_program_lanes": false
+  },
+  "observations": {
+    "transition_commit": "17e04edea2280cc03a237e8221e7f1b09f16d78f",
+    "session_entry_preflight": "passed",
+    "portfolio_test_files": 4,
+    "portfolio_tests_passed": 65,
+    "managed_include_check": "passed",
+    "track_status_check": "passed",
+    "git_diff_check": "passed"
+  },
+  "bootstrap_constraint": {
+    "type": "atomic_authority_set_replacement",
+    "counterexample": "A packet bound to a new track fails preflight because that track is absent at the clean base. A packet bound to a removed track can preflight but fails closeout because that track is absent from the resulting owner file.",
+    "handling": "The atomic transition was committed after direct whole-state tests, then the resulting state was bound and re-tested by this packet. This receipt does not relabel the earlier commit as preflight-admitted."
+  },
+  "exclusions": [
+    "Ratification proves only the checked local governance state and declared active portfolio.",
+    "It does not prove runtime liveness, deployment, remote state, participant outcomes, research quality, or production readiness.",
+    "It does not authorize deployment, spending, credentials, outreach, or mutation of remote systems."
+  ]
+}
