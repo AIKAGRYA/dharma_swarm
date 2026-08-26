@@ -33,9 +33,10 @@ from scripts.runtime.a2a_topology import (  # noqa: E402
     REPLY_CONSUMER_PREFIX,
 )
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 
-DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
-DEFAULT_REPLY_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "reply_receipts"
+DEFAULT_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
+DEFAULT_REPLY_RECEIPT_ROOT = runtime_report_dir("a2a", "reply_receipts")
 
 STATUS_NO_REPLY = "NO_REPLY"
 STATUS_REPLY_CAPTURED = "REPLY_CAPTURED"

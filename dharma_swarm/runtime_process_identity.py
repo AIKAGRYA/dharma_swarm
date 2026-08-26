@@ -6,8 +6,8 @@ liveness-oracle PR:
 1. **Command-form drift.** Every surface that asked "is orchestrate-live
    running?" carried its own needle list. ``com.dharma.swarm.plist`` execs the
    console script (``dgc orchestrate-live``) while
-   ``scripts/runtime/dharma_swarm_release_runner.sh`` execs the module form
-   (``-m dharma_swarm.dgc_cli orchestrate-live``). A scanner that knew only one
+   ``scripts/runtime/dharma_swarm_release_runner.sh`` execs the isolated release
+   entrypoint. A scanner that knew only one
    spelling reported a healthy host dead — the opposite of the loud-failure
    property this lane exists for.
 
@@ -30,12 +30,13 @@ import os
 import subprocess
 
 # Every command form the organism is actually launched under. Sources, in
-# order: com.dharma.swarm.plist (console script), release runner (module
+# order: com.dharma.swarm.plist (console script), release runner (isolated module
 # form), Dockerfile.swarm (container entrypoint), direct script invocation,
 # legacy shell launcher. tests/test_runtime_command_forms.py pins these
 # against the real launch definitions so the list cannot drift again.
 ORCHESTRATE_COMMAND_NEEDLES: tuple[str, ...] = (
     "dgc orchestrate-live",
+    "dharma_swarm.runtime_release_entrypoint orchestrate-live",
     "dharma_swarm.dgc_cli orchestrate-live",
     "dharma_swarm.orchestrate_live",
     "orchestrate_live.py",

@@ -33,9 +33,10 @@ from scripts.runtime.a2a_topology import (  # noqa: E402
 )
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
 from dharma_swarm.a2a.agent_card import a2a_inbox_subject, resolve_agent_uid  # noqa: E402
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 
 DEFAULT_A2A_BUS = Path.home() / ".dharma" / "a2a_bus"
-DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "inbox_bridge_receipts"
+DEFAULT_RECEIPT_DIR = runtime_report_dir("a2a", "inbox_bridge_receipts")
 DEFAULT_HEARTBEAT_DIR = DEFAULT_A2A_BUS / "bridge_heartbeats"
 
 STATUS_NO_MESSAGES = "NO_MESSAGES"

@@ -29,13 +29,14 @@ from scripts.runtime.model_critic_runner import DEFAULT_OUT_DIR as DEFAULT_SEMAN
 from scripts.runtime.model_critic_runner import run_model_critic  # noqa: E402
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
 from dharma_swarm.models import ProviderType  # noqa: E402
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 from dharma_swarm.runtime_provider import (  # noqa: E402
     PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
     preferred_runtime_provider_configs,
     resolve_runtime_provider_config,
 )
 
-DEFAULT_DRAIN_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "semantic_inbox_drains"
+DEFAULT_DRAIN_RECEIPT_DIR = runtime_report_dir("a2a", "semantic_inbox_drains")
 DEFAULT_AGENT_UID = "codex_composer"
 LEGACY_SCHEMA_VERSION = "dharma.a2a.codex_composer_semantic_inbox_drain.v1"
 GENERIC_SCHEMA_VERSION = "dharma.a2a.semantic_inbox_drain.v1"

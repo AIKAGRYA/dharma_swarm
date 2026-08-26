@@ -26,8 +26,9 @@ from scripts.runtime.a2a_domain_reply_worker import (  # noqa: E402
 )
 from scripts.runtime.a2a_send import resolve_agent_uid  # noqa: E402
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 
-DEFAULT_ARTIFACT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "domain_reply_artifacts"
+DEFAULT_ARTIFACT_RECEIPT_DIR = runtime_report_dir("a2a", "domain_reply_artifacts")
 
 
 def _read_json(path: Path) -> dict[str, Any]:

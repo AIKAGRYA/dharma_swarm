@@ -27,17 +27,19 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from dharma_swarm.daemon_config import runtime_report_dir
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/control-surface", tags=["control-surface"])
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DS_GOAL_STATE_ROOT = Path.home() / ".dharma" / "ds_goals"
 _AGENTOPS_WORK_PACKET_ROOT = _REPO_ROOT / "reports" / "agentops" / "work_packets"
-_A2A_SEND_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "send_receipts"
-_A2A_INBOX_BRIDGE_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "inbox_bridge_receipts"
-_A2A_DOMAIN_REPLY_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "domain_reply_receipts"
-_A2A_REPLY_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "reply_receipts"
-_SEMANTIC_RECEIPT_ROOT = _REPO_ROOT / "reports" / "agentops" / "semantic_receipts"
+_A2A_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
+_A2A_INBOX_BRIDGE_RECEIPT_ROOT = runtime_report_dir("a2a", "inbox_bridge_receipts")
+_A2A_DOMAIN_REPLY_RECEIPT_ROOT = runtime_report_dir("a2a", "domain_reply_receipts")
+_A2A_REPLY_RECEIPT_ROOT = runtime_report_dir("a2a", "reply_receipts")
+_SEMANTIC_RECEIPT_ROOT = runtime_report_dir("agentops", "semantic_receipts")
 _IMPORT_LOCK = threading.Lock()
 _ENVELOPE_TYPES: tuple[Any, Any, Any] | None = None
 _CONTROL_SURFACE_FUNCS: tuple[Any, Any, Any] | None = None

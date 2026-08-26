@@ -66,7 +66,7 @@ def test_release_runner_uses_pinned_release_interpreter_and_guard() -> None:
         'source "${runtime_env_helper}"'
     )
     assert text.index("dharma_swarm/runtime_admission.py") < text.index(
-        "dharma_swarm.dgc_cli orchestrate-live"
+        "dharma_swarm.runtime_release_entrypoint orchestrate-live"
     )
     assert "/Users/dhyana/dharma_swarm/.venv" not in text
     assert "/Users/dhyana/dharma_swarm/.env" not in text
@@ -99,7 +99,7 @@ def test_release_runner_executes_guard_before_live_command(tmp_path: Path) -> No
             f"-B -I -S {release}/dharma_swarm/runtime_admission.py "
             f"--repo {release} --expected-commit {PIN}"
         ),
-        "-B -I -m dharma_swarm.dgc_cli orchestrate-live",
+        "-B -I -m dharma_swarm.runtime_release_entrypoint orchestrate-live",
     ]
 
     call_log.unlink()

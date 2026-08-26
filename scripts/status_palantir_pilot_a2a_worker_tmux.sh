@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RECEIPT_DIR="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}/reports/a2a/palantir_pilot_worker_receipts"
 SESSION="${SESSION_NAME:-dharma_palantir_pilot_a2a_worker}"
 SUBJECT="${SUBJECT:-dharma.a2a.palantir-pilot}"
 CONSUMER="${CONSUMER:-palantir_pilot_a2a}"
@@ -31,9 +31,9 @@ if command -v nats >/dev/null 2>&1; then
   nats --no-context -s nats://127.0.0.1:4222 consumer info "${STREAM}" "${CONSUMER}" -j --no-select || true
 fi
 
-if [[ -d "${ROOT}/reports/a2a/palantir_pilot_worker_receipts" ]]; then
+if [[ -d "${RECEIPT_DIR}" ]]; then
   echo "--- latest worker receipts ---"
-  find "${ROOT}/reports/a2a/palantir_pilot_worker_receipts" -maxdepth 1 -type f -name '*.json' -print \
+  find "${RECEIPT_DIR}" -maxdepth 1 -type f -name '*.json' -print \
     | sort -r \
     | head -5
 fi

@@ -29,5 +29,6 @@ def test_a2a_inbox_bridge_status_script_reports_receipts_and_consumer() -> None:
     text = (ROOT / "scripts/status_a2a_inbox_bridge_tmux.sh").read_text(encoding="utf-8")
 
     assert "consumer info" in text
+    assert "DHARMA_STATE_DIR" in text
     assert "reports/a2a/inbox_bridge_receipts" in text
     assert "tmux capture-pane" in text

@@ -26,6 +26,19 @@ def dharma_state_dir(*env_vars: str) -> Path:
     return Path.home() / ".dharma"
 
 
+def runtime_report_dir(*parts: str) -> Path:
+    """Return the non-repository root for operational runtime reports.
+
+    Runtime receipts are observed state, not reviewed source artifacts.  They
+    therefore live below the canonical Dharma state directory and must be
+    promoted deliberately before they acquire repository authority.
+    """
+    relative = Path(*parts)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("runtime report paths must remain below the Dharma report root")
+    return dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME") / "reports" / relative
+
+
 @dataclass
 class CircuitBreaker:
     """Tracks consecutive failures and triggers pauses."""

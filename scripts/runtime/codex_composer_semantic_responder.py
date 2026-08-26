@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir, runtime_report_dir  # noqa: E402
 from scripts.runtime.a2a_domain_reply_worker import (  # noqa: E402
     DEFAULT_OUTBOX_ROOT,
     DEFAULT_RECEIPT_DIR as DEFAULT_DOMAIN_REPLY_RECEIPT_DIR,
@@ -43,7 +43,7 @@ from scripts.runtime.pr_merge_control import _nats_config, stamp, utc_now  # noq
 DEFAULT_AGENT_UID = "codex_composer"
 DEFAULT_DHARMA_HOME = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 DEFAULT_INBOX_DIR = DEFAULT_DHARMA_HOME / "a2a_bus" / "inboxes" / DEFAULT_AGENT_UID
-DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
+DEFAULT_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
 DEFAULT_STATE_DIR = (
     DEFAULT_DHARMA_HOME
     / "external_agents"
