@@ -95,19 +95,19 @@ class SandboxError(Exception):
     """Raised when a sandbox operation is rejected or fails fatally."""
 
 
+class IsolationUnavailableError(SandboxError):
+    """Requested execution isolation is unavailable; host fallback is forbidden."""
+
+
 class Sandbox(ABC):
     """Abstract base for execution sandboxes."""
 
     @abstractmethod
-    async def execute(
-        self, command: str, timeout: float = 30.0
-    ) -> SandboxResult:
+    async def execute(self, command: str, timeout: float = 30.0) -> SandboxResult:
         """Run a shell command and return captured output."""
 
     @abstractmethod
-    async def execute_python(
-        self, code: str, timeout: float = 30.0
-    ) -> SandboxResult:
+    async def execute_python(self, code: str, timeout: float = 30.0) -> SandboxResult:
         """Run a Python code snippet and return captured output."""
 
     @abstractmethod
@@ -148,9 +148,7 @@ class LocalSandbox(Sandbox):
 
     # -- execution ------------------------------------------------------
 
-    async def execute(
-        self, command: str, timeout: float = 30.0
-    ) -> SandboxResult:
+    async def execute(self, command: str, timeout: float = 30.0) -> SandboxResult:
         self._check_safety(command)
         start = time.monotonic()
         proc = await asyncio.create_subprocess_shell(
@@ -183,9 +181,7 @@ class LocalSandbox(Sandbox):
             timed_out=timed_out,
         )
 
-    async def execute_python(
-        self, code: str, timeout: float = 30.0
-    ) -> SandboxResult:
+    async def execute_python(self, code: str, timeout: float = 30.0) -> SandboxResult:
         script = self._workdir / "_dharma_run.py"
         script.write_text(code, encoding="utf-8")
         try:
@@ -215,11 +211,18 @@ class SandboxManager:
         self._prefer_docker = prefer_docker
         self._docker_available: Optional[bool] = None  # Cached after first check
 
-    async def _check_docker(self) -> bool:
-        """Check Docker availability (cached)."""
-        if self._docker_available is None:
+    async def _check_docker(self, *, refresh: bool = False) -> bool:
+        """Check Docker availability, optionally bypassing the cached probe.
+
+        Auto-selection keeps the inexpensive process-lifetime cache. An
+        explicit Docker request refreshes it so a daemon started after an
+        earlier negative auto probe can be selected without rebuilding the
+        manager.
+        """
+        if refresh or self._docker_available is None:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox
+
                 self._docker_available = await DockerSandbox.docker_available()
             except ImportError:
                 self._docker_available = False
@@ -256,6 +259,8 @@ class SandboxManager:
         sandbox_type: str = "auto",
         workdir: Optional[Path] = None,
         docker_config: Optional[object] = None,
+        *,
+        require_isolation: bool = False,
     ) -> Sandbox:
         """Create a sandbox, auto-selecting Docker when available.
 
@@ -263,29 +268,49 @@ class SandboxManager:
             sandbox_type: ``"auto"`` (default), ``"docker"``, or ``"local"``.
             workdir: Working directory for local sandboxes.
             docker_config: Optional :class:`ContainerConfig` for Docker sandboxes.
+            require_isolation: Refuse local host execution when Docker cannot be
+                created. An explicit ``sandbox_type="docker"`` always implies
+                this fail-closed behavior.
 
         Returns:
             A :class:`DockerSandbox` if Docker is available and preferred,
             otherwise a :class:`LocalSandbox`.
         """
-        use_docker = False
+        if sandbox_type not in {"auto", "docker", "local"}:
+            raise SandboxError(f"Unknown sandbox type: {sandbox_type!r}")
+        explicit_docker = sandbox_type == "docker"
+        isolation_required = require_isolation or explicit_docker
+        use_docker = explicit_docker
 
-        if sandbox_type == "docker":
-            use_docker = True
-        elif sandbox_type == "auto" and self._prefer_docker:
+        if explicit_docker and not await self._check_docker(refresh=True):
+            raise IsolationUnavailableError(
+                "Docker isolation was explicitly requested but is unavailable"
+            )
+        if sandbox_type == "auto" and self._prefer_docker:
             use_docker = await self._check_docker()
 
         if use_docker:
             try:
                 from dharma_swarm.docker_sandbox import DockerSandbox, ContainerConfig
-                config = docker_config if isinstance(docker_config, ContainerConfig) else ContainerConfig()
+
+                config = (
+                    docker_config
+                    if isinstance(docker_config, ContainerConfig)
+                    else ContainerConfig()
+                )
                 sb: Sandbox = DockerSandbox(config=config)
                 self._active[id(sb)] = sb
                 return sb
-            except ImportError:
-                pass  # Fall through to local
-            except SandboxError:
-                pass  # Docker unavailable, fall through
+            except (ImportError, SandboxError) as exc:
+                if isolation_required:
+                    raise IsolationUnavailableError(
+                        "Docker isolation could not be created; refusing host fallback"
+                    ) from exc
+
+        if isolation_required:
+            raise IsolationUnavailableError(
+                "Execution isolation is required; refusing LocalSandbox fallback"
+            )
 
         sb = LocalSandbox(workdir=workdir)
         self._active[id(sb)] = sb

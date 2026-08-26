@@ -4,7 +4,10 @@ Rule 10 compliance: extracted from terminal_bridge.py to keep that file under th
 These are pure functions with zero TerminalBridge dependencies.
 """
 
+from pathlib import Path
 from typing import Any
+
+_DEFAULT_REPO_ROOT = str(Path(__file__).resolve().parents[1])
 
 
 def render_working_memory(memory: dict[str, Any]) -> str:
@@ -48,7 +51,7 @@ def render_system_prompt(
     prompt: str,
     provider: str = "codex",
     model: str = "gpt-5.4",
-    repo_root: str = "/Users/dhyana/dharma_swarm",
+    repo_root: str = _DEFAULT_REPO_ROOT,
     workspace_preview: dict[str, Any] | None = None,
     runtime_preview: dict[str, Any] | None = None,
     command_graph: dict[str, Any] | None = None,

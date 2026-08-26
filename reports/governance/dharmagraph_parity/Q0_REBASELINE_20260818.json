@@ -1,0 +1,70 @@
+{
+  "schema": "dharma_swarm.dharmagraph_q0_rebaseline.v1",
+  "observed_at": "2026-08-18T23:55:00+09:00",
+  "main_sha": "b11d0a7d4a72f7d5853795cd41813f8716bf2b01",
+  "campaign": {
+    "charter": "~/handoffs/2026-08-18_dharmagraph_endtoend_campaign_charter.md",
+    "wave": "W0",
+    "lane": "q0",
+    "spec_anchor": "reconstructed production runtime spec v1.1 (PR #1332 head 809cd0062b0cd534f44cc17088d5ab45e16bb277), Q0 lines ~4935-4964"
+  },
+  "gauntlet_replay": {
+    "command": "DHARMA_PYTHON=<repo-venv-python3.11> bash scripts/governance/run_python_with_repo_env.sh scripts/governance/dharmagraph_parity_gauntlet.py --check",
+    "exit_code": 1,
+    "gauntlet_check_output_digest": "4786a5597ad7e8d48a0df10eb756f20ee0ce7b6fa3aaa38c5be92ef8444d5bcf",
+    "output": {
+      "check": "FAIL",
+      "findings": ["stable semantic digest changed"],
+      "gaps": 28,
+      "replay_stable_digest": "ec79bddb0b52a8feb5be57446f784a3bd6ef1d4ebe7e03d82648d6e5cf079327",
+      "score": "58.00/100",
+      "stored_digest": "5c799bb09027956797d8881111aea07d844fb7d889de46f393b3c2fc1a62180f"
+    },
+    "replay_determinism": "two consecutive runs produced byte-identical output (same replay_stable_digest)",
+    "digest_fail_attribution": {
+      "semantic_surface": "INTACT — score replays 58.00/100 exactly; all capability points, control (broken control failed as required), completeness control, PARITY_MATRIX.md render, and judge attestation bindings replay clean (none appear in findings)",
+      "sole_finding_cause": "stable_core embeds source_tree_digest over the 55-file relevant-source manifest; exactly 2 of 55 files changed since the 2026-08-08 seal: pyproject.toml and uv.lock; the other 53 files are byte-identical to the sealed manifest",
+      "attributed_commits": [
+        "884ee4fa7 fix(dharmagraph): restore frozen LangGraph oracle tuple (#1312)",
+        "1c2b6ddbc chore(deps): bump h2 from 4.3.0 to 4.4.1 (#1284)",
+        "3b2b06a07 chore(deps-dev): bump setuptools from 82.0.1 to 83.0.0 (#1222)"
+      ],
+      "verdict": "seal integrity HOLDS at the semantic level; digest drift is fully attributed to post-seal packaging-file commits on main (including the #1312 oracle-tuple restoration itself), not to any change in the graded engine surface"
+    },
+    "environment_note": "fresh worktrees carry no .venv; the wrapper script falls back to system python3 (3.9.6) which cannot import the gauntlet (datetime.UTC). Replay used the repo checkout's venv python 3.11 with the frozen tuple langgraph==1.2.4 / checkpoint 4.1.1 / checkpoint-sqlite 3.1.0, matching the sealed receipt's environment block."
+  },
+  "sealed_score": "58.00/100",
+  "sealed_receipt_anchors": {
+    "sealed_observed_at": "2026-08-08T15:55:34Z",
+    "sealed_at_rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
+    "last_commit_touching_builder_receipt": "884ee4fa75bb28877633f9c7a7ddadb8e3b1e19b (2026-08-14T00:34:16Z)",
+    "builder_receipt_sha256": "e2faac51f32947ae20f45a7569befac525a9f054e43aae701918ea06bf3a071a",
+    "judge_receipt_sha256": "44d7f95e10556812d62b9a72ba3684dce7795c4712858db9b5e036738370306d",
+    "parity_matrix_sha256": "431d8018306fa27f66f9fc25d6c3c0cddd083c8b1e70b8ff1835ed275bd6a571",
+    "seam_ledger_sha256": "2946acc3f7d9e8167f8407b2f81fa30254351f9a9a39e8373d4877b94f8d9e19"
+  },
+  "card_discrepancies": {
+    "method": "programmatic cross-check of every parity-gap-* card in docs/governance/ACTIVE_TRACK.yaml against the sealed builder_receipt.json capability points (same rows rendered in PARITY_MATRIX.md)",
+    "charter_named": ["LG14", "LG15", "LG18"],
+    "found": [
+      {"id": "LG14", "card": "1/2 points at weight 4 (ACTIVE_TRACK.yaml next_items id 19)", "sealed_matrix": "2/2, weight 4, earned 4.00 (PARITY_MATRIX.md line 55); not in gap_ids"},
+      {"id": "LG15", "card": "0/2 points at weight 9 (next_items id 20)", "sealed_matrix": "2/2, weight 9, earned 9.00 (PARITY_MATRIX.md line 56); not in gap_ids"},
+      {"id": "LG16", "card": "1/2 points at weight 2 (next_items id 21)", "sealed_matrix": "2/2, weight 2; not in gap_ids — NOT named by the charter; found by full sweep"},
+      {"id": "LG17", "card": "1/2 points at weight 8 (next_items id 22)", "sealed_matrix": "2/2, weight 8; not in gap_ids — NOT named by the charter; found by full sweep"},
+      {"id": "LG18", "card": "1/2 points at weight 10 (next_items id 23)", "sealed_matrix": "2/2, weight 10, earned 10.00 (PARITY_MATRIX.md line 59); not in gap_ids"}
+    ],
+    "note": "the remembered LG14/15/18 discrepancy is real but UNDERCOUNTED: five cards (LG14-LG18) are stale from the earlier 31.00/100 grade; the sealed 58.00/100 receipt scores all five at 2/2. All 28 sealed gap_ids cards match. No packet may cite the card distribution without this receipt."
+  },
+  "surviving_ancestor_branches": {
+    "method": "git ls-remote against https://github.com/AIKAGRYA/dharma_swarm.git on 2026-08-18; all five tips verified byte-for-byte equal to the charter §1 record",
+    "shared_stack_base": "a47c110ca",
+    "branches": [
+      {"branch": "feat/lg10-channel-semantics", "tip_sha": "a07f872354d8582b305d0592e3a574100e8b7115", "ancestor_pr": "#1276"},
+      {"branch": "feat/lg11-message-handling", "tip_sha": "66814cfe70d2cb76e2c811d13f70e8367de52ac8", "ancestor_pr": "#1275"},
+      {"branch": "feat/lg12-invocation-surfaces", "tip_sha": "f2e5a3fea117fad7c769be1119677c639228f443", "ancestor_pr": "#1274"},
+      {"branch": "feat/lg24-lg25-retry-timeout", "tip_sha": "bde4a65b0fe2e92034894bd5c4ec1540cdf17158", "ancestor_pr": "#1273"},
+      {"branch": "feat/lg30-runtime-config", "tip_sha": "8a576b429edfa577cfdc2d471cfc189747002fdc", "ancestor_pr": "#1271"}
+    ]
+  },
+  "custody_note": "This receipt is NEW evidence written beside the sealed artifacts; builder_receipt.json, judge_receipt.json, PARITY_MATRIX.md, and seam_ledger.json were NOT modified (their sha256 hashes above are their on-main values at b11d0a7d4). The gauntlet --check replay is seal-integrity evidence only, NOT a new score; no score claim beyond the sealed 58.00/100 is made. Produced in an isolated worktree off fetched origin/main by campaign lane q0; draft PR only; operator merges."
+}

@@ -54,6 +54,16 @@ test-oracle = [
     "langgraph-checkpoint==4.1.1",
     "langgraph-checkpoint-sqlite==3.1.0",
 ]
+# langchain-core is langgraph's own message vocabulary (AIMessage /
+# HumanMessage / RemoveMessage), imported directly by the LG11 gauntlet
+# comparison arm. It already arrives as a transitive of langgraph==1.2.4 at
+# exactly this uv.lock-resolved version; this extra exists only so the
+# import-provenance gate sees the root declared. It is deliberately NOT part
+# of the rubric-frozen test-oracle tuple above, which an environment-contract
+# test pins to exactly three distributions.
+test-oracle-vocab = [
+    "langchain-core==1.4.4",
+]
 
 [project.scripts]
 dharma-swarm = "dharma_swarm.cli:app"

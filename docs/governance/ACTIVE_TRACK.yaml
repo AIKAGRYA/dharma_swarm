@@ -1015,7 +1015,7 @@ active_tracks:
     name: DharmaGraph — sovereign durable graph runtime consolidation
     status: ACTIVE
     opened_at: "2026-07-05"
-    verified_at: "2026-07-05"
+    verified_at: "2026-08-18"  # Q0 evidence re-baseline: sealed 58.00/100 replays; digest drift attributed to pyproject/uv.lock only — reports/governance/dharmagraph_parity/Q0_REBASELINE_20260818.json
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -1224,23 +1224,23 @@ active_tracks:
         kind: code
         blocker: false
       - id: 19
-        what: "parity-gap-lg14-checkpoint-protocol: LG14 Checkpoint schema, saver protocol, pending writes, lineage, and serializer — 1/2 points at weight 4. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "parity-gap-lg14-checkpoint-protocol: LG14 Checkpoint schema, saver protocol, pending writes, lineage, and serializer — CLOSED at 2/2 points, weight 4, per the sealed judge-signed 58.00/100 matrix (PARITY_MATRIX.md row LG14; not in gap_ids). Card reconciled by Q0 re-baseline 2026-08-18 (Q0_REBASELINE_20260818.json)."
         kind: code
         blocker: false
       - id: 20
-        what: "parity-gap-lg15-thread-resume: LG15 Thread-scoped continuity and resume — 0/2 points at weight 9. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "parity-gap-lg15-thread-resume: LG15 Thread-scoped continuity and resume — CLOSED at 2/2 points, weight 9, per the sealed judge-signed 58.00/100 matrix (PARITY_MATRIX.md row LG15; not in gap_ids). Card reconciled by Q0 re-baseline 2026-08-18 (Q0_REBASELINE_20260818.json)."
         kind: code
         blocker: false
       - id: 21
-        what: "parity-gap-lg16-history: LG16 State inspection, history, and replay — 1/2 points at weight 2. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "parity-gap-lg16-history: LG16 State inspection, history, and replay — CLOSED at 2/2 points, weight 2, per the sealed judge-signed 58.00/100 matrix (PARITY_MATRIX.md row LG16; not in gap_ids). Card reconciled by Q0 re-baseline 2026-08-18 (Q0_REBASELINE_20260818.json; stale-card sweep beyond the charter-named three)."
         kind: code
         blocker: false
       - id: 22
-        what: "parity-gap-lg17-fork-time-travel: LG17 Manual state update, bulk update, fork, and time travel — 1/2 points at weight 8. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "parity-gap-lg17-fork-time-travel: LG17 Manual state update, bulk update, fork, and time travel — CLOSED at 2/2 points, weight 8, per the sealed judge-signed 58.00/100 matrix (PARITY_MATRIX.md row LG17; not in gap_ids). Card reconciled by Q0 re-baseline 2026-08-18 (Q0_REBASELINE_20260818.json; stale-card sweep beyond the charter-named three)."
         kind: code
         blocker: false
       - id: 23
-        what: "parity-gap-lg18-process-restart: LG18 Durability ordering and process-restart recovery — 1/2 points at weight 10. Closure: All frozen facets prove 2/2 in an independent judge rerun."
+        what: "parity-gap-lg18-process-restart: LG18 Durability ordering and process-restart recovery — CLOSED at 2/2 points, weight 10, per the sealed judge-signed 58.00/100 matrix (PARITY_MATRIX.md row LG18; not in gap_ids). Card reconciled by Q0 re-baseline 2026-08-18 (Q0_REBASELINE_20260818.json)."
         kind: code
         blocker: false
       - id: 24
@@ -1846,6 +1846,9 @@ active_tracks:
       CLOSED_NOT_PROD result. They do not prove production liveness, complete
       security, deployment readiness, Phase 1-7 completion, or authority over
       Mike, Go, terminal, graph, organism, Safety TCB, or Loop Closure surfaces.
+      Adding Docker-sandbox ownership and WP-DSI admits only a later bounded
+      implementation review. It is not implementation evidence, container-start
+      proof, generated-code isolation, or authority to re-arm evolution.
     complements:
       - merge-master-mike-d4-2026-06
       - sovereign-safety-tcb-2026-07
@@ -1880,6 +1883,7 @@ active_tracks:
       - dharma_swarm/autonomous_agent.py
       - dharma_swarm/diff_applier.py
       - dharma_swarm/sandbox.py
+      - dharma_swarm/docker_sandbox.py
       - docs/docops/AUTO_INVENTORY.md
       - api/main.py
       - tests/test_api_auth.py
@@ -1893,6 +1897,7 @@ active_tracks:
       - tests/test_make_onboarding_contract.py
       - tests/test_diff_applier.py
       - tests/test_sandbox.py
+      - tests/test_docker_sandbox.py
       - tests/test_nats_verification_split.py
       - tests/test_nats_substrate_contract.py
       - tests/test_nats_live_production_evidence.py
@@ -2010,6 +2015,10 @@ active_tracks:
           - verdict
 
     next_items:
+      - id: WP-DSI
+        what: "Implement a validated argv-based explicit entrypoint plus keepalive selection in dharma_swarm/docker_sandbox.py, with tests/test_docker_sandbox.py proving an explicitly configured digest-pinned dependency-complete image starts under NetworkMode.NONE with the workspace mounted read-only. Invalid entrypoint or keepalive configuration must fail closed; an omitted override must preserve the existing image-default behavior. This item is open and admits no evolution, DiffApplier, sealed-packet, agent-runner, or other production-caller wiring."
+        kind: code
+        blocker: true
       - id: WP-0F1
         what: "Ratify one final required-check, human-review, and thread-resolution policy across legacy branch protection and the ruleset. Verified live 2026-08-03: legacy branch protection is the sole enforcing layer — non-strict and requiring zero approvals, but with required conversation resolution ENABLED (it blocked PR #1202 that day); ruleset 20024481 sits at enforcement disabled, so its always-bypass actor and duplicate contexts are latent, not live, defects. The operator decides the ruleset's fate. Then reprove every WP-0F2 consumer; the legacy parity guard proves only six-context set equality."
         kind: governance

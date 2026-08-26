@@ -1,0 +1,82 @@
+{
+  "allowed_files": [
+    "dharma_swarm/sandbox.py",
+    "reports/agentops/work_packets/titanium-WP-ISOLATION-FALLBACK-v3-20260814.json",
+    "tests/test_sandbox.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "1366d819ceb321424c3b059f9243644df4d77d52",
+  "branch": "agent/isolation-fallback-failclosed-v3-20260814",
+  "commit": {
+    "allowed": true,
+    "message": "fix(titanium): fail closed when isolation is required"
+  },
+  "forbidden_files": [],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_sandbox.py tests/test_subprocess_cancellation.py",
+      "expected_exit": 0,
+      "name": "sandbox-and-regression-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/sandbox.py tests/test_sandbox.py",
+      "expected_exit": 0,
+      "name": "touched-files-ruff",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "titanium-WP-ISOLATION-FALLBACK-v3-20260814",
+  "intent": "Close the reproduced execution-isolation downgrade in SandboxManager: an explicit Docker request or require_isolation=true must raise IsolationUnavailableError when Docker is unavailable or cannot be created, never execute the command in LocalSandbox on the host. Preserve the current permissive fallback only for the explicitly non-required auto mode. This is the bounded re-arm precondition from the 2026-08-13 VMM audit; it does not claim Docker is a prison, production isolation is complete, or the broader execution supervisor is implemented.",
+  "negative_controls": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); old='        if explicit_docker and not await self._check_docker():\\n            raise IsolationUnavailableError(\\n                \\\"Docker isolation was explicitly requested but is unavailable\\\"\\n            )'; new='        if explicit_docker and not await self._check_docker():\\n            sb = LocalSandbox(workdir=workdir)\\n            self._active[id(sb)] = sb\\n            return sb'; t.count(old)==1 or sys.exit(3); p.write_text(t.replace(old,new)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_sandbox.py::test_explicit_docker_request_never_falls_back_to_host'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "silent-explicit-docker-fallback-must-fail",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/sandbox.py SandboxManager.create_async",
+      "dharma_swarm/docker_sandbox.py DockerSandbox.docker_available",
+      "tests/test_sandbox.py",
+      "tests/test_docker_sandbox.py"
+    ],
+    "collision": {
+      "checked_at_sha": "1366d819ceb321424c3b059f9243644df4d77d52",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The local Docker daemon is stopped, so six tests marked docker are environment-blocked and deliberately deselected; mocked unit coverage and the fail-closed negative control are the available local proof.",
+      "LocalSandbox remains bare-host execution with a regex filter. This packet prevents an isolation request from being silently downgraded; it does not make LocalSandbox isolated.",
+      "Hosted exact-head CI, independent review, and human merge authority remain required."
+    ],
+    "interface_mismatches": [
+      "SandboxManager.create_async documented explicit docker selection but caught ImportError and SandboxError with bare pass, returning LocalSandbox even when the caller explicitly required Docker."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "8ede4be5fa7cb11b2c2d953839d585ba4c83e48684fc1aa16943553d7442ce90",
+    "rollback": "Revert this packet, sandbox.py, and its tests together. Rollback restores silent host fallback for explicit Docker requests and must not be represented as safe isolation behavior.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-ISOLATION-FALLBACK"
+  },
+  "worktree": "."
+}

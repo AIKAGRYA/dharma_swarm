@@ -676,4 +676,15 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             RiskLevel.HIGH,
             "Holon talk receipts are raw conversation evidence, not semantic canon.",
         ),
+        MemoryWriterSpec(
+            "forge_v2.record_run_spend",
+            "dharma_swarm.forge_v1.forge_v2.monthly_ledger",
+            "record_run_spend",
+            ("home.forge_spend",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.APPROVED,
+            RiskLevel.LOW,
+            "Benchmark monthly spend meter (yes-sheet 2026-08-18 row 1): "
+            "append-only operational dollars ledger, not semantic memory.",
+        ),
     )

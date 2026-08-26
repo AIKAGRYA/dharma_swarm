@@ -1091,6 +1091,16 @@
       "symbol": "self._effects.dispatch_order"
     },
     {
+      "category": "rng",
+      "classification": "mediated",
+      "col": 20,
+      "file": "dharma_swarm/graph/messages.py",
+      "id": "dharma_swarm/graph/messages.py:200:20",
+      "line": 200,
+      "scope": "runtime",
+      "symbol": "active_effects.random().getrandbits"
+    },
+    {
       "category": "time",
       "classification": "bypass",
       "col": 11,
@@ -2788,6 +2798,19 @@
         "__future__",
         "copy",
         "dataclasses",
+        "typing",
+        "uuid"
+      ],
+      "file": "dharma_swarm/graph/messages.py",
+      "module": "dharma_swarm.graph.messages"
+    },
+    {
+      "custody": "dharmagraph-engine-2026-07",
+      "effectful_external_imports": [],
+      "external_imports": [
+        "__future__",
+        "copy",
+        "dataclasses",
         "datetime",
         "hashlib",
         "json",
@@ -3295,9 +3318,9 @@
       "time": 19
     },
     "bypass_total": 230,
-    "effect_site_count": 238,
-    "mediated_total": 8,
-    "module_count": 67
+    "effect_site_count": 239,
+    "mediated_total": 9,
+    "module_count": 68
   },
   "workload": {
     "description": "Bounded graph run: GraphBuilder.compile() topology invoked via CompiledGraph.invoke() with SimulatedEffects, a GraphPersistenceKernel (checkpointing on), and a DurableInvoker-wrapped dispatch (derive_graph_side_effect_key). Crosses scheduling (executor superstep barrier), persistence (journal + checkpoint + idempotency store), and channel boundaries.",

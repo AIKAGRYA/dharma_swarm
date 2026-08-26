@@ -34,6 +34,13 @@ from dharma_swarm.models import ProviderType
 K2_FLOOR_ID = "kimi-k2.6"
 MODEL_POWER_FLOOR = K2_FLOOR_ID
 
+# Vendor-family routing prefix for the un-banished Nemotron 3.5 Lightning
+# family (open-weight OpenMDW release, 2026-08-11). Consumed with startswith()
+# by free_fleet's tier rules and by the OpenRouter-free provider's
+# preferred-family ordering — a family prefix, NOT a deployable model id.
+# Single home per THE-ONE-WAY: both surfaces import it from this leaf.
+NEMOTRON_35_FAMILY_PREFIX = "nvidia/nemotron-3.5"
+
 # ---------------------------------------------------------------------------
 # The ONE per-provider default map. The string is the EXACT id a given provider
 # expects when ``request.model`` is empty. Collapsing the old ~17 scattered
@@ -88,5 +95,6 @@ def default_for_provider(provider: ProviderType) -> str:
 __all__ = [
     "K2_FLOOR_ID",
     "MODEL_POWER_FLOOR",
+    "NEMOTRON_35_FAMILY_PREFIX",
     "default_for_provider",
 ]

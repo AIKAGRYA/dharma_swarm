@@ -2004,6 +2004,9 @@ def run_capability_probes(
     _apply_command_parent_evidence(
         capabilities, row_lookup, workloads["seeded_command_parent"]
     )
+    _apply_message_reducer_evidence(
+        capabilities, row_lookup, workloads["seeded_message_reducers"]
+    )
     persistence_protocol = _persistence_protocol_probe(seed)
     _apply_persistence_protocol_evidence(capabilities, row_lookup, persistence_protocol)
     process_restart = _process_restart_probe(seed)
@@ -2938,6 +2941,390 @@ def _apply_command_resume_evidence(
             citations=_row_citations(row_lookup["LG08"]),
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Pregel-core S9 (LG11): message accumulation / replacement / removal /
+# formatting workload.  Append-only harness extension — new seeded two-arm
+# workload + evidence applier + surface support entries for the seven
+# message facets.
+# ---------------------------------------------------------------------------
+
+
+def _message_projection(messages: Any) -> list[dict[str, Any]]:
+    """Arm-neutral projection of typed message objects (``type``/``content``/``id``)."""
+    return [
+        {"type": message.type, "content": message.content, "id": message.id}
+        for message in messages
+    ]
+
+
+def _message_dict_projection(rows: Any) -> list[dict[str, Any]]:
+    """Same projection for the Dharma engine's JSON message-state dicts."""
+    return [
+        {"type": row.get("type"), "content": row.get("content"), "id": row.get("id")}
+        for row in rows
+    ]
+
+
+def _minted_id_summary(messages: Any) -> dict[str, Any]:
+    """Id-minting evidence that stays comparable across arms (uuid4 differs)."""
+    identifiers = [message.id for message in messages]
+    return {
+        "count": len(identifiers),
+        "all_present": all(isinstance(i, str) and i for i in identifiers),
+        "unique": len(set(identifiers)) == len(identifiers),
+        "contents": [message.content for message in messages],
+    }
+
+
+def _message_reducer_arm(arm: str, seed: int) -> dict[str, Any]:
+    rng = random.Random(_derived_seed(seed, "message-reducers"))
+    token = rng.randint(100, 999)
+    greeting = f"hello-{token}"
+    answer = f"ack-{token}"
+    amended = f"hello-{token}-edited"
+    fresh = f"fresh-{token}"
+    seed_text = f"system-{token}"
+    caption = f"look-{token}"
+    image_blocks = [
+        {
+            "type": "text",
+            "text": caption,
+            "cache_control": {"type": "ephemeral"},
+        },
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/jpeg",
+                "data": str(token),
+            },
+        },
+    ]
+    text_blocks = [
+        {"type": "text", "text": f"A{token}"},
+        {"type": "text", "text": f"B{token}"},
+    ]
+    ui_base = [
+        {
+            "type": "ui",
+            "id": "u1",
+            "name": "Chat",
+            "props": {"content": greeting},
+            "metadata": {},
+        }
+    ]
+    ui_updates = [
+        {
+            "type": "ui",
+            "id": "u1",
+            "name": "Chat",
+            "props": {"tone": f"warm-{token}"},
+            "metadata": {"merge": True},
+        },
+        {
+            "type": "ui",
+            "id": "u2",
+            "name": "Side",
+            "props": {"n": token},
+            "metadata": {},
+        },
+    ]
+
+    if arm == "langgraph":
+        from langchain_core.messages import (
+            AIMessage,
+            HumanMessage,
+            SystemMessage,
+        )
+        from langchain_core.messages import RemoveMessage as LGRemoveMessage
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.graph.message import REMOVE_ALL_MESSAGES as LG_REMOVE_ALL
+        from langgraph.graph.message import add_messages as lg_add_messages
+        from langgraph.graph.ui import ui_message_reducer as lg_ui_reducer
+
+        # Functional TypedDict form: the annotation object is stored
+        # directly, so a function-local schema resolves the reducer under
+        # future-annotations.
+        _LGMessageState = TypedDict(
+            "_LGMessageState",
+            {"messages": Annotated[list[Any], lg_add_messages]},
+        )
+
+        builder = StateGraph(_LGMessageState)
+        builder.add_node(
+            "greet", lambda state: {"messages": [HumanMessage(content=greeting, id="h1")]}
+        )
+        builder.add_node(
+            "reply", lambda state: {"messages": [AIMessage(content=answer, id="a1")]}
+        )
+        builder.add_node(
+            "amend",
+            lambda state: {
+                "messages": [
+                    HumanMessage(content=amended, id="h1"),
+                    LGRemoveMessage(id="a1"),
+                ]
+            },
+        )
+        builder.add_edge(START, "greet")
+        builder.add_edge("greet", "reply")
+        builder.add_edge("reply", "amend")
+        builder.add_edge("amend", END)
+        graph_out = builder.compile().invoke(
+            {"messages": [SystemMessage(content=seed_text, id="s1")]}
+        )
+
+        base = [
+            SystemMessage(content=seed_text, id="s1"),
+            HumanMessage(content=greeting, id="h1"),
+        ]
+        appended = lg_add_messages(base, [AIMessage(content=answer, id="a1")])
+        replaced = lg_add_messages(base, [HumanMessage(content=amended, id="h1")])
+        removed = lg_add_messages(appended, [LGRemoveMessage(id="h1")])
+        after_remove_all = lg_add_messages(
+            appended,
+            [
+                LGRemoveMessage(id=LG_REMOVE_ALL),
+                AIMessage(content=fresh, id="f1"),
+            ],
+        )
+        minted = lg_add_messages(
+            [], [HumanMessage(content=greeting), AIMessage(content=answer)]
+        )
+
+        invalid_remove_error = ""
+        try:
+            lg_add_messages(base, [LGRemoveMessage(id=f"missing-{token}")])
+        except ValueError as exc:
+            invalid_remove_error = str(exc)
+
+        formatted = lg_add_messages(
+            [],
+            [
+                HumanMessage(content=image_blocks, id="i1"),
+                HumanMessage(content=text_blocks, id="t1"),
+                AIMessage(content=answer, id="a1"),
+                SystemMessage(content=seed_text, id="s1"),
+            ],
+            format="langchain-openai",
+        )
+        invalid_format_rejected = False
+        try:
+            lg_add_messages(base, [], format=f"bogus-{token}")
+        except ValueError:
+            invalid_format_rejected = True
+
+        ui_after = lg_ui_reducer(ui_base, ui_updates)
+        ui_removed = lg_ui_reducer(ui_after, [{"type": "remove-ui", "id": "u1"}])
+        ui_invalid_rejected = False
+        try:
+            lg_ui_reducer(ui_base, [{"type": "remove-ui", "id": f"ghost-{token}"}])
+        except ValueError:
+            ui_invalid_rejected = True
+
+        return {
+            "graph_messages": _message_projection(graph_out["messages"]),
+            "appended": _message_projection(appended),
+            "replaced": _message_projection(replaced),
+            "removed": _message_projection(removed),
+            "after_remove_all": _message_projection(after_remove_all),
+            "ids_minted": _minted_id_summary(minted),
+            "invalid_remove_rejected": bool(invalid_remove_error),
+            "invalid_remove_error": invalid_remove_error,
+            "openai_format": [
+                {"type": message.type, "content": message.content}
+                for message in formatted
+            ],
+            "openai_ids_dropped": all(message.id is None for message in formatted),
+            "invalid_format_rejected": invalid_format_rejected,
+            "ui_after_reduce": ui_after,
+            "ui_after_remove": ui_removed,
+            "ui_invalid_remove_rejected": ui_invalid_rejected,
+        }
+
+    from dharma_swarm.graph import (
+        END,
+        REMOVE_ALL_MESSAGES,
+        START,
+        GraphBuilder,
+        GraphMessage,
+        MessagesChannel,
+        RemoveMessage,
+        add_messages,
+        ui_message_reducer,
+    )
+    from dharma_swarm.graph.effects import SimulatedEffects
+
+    compiled = (
+        GraphBuilder("gauntlet-messages")
+        .add_channel("messages", MessagesChannel)
+        .add_node(
+            "greet",
+            lambda state: {
+                "messages": [GraphMessage(greeting, "human", id="h1").to_dict()]
+            },
+        )
+        .add_node(
+            "reply",
+            lambda state: {"messages": [GraphMessage(answer, "ai", id="a1").to_dict()]},
+        )
+        .add_node(
+            "amend",
+            lambda state: {
+                "messages": [
+                    GraphMessage(amended, "human", id="h1").to_dict(),
+                    RemoveMessage("a1").to_dict(),
+                ]
+            },
+        )
+        .add_edge(START, "greet")
+        .add_edge("greet", "reply")
+        .add_edge("reply", "amend")
+        .add_edge("amend", END)
+        .compile()
+    )
+    graph_out = _run_awaitable(
+        compiled.invoke(
+            input={"messages": [GraphMessage(seed_text, "system", id="s1").to_dict()]},
+            effects=SimulatedEffects(seed),
+        )
+    )
+
+    base = [
+        GraphMessage(seed_text, "system", id="s1"),
+        GraphMessage(greeting, "human", id="h1"),
+    ]
+    appended = add_messages(base, [GraphMessage(answer, "ai", id="a1")])
+    replaced = add_messages(base, [GraphMessage(amended, "human", id="h1")])
+    removed = add_messages(appended, [RemoveMessage("h1")])
+    after_remove_all = add_messages(
+        appended,
+        [RemoveMessage(REMOVE_ALL_MESSAGES), GraphMessage(fresh, "ai", id="f1")],
+    )
+    minted = add_messages(
+        [], [GraphMessage(greeting, "human"), GraphMessage(answer, "ai")]
+    )
+
+    invalid_remove_error = ""
+    try:
+        add_messages(base, [RemoveMessage(f"missing-{token}")])
+    except ValueError as exc:
+        invalid_remove_error = str(exc)
+
+    formatted = add_messages(
+        [],
+        [
+            GraphMessage(image_blocks, "human", id="i1"),
+            GraphMessage(text_blocks, "human", id="t1"),
+            GraphMessage(answer, "ai", id="a1"),
+            GraphMessage(seed_text, "system", id="s1"),
+        ],
+        format="langchain-openai",
+    )
+    invalid_format_rejected = False
+    try:
+        add_messages(base, [], format=f"bogus-{token}")
+    except ValueError:
+        invalid_format_rejected = True
+
+    ui_after = ui_message_reducer(ui_base, ui_updates)
+    ui_removed = ui_message_reducer(ui_after, [{"type": "remove-ui", "id": "u1"}])
+    ui_invalid_rejected = False
+    try:
+        ui_message_reducer(ui_base, [{"type": "remove-ui", "id": f"ghost-{token}"}])
+    except ValueError:
+        ui_invalid_rejected = True
+
+    return {
+        "graph_messages": _message_dict_projection(graph_out.state["messages"]),
+        "appended": _message_projection(appended),
+        "replaced": _message_projection(replaced),
+        "removed": _message_projection(removed),
+        "after_remove_all": _message_projection(after_remove_all),
+        "ids_minted": _minted_id_summary(minted),
+        "invalid_remove_rejected": bool(invalid_remove_error),
+        "invalid_remove_error": invalid_remove_error,
+        "openai_format": [
+            {"type": message.type, "content": message.content}
+            for message in formatted
+        ],
+        "openai_ids_dropped": all(message.id is None for message in formatted),
+        "invalid_format_rejected": invalid_format_rejected,
+        "ui_after_reduce": ui_after,
+        "ui_after_remove": ui_removed,
+        "ui_invalid_remove_rejected": ui_invalid_rejected,
+    }
+
+
+_WORKLOAD_ARMS["seeded_message_reducers"] = _message_reducer_arm
+_support(
+    "LG11",
+    ("append_message", "replace_by_id", "remove_message", "remove_all"),
+    "dharma_swarm.graph:add_messages",
+)
+_support("LG11", ("invalid_remove",), "dharma_swarm.graph:RemoveMessage")
+_support("LG11", ("openai_format",), "dharma_swarm.graph:add_messages#format")
+_support("LG11", ("ui_message_helpers",), "dharma_swarm.graph:ui_message_reducer")
+
+
+_MESSAGE_FACET_FIELDS: dict[str, tuple[str, ...]] = {
+    "append_message": ("graph_messages", "appended", "ids_minted"),
+    "replace_by_id": ("graph_messages", "replaced"),
+    "remove_message": ("graph_messages", "removed"),
+    "remove_all": ("after_remove_all",),
+    "invalid_remove": ("invalid_remove_rejected", "invalid_remove_error"),
+    "openai_format": (
+        "openai_format",
+        "openai_ids_dropped",
+        "invalid_format_rejected",
+    ),
+    "ui_message_helpers": (
+        "ui_after_reduce",
+        "ui_after_remove",
+        "ui_invalid_remove_rejected",
+    ),
+}
+
+
+def _apply_message_reducer_evidence(
+    capabilities: dict[str, Any],
+    row_lookup: Mapping[str, Any],
+    workload: Mapping[str, Any],
+) -> None:
+    """LG11's seven facets from the seeded two-arm message-reducer workload.
+
+    Fail-closed per the error-parity rule: a probe_error on either arm keeps
+    every facet failing — identical errors are a finding, never a pass.
+    """
+    both_ran = (
+        "probe_error" not in workload["dharma"]
+        and "probe_error" not in workload["langgraph"]
+    )
+    for facet, fields in _MESSAGE_FACET_FIELDS.items():
+        equal = both_ran and all(
+            workload["dharma"].get(name) == workload["langgraph"].get(name)
+            for name in fields
+        )
+        entry = capabilities["LG11"]["facets"][facet]
+        entry["status"] = "pass" if equal else "fail"
+        entry["evidence"].append(
+            _evidence(
+                kind="two_arm_differential",
+                evidence_id=f"seeded_message_reducers:{facet}",
+                command_or_probe=(
+                    "drive message append / replace-by-id / removal / "
+                    "remove-all / invalid-remove / openai formatting / UI "
+                    "reduction through a message channel and the reducer on "
+                    "both installed runtimes"
+                ),
+                outcome="parity" if equal else "mismatch",
+                dharma={name: workload["dharma"].get(name) for name in fields},
+                langgraph={name: workload["langgraph"].get(name) for name in fields},
+                citations=_row_citations(row_lookup["LG11"]),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -48,6 +48,7 @@
     "JIKOKU_LOG.jsonl",
     "MANIFEST.jsonl",
     "THINKODYNAMIC_DIRECTOR_LOG.jsonl",
+    "YYYY-MM.jsonl",
     "action_log.jsonl",
     "actions.jsonl",
     "activation_receipts.jsonl",
@@ -281,6 +282,7 @@
   "ledger_modules": [
     "dharma_swarm/ai_reciprocity_ledger.py",
     "dharma_swarm/episode_ledger.py",
+    "dharma_swarm/forge_v1/forge_v2/monthly_ledger.py",
     "dharma_swarm/forge_v1/forge_v2/taskbed_ledger.py",
     "dharma_swarm/gaia_ledger.py",
     "dharma_swarm/human_yds_ledger.py",
@@ -302,8 +304,8 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 222,
+    "distinct_jsonl_names": 223,
     "ledger_classes": 11,
-    "ledger_modules": 12
+    "ledger_modules": 13
   }
 }

@@ -1646,6 +1646,21 @@ describe("resolveCommandTargetPane", () => {
 });
 
 describe("eventToTabPatch", () => {
+  test("renders executor tool completion without claiming verifier success", () => {
+    const patches = eventToTabPatch({
+      type: "tool_result",
+      tool_name: "exec_command",
+      content: "command exited 0",
+    });
+
+    expect(patches).toHaveLength(2);
+    expect(patches.map((patch) => patch.tabId)).toEqual(["tools", "chat"]);
+    for (const patch of patches) {
+      expect(patch.lines[0]?.text).toBe("■ exec_command: command exited 0");
+      expect(patch.lines[0]?.text).not.toContain("✓");
+    }
+  });
+
   test("renders cancellation acknowledgement separately from the terminal cancelled state", () => {
     const accepted = eventToTabPatch({
       type: "session.cancelled",
