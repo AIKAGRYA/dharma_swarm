@@ -74,6 +74,7 @@ def test_release_runner_uses_pinned_release_interpreter_and_guard() -> None:
     assert "a2a-inbox-bridge" in text
     assert "bridge_env=(" in text
     assert "env -i" in text
+    assert '"PYTHONUNBUFFERED=1"' in text
     assert "uv run" not in text
     assert "/Users/dhyana/dharma_swarm/.venv" not in text
     assert "/Users/dhyana/dharma_swarm/.env" not in text

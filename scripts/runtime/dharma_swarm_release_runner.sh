@@ -172,6 +172,7 @@ case "${runtime_command}" in
             "DHARMA_PYTHON=${runtime_python}"
             "PYTHONDONTWRITEBYTECODE=1"
             "PYTHONNOUSERSITE=1"
+            "PYTHONUNBUFFERED=1"
         )
         if [[ -n "${DHARMA_STATE_DIR-}" ]]; then
             bridge_env+=("DHARMA_STATE_DIR=${DHARMA_STATE_DIR}")
