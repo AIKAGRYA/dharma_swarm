@@ -1,0 +1,106 @@
+{
+  "id": "fleet-advancement-WP-FLEETHUB-OWNER-R10-20260827",
+  "base_ref": "436ebcdcea9573a3dac93eb47078d1d83dcab7ba",
+  "branch": "agent/fleet-owner-integration-r10-20260827",
+  "worktree": ".",
+  "intent": "Provide Fleet Hub one authenticated, bounded, read-only Mission Control projection over canonical TaskBoard and RuntimeStateStore owners. Preserve source uncertainty, forbid owner mutation, avoid direct Fleet database access, and expose no executor-liveness or completion authority beyond the typed owner snapshot.",
+  "allowed_files": [
+    "api/routers/control_surface.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_projection.py",
+    "tests/test_control_surface_mission_control.py",
+    "tests/test_fleet_hub_owner_integration.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-FLEETHUB-OWNER-R10-20260827.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/orchestrator.py",
+    "api/main.py",
+    "deploy/**",
+    "docker-compose.yml",
+    ".github/**"
+  ],
+  "gates": [
+    {
+      "name": "fleet-owner-read-contracts",
+      "command": "python3 -m pytest -q tests/test_control_surface_mission_control.py tests/test_control_surface.py tests/test_control_surface_router_threadpool.py tests/test_fleet_hub_owner_integration.py",
+      "expected_exit": 0,
+      "timeout_seconds": 360
+    },
+    {
+      "name": "fleet-owner-ruff",
+      "command": "python3 -m ruff check api/routers/control_surface.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_projection.py tests/test_control_surface_mission_control.py tests/test_fleet_hub_owner_integration.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "fleet-owner-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "fleet-owner-fails-closed",
+      "command": "python3 -m pytest -q tests/test_control_surface_mission_control.py tests/test_fleet_hub_owner_integration.py -k 'uninitialized or reject or mismatch or unauthorized or unavailable or bounded'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(mission-control): expose bounded Fleet owner reads"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.9.6",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-FLEETHUB-OWNER-R10-20260827",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "436ebcdcea9573a3dac93eb47078d1d83dcab7ba",
+      "details": [
+        "The unmerged codex/mission-control-fleet-final-20260827 branch remains a candidate source and is not silently promoted; only reviewed API/test behavior may be adapted."
+      ]
+    },
+    "interface_mismatches": [
+      "Mission Control has an exact one-mission snapshot but no ratified complete fleet enumeration contract.",
+      "Fleet Hub must not open or copy TaskBoard or RuntimeStateStore SQLite files; the owner boundary must be injected and read-only.",
+      "Recorded attempts, leases, heartbeats, acknowledgements, and replaceable runtime receipts do not prove a live executor or external effect.",
+      "TaskBoard has no atomic expected-version mutation, so this packet exposes no Fleet command path."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_projection.py",
+      "api/routers/control_surface.py",
+      "origin/codex/mission-control-fleet-final-20260827"
+    ],
+    "honest_blockers": [
+      "This local integration selection is not production topology ratification or deployment authority.",
+      "Mission enumeration may remain configured-ID bounded until a complete owner enumeration API is independently ratified.",
+      "This packet does not implement Chat authority, roster ownership, task mutation, NATS ACLs, durable Fleet SSE, or production authentication."
+    ],
+    "rollback": "Revert the packet-scoped owner projection commit. No TaskBoard, RuntimeStateStore, NATS, credential, ACL, daemon, deployment, or live owner data is mutated.",
+    "packet_digest": "252b4f60a71e4a9805f2987f1a3d2a0fbedd219a5aabcbe7f761dfb2357cab52"
+  }
+}
