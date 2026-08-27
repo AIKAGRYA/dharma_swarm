@@ -16,7 +16,7 @@
     "before_merge": true
   },
   "base_ref": "2749215318135c6906dd9b5898919f2b79399682",
-  "branch": "codex/governed-patch-reflex-v1-20260827",
+  "branch": "codex/governed-patch-reflex-foundry-20260828",
   "commit": {
     "allowed": true,
     "message": "feat(foundry): make isolation observations non-authorizing"
@@ -58,7 +58,7 @@
     }
   ],
   "id": "sublimation-forge-WP-GOVERNED-REFUSAL-MEMBRANE-20260828",
-  "intent": "Make the public Foundry isolation surface observational and permanently non-authorizing. The slice adds bounded argv-only process capture, digest-pinned Docker request facts, strict resource and path validation, exact evaluation bindings, and owner-scoped content-addressed writes. Caller-constructible RunResult and BoundIsolationProof values always report promotion_allowed=false, and the evaluator rejects any forged positive structural claim. Ring 1 and held-out scoring may retain non-authorizing observations, but no public shape can reach on_survivor or authorize promotion. This is an offline Foundry safety membrane only; it does not add a candidate producer, verifier process composition, runtime trust root, trial ledger, repository effect, or deployment.",
+  "intent": "Make the public Foundry isolation surface observational and permanently non-authorizing. The slice adds bounded argv-only process capture, digest-pinned Docker request facts, strict resource and path validation, exact evaluation bindings, owner-scoped content-addressed writes, and explicit vanished-child cleanup instead of a silent exception body. Caller-constructible RunResult and BoundIsolationProof values always report promotion_allowed=false, and the evaluator rejects any forged positive structural claim. Ring 1 and held-out scoring may retain non-authorizing observations, but no public shape can reach on_survivor or authorize promotion. This is an offline Foundry safety membrane only; it does not add a candidate producer, verifier process composition, runtime trust root, trial ledger, repository effect, or deployment.",
   "negative_controls": [
     {
       "command": "python3 -m pytest -q tests/test_foundry_evaluator.py tests/test_foundry_heldout.py tests/test_foundry_loop.py -k \"public_structural or bound_observation_never_echoes\"",
@@ -67,7 +67,7 @@
       "timeout_seconds": 180
     },
     {
-      "command": "python3 -m pytest -q tests/test_foundry_runner_isolation.py -k \"shell or unpinned or symlink or truncated or promotion\"",
+      "command": "python3 -m pytest -q tests/test_foundry_runner_isolation.py -k \"shell or unpinned or symlink or truncated or promotion or timeout or stream_bounded\"",
       "expected_exit": 0,
       "name": "unsafe-runner-inputs-and-observations-fail-closed",
       "timeout_seconds": 180
@@ -91,6 +91,7 @@
     "closest_existing_implementation": [
       "dharma_swarm/foundry/evaluator.py",
       "dharma_swarm/foundry/runner_isolation.py",
+      "dharma_swarm/foundry/runner_process.py",
       "dharma_swarm/foundry/patches.py",
       "dharma_swarm/foundry/heldout.py",
       "dharma_swarm/foundry/loop.py"
@@ -105,16 +106,17 @@
       "No real Foundry trial ledger or externally attested promotion capability exists in this slice.",
       "A positive promotion path requires a distinct externally attested nominal capability type that this packet deliberately does not define.",
       "No repository effect, runtime deployment, provider call, terminal reconciliation, or clean-restart canary is authorized or performed.",
-      "PR 1466 requires approval before merge; passing this packet does not satisfy that external human gate."
+      "This stacked PR requires external human approval before merge; passing this packet does not satisfy that gate."
     ],
     "interface_mismatches": [
       "Existing Foundry runners exposed caller-constructible promotion booleans even though no external attestor owned that claim.",
       "A digest over caller-supplied isolation facts proves integrity of the shape, not truth or authority of the facts.",
-      "Ring scoring and promotion authority are separate modalities; a scored observation must not inhabit an authority-bearing type."
+      "Ring scoring and promotion authority are separate modalities; a scored observation must not inhabit an authority-bearing type.",
+      "A vanished child during cleanup is a bounded process outcome, not evidence that can be silently swallowed or promoted."
     ],
     "owner": "@dhyana",
-    "packet_digest": "1c204f067c4556b48e97755499b14ba96feecf8e13b5db896eebf39b3da969f8",
-    "rollback": "Revert this Foundry-only commit and its packet. No external receipts, RuntimeState rows, repository effects, or deployments are created by this slice, so Git rollback only removes the observational safety membrane and its tests.",
+    "packet_digest": "7e81afb2a7143040c3aeb267af036865927d5036c1224b35c43d96d62c436e56",
+    "rollback": "Revert this Foundry-only segment and its packet. No external receipts, RuntimeState rows, repository effects, or deployments are created by this slice, so Git rollback only removes the observational safety membrane and its tests.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
       "git": "2.50.1",

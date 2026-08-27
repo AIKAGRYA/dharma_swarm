@@ -202,7 +202,7 @@ def _drain_one(selector, stream, name, buffers, truncated, limit) -> None:
         try:
             selector.unregister(stream)
         except (KeyError, ValueError):
-            pass
+            return
         return
     remaining = max(0, limit - len(buffers[name]))
     buffers[name].extend(chunk[:remaining])
@@ -226,7 +226,7 @@ def _kill_process_group(process: subprocess.Popen) -> None:
         try:
             process.kill()
         except ProcessLookupError:
-            pass
+            return
 
 
 def _bounded_text(value: object, limit: int) -> tuple[str, bool]:
