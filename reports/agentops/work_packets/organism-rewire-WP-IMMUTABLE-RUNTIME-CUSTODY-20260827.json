@@ -1,0 +1,118 @@
+{
+  "id": "organism-rewire-WP-IMMUTABLE-RUNTIME-CUSTODY-20260827",
+  "base_ref": "cc85f31bc7aab6c658e300950a811797a25a655b",
+  "branch": "codex/fleet-consolidation-runtime-20260826",
+  "worktree": ".",
+  "intent": "Bind autonomous runtime imports to one exact immutable release, move operational receipt defaults out of reviewed source custody and under the canonical Dharma state root, and keep those observed receipts epistemically distinct from repository-governed evidence until deliberate promotion.",
+  "allowed_files": [
+    "api/routers/control_surface.py",
+    "dharma_swarm/daemon_config.py",
+    "dharma_swarm/runtime_process_identity.py",
+    "dharma_swarm/runtime_release_entrypoint.py",
+    "scripts/runtime/a2a_domain_reply_artifact.py",
+    "scripts/runtime/a2a_domain_reply_worker.py",
+    "scripts/runtime/a2a_inbox_bridge.py",
+    "scripts/runtime/a2a_reply_capture.py",
+    "scripts/runtime/a2a_send.py",
+    "scripts/runtime/codex_composer_semantic_inbox_drain.py",
+    "scripts/runtime/codex_composer_semantic_responder.py",
+    "scripts/runtime/dharma_swarm_release_runner.sh",
+    "scripts/runtime/live_ops_census.py",
+    "scripts/runtime/model_critic_runner.py",
+    "scripts/runtime/organism_liveness_sentinel.py",
+    "scripts/runtime/palantir_pilot_a2a_worker.py",
+    "scripts/start_a2a_inbox_bridge_tmux.sh",
+    "scripts/status_a2a_inbox_bridge_tmux.sh",
+    "scripts/status_palantir_pilot_a2a_worker_tmux.sh",
+    "tests/test_a2a_inbox_bridge_tmux_scripts.py",
+    "tests/test_runtime_release_entrypoint.py",
+    "tests/test_runtime_release_runner.py",
+    "tests/test_runtime_report_paths.py",
+    "reports/agentops/work_packets/organism-rewire-WP-IMMUTABLE-RUNTIME-CUSTODY-20260827.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "immutable-runtime-and-receipt-custody-contracts",
+      "command": "python3 -m pytest -q tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_runtime_report_paths.py tests/test_a2a_inbox_bridge_tmux_scripts.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "touched-python-ruff",
+      "command": "python3 -m ruff check api/routers/control_surface.py dharma_swarm/daemon_config.py dharma_swarm/runtime_process_identity.py dharma_swarm/runtime_release_entrypoint.py scripts/runtime/a2a_domain_reply_artifact.py scripts/runtime/a2a_domain_reply_worker.py scripts/runtime/a2a_inbox_bridge.py scripts/runtime/a2a_reply_capture.py scripts/runtime/a2a_send.py scripts/runtime/codex_composer_semantic_inbox_drain.py scripts/runtime/codex_composer_semantic_responder.py scripts/runtime/live_ops_census.py scripts/runtime/model_critic_runner.py scripts/runtime/organism_liveness_sentinel.py scripts/runtime/palantir_pilot_a2a_worker.py tests/test_a2a_inbox_bridge_tmux_scripts.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_runtime_report_paths.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "ambient-release-root-must-not-be-admitted",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/runtime_release_entrypoint.py'); t=p.read_text(); a='    if release_root != package_root:'; a in t or sys.exit(3); p.write_text(t.replace(a, '    if False and release_root != package_root:', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_runtime_release_entrypoint.py', '-k', 'rejects_a_different_release_root']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "repository-receipt-default-must-not-return",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/daemon_config.py'); t=p.read_text(); a='    return dharma_state_dir(\\\"DHARMA_STATE_DIR\\\", \\\"DHARMA_HOME\\\") / \\\"reports\\\" / relative'; a in t or sys.exit(3); p.write_text(t.replace(a, '    return Path.cwd() / \\\"reports\\\" / relative', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_runtime_report_paths.py', '-k', 'runtime_receipt_defaults']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: bind immutable runtime receipt custody"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-IMMUTABLE-RUNTIME-CUSTODY-20260827",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "cc85f31bc7aab6c658e300950a811797a25a655b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Python isolated mode removes the checkout root from sys.path, while the daemon still consumes the versioned scripts namespace. The release entrypoint may reintroduce only the root containing its already-installed dharma_swarm package, never an ambient checkout.",
+      "Runtime modules expose module-level default receipt paths and explicit CLI overrides. Defaults move together to the canonical state authority; explicit operator-supplied paths remain supported and are not silently rewritten.",
+      "Operational receipts are mutable observations, whereas repository reports are reviewed evidence. Moving defaults out of the checkout prevents accidental authority promotion but does not itself validate receipt semantics."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/runtime_admission.py",
+      "scripts/runtime/dharma_swarm_release_runner.sh",
+      "dharma_swarm/daemon_config.py",
+      "dharma_swarm/runtime_process_identity.py"
+    ],
+    "honest_blockers": [
+      "This packet retrospectively binds the complete pull-request range from exact main cc85f31bc; the implementation commits predate the packet and gain no independent runtime authority from that chronology.",
+      "Repository tests prove release-root admission and default receipt custody. They do not install or restart launchd, cron, a VPS service, an A2A consumer, or the autonomous swarm.",
+      "A receipt located below the state root remains an observation, not proof of external delivery, semantic processing, task success, or repository standing.",
+      "The isolated release entrypoint intentionally admits only orchestrate-live; other commands remain denied until separately typed and governed."
+    ],
+    "rollback": "Revert this pull request as one unit. Restore runtime service configuration only through the separately receipted fleet cutover procedure; repository rollback alone neither deletes state-root receipts nor authorizes restarting the older autonomous release.",
+    "packet_digest": "4a7a98e0712bf8febf0297f80d24db36ff5868b920f99fa55e1b6f498c8545b7"
+  }
+}
