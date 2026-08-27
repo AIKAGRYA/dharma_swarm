@@ -575,6 +575,33 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           models: false,
           agents: false,
         },
+        // A retained catalog remains inspectable as stale evidence, but an
+        // owner-truth reset revokes its ability to steer the next provider
+        // turn. Selection stays put; resume authority does not.
+        sessionContinuity: {
+          ...state.sessionContinuity,
+          activeSessionId: undefined,
+          resumeSessionId: undefined,
+          activeRouteId: state.routePolicy.routeId,
+          continuityMode: "fresh",
+          boundedHistory: [],
+          compactionPolicy: {
+            eventCount: 0,
+            compactableRatio: 0,
+            protectedEventTypes: [],
+            recentEventTypes: [],
+          },
+          compactedSummary: undefined,
+        },
+        // Session detail contains provider-owned continuation identity. Keep
+        // the catalog/selection as inspectable stale evidence, but discard
+        // detail and request provenance so a reconnect must fetch it again
+        // before resume can be armed.
+        sessionPane: {
+          ...state.sessionPane,
+          detailsBySessionId: {},
+          pendingDetailRequestsBySessionId: {},
+        },
       };
     case "surface.truth.mark":
       return {

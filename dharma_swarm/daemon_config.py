@@ -21,7 +21,7 @@ def dharma_state_dir(*env_vars: str) -> Path:
     """Return the canonical local Dharma state directory."""
     for env_var in env_vars:
         raw = os.getenv(env_var)
-        if raw is not None:
+        if raw:
             return Path(raw).expanduser().resolve()
     return Path.home() / ".dharma"
 

@@ -1,0 +1,87 @@
+{
+  "allowed_files": [
+    "terminal/**",
+    "reports/agentops/work_packets/helm-worldclass-terminal-WP-HELMLEGONE02-INK7.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "6d989fd8c328602db734a4581cfbf48b4f324bb6",
+  "branch": "build/helm-legone-02-ink7",
+  "commit": {
+    "allowed": true,
+    "message": "feat(helm): migrate terminal chassis to Ink 7"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "docs/**",
+    "packages/**",
+    "scripts/governance/**",
+    "scripts/runtime/**",
+    "tests/**",
+    "tools/**"
+  ],
+  "gates": [
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "helm-ink7-diff",
+      "timeout_seconds": 60
+    }
+  ],
+  "id": "helm-worldclass-terminal-WP-HELMLEGONE02-INK7",
+  "intent": "Migrate the Helm product chassis from Ink 5 to Ink 7 with React 19.2 and Node 22, wiring alternate-screen and window-size ownership once at the app root, preserving navigation/overlay boundaries, and deliberately re-golding the 42 compact/standard/panorama frames once after real tmux verification.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"import pathlib,sys; p=pathlib.Path('terminal/src/index.tsx'); t=p.read_text(); old='alternateScreen: true'; new='alternateScreen: false'; (t.count(old) == 1) or sys.exit(3); p.write_text(t.replace(old,new,1)); sys.exit(1 if 'alternateScreen: false' in p.read_text() else 2)\"",
+      "expected_exit": 1,
+      "name": "alternate-screen-removal-is-observable",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "helm-worldclass-terminal-2026-06",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "terminal/src/index.tsx",
+      "terminal/src/app.tsx",
+      "terminal/scripts/golden_capture.sh",
+      "scripts/terminal_guardian_preflight.sh"
+    ],
+    "collision": {
+      "checked_at_sha": "6d989fd8c328602db734a4581cfbf48b4f324bb6",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The shared Node 22 CI pin is owned by repository-titanium-hardening and is carried separately in draft PR #1422; this terminal packet does not cross that ownership boundary.",
+      "This ticket upgrades the chassis and rendering primitives only. It does not itself create seven fresh live route receipts or satisfy the Helm alive bar."
+    ],
+    "interface_mismatches": [
+      "Ink 7 requires Node >=22 and React >=19.2 while the terminal manifest and CI pin Ink 5, React 18, and Node 20.",
+      "The current app owns width through global process.stdout and a manual resize tick; Ink 7 provides renderer-owned useWindowSize.",
+      "Golden capture sends Escape and Tab without waiting for Ink 7 escape-sequence disambiguation."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "70279ea986c61eb4dfe07ba3c8d4767b5cf3d93a6a579431d18fa3bf9606de4c",
+    "rollback": "Revert the packet-scoped migration commit to restore Ink 5/React 18/Node 20 and the previous 42 golden frames.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-HELMLEGONE02-INK7"
+  },
+  "worktree": "."
+}

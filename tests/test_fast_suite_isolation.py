@@ -36,7 +36,6 @@ Authority: docs/plans/TITANIUM_GRADE_REPOSITORY_HARDENING_2026-07-10.md (WP-0D).
 from __future__ import annotations
 
 import ast
-import copy
 import re
 from pathlib import Path
 
@@ -227,24 +226,34 @@ class TestTrackCriterionTimeoutBudgets:
         )
 
     def test_guard_names_real_underbudget_mutation(self):
-        portfolio = yaml.safe_load(ACTIVE_TRACK.read_text(encoding="utf-8"))
-        mutated = copy.deepcopy(portfolio)
-        titanium = next(
-            track
-            for track in mutated["active_tracks"]
-            if track["id"] == "repository-titanium-hardening-2026-07"
-        )
-        verifier = next(
-            criterion
-            for criterion in titanium["completion_criteria"]
-            if criterion["id"] == "titanium_verifier_truth_contracts_pass"
-        )
+        mutated = {
+            "active_tracks": [
+                {
+                    "id": "synthetic-timeout-track",
+                    "completion_criteria": [
+                        {
+                            "id": "synthetic-verifier-contracts-pass",
+                            "kind": "command_passes",
+                            "timeout_s": 900,
+                            "command": [
+                                "python3",
+                                "-m",
+                                "pytest",
+                                "tests/test_verifier_selfcheck_contract.py",
+                                "-q",
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        verifier = mutated["active_tracks"][0]["completion_criteria"][0]
         verifier.pop("timeout_s", None)
 
         violations = _criterion_timeout_violations(mutated)
         expected = (
-            "repository-titanium-hardening-2026-07::"
-            "titanium_verifier_truth_contracts_pass timeout_s=120 < "
+            "synthetic-timeout-track::"
+            "synthetic-verifier-contracts-pass timeout_s=120 < "
             "tests/test_verifier_selfcheck_contract.py max pytest.mark.timeout=900"
         )
         assert expected in violations, violations

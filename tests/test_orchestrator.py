@@ -23,6 +23,7 @@ from dharma_swarm.models import (
 )
 from dharma_swarm.orchestrator import Orchestrator
 from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.yoga_node import ConstraintVerdict
 
 
 class MockTaskBoard:
@@ -177,6 +178,86 @@ async def test_route_next_limited_agents(tasks):
 
     dispatches = await orch.route_next()
     assert len(dispatches) == 1  # Only 1 agent for 2 tasks
+
+
+@pytest.mark.asyncio
+async def test_route_next_respects_remaining_concurrency_slots():
+    board = MockTaskBoard()
+    board.tasks = [Task(id=f"t{index}", title=f"Task {index}") for index in range(5)]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id=f"a{index}",
+                name=f"agent-{index}",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            )
+            for index in range(5)
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._max_concurrent_tasks = 3
+    occupied = asyncio.get_running_loop().create_future()
+    orch._running_tasks["already-running"] = occupied  # type: ignore[assignment]
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 2
+    occupied.cancel()
+
+
+@pytest.mark.asyncio
+async def test_route_next_fills_remaining_slots_after_constraint_block():
+    board = MockTaskBoard()
+    board.tasks = [Task(id=f"t{index}", title=f"Task {index}") for index in range(3)]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id=f"a{index}",
+                name=f"agent-{index}",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            )
+            for index in range(3)
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._max_concurrent_tasks = 2
+    orch._yoga = MagicMock()
+    orch._yoga.can_dispatch.side_effect = [
+        [MagicMock(verdict=ConstraintVerdict.HOLD, constraint_name="test", reason="blocked")],
+        [MagicMock(verdict=ConstraintVerdict.ALLOW)],
+        [MagicMock(verdict=ConstraintVerdict.ALLOW)],
+    ]
+    orch._yoga.estimate_cost.return_value = MagicMock(
+        required_providers=[], estimated_tokens=0
+    )
+
+    dispatches = await orch.route_next()
+
+    assert [dispatch.task_id for dispatch in dispatches] == ["t1", "t2"]
+
+
+@pytest.mark.asyncio
+async def test_route_next_reaps_completed_tasks_before_capacity_check(agents):
+    board = MockTaskBoard()
+    board.tasks = [Task(id="t-after-collect", title="Runs after collection")]
+    pool = MockAgentPool(agents[:1])
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch._max_concurrent_tasks = 1
+
+    async def complete_immediately():
+        return None
+
+    completed = asyncio.create_task(complete_immediately())
+    await completed
+    orch._running_tasks["completed"] = completed
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].task_id == "t-after-collect"
+    assert "completed" not in orch._running_tasks
 
 
 @pytest.mark.asyncio

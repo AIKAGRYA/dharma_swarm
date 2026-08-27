@@ -1,6 +1,6 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 6,
+  "version": 7,
   "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow. Completeness is enforced: every PR-visible check name must carry a row here or an explicit exclusion, pinned by tests/test_ci_truth_contract_completeness.py.",
   "required_contexts_manifest": "scripts/governance/ci_parity_manifest.json",
   "required": [
@@ -159,6 +159,14 @@
       "owner": "frontend",
       "local_command": "npm --prefix dashboard ci --legacy-peer-deps && npm --prefix dashboard run lint -- --quiet && npm --prefix dashboard run build",
       "failure_category": "frontend_build",
+      "autofix": "manual"
+    },
+    {
+      "id": "desktop_shell",
+      "names": ["desktop-shell"],
+      "owner": "desktop",
+      "local_command": "make desktop-shell-check",
+      "failure_category": "desktop_build",
       "autofix": "manual"
     },
     {

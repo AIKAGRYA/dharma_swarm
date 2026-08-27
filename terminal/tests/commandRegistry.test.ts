@@ -78,7 +78,7 @@ describe("F-158 slash-command registry coverage", () => {
       const resultLines = projectChatTraceLines(resultEvents).map((line) => line.text);
       expect(resultLines).toContain(`> ${command}`);
       expect(resultLines.some((text) => text.includes(`output for ${name}`))).toBe(true);
-      expect(resultLines.some((text) => text.startsWith("✓"))).toBe(true);
+      expect(resultLines.some((text) => text.startsWith("■"))).toBe(true);
       expect(resultLines.some((text) => text.startsWith("▶"))).toBe(false);
     }
   });
@@ -94,7 +94,7 @@ describe("F-158 slash-command registry coverage", () => {
     const lines = projectChatTraceLines(events).map((line) => line.text);
     expect(lines).toContain("> /model");
     expect(lines.some((text) => text.includes("route picker opened"))).toBe(true);
-    expect(lines.some((text) => text.startsWith("✓"))).toBe(true);
+    expect(lines.some((text) => text.startsWith("■"))).toBe(true);
   });
 
   test("a slash turn closes only on its own command result; prompt turns stay governed by session end", () => {
@@ -115,7 +115,7 @@ describe("F-158 slash-command registry coverage", () => {
     );
     const mismatchedLines = projectChatTraceLines(mismatched).map((line) => line.text);
     expect(mismatchedLines.some((text) => text.startsWith("… thinking"))).toBe(true);
-    expect(mismatchedLines.some((text) => text.startsWith("✓"))).toBe(false);
+    expect(mismatchedLines.some((text) => text.startsWith("■"))).toBe(false);
 
     // A natural-language prompt turn absorbs a command step WITHOUT closing —
     // its lifecycle still ends at session end (F-173 contract untouched).
@@ -145,7 +145,7 @@ describe("F-158 slash-command registry coverage", () => {
       }),
     ]);
     const closedLines = projectChatTraceLines(closed).map((line) => line.text);
-    expect(closedLines.some((text) => text.startsWith("✓"))).toBe(true);
+    expect(closedLines.some((text) => text.startsWith("■"))).toBe(true);
   });
 
   test("command result responses pass the raw-identifier scrub", () => {

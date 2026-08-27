@@ -14,6 +14,14 @@ import os
 from pydantic import BaseModel, Field
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, str(default))
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, got {raw!r}") from exc
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator parameters
 # ---------------------------------------------------------------------------
@@ -21,6 +29,15 @@ from pydantic import BaseModel, Field
 class OrchestratorConfig(BaseModel):
     """Timeouts, retries, and backoff for the task orchestrator."""
 
+    max_concurrent_tasks: int = Field(
+        default_factory=lambda: _env_int("DGC_MAX_CONCURRENT_TASKS", 4),
+        validate_default=True,
+        ge=1, le=256,
+        description=(
+            "Maximum autonomous route_next tasks; explicit topology dispatch "
+            "remains caller-governed"
+        ),
+    )
     tick_interval_seconds: float = Field(
         default=1.0, ge=0.1, le=60.0,
         description="Seconds between orchestrator ticks",

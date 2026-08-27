@@ -4,8 +4,8 @@
 This is the governance gate that prevents the failure mode where a prose
 "current track" pointer rots while work moves on. It does three things:
 
-  1. Verifies the track portfolio is well-formed (schema; 1..max_active
-     co-equal active tracks; spine/edge/cycle/conflict/surface invariants).
+  1. Verifies the track portfolio is well-formed (schema; global and scoped
+     WIP limits; spine/edge/cycle/conflict/surface invariants).
   2. Evaluates each acceptance_criteria predicate against the filesystem
      (and, when network is allowed, the GitHub API for PR merge status).
   3. Checks TTL — fails if (today - verified_at) > ttl_days.
@@ -1963,6 +1963,12 @@ def normalize_portfolio(track: dict[str, Any] | None) -> dict[str, Any]:
             "min_active": int(policy.get("min_active", 1)),
             "max_active": int(policy.get("max_active", 10)),
             "warn_active": int(policy.get("warn_active", 5)),
+            # Host/context-specific admission limits are deliberately kept
+            # separate from the repository-wide max_active. Preserve the raw
+            # mapping here so validate_portfolio_graph can reject malformed
+            # or typoed declarations fail-closed instead of normalizing them
+            # away and silently disabling the cap.
+            "scoped_wip_limits": policy.get("scoped_wip_limits", {}),
             "min_active_grace_days": int(policy.get("min_active_grace_days", 7)),
             # Explicit "not CI-enforced" tombstone so downstream JSON consumers
             # (dashboard, dgc, agent_onboard) can render "advisory" without
@@ -2132,6 +2138,105 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
                 f"{n} ACTIVE tracks exceed warn_active={policy['warn_active']} — focus is spreading thin.",
             )
         )
+
+    # Scoped WIP limits express narrower authority (for example, programs
+    # admitted to build on one host) without turning that limit into a global
+    # repository freeze. A scope is declared build authority only; membership
+    # does not prove a process is running on that host. Unknown and malformed
+    # scopes fail closed so a typo cannot bypass the intended capacity gate.
+    raw_scoped_limits = policy.get("scoped_wip_limits", {})
+    valid_scoped_limits: dict[str, dict[str, Any]] = {}
+    if not isinstance(raw_scoped_limits, dict):
+        findings.append(
+            Finding(
+                "ERROR",
+                "scoped-wip-malformed",
+                "track_policy.scoped_wip_limits must be a mapping.",
+            )
+        )
+    else:
+        for raw_scope, raw_limit in raw_scoped_limits.items():
+            scope = str(raw_scope).strip() if isinstance(raw_scope, str) else ""
+            if not scope or not isinstance(raw_limit, dict):
+                findings.append(
+                    Finding(
+                        "ERROR",
+                        "scoped-wip-malformed",
+                        f"Scoped WIP entry {raw_scope!r} must have a non-empty string id and mapping value.",
+                    )
+                )
+                continue
+            max_scoped = raw_limit.get("max_active")
+            warn_scoped = raw_limit.get("warn_active", max_scoped)
+            scope_label = raw_limit.get("scope")
+            if (
+                type(max_scoped) is not int
+                or max_scoped < 1
+                or type(warn_scoped) is not int
+                or warn_scoped < 0
+                or warn_scoped > max_scoped
+                or (scope_label is not None and not isinstance(scope_label, str))
+            ):
+                findings.append(
+                    Finding(
+                        "ERROR",
+                        f"scoped-wip-malformed:{scope}",
+                        f"Scoped WIP '{scope}' requires integer 0 <= warn_active <= max_active, "
+                        "max_active >= 1, and an optional string scope label.",
+                    )
+                )
+                continue
+            valid_scoped_limits[scope] = raw_limit
+
+    active_scopes: dict[str, set[str]] = {}
+    for t in active:
+        tid = str(t.get("id") or "(missing-id)")
+        raw_scopes = t.get("admission_scopes") or []
+        if not isinstance(raw_scopes, list) or not all(
+            isinstance(scope, str) and scope.strip() for scope in raw_scopes
+        ):
+            findings.append(
+                Finding(
+                    "ERROR",
+                    f"admission-scopes-malformed:{tid}",
+                    f"Track '{tid}' admission_scopes must be a list of non-empty strings.",
+                )
+            )
+            continue
+        scopes = {scope.strip() for scope in raw_scopes}
+        active_scopes[tid] = scopes
+        for scope in sorted(scopes):
+            if scope not in valid_scoped_limits:
+                findings.append(
+                    Finding(
+                        "ERROR",
+                        f"admission-scope-unresolved:{tid}",
+                        f"Track '{tid}' references unknown admission scope '{scope}'.",
+                    )
+                )
+
+    for scope, limit in sorted(valid_scoped_limits.items()):
+        scoped_active = sum(1 for scopes in active_scopes.values() if scope in scopes)
+        max_scoped = int(limit["max_active"])
+        warn_scoped = int(limit.get("warn_active", max_scoped))
+        if scoped_active > max_scoped:
+            findings.append(
+                Finding(
+                    "ERROR",
+                    f"scoped-wip-exceeded:{scope}",
+                    f"{scoped_active} ACTIVE tracks in admission scope '{scope}' exceed "
+                    f"max_active={max_scoped}. Close or re-scope a track first.",
+                )
+            )
+        elif scoped_active > warn_scoped:
+            findings.append(
+                Finding(
+                    "WARN",
+                    f"scoped-wip-high:{scope}",
+                    f"{scoped_active} ACTIVE tracks in admission scope '{scope}' exceed "
+                    f"warn_active={warn_scoped}.",
+                )
+            )
 
     # Spine resolution + coverage (v2 only; v1 has no spine_objectives).
     # `serves:` is required only of tracks that occupy the portfolio (active/
@@ -2975,6 +3080,7 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "complements": t.get("complements") or [],
         "depends_on": t.get("depends_on") or [],
         "conflicts_with": t.get("conflicts_with") or [],
+        "admission_scopes": t.get("admission_scopes") or [],
         "owned_surfaces": t.get("owned_surfaces") or [],
         "moves_vital_signs": t.get("moves_vital_signs") or [],
         "verified_at": t.get("verified_at"),
@@ -2993,6 +3099,9 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "min_evidence_grade_name": r.get("min_evidence_grade_name", "S2"),
         "prerequisites_ok": r["prereqs_ok"],
         "completion_progress": {"passed": r["passed"], "total": r["total"]},
+        "prerequisites": [asdict(c) for c in r["prereqs"]],
+        "completion_criteria": [asdict(c) for c in r["completion"]],
+        # Backward-compatible combined projection for existing dashboard users.
         "criteria": [asdict(c) for c in (r["prereqs"] + r["completion"])],
         "ship_vetoes": [asdict(c) for c in r.get("ship_vetoes", [])],
     }
@@ -3026,6 +3135,22 @@ def emit_reports(
     ]
     served = {t.get("serves") for t in active}
     pol = portfolio.get("track_policy", {})
+    raw_scoped_limits = pol.get("scoped_wip_limits", {})
+    scoped_wip: dict[str, dict[str, Any]] = {}
+    if isinstance(raw_scoped_limits, dict):
+        for scope, limit in sorted(raw_scoped_limits.items()):
+            if not isinstance(scope, str) or not isinstance(limit, dict):
+                continue
+            scoped_wip[scope] = {
+                "active": sum(
+                    1
+                    for t in active
+                    if scope in (t.get("admission_scopes") or [])
+                ),
+                "max_active": limit.get("max_active"),
+                "warn_active": limit.get("warn_active", limit.get("max_active")),
+                "scope": limit.get("scope"),
+            }
 
     payload = {
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -3045,6 +3170,7 @@ def emit_reports(
             "active": len(active),
             "max_active": pol.get("max_active"),
             "warn_active": pol.get("warn_active"),
+            "scoped_wip": scoped_wip,
             "shippable": sum(1 for p in at_payload if p["shippable"]),
         },
         "spine_objectives": portfolio.get("spine_objectives", []),
@@ -3067,6 +3193,15 @@ def emit_reports(
         f"shippable {payload['portfolio_summary']['shippable']}",
         "",
     ]
+    for scope, scoped in scoped_wip.items():
+        label = f"; {scoped['scope']}" if scoped.get("scope") else ""
+        md.append(
+            f"Scoped WIP `{scope}`: **{scoped['active']}** "
+            f"(warn {scoped['warn_active']}, max {scoped['max_active']}{label}). "
+            "This is declared build admission, not host/runtime evidence."
+        )
+    if scoped_wip:
+        md.append("")
     if spine_ids:
         md.append("## Spine coverage")
         md.append("")
@@ -3083,6 +3218,11 @@ def emit_reports(
             f"- serves: `{tp['serves']}` · complements: {tp['complements']} · "
             f"depends_on: {tp['depends_on']} · conflicts_with: {tp['conflicts_with']}"
         )
+        if tp["admission_scopes"]:
+            md.append(
+                f"- admission scopes: {tp['admission_scopes']} "
+                "(declared build authority; not runtime evidence)"
+            )
         md.append(f"- owned_surfaces: {tp['owned_surfaces']}")
         md.append(f"- moves_vital_signs: {tp['moves_vital_signs']}")
         if tp.get("claim_boundary"):
@@ -3095,9 +3235,16 @@ def emit_reports(
             md.append(f"  - {mark} ship veto `{c['id']}` ({c['kind']}) — {c['detail']}")
         if tp.get("ship_vetoes"):
             md.append("")
-        for c in tp["criteria"]:
+        for c in tp["prerequisites"]:
             mark = "✓" if c["passed"] else "✗"
-            md.append(f"  - {mark} `{c['id']}` ({c['kind']}) — {c['detail']}")
+            md.append(
+                f"  - {mark} prerequisite `{c['id']}` ({c['kind']}) — {c['detail']}"
+            )
+        for c in tp["completion_criteria"]:
+            mark = "✓" if c["passed"] else "✗"
+            md.append(
+                f"  - {mark} completion `{c['id']}` ({c['kind']}) — {c['detail']}"
+            )
         md.append("")
     if findings:
         md.append("## Findings")

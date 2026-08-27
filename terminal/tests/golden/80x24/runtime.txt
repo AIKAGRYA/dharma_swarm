@@ -1,16 +1,16 @@
- ◆ DHARMA HELM  /  SYSTEM  ·  ds_nihonga_helm_frontier_20260814
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · · Conv · · Acti · · Evid · ◆ Syst
+ ◆ DHARMA HELM / SYSTEM · dharma_swarm                                ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  · Conv  · Acti  · Evid  ◆ Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Runtime · Runtime Snapshot                                                   │
 │ 1/1 sections · j/k select                                                    │
 │                                                                              │
-│ Bridge: booting                                                              │
-│ Python runtime: expected 3.11+                                               │
-│ Frontend runtime: Bun                                                        │
+│ ?[?] UNKNOWN · runtime owner projection not observed.                        │
+│ Bridge presence alone is not executor liveness.                              │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

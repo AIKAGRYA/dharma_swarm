@@ -6,7 +6,7 @@ authority: local_evidence
 
 # World-Signal Supply Chain
 
-Producer: World Radar's Go bridge writes raw observations, typed signals, health, and ledgers. It is bound to `organism-rewire-2026-07`.
+Producer: World Radar's Go bridge writes raw observations, typed signals, health, and ledgers. It is bound to `rsi-lab-meghadharma-2026-08` and `sublimation-forge-2026-08`.
 
 Contract: consume `promoted_feedback`; apply `ground_feedback`; emit `grounded_signal` to [Persistent Agent / Sarathi](sarathi_runtime.md). During local rehearsal the initial input is explicitly a fixture, not a fresh world observation.
 

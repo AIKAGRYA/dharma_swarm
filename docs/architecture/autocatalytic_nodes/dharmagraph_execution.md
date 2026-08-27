@@ -6,7 +6,7 @@ authority: local_evidence
 
 # DharmaGraph Durable Execution
 
-Producer: `DurableInvoker` and the production orchestrator bind execution identity, idempotency, and `EvidenceReceipt` persistence. This node is bound to `dharmagraph-engine-2026-07`.
+Producer: `DurableInvoker` and the production orchestrator bind execution identity, idempotency, and `EvidenceReceipt` persistence. This node is bound to `fleet-advancement-2026-08`.
 
 Contract: consume `prioritized_work`; apply `execute_durably`; emit `execution_receipt` to [Cybernetic Supervision](cybernetic_supervision.md).
 

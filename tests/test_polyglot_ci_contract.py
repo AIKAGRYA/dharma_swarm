@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 
 import yaml
@@ -24,7 +25,7 @@ JOBS = WORKFLOW["jobs"]
 MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 
 GO_LANES = ("go-adapter-contracts", "go-evidence-ingestor")
-POLYGLOT_LANES = GO_LANES + ("dashboard", "terminal")
+POLYGLOT_LANES = GO_LANES + ("dashboard", "desktop-shell", "terminal")
 
 SHA_PINNED_USES = re.compile(r"@[0-9a-f]{40}\b")
 EXACT_SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
@@ -131,6 +132,38 @@ def test_dashboard_lane_lints_and_builds() -> None:
     assert "npm run build" in run_text
 
 
+# ── Desktop shell: exact patched MSRV, locked check + test ─────────────────
+
+def test_desktop_shell_ci_pin_matches_manifest_msrv() -> None:
+    manifest = tomllib.loads(
+        (REPO_ROOT / "desktop-shell" / "src-tauri" / "Cargo.toml").read_text()
+    )
+    msrv = manifest["package"]["rust-version"]
+    run_text = _run_text("desktop-shell")
+    match = re.search(r"rustup toolchain install (\d+\.\d+\.\d+) ", run_text)
+    assert match, "desktop-shell CI must install an exact Rust patch version"
+    assert match.group(1) == f"{msrv}.0", (
+        f"desktop-shell CI Rust {match.group(1)} != manifest MSRV {msrv}"
+    )
+
+
+def test_desktop_shell_lane_runs_locked_check_and_tests_on_macos() -> None:
+    assert JOBS["desktop-shell"]["runs-on"] == "macos-15"
+    run_text = _run_text("desktop-shell")
+    manifest = "desktop-shell/src-tauri/Cargo.toml"
+    assert f"cargo +1.88.0 check --locked --manifest-path {manifest}" in run_text
+    assert f"cargo +1.88.0 test --locked --manifest-path {manifest}" in run_text
+
+
+def test_desktop_lock_retains_the_patched_rust_dependency_floors() -> None:
+    lock = tomllib.loads(
+        (REPO_ROOT / "desktop-shell" / "src-tauri" / "Cargo.lock").read_text()
+    )
+    versions = {row["name"]: row["version"] for row in lock["package"]}
+    assert tuple(map(int, versions["serde_with"].split("."))) >= (3, 21, 0)
+    assert tuple(map(int, versions["time"].split("."))) >= (0, 3, 47)
+
+
 # ── Terminal lane: pinned Bun, frozen lockfile, typecheck + behavior ────────
 
 def test_terminal_lane_bun_pin_matches_package_manager_manifest() -> None:
@@ -201,6 +234,16 @@ def test_make_targets_mirror_workflow_commands() -> None:
         ("npm --prefix dashboard ci --legacy-peer-deps", "npm ci --legacy-peer-deps", "dashboard"),
         ("npm --prefix dashboard run lint -- --quiet", "npm run lint -- --quiet", "dashboard"),
         ("npm --prefix dashboard run build", "npm run build", "dashboard"),
+        (
+            "cargo +1.88.0 check --locked --manifest-path desktop-shell/src-tauri/Cargo.toml",
+            "cargo +1.88.0 check --locked --manifest-path desktop-shell/src-tauri/Cargo.toml",
+            "desktop-shell",
+        ),
+        (
+            "cargo +1.88.0 test --locked --manifest-path desktop-shell/src-tauri/Cargo.toml",
+            "cargo +1.88.0 test --locked --manifest-path desktop-shell/src-tauri/Cargo.toml",
+            "desktop-shell",
+        ),
         # Not `bun --cwd terminal ...`: on pinned bun 1.3.11 that form prints
         # usage and exits 0 (a false green). `cd` matches CI's
         # working-directory, keeping local and CI commands byte-comparable.
@@ -212,7 +255,7 @@ def test_make_targets_mirror_workflow_commands() -> None:
         assert make_cmd in MAKEFILE, f"Makefile lacks {make_cmd!r}"
         assert workflow_cmd in _run_text(lane), f"{lane} lane lacks {workflow_cmd!r}"
 
-    for target in ("frontend-check:", "terminal-check:", "go-ci:"):
+    for target in ("frontend-check:", "desktop-shell-check:", "terminal-check:", "go-ci:"):
         assert re.search(rf"^{re.escape(target)}", MAKEFILE, re.M), (
             f"Makefile lacks the {target[:-1]} target"
         )

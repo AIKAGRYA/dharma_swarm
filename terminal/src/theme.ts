@@ -45,7 +45,7 @@ export const AGENT_STATES = {
   spawning: {glyph: "◌", color: THEME.iris},
   blocked: {glyph: "⚠", color: THEME.persimmon},
   error: {glyph: "✖", color: THEME.vermilion},
-  done: {glyph: "✓", color: THEME.moss},
+  done: {glyph: "■", color: THEME.pine},
   idle: {glyph: "·", color: THEME.stone},
   offline: {glyph: "○", color: THEME.ink},
 } as const;
