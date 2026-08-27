@@ -155,8 +155,8 @@ function serverLocationSearch(): string {
 
 function statusTone(status: string): string {
   if (["done", "completed", "succeeded", "coherent"].includes(status)) return "text-[#7FB8A6]";
-  if (["failed", "blocked", "expired"].includes(status)) return "text-[#D14B3A]";
-  if (["review", "queued", "needs_action"].includes(status)) return "text-[#D8B44A]";
+  if (["failed", "blocked", "expired", "quarantined_fake_result"].includes(status)) return "text-[#D14B3A]";
+  if (["pending", "review", "queued", "needs_action"].includes(status)) return "text-[#D8B44A]";
   if (["running", "claimed", "assigned", "recorded_running"].includes(status)) return "text-[#6FB0C4]";
   return "text-[#6B7694]";
 }
@@ -166,10 +166,10 @@ function StatusGlyph({ status }: { status: string }) {
   if (["done", "completed", "succeeded", "coherent"].includes(status)) {
     return <CheckCircle2 size={15} className={className} aria-hidden />;
   }
-  if (["failed", "blocked", "expired"].includes(status)) {
+  if (["failed", "blocked", "expired", "quarantined_fake_result"].includes(status)) {
     return <XCircle size={15} className={className} aria-hidden />;
   }
-  if (["review", "queued", "needs_action"].includes(status)) {
+  if (["pending", "review", "queued", "needs_action"].includes(status)) {
     return <AlertTriangle size={15} className={className} aria-hidden />;
   }
   return <CircleDashed size={15} className={className} aria-hidden />;
@@ -239,7 +239,7 @@ export function MissionControlDeck() {
     !showSimulation,
   );
 
-  const observed = !showSimulation && projection?.state === "observed" && projection.snapshot;
+  const observed = !showSimulation && !error && projection?.state === "observed" && projection.snapshot;
   const snapshot = showSimulation ? PROTOTYPE_SNAPSHOT : observed || null;
   const source: SourceKind = showSimulation
     ? "simulation"
@@ -257,8 +257,11 @@ export function MissionControlDeck() {
       }
     : { tasks: "—", attempts: "—", leases: "—", receipts: "—" };
   const needsAction = useMemo(
-    () => snapshot?.tasks.filter((task) => ["pending", "queued", "review", "blocked", "failed"].includes(task.status)) ?? [],
+    () => snapshot?.tasks.filter((task) => ["pending", "queued", "review", "blocked", "failed", "quarantined_fake_result"].includes(task.status)) ?? [],
     [snapshot],
+  );
+  const reconciliationNeedsAction = Boolean(
+    !showSimulation && snapshot && snapshot.reconciliation !== "coherent",
   );
   const receiptCounts = useMemo(() => {
     const result = new Map<string, number>();
@@ -385,6 +388,17 @@ export function MissionControlDeck() {
                 <AlertTriangle size={15} /> Needs-Action
               </div>
               <div className="mt-4 space-y-3">
+                {reconciliationNeedsAction ? (
+                  <div className="bg-[#0A0E1A] px-3 py-3">
+                    <div className="flex items-start gap-2 text-sm text-[#EDE8DC]">
+                      <StatusGlyph status="blocked" />
+                      <span>Mission reconciliation requires intervention</span>
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-[#6B7694]">
+                      Canonical stores report {snapshot.reconciliation.replaceAll("_", " ")}; inspect task and runtime evidence before action.
+                    </div>
+                  </div>
+                ) : null}
                 {needsAction.map((task) => (
                   <div key={task.task_id} className="bg-[#0A0E1A] px-3 py-3">
                     <div className="flex items-start gap-2 text-sm text-[#EDE8DC]">
@@ -396,7 +410,7 @@ export function MissionControlDeck() {
                     </div>
                   </div>
                 ))}
-                {!needsAction.length ? (
+                {!reconciliationNeedsAction && !needsAction.length ? (
                   <div className="bg-[#0A0E1A] px-3 py-6 text-center text-xs text-[#6B7694]">
                     No recorded task currently maps to this lane.
                   </div>
