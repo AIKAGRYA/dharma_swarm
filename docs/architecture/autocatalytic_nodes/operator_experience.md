@@ -6,7 +6,7 @@ authority: projection_only
 
 # Operator Experience Membrane
 
-Producer: the shipped Helm JSON bridge and terminal approval store project runtime truth to the operator. This candidate node is bound to `organism-rewire-2026-07`, which retains the operator-facing organism membrane after the Helm track retired.
+Producer: the shipped Helm JSON bridge and terminal approval store project runtime truth to the operator. This candidate node is bound to `fleet-advancement-2026-08` and `sadhana-10-day-program-2026-08`; the standalone Helm track is superseded by Fleet rather than claimed complete.
 
 Contract: consume `verified_release`; apply `request_operator_authority`; emit `authorized_action` to [External Value Delivery](external_value_delivery.md).
 

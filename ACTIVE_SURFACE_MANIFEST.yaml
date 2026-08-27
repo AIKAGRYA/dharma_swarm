@@ -1111,7 +1111,7 @@ autocatalytic_portfolio:
       ordinal: 1
       label: "World-Signal Supply Chain"
       role: "Ground external feedback into source-linked opportunity signals."
-      project_bindings: [organism-rewire-2026-07]
+      project_bindings: [rsi-lab-meghadharma-2026-08, sublimation-forge-2026-08]
       authority: local_evidence
       input_signal: promoted_feedback
       output_signal: grounded_signal
@@ -1134,7 +1134,7 @@ autocatalytic_portfolio:
       ordinal: 2
       label: "Persistent Agent / Sarathi Runtime"
       role: "Turn grounded signals and loop debt into prioritized, identity-bound work."
-      project_bindings: [organism-rewire-2026-07]
+      project_bindings: [fleet-advancement-2026-08]
       authority: local_evidence
       input_signal: grounded_signal
       cross_inputs:
@@ -1157,7 +1157,7 @@ autocatalytic_portfolio:
       ordinal: 3
       label: "DharmaGraph Durable Execution"
       role: "Execute prioritized work through idempotent, durable graph boundaries."
-      project_bindings: [dharmagraph-engine-2026-07]
+      project_bindings: [fleet-advancement-2026-08]
       authority: local_evidence
       input_signal: prioritized_work
       cross_inputs:
@@ -1180,7 +1180,7 @@ autocatalytic_portfolio:
       ordinal: 4
       label: "Cybernetic Supervision & Loop Closure"
       role: "Diagnose receipt-backed execution gaps and keep stalled loops visible."
-      project_bindings: [organism-rewire-2026-07]
+      project_bindings: [fleet-advancement-2026-08]
       authority: local_evidence
       input_signal: execution_receipt
       output_signal: closure_gap
@@ -1201,7 +1201,7 @@ autocatalytic_portfolio:
       ordinal: 5
       label: "Live Evaluation & Routing Feedback"
       role: "Measure candidate responses under parity and select a bounded experiment."
-      project_bindings: [dharmagraph-engine-2026-07]
+      project_bindings: [rsi-lab-meghadharma-2026-08, sublimation-forge-2026-08]
       authority: local_evidence
       input_signal: closure_gap
       output_signal: selected_experiment
@@ -1222,7 +1222,7 @@ autocatalytic_portfolio:
       ordinal: 6
       label: "Chamber Research & Evolution"
       role: "Turn selected experiments into falsifiable, source-resolvable change proposals."
-      project_bindings: [hyperbolic-time-chamber-2026-07]
+      project_bindings: [rsi-lab-meghadharma-2026-08, sublimation-forge-2026-08]
       authority: local_evidence
       input_signal: selected_experiment
       cross_inputs:
@@ -1245,7 +1245,7 @@ autocatalytic_portfolio:
       ordinal: 7
       label: "Assurance & Merge Membrane"
       role: "Bind claims to evidence, verify CI truth, and integrate only authorized changes."
-      project_bindings: [organism-rewire-2026-07, dharmagraph-engine-2026-07]
+      project_bindings: [fleet-advancement-2026-08, sadhana-10-day-program-2026-08, rsi-lab-meghadharma-2026-08, sublimation-forge-2026-08]
       authority: local_evidence
       input_signal: proposed_change
       output_signal: verified_release
@@ -1269,7 +1269,7 @@ autocatalytic_portfolio:
       ordinal: 8
       label: "Operator Experience Membrane"
       role: "Project verified releases into legible, explicitly authorized operator actions."
-      project_bindings: [organism-rewire-2026-07]
+      project_bindings: [fleet-advancement-2026-08, sadhana-10-day-program-2026-08]
       authority: projection_only
       input_signal: verified_release
       output_signal: authorized_action
@@ -1292,7 +1292,7 @@ autocatalytic_portfolio:
       ordinal: 9
       label: "External Value Delivery"
       role: "Deliver an operator-authorized artifact and ingest a typed external outcome."
-      project_bindings: [darshan-publication-2026-07]
+      project_bindings: [sadhana-10-day-program-2026-08]
       authority: external_gated
       input_signal: authorized_action
       output_signal: external_outcome
@@ -1312,7 +1312,7 @@ autocatalytic_portfolio:
       ordinal: 10
       label: "Learning & Promotion Membrane"
       role: "Promote verified outcomes into bounded feedback without self-certification."
-      project_bindings: [organism-rewire-2026-07, dharmagraph-engine-2026-07]
+      project_bindings: [sadhana-10-day-program-2026-08, rsi-lab-meghadharma-2026-08, sublimation-forge-2026-08]
       authority: projection_only
       input_signal: external_outcome
       output_signal: promoted_feedback

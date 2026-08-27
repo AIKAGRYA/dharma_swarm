@@ -6,7 +6,7 @@ authority: local_evidence
 
 # Assurance and Merge Membrane
 
-Producer: claim-evidence binding, CI truth, and merge control form one fail-closed integration membrane. It binds the active `organism-rewire-2026-07` substrate lane and `dharmagraph-engine-2026-07` execution lane; retired assurance tracks remain historical evidence rather than active authority.
+Producer: claim-evidence binding, CI truth, and merge control form one fail-closed integration membrane. It binds all four active lanes: `fleet-advancement-2026-08`, `sadhana-10-day-program-2026-08`, `rsi-lab-meghadharma-2026-08`, and `sublimation-forge-2026-08`; superseded assurance tracks remain historical evidence rather than active authority.
 
 Contract: consume `proposed_change`; apply `assure_and_integrate`; emit `verified_release` to [Operator Experience](operator_experience.md).
 

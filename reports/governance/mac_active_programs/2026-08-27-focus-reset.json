@@ -1,0 +1,39 @@
+{
+  "schema": "dharma.mac_active_programs.focus_reset.v1",
+  "observed_at": "2026-08-27T00:18:12+09:00",
+  "authority": {
+    "kind": "operator_directive",
+    "source": "2026-08-26 crash-recovery session",
+    "scope": "Mac build admission only"
+  },
+  "claim": {
+    "modality": "declared",
+    "active_lane_ids": [
+      "fleet-advancement-2026-08",
+      "sadhana-10-day-program-2026-08",
+      "rsi-lab-meghadharma-2026-08",
+      "sublimation-forge-2026-08"
+    ],
+    "prototype_deliverables": [
+      "Mission Control",
+      "Fleet Hub",
+      "HELM"
+    ],
+    "prototype_deliverables_are_extra_program_lanes": false
+  },
+  "observations": {
+    "crash_custody_marker": "/Users/dhyana/.dharma/recovery/2026-08-26-crash-custody/CUSTODY_COMPLETE",
+    "fleet_hub_commit": "7861098",
+    "fleet_hub_pull_request": "https://github.com/AIKAGRYA/fleet-hub/pull/15",
+    "rsi_canonical_commit": "b148f55e00f668fa84774f299610eaae4d8283e4",
+    "rsi_plan_digest": "sha256:38410a2e9b3caaae29f37b9492d01261560865f452210c7c3ef582b6e6da3db7",
+    "rsi_mac_meghadharma_in_sync": true,
+    "sadhana_active_worktree": "/Users/dhyana/ds_sadhana_10day_active_20260826",
+    "sublimation_forge_worktree": "/Users/dhyana/ds_sublimation_foundry_meghadharma_20260824"
+  },
+  "exclusions": [
+    "This receipt does not prove executor liveness.",
+    "It does not authorize deployment, spend, credentials, outreach, or production promotion.",
+    "Superseded entries below relinquish portfolio slots only; their work and evidence remain preserved."
+  ]
+}

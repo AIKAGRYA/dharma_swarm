@@ -6,7 +6,7 @@ authority: external_gated
 
 # External Value Delivery
 
-Producer: the Darshan charter describes an intended publication loop, but no in-repo publisher, typed response ingestor, or Issue One effect receipt currently closes it. This candidate node is bound to `darshan-publication-2026-07`.
+Producer: the SADHANA program defines the only active operator-gated external-value lane. No schedule, participant record, outreach, or effect receipt is inferred by this binding. This candidate node is bound to `sadhana-10-day-program-2026-08`.
 
 Contract: consume `authorized_action`; apply `deliver_and_observe`; emit `external_outcome` to [Learning & Promotion](learning_promotion.md).
 
