@@ -12,10 +12,7 @@ import math
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from dharma_swarm.foundry.runner_isolation import IsolationProof
+from typing import Any, Protocol, runtime_checkable
 
 _ISOLATION_BOOL_FIELDS = (
     "network_disabled",
@@ -52,6 +49,15 @@ _EVALUATION_BINDING_FIELDS = (
     "evaluator_id", "seed", "run_id", "command_digest", "output_digest",
     "isolation_digest",
 )
+
+
+class IsolationProofLike(Protocol):
+    """Structural runner-proof boundary; no concrete sibling import required."""
+
+    @property
+    def promotion_allowed(self) -> bool: ...
+
+    def to_dict(self) -> dict[str, Any]: ...
 
 
 def _utc_now_iso() -> str:
@@ -301,7 +307,7 @@ class EvalMetrics:
     metrics: dict[str, float] = field(default_factory=dict)
     wall_clock_s: float = 0.0
     notes: str = ""
-    isolation_proof: "IsolationProof | BoundIsolationProof | None" = None
+    isolation_proof: IsolationProofLike | None = None
     run_identity: EvaluationRunIdentity | None = None
 
 
