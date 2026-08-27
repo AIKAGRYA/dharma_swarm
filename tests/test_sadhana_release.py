@@ -213,7 +213,14 @@ def _standby_activation_harness(
     monkeypatch.setattr(
         release,
         "_unit_inactive",
-        lambda unit, **kwargs: not active(unit, **kwargs),
+        lambda unit, expected_load_state="loaded", **kwargs: (
+            not active(unit, **kwargs)
+            and (
+                expected_load_state == "masked"
+                if unit in release.CAMPAIGN_UNITS and state["campaign_masked"]
+                else expected_load_state == "loaded"
+            )
+        ),
     )
     monkeypatch.setattr(release, "_unit_enabled", enabled)
     monkeypatch.setattr(
@@ -1395,6 +1402,20 @@ def test_deploy_cannot_activate_before_governed_authority_binding(
     assert parser.parse_args(
         ["activate-standby", "--role", "standby", "--release-sha", "a" * 40]
     ).command == "activate-standby"
+    retired = parser.parse_args(
+        [
+            "retire-failed-standby-activation",
+            "--role",
+            "standby",
+            "--failed-release-sha",
+            "a" * 40,
+            "--replacement-release-sha",
+            "b" * 40,
+            "--failed-intent-receipt-digest",
+            "sha256:" + "c" * 64,
+        ]
+    )
+    assert retired.command == "retire-failed-standby-activation"
 
 
 @pytest.mark.parametrize(
@@ -2217,6 +2238,50 @@ def test_clock_proof_requires_ntp_bounded_skew_and_exact_installed_timer(
             expected_root_uid=os.geteuid(),
             expected_root_gid=os.getegid(),
         )
+
+    standby_intent = tmp_path / "standby-activation-intent.v1.json"
+    standby_receipt = tmp_path / "standby-activation.v1.json"
+    standby_pending = tmp_path / "standby-retirement-pending.v1.json"
+    monkeypatch.setattr(release, "STANDBY_ACTIVATION_INTENT", standby_intent)
+    monkeypatch.setattr(release, "STANDBY_ACTIVATION_RECEIPT", standby_receipt)
+    monkeypatch.setattr(release, "STANDBY_RETIREMENT_PENDING", standby_pending)
+    receipt_path.write_bytes(b"old-clock-proof\n")
+    receipt_path.chmod(0o600)
+    standby_intent.write_bytes(b"failed-attempt\n")
+    standby_intent.chmod(0o600)
+    standby_call = {
+        "role": "standby",
+        "release_sha": release_sha,
+        "controller_utc": "2026-08-23T00:00:00Z",
+        "known_hosts_sha256": "b" * 64,
+        "strict_host_key_channel": True,
+        "staged_release_admission_receipt_digest": "sha256:" + "c" * 64,
+        "release_timer_path": timer,
+        "installed_timer_path": installed,
+        "receipt_path": receipt_path,
+        "runner": synchronized,
+        "now": observed,
+        "observed_node": release.STANDBY_NODE,
+        "ssh_connection_observed": True,
+        "expected_root_uid": os.geteuid(),
+        "expected_root_gid": os.getegid(),
+    }
+    with pytest.raises(release.ReleaseContractError, match="lifecycle evidence"):
+        release.record_preactivation_clock_proof(**standby_call)
+    assert receipt_path.read_bytes() == b"old-clock-proof\n"
+    standby_intent.unlink()
+    lock_path = standby_intent.with_name(release.STANDBY_ACTIVATION_LOCK.name)
+    with release._standby_lifecycle_lock(
+        path=lock_path,
+        expected_root_uid=os.geteuid(),
+        expected_root_gid=os.getegid(),
+    ):
+        with pytest.raises(
+            release.ReleaseContractError,
+            match="lifecycle transaction is active",
+        ):
+            release.record_preactivation_clock_proof(**standby_call)
+    assert receipt_path.read_bytes() == b"old-clock-proof\n"
 
 
 @pytest.mark.parametrize(
@@ -4242,6 +4307,401 @@ def test_failed_predispatch_intent_replay_only_compensates_to_quiet(
     assert intent_path.exists()
     assert not receipt_path.exists()
     assert not writer_marker.exists()
+    if clock_failure == "stale":
+        recovery_root = tmp_path / "recovery"
+        recovery_root.mkdir(mode=0o700)
+        old_sha = "c" * 40
+        replacement_sha = "d" * 40
+        activation_receipt = recovery_root / "standby-activation.json"
+        activation_intent = recovery_root / "standby-activation-intent.json"
+        clock_receipt = recovery_root / "clock.json"
+        serve_intent_path = recovery_root / "serve-intent.json"
+        serve_ownership_path = recovery_root / "serve-owned.json"
+        serve_stop_path = recovery_root / "serve-stopped.json"
+        retirement_pending = recovery_root / "retirement-pending.json"
+        release_receipts = recovery_root / "releases"
+        (release_receipts / old_sha).mkdir(parents=True, mode=0o700)
+        dispatch_marker = recovery_root / "dispatch-enabled.json"
+        for name, value in (
+            ("STANDBY_ACTIVATION_RECEIPT", activation_receipt),
+            ("STANDBY_ACTIVATION_INTENT", activation_intent),
+            ("PREACTIVATION_CLOCK_RECEIPT", clock_receipt),
+            ("STANDBY_TAILSCALE_INTENT_RECEIPT", serve_intent_path),
+            ("STANDBY_TAILSCALE_OWNERSHIP_RECEIPT", serve_ownership_path),
+            ("STANDBY_TAILSCALE_STOP_RECEIPT", serve_stop_path),
+            ("STANDBY_RETIREMENT_PENDING", retirement_pending),
+            ("RELEASE_RECEIPT_ROOT", release_receipts),
+            ("DISPATCH_ENABLE_MARKER", dispatch_marker),
+        ):
+            monkeypatch.setattr(release, name, value)
+        monkeypatch.setattr(
+            release,
+            "_unit_inactive",
+            lambda unit, expected_load_state="loaded", **_kwargs: (
+                expected_load_state == "masked"
+                if unit in release.CAMPAIGN_UNITS
+                else expected_load_state == "loaded"
+            ),
+        )
+        monkeypatch.setattr(
+            release,
+            "_unit_disabled",
+            lambda _unit, **_kwargs: True,
+        )
+        monkeypatch.setattr(
+            release,
+            "_unit_masked",
+            lambda unit, **_kwargs: unit in release.CAMPAIGN_UNITS,
+        )
+        monkeypatch.setattr(
+            release,
+            "_unit_jobless",
+            lambda _unit, **_kwargs: True,
+        )
+        monkeypatch.setattr(
+            release,
+            "_require_standby_tailscale_route_absent",
+            lambda **_kwargs: None,
+        )
+        monkeypatch.setattr(
+            release,
+            "_ensure_host_directory",
+            lambda *_args, **_kwargs: None,
+        )
+        clock_payload: dict[str, object] = {
+            "schema_version": release.PREACTIVATION_CLOCK_SCHEMA_VERSION,
+            "mission_id": release.MISSION_ID,
+            "release_sha": old_sha,
+            "staged_release_admission_receipt_digest": "sha256:" + "7" * 64,
+            "role": "standby",
+            "hostname": release.STANDBY_NODE,
+            "controller_utc": "2026-08-23T01:00:00Z",
+            "host_utc": "2026-08-23T01:00:00Z",
+            "skew_seconds": 0.0,
+            "max_skew_seconds": release.MAX_CONTROLLER_CLOCK_SKEW_SECONDS,
+            "ntp_synchronized": True,
+            "strict_host_key_channel": True,
+            "ssh_connection_observed": True,
+            "known_hosts_sha256": release.DEPLOYMENT_KNOWN_HOSTS_SHA256,
+            "campaign_stop_utc": release.CAMPAIGN_STOP_UTC,
+            "timer_unit": release.STANDBY_STOP_TIMER,
+            "timer_on_calendar": "2026-09-01 17:15:12 UTC",
+            "timer_accuracy_seconds": 1,
+            "timer_persistent": True,
+            "release_timer_sha256": "a" * 64,
+            "installed_timer_match": True,
+            "valid_until": "2026-08-23T01:02:00Z",
+            "receipt_digest": "",
+        }
+        clock_payload["receipt_digest"] = release._canonical_self_digest(
+            clock_payload, "receipt_digest"
+        )
+        release._publish_or_replay_private_receipt(
+            clock_receipt,
+            clock_payload,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+        failed_intent, created = release._standby_activation_intent(
+            release_sha=old_sha,
+            staged_release_admission_receipt_digest="sha256:" + "7" * 64,
+            preactivation_clock_proof_receipt_digest=clock_payload["receipt_digest"],
+            path=activation_intent,
+            runner=runner,
+            observed=observed,
+            expected_root_uid=os.geteuid(),
+            expected_root_gid=os.getegid(),
+        )
+        assert created is True
+        serve_intent: dict[str, object] = {
+            "schema_version": release.STANDBY_TAILSCALE_INTENT_SCHEMA_VERSION,
+            "campaign_id": release.MISSION_ID,
+            "release_sha": old_sha,
+            "route": release.STANDBY_TAILSCALE_ROUTE,
+            "tailnet_port": release.STANDBY_TAILSCALE_PORT,
+            "local_endpoint": "127.0.0.1:22",
+            "tailscale_version": release.TAILSCALE_VERSION,
+            "serve_status_before_sha256": release._tailscale_config_digest({}),
+            "named_config_before_sha256": release._tailscale_config_digest(
+                release.TAILSCALE_EMPTY_CONFIG
+            ),
+            "end_to_end_route_verified": False,
+            "effect_intent": "InfrastructureEffect",
+            "receipt_digest": "",
+        }
+        serve_intent["receipt_digest"] = release._canonical_self_digest(
+            serve_intent, "receipt_digest"
+        )
+        release._publish_or_replay_private_receipt(
+            serve_intent_path,
+            serve_intent,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+        ownership = release._write_standby_tailscale_ownership_receipt(
+            serve_ownership_path,
+            release.STANDBY_TAILSCALE_STATUS,
+            release_sha=old_sha,
+            intent=serve_intent,
+            expected_root_uid=os.geteuid(),
+            expected_root_gid=os.getegid(),
+        )
+        stop: dict[str, object] = {
+            "schema_version": release.STANDBY_TAILSCALE_STOP_SCHEMA_VERSION,
+            "campaign_id": release.MISSION_ID,
+            "release_sha": old_sha,
+            "tailnet_port": release.STANDBY_TAILSCALE_PORT,
+            "ownership_receipt_digest": ownership["receipt_digest"],
+            "prestate_sha256": ownership["config_sha256"],
+            "poststate_sha256": release._tailscale_config_digest({}),
+            "named_config_sha256": release._tailscale_config_digest(
+                release.TAILSCALE_EMPTY_CONFIG
+            ),
+            "owned_handler_removed": True,
+            "effect": "InfrastructureEffect",
+            "receipt_digest": "",
+        }
+        stop["receipt_digest"] = release._canonical_self_digest(stop, "receipt_digest")
+        release._publish_or_replay_private_receipt(
+            serve_stop_path,
+            stop,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+        phase_archive = recovery_root / "phase-archive"
+        phase_paths = {
+            "activation_intent": (
+                activation_intent,
+                phase_archive / "activation-intent.json",
+            ),
+            "clock_proof": (clock_receipt, phase_archive / "clock.json"),
+            "serve_intent": (
+                serve_intent_path,
+                phase_archive / "serve-intent.json",
+            ),
+            "serve_ownership": (
+                serve_ownership_path,
+                phase_archive / "serve-owned.json",
+            ),
+            "serve_stop": (
+                serve_stop_path,
+                phase_archive / "serve-stopped.json",
+            ),
+        }
+        admitted_evidence, _admitted_raw, failure_phase = (
+            release._validate_standby_retirement_evidence(
+                failed_release_sha=old_sha,
+                failed_admission={"receipt_digest": "sha256:" + "7" * 64},
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                paths=phase_paths,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+            )
+        )
+        assert failure_phase == "ServeOwnedStoppedQuiet"
+        assert set(admitted_evidence) == {
+            "activation_intent",
+            "clock_proof",
+            "serve_intent",
+            "serve_ownership",
+            "serve_stop",
+        }
+        serve_ownership_path.unlink()
+        serve_stop_path.unlink()
+        admitted_evidence, _admitted_raw, failure_phase = (
+            release._validate_standby_retirement_evidence(
+                failed_release_sha=old_sha,
+                failed_admission={"receipt_digest": "sha256:" + "7" * 64},
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                paths=phase_paths,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+            )
+        )
+        assert failure_phase == "ServeIntentOnlyQuiet"
+        assert set(admitted_evidence) == {
+            "activation_intent",
+            "clock_proof",
+            "serve_intent",
+        }
+        serve_intent_path.unlink()
+        admitted_evidence, _admitted_raw, failure_phase = (
+            release._validate_standby_retirement_evidence(
+                failed_release_sha=old_sha,
+                failed_admission={"receipt_digest": "sha256:" + "7" * 64},
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                paths=phase_paths,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+            )
+        )
+        assert failure_phase == "IntentOnlyQuiet"
+        assert set(admitted_evidence) == {"activation_intent", "clock_proof"}
+        release._publish_or_replay_private_receipt(
+            serve_stop_path,
+            stop,
+            expected_uid=os.geteuid(),
+            expected_gid=os.getegid(),
+        )
+        with pytest.raises(release.ReleaseContractError, match="phase is inadmissible"):
+            release._validate_standby_retirement_evidence(
+                failed_release_sha=old_sha,
+                failed_admission={"receipt_digest": "sha256:" + "7" * 64},
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                paths=phase_paths,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+            )
+        serve_stop_path.unlink()
+        for path, payload in (
+            (serve_intent_path, serve_intent),
+            (serve_ownership_path, ownership),
+            (serve_stop_path, stop),
+        ):
+            release._publish_or_replay_private_receipt(
+                path,
+                payload,
+                expected_uid=os.geteuid(),
+                expected_gid=os.getegid(),
+            )
+        monkeypatch.setattr(
+            release,
+            "_verify_activation_staged_release",
+            lambda release_sha, **_kwargs: (
+                {
+                    "receipt_digest": (
+                        "sha256:" + "7" * 64
+                        if release_sha == old_sha
+                        else "sha256:" + "6" * 64
+                    )
+                },
+                SimpleNamespace(),
+            ),
+        )
+        monkeypatch.setattr(
+            release,
+            "validate_preactivation_clock_proof",
+            lambda **_kwargs: clock_payload,
+        )
+        monkeypatch.setattr(
+            release,
+            "_current_frozen_release_sha",
+            lambda: replacement_sha,
+        )
+        monkeypatch.setattr(
+            release,
+            "_systemd_main_pid",
+            lambda *_args, **_kwargs: 0,
+        )
+        redirected_archive = recovery_root / "redirected-archive"
+        redirected_archive.mkdir(mode=0o700)
+        failed_standby_root = release_receipts / old_sha / "failed-standby"
+        failed_standby_root.symlink_to(redirected_archive, target_is_directory=True)
+        with pytest.raises(
+            release.ReleaseContractError,
+            match="private directory is not a real directory",
+        ):
+            release.retire_failed_standby_activation(
+                role="standby",
+                failed_release_sha=old_sha,
+                replacement_release_sha=replacement_sha,
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                runner=runner,
+                now=observed,
+                observed_node=release.STANDBY_NODE,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+                release_receipt_root=release_receipts,
+            )
+        assert not tuple(redirected_archive.iterdir())
+        failed_standby_root.unlink()
+        injected = False
+
+        def crash_after_first_move(label: str) -> None:
+            nonlocal injected
+            if label == f"after:{serve_stop_path.name}" and not injected:
+                injected = True
+                raise RuntimeError("injected retirement crash")
+
+        with pytest.raises(RuntimeError, match="injected retirement crash"):
+            release.retire_failed_standby_activation(
+                role="standby",
+                failed_release_sha=old_sha,
+                replacement_release_sha=replacement_sha,
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                runner=runner,
+                now=observed,
+                observed_node=release.STANDBY_NODE,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+                release_receipt_root=release_receipts,
+                checkpoint=crash_after_first_move,
+            )
+        assert retirement_pending.exists()
+        with pytest.raises(
+            release.ReleaseContractError, match="retirement is incomplete"
+        ):
+            release._standby_activation_intent(
+                release_sha=replacement_sha,
+                staged_release_admission_receipt_digest="sha256:" + "6" * 64,
+                preactivation_clock_proof_receipt_digest="sha256:" + "5" * 64,
+                path=activation_intent,
+                runner=runner,
+                observed=observed,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+            )
+        completed = release.retire_failed_standby_activation(
+            role="standby",
+            failed_release_sha=old_sha,
+            replacement_release_sha=replacement_sha,
+            failed_intent_receipt_digest=failed_intent["receipt_digest"],
+            runner=runner,
+            now=observed,
+            observed_node=release.STANDBY_NODE,
+            expected_root_uid=os.geteuid(),
+            expected_root_gid=os.getegid(),
+            release_receipt_root=release_receipts,
+        )
+        assert completed["effect"] == "RecoveryAuthorityEffect"
+        assert completed["provider_dispatch"] == "NoProviderDispatch"
+        assert completed["failure_phase"] == "ServeOwnedStoppedQuiet"
+        assert not retirement_pending.exists()
+        assert clock_receipt.exists()
+        for candidate in (
+            activation_intent,
+            serve_intent_path,
+            serve_ownership_path,
+            serve_stop_path,
+        ):
+            assert not candidate.exists()
+        assert (
+            release.retire_failed_standby_activation(
+                role="standby",
+                failed_release_sha=old_sha,
+                replacement_release_sha=replacement_sha,
+                failed_intent_receipt_digest=failed_intent["receipt_digest"],
+                runner=runner,
+                now=observed,
+                observed_node=release.STANDBY_NODE,
+                expected_root_uid=os.geteuid(),
+                expected_root_gid=os.getegid(),
+                release_receipt_root=release_receipts,
+            )
+            == completed
+        )
+        replacement_intent, replacement_created = release._standby_activation_intent(
+            release_sha=replacement_sha,
+            staged_release_admission_receipt_digest="sha256:" + "6" * 64,
+            preactivation_clock_proof_receipt_digest="sha256:" + "5" * 64,
+            path=activation_intent,
+            runner=runner,
+            observed=observed,
+            expected_root_uid=os.geteuid(),
+            expected_root_gid=os.getegid(),
+        )
+        assert replacement_created is True
+        assert replacement_intent["release_sha"] == replacement_sha
 
 
 def test_standby_activation_is_receipted_replayable_and_live_fenced(
@@ -6124,6 +6584,36 @@ def test_failed_systemd_unit_with_zero_main_pid_is_proven_stopped(
         raise AssertionError("unsupported unit interface must fail before inspection")
 
     assert not release._unit_inactive("example.socket", runner=unsupported_runner)
+
+    def masked_runner(
+        command: tuple[str, ...],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        main_pid = "MainPID=0\n" if command[-1].endswith(".service") else ""
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"LoadState=masked\nActiveState=inactive\n{main_pid}",
+            stderr="",
+        )
+
+    for unit in (
+        "example.service",
+        "example.path",
+        "example.target",
+        "example.timer",
+    ):
+        assert not release._unit_inactive(unit, runner=masked_runner)
+        assert release._unit_inactive(
+            unit,
+            runner=masked_runner,
+            expected_load_state="masked",
+        )
+        assert not release._unit_inactive(
+            unit,
+            runner=masked_runner,
+            expected_load_state="not-found",
+        )
 
     os.chmod(tmp_path, 0o700)
     intent_path = tmp_path / "standby-intent.json"
@@ -10171,8 +10661,8 @@ _PINNED_UV_EGG_INFO_SPECS = {
     ),
     "SOURCES.txt": (
         0o600,
-        77815,
-        "0d129f9b098ea385dc25e14034b69f5a893bddb22949da85d6d419a15ea7a0b7",
+        77856,
+        "ed8884b7bb6c85d2fa54a39fdb6ca6e9e864eecfc88ca910075c3d561fc0c610",
     ),
     "dependency_links.txt": (
         0o600,
@@ -10212,7 +10702,7 @@ def _pinned_uv_egg_info_bytes() -> dict[str, bytes]:
         path.relative_to(source_root).as_posix()
         for path in (source_root / "tests").glob("test*.py")
     ]
-    assert (len(package_sources), len(test_sources)) == (1170, 998)
+    assert (len(package_sources), len(test_sources)) == (1170, 999)
     source_paths = [
         "README.md",
         "pyproject.toml",

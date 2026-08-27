@@ -1,0 +1,129 @@
+{
+  "id": "sadhana-10-day-program-WP-STANDBY-RETIREMENT-P0",
+  "base_ref": "2cf36348102c2dbefa56271de12d4cd4daf020ee",
+  "branch": "agent/sadhana-10day-retirement-final-20260827",
+  "worktree": ".",
+  "intent": "Close one bounded SADHANA ten-day release-state gap without widening campaign authority: a compensated standby activation may leave immutable singleton intent, clock, and optional Serve evidence that correctly blocks a replacement attempt. Add a root-only, single-writer retirement transaction that validates the complete failed-attempt chain, proves an authority-quiet host, archives exact receipt bytes, survives interruption, and only then frees singleton paths for a separately admitted replacement release. This source contract does not claim participant completion, provider dispatch, campaign activation, or live deployment.",
+  "allowed_files": [
+    "deploy/sadhana/README.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/sadhana-10-day-program-WP-STANDBY-RETIREMENT-P0.json",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dashboard/src/app/dashboard/cockpit/**",
+    "dashboard/src/components/cockpit/**",
+    "dashboard/src/components/operator-coherence/v2/**",
+    "deploy/sadhana/systemd/**",
+    "dharma_swarm/**",
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/mission_control*.py",
+    "docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md",
+    "docs/foundry/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "docs/plans/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/forge_lab/**",
+    "scripts/foundry/**",
+    "scripts/governance/**",
+    "specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md",
+    "terminal/**",
+    "tests/forge_lab_v1/**",
+    "tests/test_foundry_*.py",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-release-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check 2cf36348102c2dbefa56271de12d4cd4daf020ee HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "standby-retirement-fail-closed-contract",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'retirement or clock_proof or standby_activation or failed_predispatch'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): make standby retirement crash-safe"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-STANDBY-RETIREMENT-P0",
+    "active_track": "sadhana-10-day-program-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "2cf36348102c2dbefa56271de12d4cd4daf020ee",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The activation contract intentionally leaves immutable lifecycle evidence after a compensated failure, and fresh clock proof plus replacement activation correctly fail closed while that evidence exists.",
+      "The recovered implementation adds a distinct retirement authority rather than deleting fixed receipts manually: it binds failed and replacement staged-release admission, the failed activation intent, the stale-but-structurally-exact clock proof, the only admissible Serve evidence phases, and a freshly observed authority-quiet systemd and route poststate.",
+      "A durable pending intent is published before receipt relocation. Exact no-replace archival, an exclusive lifecycle lock, post-move quiet-state proof, completion publication, and replay convergence preserve single-writer and hard-stop semantics across interruption."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "tests/test_sadhana_release.py",
+      "deploy/sadhana/README.md"
+    ],
+    "honest_blockers": [
+      "This packet proves only a local source and deterministic fixture contract. It does not prove a participant completed any SADHANA day, that a campaign is active, that a release is deployed, or that a provider was contacted.",
+      "No deployment, host mutation, external contact, credential access, participant-data access, account confirmation, provider dispatch, supervisor start, campaign activation, or writer failover is authorized by this packet.",
+      "Production confidence would still require a separately authorized inert host rehearsal against exact systemd and filesystem behavior, a fresh sealed release envelope, and independent review of the resulting receipts."
+    ],
+    "rollback": "Revert only the standby lifecycle lock, retirement transaction, its CLI and documentation, the focused regressions, the mechanically generated DocOps updates, and this packet. Never recover by deleting or renaming singleton receipts manually, relaxing receipt custody, bypassing the pending guard, accepting a partial Serve chain, transferring writer authority, or treating an archived bundle as participant-completion or deployment proof.",
+    "packet_digest": "fb3096a4bbd55488bac7e2f6365f4068a4121a003127d4fb1c4a59e4f7367fab"
+  }
+}
