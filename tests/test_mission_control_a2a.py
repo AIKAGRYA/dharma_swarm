@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import subprocess
+import sys
 from dataclasses import dataclass
+from itertools import permutations
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -75,6 +78,26 @@ from scripts.runtime.codex_composer_semantic_responder import (
     mark_processed,
     write_responder_receipt,
 )
+
+_A2A_HELPER_MODULES = (
+    "dharma_swarm.mission_control_a2a_projection",
+    "dharma_swarm.mission_control_a2a_evaluator",
+    "dharma_swarm.mission_control_a2a_io",
+)
+
+
+@pytest.mark.parametrize("modules", tuple(permutations(_A2A_HELPER_MODULES)))
+def test_a2a_helper_modules_cold_import_in_any_order(modules: tuple[str, ...]) -> None:
+    code = ";".join(f"import {module}" for module in modules)
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def _sha(value: str) -> str:
@@ -196,17 +219,21 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
     delivery_id = _delivery_id(delivery_path, delivery, envelope)
 
     job_db = job_root / f"{agent}.sqlite3"
-    with sqlite3.connect(job_db) as connection:
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute(
-            "CREATE TABLE semantic_jobs (event_id TEXT PRIMARY KEY, "
-            "envelope_sha256 TEXT, envelope_json TEXT, status TEXT, "
-            "created_at TEXT, updated_at TEXT)",
-        )
-        connection.execute(
-            "INSERT INTO semantic_jobs VALUES (?, ?, ?, 'PENDING', 'now', 'now')",
-            (packet_id, envelope_sha, json.dumps(envelope, sort_keys=True)),
-        )
+    connection = sqlite3.connect(job_db)
+    try:
+        with connection:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute(
+                "CREATE TABLE semantic_jobs (event_id TEXT PRIMARY KEY, "
+                "envelope_sha256 TEXT, envelope_json TEXT, status TEXT, "
+                "created_at TEXT, updated_at TEXT)",
+            )
+            connection.execute(
+                "INSERT INTO semantic_jobs VALUES (?, ?, ?, 'PENDING', 'now', 'now')",
+                (packet_id, envelope_sha, json.dumps(envelope, sort_keys=True)),
+            )
+    finally:
+        connection.close()
 
     runtime = RuntimeStateStore(
         tmp_path / "runtime.db",

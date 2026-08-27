@@ -4,7 +4,10 @@ import copy
 import hashlib
 import inspect
 import json
+import subprocess
+import sys
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -40,6 +43,31 @@ from dharma_swarm.mission_control_verification import (
 )
 from dharma_swarm.models import GateDecision
 from dharma_swarm.operator_core.governed_work_admission import GovernedWorkAdmission
+
+_VERIFICATION_HELPER_ORDERS = (
+    (
+        "dharma_swarm.mission_control_verification_forge",
+        "dharma_swarm.mission_control_verification_vibe",
+    ),
+    (
+        "dharma_swarm.mission_control_verification_vibe",
+        "dharma_swarm.mission_control_verification_forge",
+    ),
+)
+
+
+@pytest.mark.parametrize("modules", _VERIFICATION_HELPER_ORDERS)
+def test_verification_helpers_cold_import_in_any_order(modules: tuple[str, ...]) -> None:
+    code = ";".join(f"import {module}" for module in modules)
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def _sha(label: str) -> str:

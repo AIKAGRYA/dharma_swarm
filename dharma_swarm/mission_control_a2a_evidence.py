@@ -4,11 +4,24 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import stat
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from dharma_swarm.mission_control_a2a_io import (
+    _absolute_lexical,
+    _exact_json_equal,
+    _exact_path,
+    _field,
+    _IncompleteEvidence,
+    _optional_file,
+    _present,
+    _successful_send_statuses,
+    _trusted_link,
+    read_bytes,
+    read_json,
+    resolved_root,
+    safe_file,
+)
 from dharma_swarm.mission_control_contract import MissionControlError
 from dharma_swarm.operator_core.semantic_receipt import (
     REQUIRED_FIELDS as SEMANTIC_REQUIRED_FIELDS,
@@ -32,185 +45,6 @@ class RefLike(Protocol):
     agent_uid: str
     packet_id: str
     delivery_id: str
-
-
-class _IncompleteEvidence(Exception):
-    """Absent/partial evidence proves no execution but is not corruption."""
-
-
-def resolved_root(root: Path) -> Path:
-    candidate = root.expanduser()
-    try:
-        info = candidate.lstat()
-        resolved = candidate.resolve(strict=True)
-    except OSError as exc:
-        raise MissionControlError("trusted evidence root is unavailable") from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-        raise MissionControlError("trusted evidence root is not a regular directory")
-    return resolved
-
-
-def safe_file(root: Path, *parts: str) -> Path:
-    trusted = resolved_root(root)
-    candidate = trusted.joinpath(*parts)
-    try:
-        info = candidate.lstat()
-    except OSError as exc:
-        raise MissionControlError(
-            f"trusted evidence file is unavailable: {candidate.name}",
-        ) from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
-        raise MissionControlError(
-            f"trusted evidence file is not a regular file: {candidate.name}",
-        )
-    resolved = candidate.resolve(strict=True)
-    if not resolved.is_relative_to(trusted):
-        raise MissionControlError("trusted evidence path escaped its injected root")
-    return resolved
-
-
-def read_bytes(path: Path, *, limit: int) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        fd = os.open(path, flags)
-    except OSError as exc:
-        raise MissionControlError(
-            f"could not open trusted evidence: {path.name}",
-        ) from exc
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
-            raise MissionControlError(
-                f"trusted evidence exceeds its read bound: {path.name}",
-            )
-        chunks: list[bytes] = []
-        remaining = limit + 1
-        while remaining > 0:
-            chunk = os.read(fd, min(64 * 1024, remaining))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        after = os.fstat(fd)
-        if (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) != (
-            info.st_dev,
-            info.st_ino,
-            info.st_size,
-            info.st_mtime_ns,
-        ):
-            raise MissionControlError(
-                f"trusted evidence changed while read: {path.name}",
-            )
-        data = b"".join(chunks)
-    finally:
-        os.close(fd)
-    if len(data) > limit:
-        raise MissionControlError(
-            f"trusted evidence exceeds its read bound: {path.name}",
-        )
-    return data
-
-
-def read_json(path: Path, *, limit: int) -> tuple[dict[str, Any], bytes]:
-    raw = read_bytes(path, limit=limit)
-    try:
-        value = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise MissionControlError(
-            f"malformed trusted JSON evidence: {path.name}",
-        ) from exc
-    if not isinstance(value, dict):
-        raise MissionControlError(
-            f"trusted JSON evidence must be an object: {path.name}",
-        )
-    return value, raw
-
-
-def _optional_file(root: Path, *parts: str) -> Path | None:
-    if not resolved_root(root).joinpath(*parts).exists():
-        return None
-    return safe_file(root, *parts)
-
-
-def _absolute_lexical(path: Path) -> Path:
-    return Path(os.path.abspath(path.expanduser()))
-
-
-def _exact_path(value: object, expected: Path, label: str) -> None:
-    raw = str(value or "")
-    if not raw:
-        raise _IncompleteEvidence(label)
-    declared = Path(raw)
-    if not declared.is_absolute() or _absolute_lexical(declared) != expected:
-        raise MissionControlError(
-            f"{label} does not match its trusted canonical path",
-        )
-
-
-def _trusted_link(value: object, roots: tuple[Path, ...], label: str) -> Path:
-    raw = str(value or "")
-    if not raw:
-        raise _IncompleteEvidence(label)
-    declared = Path(raw)
-    if not declared.is_absolute():
-        raise MissionControlError(f"{label} must be an absolute trusted path")
-    lexical = _absolute_lexical(declared)
-    for configured in roots:
-        trusted = resolved_root(configured)
-        if lexical.is_relative_to(trusted):
-            if not lexical.exists():
-                raise _IncompleteEvidence(label)
-            return safe_file(trusted, *lexical.relative_to(trusted).parts)
-    if not roots:
-        raise _IncompleteEvidence(label)
-    raise MissionControlError(
-        f"{label} is outside every injected trusted receipt root",
-    )
-
-
-def _field(
-    mapping: Mapping[str, Any], key: str, expected: Any, label: str,
-) -> None:
-    if key not in mapping:
-        raise _IncompleteEvidence(f"{label}.{key}")
-    actual = mapping[key]
-    if type(actual) is not type(expected) or actual != expected:
-        raise MissionControlError(
-            f"{label}.{key} contradicts native A2A identity",
-        )
-
-
-def _present(mapping: Mapping[str, Any], key: str, label: str) -> Any:
-    if key not in mapping or mapping[key] in (None, ""):
-        raise _IncompleteEvidence(f"{label}.{key}")
-    return mapping[key]
-
-
-def _exact_json_equal(left: Any, right: Any) -> bool:
-    if type(left) is not type(right):
-        return False
-    if isinstance(left, dict):
-        return left.keys() == right.keys() and all(
-            _exact_json_equal(left[key], right[key]) for key in left
-        )
-    if isinstance(left, list):
-        return len(left) == len(right) and all(
-            _exact_json_equal(first, second)
-            for first, second in zip(left, right, strict=True)
-        )
-    return bool(left == right)
-
-
-def _successful_send_statuses(agent_uid: str) -> frozenset[str]:
-    label = "".join(
-        char.upper() if char.isalnum() else "_" for char in agent_uid
-    ).strip("_") or "AGENT"
-    return frozenset({
-        "PUBLISH_ACKED",
-        "PUBLISH_DEDUPED",
-        f"{label}_CONSUMED",
-        f"{label}_REPLIED",
-    })
 
 
 class CanonicalA2AEvidenceReader:
