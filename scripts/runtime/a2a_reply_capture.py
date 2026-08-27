@@ -37,6 +37,9 @@ from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 
 DEFAULT_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
 DEFAULT_REPLY_RECEIPT_ROOT = runtime_report_dir("a2a", "reply_receipts")
+# Read-only compatibility root for receipts created before the state-root
+# migration. Remove after the legacy queue has a certified drain receipt.
+LEGACY_REPO_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
 
 STATUS_NO_REPLY = "NO_REPLY"
 STATUS_REPLY_CAPTURED = "REPLY_CAPTURED"
@@ -183,39 +186,66 @@ def pending_reply_targets(
     *,
     target: str = "",
     limit: int = 0,
+    legacy_send_receipt_root: Path | str | None = None,
 ) -> list[ReplyCaptureTarget]:
     root = Path(send_receipt_root).expanduser().resolve()
-    if not root.exists():
-        return []
-    paths = sorted(
-        (path for path in root.glob("*.json") if path.is_file()),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    targets: list[ReplyCaptureTarget] = []
-    for path in paths:
-        receipt = _read_json(path)
-        if receipt.get("replied") is True:
+    roots = [root]
+    if root == DEFAULT_SEND_RECEIPT_ROOT.expanduser().resolve():
+        legacy_root = Path(
+            legacy_send_receipt_root or LEGACY_REPO_SEND_RECEIPT_ROOT
+        ).expanduser().resolve()
+        if legacy_root != root:
+            roots.append(legacy_root)
+
+    # Prefer the state-root copy when a migration copied the same receipt, then
+    # restore the historical newest-first ordering across both roots.
+    candidates: list[tuple[float, ReplyCaptureTarget]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for candidate_root in roots:
+        if not candidate_root.exists():
             continue
-        reply_subject = str(receipt.get("reply_subject") or "")
-        if not reply_subject:
-            continue
-        receipt_target = str(receipt.get("to") or receipt.get("target_uid") or "")
-        target_uid = str(receipt.get("target_uid") or "")
-        if target and target not in path.stem and target not in {receipt_target, target_uid}:
-            continue
-        targets.append(
-            ReplyCaptureTarget(
-                send_receipt_path=path,
-                send_receipt=receipt,
-                reply_subject=reply_subject,
-                packet_id=str(receipt.get("packet_id") or path.stem),
-                target=receipt_target or target_uid or "unknown",
-            )
+        paths = sorted(
+            (path for path in candidate_root.glob("*.json") if path.is_file()),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
         )
-        if limit > 0 and len(targets) >= limit:
-            break
-    return targets
+        for path in paths:
+            try:
+                receipt = _read_json(path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            if receipt.get("replied") is True:
+                continue
+            reply_subject = str(receipt.get("reply_subject") or "")
+            if not reply_subject:
+                continue
+            receipt_target = str(receipt.get("to") or receipt.get("target_uid") or "")
+            target_uid = str(receipt.get("target_uid") or "")
+            if target and target not in path.stem and target not in {
+                receipt_target,
+                target_uid,
+            }:
+                continue
+            packet_id = str(receipt.get("packet_id") or path.stem)
+            identity = (packet_id, reply_subject, receipt_target or target_uid)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            candidates.append(
+                (
+                    path.stat().st_mtime,
+                    ReplyCaptureTarget(
+                        send_receipt_path=path,
+                        send_receipt=receipt,
+                        reply_subject=reply_subject,
+                        packet_id=packet_id,
+                        target=receipt_target or target_uid or "unknown",
+                    ),
+                )
+            )
+
+    targets = [item[1] for item in sorted(candidates, key=lambda item: item[0], reverse=True)]
+    return targets[:limit] if limit > 0 else targets
 
 
 def no_reply_receipt(target: ReplyCaptureTarget, *, stream: str, endpoint: str) -> dict[str, Any]:

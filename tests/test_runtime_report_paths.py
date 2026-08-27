@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -8,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.daemon_config import runtime_report_dir
+from dharma_swarm.daemon_config import dharma_state_dir, runtime_report_dir
 
 
 def test_runtime_report_dir_honors_state_authority(monkeypatch, tmp_path: Path) -> None:
@@ -19,6 +20,14 @@ def test_runtime_report_dir_honors_state_authority(monkeypatch, tmp_path: Path) 
     assert runtime_report_dir("a2a", "send_receipts") == (
         state_root / "reports" / "a2a" / "send_receipts"
     )
+
+
+def test_state_authority_expands_user_and_normalizes_absolute(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("DHARMA_STATE_DIR", "~/.dharma")
+
+    assert dharma_state_dir("DHARMA_STATE_DIR") == (tmp_path / ".dharma").resolve()
+    assert runtime_report_dir() == (tmp_path / ".dharma" / "reports").resolve()
 
 
 @pytest.mark.parametrize("parts", [("..", "repo"), ("/tmp", "receipts")])
@@ -93,3 +102,75 @@ def test_runtime_receipt_defaults_are_outside_the_repository(tmp_path: Path) -> 
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_default_send_receipt_readers_drain_legacy_root(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from scripts.runtime import a2a_reply_capture
+    from scripts.runtime import codex_composer_semantic_responder as semantic_responder
+
+    primary_root = tmp_path / "state" / "reports" / "a2a" / "send_receipts"
+    legacy_root = tmp_path / "repo" / "reports" / "a2a" / "send_receipts"
+    legacy_root.mkdir(parents=True)
+    receipt = {
+        "packet_id": "packet-legacy",
+        "reply_subject": "dharma.a2a.reply.packet-legacy",
+        "target_uid": "codex_composer",
+    }
+    legacy_path = legacy_root / "legacy.json"
+    legacy_path.write_text(json.dumps(receipt), encoding="utf-8")
+    monkeypatch.setattr(a2a_reply_capture, "DEFAULT_SEND_RECEIPT_ROOT", primary_root)
+    monkeypatch.setattr(semantic_responder, "DEFAULT_SEND_RECEIPT_ROOT", primary_root)
+
+    targets = a2a_reply_capture.pending_reply_targets(
+        primary_root,
+        legacy_send_receipt_root=legacy_root,
+    )
+    found = semantic_responder.find_send_receipt(
+        primary_root,
+        agent_uid="codex_composer",
+        packet_id="packet-legacy",
+        reply_subject="dharma.a2a.reply.packet-legacy",
+        legacy_send_receipt_root=legacy_root,
+    )
+
+    assert [target.send_receipt_path for target in targets] == [legacy_path]
+    assert found == legacy_path
+
+
+def test_explicit_send_receipt_root_does_not_inherit_legacy_authority(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from scripts.runtime import a2a_reply_capture
+    from scripts.runtime import codex_composer_semantic_responder as semantic_responder
+
+    default_root = tmp_path / "default"
+    explicit_root = tmp_path / "explicit"
+    legacy_root = tmp_path / "legacy"
+    legacy_root.mkdir()
+    receipt = {
+        "packet_id": "packet-legacy",
+        "reply_subject": "dharma.a2a.reply.packet-legacy",
+        "target_uid": "codex_composer",
+    }
+    (legacy_root / "legacy.json").write_text(json.dumps(receipt), encoding="utf-8")
+    monkeypatch.setattr(a2a_reply_capture, "DEFAULT_SEND_RECEIPT_ROOT", default_root)
+    monkeypatch.setattr(semantic_responder, "DEFAULT_SEND_RECEIPT_ROOT", default_root)
+
+    assert not a2a_reply_capture.pending_reply_targets(
+        explicit_root,
+        legacy_send_receipt_root=legacy_root,
+    )
+    assert (
+        semantic_responder.find_send_receipt(
+            explicit_root,
+            agent_uid="codex_composer",
+            packet_id="packet-legacy",
+            reply_subject="dharma.a2a.reply.packet-legacy",
+            legacy_send_receipt_root=legacy_root,
+        )
+        is None
+    )

@@ -22,7 +22,7 @@ def dharma_state_dir(*env_vars: str) -> Path:
     for env_var in env_vars:
         raw = os.getenv(env_var)
         if raw is not None:
-            return Path(raw)
+            return Path(raw).expanduser().resolve()
     return Path.home() / ".dharma"
 
 

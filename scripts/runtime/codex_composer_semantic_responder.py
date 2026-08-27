@@ -44,6 +44,9 @@ DEFAULT_AGENT_UID = "codex_composer"
 DEFAULT_DHARMA_HOME = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 DEFAULT_INBOX_DIR = DEFAULT_DHARMA_HOME / "a2a_bus" / "inboxes" / DEFAULT_AGENT_UID
 DEFAULT_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
+# Read-only compatibility root for receipts created before the state-root
+# migration. Remove after the legacy queue has a certified drain receipt.
+LEGACY_REPO_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
 DEFAULT_STATE_DIR = (
     DEFAULT_DHARMA_HOME
     / "external_agents"
@@ -482,24 +485,38 @@ def find_send_receipt(
     agent_uid: str,
     packet_id: str,
     reply_subject: str,
+    legacy_send_receipt_root: Path | str | None = None,
 ) -> Path | None:
     root = Path(send_receipt_root).expanduser().resolve()
-    if not root.exists():
-        return None
-    candidates = sorted(root.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
-    for path in candidates:
-        try:
-            receipt = _read_json(path)
-        except (OSError, ValueError, json.JSONDecodeError):
+    roots = [root]
+    if root == DEFAULT_SEND_RECEIPT_ROOT.expanduser().resolve():
+        legacy_root = Path(
+            legacy_send_receipt_root or LEGACY_REPO_SEND_RECEIPT_ROOT
+        ).expanduser().resolve()
+        if legacy_root != root:
+            roots.append(legacy_root)
+
+    for candidate_root in roots:
+        if not candidate_root.exists():
             continue
-        if str(receipt.get("packet_id") or "") != packet_id:
-            continue
-        if str(receipt.get("reply_subject") or "") != reply_subject:
-            continue
-        target = str(receipt.get("target_uid") or receipt.get("to") or "")
-        if target and target != agent_uid:
-            continue
-        return path
+        candidates = sorted(
+            candidate_root.glob("*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        for path in candidates:
+            try:
+                receipt = _read_json(path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            if str(receipt.get("packet_id") or "") != packet_id:
+                continue
+            if str(receipt.get("reply_subject") or "") != reply_subject:
+                continue
+            target = str(receipt.get("target_uid") or receipt.get("to") or "")
+            if target and target != agent_uid:
+                continue
+            return path
     return None
 
 
