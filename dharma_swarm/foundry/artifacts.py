@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -50,6 +51,26 @@ class PriorArtifact:
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _is_canonical_digest(value: str) -> bool:
+    return value.startswith("sha256:") and _HEX_64.fullmatch(value[7:]) is not None
+
+
+def _read_regular(path: Path, *, field: str) -> bytes:
+    """Read one non-symlink regular file through the descriptor we inspect."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ArtifactReplayError(f"{field} missing or unreadable: {path}") from exc
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ArtifactReplayError(f"{field} is not a regular file: {path}")
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            return handle.read()
+    finally:
+        os.close(descriptor)
 
 
 def _safe_relative(value: object, *, field: str) -> str:
@@ -166,12 +187,7 @@ def _verify_delta_relation(
                 f"artifacts/{parent_artifact_sha256}.patch",
                 field="parent_artifact",
             )
-            try:
-                parent_bytes = parent_path.read_bytes()
-            except OSError as exc:
-                raise ArtifactReplayError(
-                    f"parent artifact missing: {parent_path}"
-                ) from exc
+            parent_bytes = _read_regular(parent_path, field="parent artifact")
             if sha256_bytes(parent_bytes) != parent_artifact_sha256:
                 raise ArtifactReplayError("parent artifact sha256 mismatch")
             try:
@@ -224,6 +240,7 @@ def verify_lineage(
         "cumulative_sha256",
         "candidate_tree_digest",
         "evolve_file",
+        "parent_lineage_digest",
         "parent_artifact_sha256",
         "parent_candidate_tree_digest",
         "delta_artifact",
@@ -251,9 +268,7 @@ def verify_lineage(
     if manifest["delta_artifact"] != expected_delta_locator:
         raise ArtifactReplayError("delta artifact locator is not its canonical content address")
     if manifest["cumulative_artifact"] != expected_cumulative_locator:
-        raise ArtifactReplayError(
-            "cumulative artifact locator is not its canonical content address"
-        )
+        raise ArtifactReplayError("cumulative artifact locator is not its canonical content address")
 
     claimed_lineage = str(manifest.get("lineage_digest", ""))
     lineage_body = {
@@ -263,18 +278,18 @@ def verify_lineage(
     }
     if not claimed_lineage or canonical_digest(lineage_body) != claimed_lineage:
         raise ArtifactReplayError("lineage manifest digest mismatch")
-    expected_manifest_locator = (
-        "artifacts/manifests/"
-        f"{claimed_lineage.removeprefix('sha256:')}.json"
-    )
+    expected_manifest_locator = f"artifacts/manifests/{claimed_lineage[7:]}.json"
     if manifest["manifest_path"] != expected_manifest_locator:
         raise ArtifactReplayError(
             "manifest locator is not its canonical lineage address"
         )
     declared_parent = str(manifest["parent_artifact_sha256"])
     parent_tree = str(manifest["parent_candidate_tree_digest"])
-    if bool(declared_parent) != bool(parent_tree):
-        raise ArtifactReplayError("parent artifact/tree relation is incomplete")
+    parent_lineage = str(manifest["parent_lineage_digest"])
+    if len({bool(declared_parent), bool(parent_tree), bool(parent_lineage)}) != 1:
+        raise ArtifactReplayError("parent manifest/artifact/tree relation is incomplete")
+    if parent_lineage and not _is_canonical_digest(parent_lineage):
+        raise ArtifactReplayError("parent lineage digest is malformed")
     if declared_parent and _HEX_64.fullmatch(declared_parent) is None:
         raise ArtifactReplayError("parent artifact sha256 is malformed")
     candidate_tree = str(manifest["candidate_tree_digest"])
@@ -303,19 +318,40 @@ def verify_lineage(
     artifact_path = Path(artifact_path)
     if artifact_path.is_symlink():
         raise ArtifactReplayError("cumulative artifact must not be a symlink")
-    try:
-        artifact_bytes = artifact_path.read_bytes()
-    except OSError as exc:
-        raise ArtifactReplayError(f"cumulative artifact missing: {artifact_path}") from exc
-    if sha256_bytes(artifact_bytes) != manifest["cumulative_sha256"]:
-        raise ArtifactReplayError("cumulative artifact sha256 mismatch")
-
-    artifact_root = artifact_path.resolve().parent.parent
-    declared_cumulative = _manifest_locator(
-        artifact_root, manifest["cumulative_artifact"], field="cumulative_artifact"
-    )
+    artifact_root = artifact_path.parent.parent
+    declared_cumulative = _manifest_locator(artifact_root, manifest["cumulative_artifact"], field="cumulative_artifact")
     if declared_cumulative.resolve(strict=False) != artifact_path.resolve(strict=False):
         raise ArtifactReplayError("cumulative artifact locator mismatch")
+    artifact_bytes = _read_regular(artifact_path, field="cumulative artifact")
+    if sha256_bytes(artifact_bytes) != manifest["cumulative_sha256"]:
+        raise ArtifactReplayError("cumulative artifact sha256 mismatch")
+    if parent_lineage:
+        parent_manifest_path = _manifest_locator(
+            artifact_root,
+            f"artifacts/manifests/{parent_lineage[7:]}.json",
+            field="parent_manifest",
+        )
+        try:
+            parent_manifest = json.loads(_read_regular(parent_manifest_path, field="parent manifest"))
+        except (UnicodeDecodeError, ValueError, TypeError) as exc:
+            raise ArtifactReplayError("parent manifest missing or unreadable") from exc
+        if not isinstance(parent_manifest, dict):
+            raise ArtifactReplayError("parent manifest is not an object")
+        if parent_manifest.get("lineage_digest") != parent_lineage:
+            raise ArtifactReplayError("parent manifest lineage digest mismatch")
+        for field in ("target_id", "resolved_sha", "base_tree_digest", "evolve_file"):
+            if parent_manifest.get(field) != manifest[field]:
+                raise ArtifactReplayError(f"parent manifest {field} mismatch")
+        if parent_manifest.get("cumulative_sha256") != declared_parent:
+            raise ArtifactReplayError("parent manifest cumulative artifact mismatch")
+        if parent_manifest.get("candidate_tree_digest") != parent_tree:
+            raise ArtifactReplayError("parent manifest candidate tree mismatch")
+        if parent_manifest.get("replay_verified") is not True:
+            raise ArtifactReplayError("parent manifest lacks verified replay")
+        parent_artifact = _manifest_locator(
+            artifact_root, parent_manifest.get("cumulative_artifact", ""), field="parent cumulative artifact"
+        )
+        verify_lineage(base_root, parent_manifest, artifact_path=parent_artifact)
     declared_delta = _manifest_locator(
         artifact_root, manifest["delta_artifact"], field="delta_artifact"
     )
@@ -327,10 +363,7 @@ def verify_lineage(
             raise ArtifactReplayError("delta artifact must not be a symlink")
         if delta_path.resolve(strict=False) != declared_delta.resolve(strict=False):
             raise ArtifactReplayError("delta artifact locator mismatch")
-    try:
-        delta_bytes = Path(delta_path).read_bytes()
-    except OSError as exc:
-        raise ArtifactReplayError(f"delta artifact missing: {delta_path}") from exc
+    delta_bytes = _read_regular(Path(delta_path), field="delta artifact")
     if sha256_bytes(delta_bytes) != manifest["delta_sha256"]:
         raise ArtifactReplayError("delta artifact sha256 mismatch")
     _verify_delta_relation(
@@ -374,6 +407,7 @@ def build_lineage(
     base_tree_digest: str,
     evolve_file: str,
     delta: str,
+    parent_lineage_digest: str = "",
     parent_artifact_sha256: str = "",
     parent_candidate_tree_digest: str = "",
 ) -> dict[str, Any]:
@@ -391,6 +425,11 @@ def build_lineage(
             f"lineage base changed before build: expected={base_tree_digest} actual={actual_base}"
         )
     seeded_digest = compute_tree_digest(Path(seeded_root), [evolve_file])
+    parent_fields = (parent_lineage_digest, parent_artifact_sha256, parent_candidate_tree_digest)
+    if any(parent_fields) and not all(parent_fields):
+        raise ArtifactReplayError("parent manifest/artifact/tree relation is incomplete")
+    if parent_lineage_digest and not _is_canonical_digest(parent_lineage_digest):
+        raise ArtifactReplayError("parent lineage digest is malformed")
     if parent_artifact_sha256:
         if _HEX_64.fullmatch(parent_artifact_sha256) is None:
             raise ArtifactReplayError("parent artifact sha256 is malformed")
@@ -431,6 +470,7 @@ def build_lineage(
         "target_id": target_id,
         "resolved_sha": resolved_sha,
         "base_tree_digest": base_tree_digest,
+        "parent_lineage_digest": parent_lineage_digest,
         "parent_artifact_sha256": parent_artifact_sha256,
         "parent_candidate_tree_digest": parent_candidate_tree_digest,
         "delta_sha256": delta_sha,

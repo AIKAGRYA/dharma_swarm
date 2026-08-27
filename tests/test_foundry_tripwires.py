@@ -122,6 +122,34 @@ def test_attribute_call_through_preexisting_forbidden_module_fires():
     assert "forbidden_primitive" in report.fired
 
 
+@pytest.mark.parametrize(
+    "call",
+    [
+        "result = re.compile(pattern)",
+        "result = model.compile(pattern)",
+        "    return re.compile(pattern)",
+        "elif ready:\n    # text says eval( but is not code\n    return model.compile(pattern)",
+    ],
+)
+def test_benign_attribute_method_named_like_builtin_is_clean(call):
+    diff = "+++ b/kernels/attn.py\n" + "\n".join(
+        f"+{line}" for line in call.splitlines()
+    ) + "\n"
+    report = scan_tripwires(_cand(diff), allowed_paths=["kernels/*.py"])
+    assert report.clean
+
+
+def test_detached_fragment_comment_cannot_hide_bare_forbidden_call():
+    diff = (
+        "+++ b/kernels/attn.py\n"
+        "+elif ready:\n"
+        "+    # harmless.\n"
+        "+    eval(user_input)\n"
+    )
+    report = scan_tripwires(_cand(diff), allowed_paths=["kernels/*.py"])
+    assert "forbidden_primitive" in report.fired
+
+
 def test_benign_python_is_clean():
     diff = "+++ b/kernels/attn.py\n+def faster(x):\n+    return x * 2\n"
     report = scan_tripwires(_cand(diff), allowed_paths=["kernels/*.py"])

@@ -92,6 +92,43 @@ def test_terminal_kill_fsyncs_file_and_parent_directory(tmp_path, monkeypatch):
     assert len(fsync_calls) == 2
 
 
+def test_dangling_terminal_kill_symlink_fails_closed_and_is_recoverable(tmp_path):
+    marker = killswitch.terminal_kill_file(tmp_path)
+    marker.symlink_to(tmp_path / "missing-terminal-kill-target")
+
+    assert not marker.exists()
+    assert killswitch.has_terminal_kill(tmp_path)
+    assert killswitch.is_stopped(state_root=tmp_path)
+    assert "corrupt_kill_marker" in killswitch.stop_reason(state_root=tmp_path)
+    with pytest.raises(killswitch.FoundryStopped):
+        killswitch.check(state_root=tmp_path)
+
+    # Persistence never follows or silently clobbers a corrupt directory entry.
+    killswitch.persist_terminal_kill(
+        tmp_path,
+        category="later_failure",
+        reason="must remain stopped",
+    )
+    assert marker.is_symlink()
+    assert killswitch.is_stopped(state_root=tmp_path)
+
+    # An operator can remove the visibly corrupt sentinel and record a valid cause.
+    marker.unlink()
+    killswitch.persist_terminal_kill(
+        tmp_path,
+        category="operator_recovered",
+        reason="valid terminal marker restored",
+    )
+    assert killswitch.read_terminal_kill(tmp_path)["category"] == "operator_recovered"
+
+
+def test_non_regular_terminal_kill_marker_fails_closed(tmp_path):
+    killswitch.terminal_kill_file(tmp_path).mkdir()
+    assert killswitch.has_terminal_kill(tmp_path)
+    assert killswitch.is_stopped(state_root=tmp_path)
+    assert "not a regular file" in killswitch.stop_reason(state_root=tmp_path)
+
+
 @pytest.mark.parametrize("contents", ["not json", "[]"])
 def test_corrupt_terminal_marker_fails_closed(tmp_path, contents):
     tmp_path.mkdir(exist_ok=True)

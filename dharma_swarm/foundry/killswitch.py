@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -45,8 +46,22 @@ def terminal_kill_file(state_root: Path | None = None) -> Path:
 def read_terminal_kill(state_root: Path | None = None) -> dict[str, Any] | None:
     """Read the terminal marker; malformed evidence still means stop."""
     path = terminal_kill_file(state_root)
-    if not path.exists():
+    try:
+        marker_stat = path.lstat()
+    except FileNotFoundError:
         return None
+    except OSError as exc:
+        return {
+            "schema_version": "foundry_terminal_kill.corrupt",
+            "category": "corrupt_kill_marker",
+            "reason": f"terminal KILL marker cannot be inspected ({type(exc).__name__})",
+        }
+    if not stat.S_ISREG(marker_stat.st_mode):
+        return {
+            "schema_version": "foundry_terminal_kill.corrupt",
+            "category": "corrupt_kill_marker",
+            "reason": "terminal KILL marker is not a regular file",
+        }
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError) as exc:
@@ -115,7 +130,13 @@ def persist_terminal_kill(
 
 
 def has_terminal_kill(state_root: Path | None = None) -> bool:
-    return terminal_kill_file(state_root).exists()
+    try:
+        terminal_kill_file(state_root).lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    return True
 
 
 def _quarantine_files(state_root: Path | None = None) -> tuple[Path, Path]:

@@ -27,10 +27,12 @@ from __future__ import annotations
 
 import ast
 import fnmatch
+import io
 import math
 import re
 import shlex
 import textwrap
+import tokenize
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
@@ -184,6 +186,18 @@ def _added_python_source(diff: str) -> str:
     return "\n".join(out)
 
 
+def _lexical_symbols(source: str) -> list[str]:
+    """Tokenize an incomplete fragment without trusting comments or strings."""
+    symbols: list[str] = []
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type in {tokenize.NAME, tokenize.OP}:
+                symbols.append(token.string)
+    except (IndentationError, tokenize.TokenError):
+        return symbols
+    return symbols
+
+
 def _scan_forbidden_primitives(
     source: str,
     forbidden_modules: frozenset[str],
@@ -193,17 +207,28 @@ def _scan_forbidden_primitives(
     try:
         tree = ast.parse(source)
     except SyntaxError:
+        try:
+            tree = ast.parse("def __foundry_fragment__():\n" + textwrap.indent(source, "    "))
+        except SyntaxError:
+            tree = None
+    if tree is None:
         # Added fragments are often not standalone modules (for example an
-        # indented return inside an existing function). Fall back to a bounded
+        # ``elif`` detached from its surrounding block). Fall back to a bounded
         # lexical scan instead of treating parse failure as permission.
-        for module in sorted(forbidden_modules):
-            if re.search(rf"\b(?:from|import)\s+{re.escape(module)}\b", source):
-                return f"lexical import {module}"
-            if re.search(rf"\b{re.escape(module)}(?:\.[A-Za-z_]\w*)+\s*\(", source):
-                return f"lexical call through {module}"
-        for call in sorted(forbidden_calls):
-            if re.search(rf"(?:\b|\.){re.escape(call)}\s*\(", source):
-                return f"lexical call {call}()"
+        symbols = _lexical_symbols(source)
+        for index, symbol in enumerate(symbols):
+            previous = symbols[index - 1] if index else ""
+            following = symbols[index + 1] if index + 1 < len(symbols) else ""
+            if symbol in forbidden_calls and following == "(" and previous != ".":
+                return f"lexical call {symbol}()"
+            if symbol in forbidden_modules and previous in {"from", "import"}:
+                return f"lexical import {symbol}"
+            if symbol in forbidden_modules and following == ".":
+                cursor = index + 1
+                while cursor + 1 < len(symbols) and symbols[cursor] == ".":
+                    cursor += 2
+                if cursor < len(symbols) and symbols[cursor] == "(":
+                    return f"lexical call through {symbol}"
         return None
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -225,8 +250,6 @@ def _scan_forbidden_primitives(
                     root = root.value
                 if isinstance(root, ast.Name) and root.id in forbidden_modules:
                     return f"call {root.id}.{func.attr}()"
-                if func.attr in forbidden_calls:
-                    return f"attribute call {func.attr}()"
     return None
 
 
