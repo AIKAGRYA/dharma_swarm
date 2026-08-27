@@ -257,7 +257,7 @@ export function MissionControlDeck() {
       }
     : { tasks: "—", attempts: "—", leases: "—", receipts: "—" };
   const needsAction = useMemo(
-    () => snapshot?.tasks.filter((task) => ["queued", "review", "blocked", "failed"].includes(task.status)) ?? [],
+    () => snapshot?.tasks.filter((task) => ["pending", "queued", "review", "blocked", "failed"].includes(task.status)) ?? [],
     [snapshot],
   );
   const receiptCounts = useMemo(() => {
