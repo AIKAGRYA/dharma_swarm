@@ -1,16 +1,29 @@
 {
   "id": "fleet-advancement-WP-AUTOCATALYTIC-FOUR-LANE-20260827",
-  "base_ref": "fd1c203d87550d1c71103c3dd44da29593b1bab4",
+  "base_ref": "c811e8d0fa2558850a3484411b4f8546505589ac",
   "branch": "governance/four-active-mac-lanes-20260827",
   "worktree": ".",
-  "intent": "Repair the four-lane focus reset's missed typed dependency by rebinding the existing ten-node autocatalytic local-rehearsal portfolio from the ten superseded project ids to the four operator-authorized Mac programs. Preserve every node role, authority, proof obligation, source adapter, edge, and local_rehearsal claim ceiling; this metadata repair grants no runtime, deployment, mutation, external-effect, or promotion authority.",
+  "intent": "Repair the four-lane focus reset's missed typed dependency by rebinding the existing ten-node autocatalytic local-rehearsal portfolio from the ten superseded project ids to the four operator-authorized Mac programs, then keep its declared-intent documentation aligned after the contradictory three-lane PR #1445 landed first. Preserve every node role, authority, proof obligation, source adapter, edge, and local_rehearsal claim ceiling; this metadata repair grants no runtime, deployment, mutation, external-effect, or promotion authority.",
   "allowed_files": [
     "ACTIVE_SURFACE_MANIFEST.yaml",
+    "CLAUDE.md",
+    "docs/architecture/AUTOCATALYTIC_PORTFOLIO.md",
+    "docs/architecture/autocatalytic_nodes/arena_selection.md",
+    "docs/architecture/autocatalytic_nodes/assurance_merge.md",
+    "docs/architecture/autocatalytic_nodes/chamber_research.md",
+    "docs/architecture/autocatalytic_nodes/cybernetic_supervision.md",
+    "docs/architecture/autocatalytic_nodes/dharmagraph_execution.md",
+    "docs/architecture/autocatalytic_nodes/external_value_delivery.md",
+    "docs/architecture/autocatalytic_nodes/learning_promotion.md",
+    "docs/architecture/autocatalytic_nodes/operator_experience.md",
+    "docs/architecture/autocatalytic_nodes/sarathi_runtime.md",
+    "docs/architecture/autocatalytic_nodes/world_signal_supply.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
     "reports/agentops/work_packets/fleet-advancement-WP-AUTOCATALYTIC-FOUR-LANE-20260827.json"
   ],
   "forbidden_files": [
     ".github/**",
-    "CLAUDE.md",
     "dharma_swarm/**",
     "dharma_swarm/forge_lab/**",
     "dharma_swarm/foundry/**",
@@ -18,7 +31,6 @@
     "dashboard/src/app/dashboard/sadhana/**",
     "deploy/**",
     "deploy/sadhana/**",
-    "docs/**",
     "docs/foundry/**",
     "docs/ops/RSI_LAB_SYNC.md",
     "scripts/**",
@@ -48,8 +60,14 @@
       "timeout_seconds": 300
     },
     {
+      "name": "four-lane-generated-declared-intent",
+      "command": "python3 scripts/governance/render_active_track_includes.py --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
       "name": "committed-range-whitespace",
-      "command": "git diff --check fd1c203d87550d1c71103c3dd44da29593b1bab4...HEAD",
+      "command": "git diff --check c811e8d0fa2558850a3484411b4f8546505589ac...HEAD",
       "expected_exit": 0,
       "timeout_seconds": 120
     }
@@ -64,7 +82,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "governance: bind metabolism to four active programs"
+    "message": "governance: reassert four-lane authority on current main"
   },
   "approval": {
     "before_commit": false,
@@ -89,7 +107,7 @@
     "owner": "@dhyana",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "fd1c203d87550d1c71103c3dd44da29593b1bab4",
+      "checked_at_sha": "c811e8d0fa2558850a3484411b4f8546505589ac",
       "details": []
     },
     "interface_mismatches": [
@@ -104,9 +122,10 @@
     "honest_blockers": [
       "This change proves only exact metadata closure between the active-track set and a local-rehearsal topology; it does not prove any node, program, daemon, remote host, participant journey, external effect, or promotion is live.",
       "The four programs share several metabolic membranes because assurance, evaluation, and operator projection are cross-cutting; a binding records relevance, not ownership or execution authority.",
+      "PR #1445 merged a contradictory three-lane portfolio while this packet's PR was waiting on CI; this current-main integration preserves that PR's historical receipts but supersedes its active authority under the operator's explicit four-lane instruction.",
       "PR #1444 remains unmergeable until its fresh exact-head required CI contexts pass after this repair."
     ],
-    "rollback": "Revert this packet and the ACTIVE_SURFACE_MANIFEST.yaml binding edit together. Rollback restores the known full-suite failure and the stale superseded-track closure but performs no runtime, deployment, provider, participant, remote-host, or external-state mutation.",
-    "packet_digest": "1f96ef99269d2bbdd8f98992db5d2b8a9781b3bf1c1909c823af4350f47a3898"
+    "rollback": "Revert this packet, the ACTIVE_SURFACE_MANIFEST.yaml binding edit, and its declared-intent mirrors together. Rollback restores the contradictory three-lane authority and stale superseded-track closure but performs no runtime, deployment, provider, participant, remote-host, or external-state mutation.",
+    "packet_digest": "0ff92d2880e6c8f0ac1a3b654502e56926b91f034ae7fe80af3cdd0bbe132a34"
   }
 }

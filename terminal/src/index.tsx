@@ -3,4 +3,7 @@ import {render} from "ink";
 
 import {App} from "./app.tsx";
 
-render(<App />, {exitOnCtrlC: false});
+render(<App />, {
+  alternateScreen: true,
+  exitOnCtrlC: false,
+});

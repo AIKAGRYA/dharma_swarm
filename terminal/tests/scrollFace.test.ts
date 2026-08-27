@@ -12,7 +12,7 @@ describe("FACE-3 the scroll — manuscript projection", () => {
     const lines = [
       line("u1", "user", "> hello"),
       line("a1", "assistant", "namaste"),
-      line("t1", "thinking", "✓ 2s · codex:gpt-5.4 · ^T details"),
+      line("t1", "thinking", "■ 2s · codex:gpt-5.4 · ^T details"),
       line("u2", "user", "> and again"),
       line("a2", "assistant", "still here"),
     ];

@@ -32,10 +32,14 @@ export function projectWholeOrganism(input: OrganismProjectionInput): OrganismRe
   const workspaceObserved = input.authority.repo;
   const routeObservation: OrganismObservation =
     input.routePolicy.routeState === "ready"
-      ? input.bridgeStatus === "connected" ? "observed" : "stale"
+      ? input.bridgeStatus === "connected" ? "configured" : "stale"
       : input.routePolicy.selectable
         ? "unverified"
         : "held";
+  const currentOwnerObservation = (observed: boolean): OrganismObservation => {
+    if (!observed) return "unknown";
+    return input.bridgeStatus === "connected" ? "observed" : "stale";
+  };
 
   return [
     {
@@ -49,7 +53,7 @@ export function projectWholeOrganism(input: OrganismProjectionInput): OrganismRe
       id: "core",
       ordinal: "02",
       label: "CORE ORGANISM",
-      observation: runtimeObserved ? "observed" : "unknown",
+      observation: currentOwnerObservation(runtimeObserved),
       detail: `${input.bridgeStatus} transport · turn ${input.activeTurn.phase}`,
     },
     {
@@ -70,14 +74,16 @@ export function projectWholeOrganism(input: OrganismProjectionInput): OrganismRe
       id: "outward",
       ordinal: "05",
       label: "OUTWARD ORGANS",
-      observation: input.authority.agents ? "configured" : "unknown",
+      observation: input.authority.agents
+        ? input.bridgeStatus === "connected" ? "configured" : "stale"
+        : "unknown",
       detail: input.authority.agents ? "route catalog observed · contact unproved" : "swarm and A2A not observed",
     },
     {
       id: "delivery",
       ordinal: "06",
       label: "DELIVERY SUBSTRATE",
-      observation: workspaceObserved ? "observed" : "unknown",
+      observation: currentOwnerObservation(workspaceObserved),
       detail: workspaceObserved ? "workspace projection observed" : "workspace projection awaiting resync",
     },
   ];

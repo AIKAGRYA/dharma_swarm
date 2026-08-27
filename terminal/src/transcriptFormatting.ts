@@ -108,8 +108,11 @@ export function formatTranscriptLine(line: TranscriptLine): FormattedTranscriptL
       color: baseColor,
     };
   }
-  if (line.kind === "tool" && (text.startsWith("⠋ ") || text.startsWith("✓ "))) {
-    const prefix = text.slice(0, 2);
+  if (line.kind === "tool" && (text.startsWith("⠋ ") || text.startsWith("■ ") || text.startsWith("✓ "))) {
+    // Older persisted/tool-patch rows used ✓ for executor completion. Normalize
+    // that historical input at the rendering boundary; ✓ stays verifier-owned.
+    const rawPrefix = text.slice(0, 2);
+    const prefix = rawPrefix === "✓ " ? "■ " : rawPrefix;
     const body = text.slice(2);
     return {
       prefix: {text: `${prefix} `, color: baseColor, bold: true},

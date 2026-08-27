@@ -6,7 +6,7 @@ authority: local_evidence
 
 # Live Evaluation and Routing Feedback
 
-Producer: Arena measures candidates with parity and seeded significance controls. It is bound to `orchestration-arena-v1-2026-06`.
+Producer: Arena measures candidates with parity and seeded significance controls. It is bound to `rsi-lab-meghadharma-2026-08` and `sublimation-forge-2026-08`; the superseded Orchestration Arena track remains historical evidence.
 
 Contract: consume `closure_gap`; apply `select_bounded_experiment`; emit `selected_experiment` to [Chamber Research](chamber_research.md).
 

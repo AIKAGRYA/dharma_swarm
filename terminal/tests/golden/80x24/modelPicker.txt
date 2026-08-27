@@ -1,7 +1,6 @@
- ◆ DHARMA HELM  /  CONVERSATION  ·  ds_nihonga_helm_frontier_20260814
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · ◆ Conv · · Acti · · Evid · · Syst
+ ◆ DHARMA HELM / CONVERSATION · dharma_swarm                          ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  ◆ Conv  · Acti  · Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 OVERLAY / TEMPORARY
@@ -9,6 +8,7 @@ OVERLAY / TEMPORARY
 │ Model Picker                                                                 │
 │ Enter apply | Esc close | 0 routes                                           │
 │ No model targets loaded.                                                     │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

@@ -14,6 +14,7 @@
     "test:repo-pane": "bun test tests/protocol.test.ts tests/persistence.test.ts tests/repoPane.test.ts tests/sidebar.test.ts tests/app.test.ts",
     "lint": "eslint src tests eslint.config.js --max-warnings 19",
     "typecheck": "tsc --noEmit",
+    "verify:alternate-screen": "bash scripts/alternate_screen_check.sh",
     "verify:command-routing": "bun run typecheck && bun run test:command-routing",
     "verify:control-surface": "bun run typecheck && bun run test:control-surface",
     "verify:repo-pane": "bun run typecheck && bun run test:repo-pane"
@@ -23,17 +24,20 @@
     "ascii-artist": "^0.0.14",
     "cfonts": "^3.3.1",
     "figlet": "^1.11.0",
-    "ink": "^5.1.0",
+    "ink": "^7.1.1",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^4.0.0",
-    "react": "^18.3.1"
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.13.10",
-    "@types/react": "^18.3.12",
+    "@types/react": "^19.2.0",
     "eslint": "^10.4.1",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.61.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

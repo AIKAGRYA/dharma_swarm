@@ -1,12 +1,16 @@
 import React from "react";
 import {Box, Text} from "ink";
 
-import type {ApprovalQueueEntry, ApprovalQueueState} from "../types";
+import {ownerProjectionModality} from "../nihonga/projectionModality.ts";
+import type {ApprovalQueueEntry, ApprovalQueueState, BridgeStatus} from "../types";
 import {THEME} from "../theme";
 
 type Props = {
   title: string;
   approvalPane: ApprovalQueueState;
+  authorityObserved: boolean;
+  bridgeStatus: BridgeStatus;
+  compact?: boolean;
 };
 
 function approvalEntries(approvalPane: ApprovalQueueState): ApprovalQueueEntry[] {
@@ -21,23 +25,37 @@ function selectedApprovalEntry(approvalPane: ApprovalQueueState): ApprovalQueueE
   return approvalPane.selectedActionId ? approvalPane.entriesByActionId[approvalPane.selectedActionId] : pending[0] ?? entries[0];
 }
 
-export function ApprovalsPane({title, approvalPane}: Props): React.ReactElement {
+export function ApprovalsPane({title, approvalPane, authorityObserved, bridgeStatus, compact = false}: Props): React.ReactElement {
   const entries = approvalEntries(approvalPane);
   const pending = entries.filter((entry) => entry.pending);
   const selected = selectedApprovalEntry(approvalPane);
+  const retained = entries.length > 0 || approvalPane.historyBacked;
+  const modality = ownerProjectionModality({
+    bridgeStatus,
+    authorityObserved,
+    hasRetainedProjection: retained,
+  });
+  const modalityLabel = modality === "observed"
+    ? `◉ OBSERVED · owner history · pending ${pending.length} · tracked ${entries.length}`
+    : modality === "stale"
+      ? `~ STALE · ${entries.length} retained rows · resolution held`
+      : "?[?] UNKNOWN · permission owner projection absent";
 
   return (
     <Box flexGrow={1} borderStyle="round" borderColor={THEME.ridge} paddingX={1} flexDirection="column">
       <Text color={THEME.wave} bold>{title}</Text>
       <Text color={THEME.stone}>
-        {approvalPane.historyBacked ? "history-backed" : "provisional-live"} | pending {pending.length} | tracked {entries.length}
+        {modalityLabel}
       </Text>
-      <Box marginTop={1}>
-        <Box width="35%" flexDirection="column" paddingX={1}>
+      {compact && modality !== "observed" ? <Text color={THEME.persimmon}>▣ HELD · fresh owner history required</Text> : null}
+      <Box marginTop={1} flexDirection={compact ? "column" : "row"}>
+        <Box width={compact ? undefined : "35%"} flexDirection="column" paddingX={1}>
           <Text color={THEME.mist} bold>Queue</Text>
           <Text color={THEME.stone}>pending-first operator decisions</Text>
           {entries.length === 0 ? (
-            <Text color={THEME.stone}>No approvals.</Text>
+            <Text color={THEME.stone}>
+              {modality === "observed" ? "No approvals in the observed projection." : "No current permission projection."}
+            </Text>
           ) : (
             entries.slice(0, 12).map((entry) => {
               const active = approvalPane.selectedActionId === entry.decision.action_id;
@@ -56,7 +74,13 @@ export function ApprovalsPane({title, approvalPane}: Props): React.ReactElement 
             })
           )}
         </Box>
-        <Box width="65%" marginLeft={1} flexDirection="column" paddingX={1}>
+        <Box
+          width={compact ? undefined : "65%"}
+          marginLeft={compact ? 0 : 1}
+          marginTop={compact ? 1 : 0}
+          flexDirection="column"
+          paddingX={1}
+        >
           <Text color={THEME.mist} bold>Selected</Text>
           <Text color={THEME.stone}>decision, resolution, and runtime trace</Text>
           {!selected ? (

@@ -10,7 +10,7 @@
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
-**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The governing principle: the operator may run between `min_active` and `max_active` concurrent tracks (default floor 1, ceiling 10) as declared by `track_policy` in `ACTIVE_TRACK.yaml`. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. A portfolio of one is fine — concurrency is authorized, not mandated — and equally, opening a second co-equal track when the operator proposes new work is the expected response, never a violation of an existing track. **To open a track** (e.g. when the operator proposes a new project — treat that as a new track, never a violation): add an entry under `active_tracks:` in `ACTIVE_TRACK.yaml` with `serves:` a spine objective, `owned_surfaces:`, and acceptance criteria, then run `scripts/governance/render_active_track_includes.py`; `check_track_status.py` enforces WIP limit, spine binding, surface non-overlap, and edge/cycle validity. Rationale: with 10+ agent contributors active on the repo (387 commits in the last 30 days as of 2026-05-31), serializing all work behind one track creates unbounded queueing on the operator and on review capacity. Concurrency is gated on non-overlap, not on agent count.
+**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The governing principle: the operator may run between `min_active` and `max_active` concurrent tracks (default floor 1, ceiling 4) as declared by `track_policy` in `ACTIVE_TRACK.yaml`. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. A portfolio of one is fine — concurrency is authorized, not mandated — and equally, opening a second co-equal track when the operator proposes new work is the expected response, never a violation of an existing track. **To open a track** (e.g. when the operator proposes a new project — treat that as a new track, never a violation): add an entry under `active_tracks:` in `ACTIVE_TRACK.yaml` with `serves:` a spine objective, `owned_surfaces:`, and acceptance criteria, then run `scripts/governance/render_active_track_includes.py`; `check_track_status.py` enforces WIP limit, spine binding, surface non-overlap, and edge/cycle validity. Rationale: the four-lane ceiling reserves three durable priorities plus one bounded temporary lane; any fourth lane requires explicit WIP justification. Concurrency is gated on non-overlap, not on agent count.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -156,13 +156,13 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 |--------|-------|-------------|
 | Total Python modules | **1,125** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **490 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **396,567** | wc -l across dharma_swarm Python modules |
-| Test files | **1014** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **15,430 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **396,573** | wc -l across dharma_swarm Python modules |
+| Test files | **1015** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **15,448 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,532** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **320,497** | wc -l across all tracked .md |
+| Markdown files | **1,534** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **320,585** | wc -l across all tracked .md |
 | Bridge files | **37** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **50** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **23** | find dharma_swarm -type f \| rg -i "rout" |

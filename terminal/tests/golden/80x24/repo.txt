@@ -1,15 +1,15 @@
- ◆ DHARMA HELM  /  EVIDENCE  ·  ds_nihonga_helm_frontier_20260814
- ○ offline  ·  claude:claude-opus-4.8 [unverified]
-────────────────────────────────────────────────────────────────────────────────
- · Home · · Conv · · Acti · ◆ Evid · · Syst
+ ◆ DHARMA HELM / EVIDENCE · dharma_swarm                              ○ OFFLINE
+ route claude:claude-opus-4.8 · ? UNVERIFIED · PROJECTION
+ · Home  · Conv  · Acti  ◆ Evid  · Syst
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  F5 ? G56 ? G46 ? FU ? K3 ? O50 ? O48 ?
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Repo · Repo Snapshot                                                         │
 │ 1/1 sections · j/k select                                                    │
 │                                                                              │
-│ Workspace snapshot loading...                                                │
-│ The terminal should know what repo it is standing in.                        │
+│ ?[?] UNKNOWN · workspace owner projection not observed.                      │
+│ Path labels are local context; Git state awaits an authoritative snapshot.   │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │
