@@ -1,0 +1,98 @@
+{
+  "allowed_files": [
+    "reports/governance/mac_active_programs/2026-08-27-focus-reset-ratification.json",
+    "reports/agentops/work_packets/fleet-advancement-WP-FOCUS-RESET-20260827.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "17e04edea2280cc03a237e8221e7f1b09f16d78f",
+  "branch": "governance/four-active-mac-lanes-20260827",
+  "commit": {
+    "allowed": true,
+    "message": "governance: ratify the four-lane Mac focus reset"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "deploy/**",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_track_portfolio.py tests/test_check_track_status_lifecycle.py tests/test_active_track_governance.py tests/test_agent_onboard.py",
+      "expected_exit": 0,
+      "name": "four-lane-portfolio-and-generated-governance-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-FOCUS-RESET-20260827",
+  "intent": "Ratify and re-test the resulting post-crash governance state after an atomic owner-file transition established exactly four active Mac programs: Fleet advancement, the SADHANA ten-day program, RSI Lab via Meghadharma, and the Sublimation Forge. Record the packet validator's bootstrap limitation explicitly: a newly introduced authorizing track cannot preflight the commit that introduces it, while a removed authorizing track cannot close out that same commit.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_check_track_status_lifecycle.py -k resurrection_without_reopened_at_is_error",
+      "expected_exit": 0,
+      "name": "closed-track-resurrection-remains-rejected",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "scripts/governance/check_track_status.py",
+      "scripts/governance/render_active_track_includes.py",
+      "dharma_swarm/operator_core/onboarding/track_portfolio.py"
+    ],
+    "collision": {
+      "checked_at_sha": "17e04edea2280cc03a237e8221e7f1b09f16d78f",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Commit 17e04edea2280cc03a237e8221e7f1b09f16d78f necessarily preceded this ratification packet because Session Entry requires its authorizing track to exist at both clean preflight and changed closeout; the atomic replacement has no such common track.",
+      "The portfolio reset does not prove any executor, daemon, remote host, participant journey, or production adapter is live.",
+      "Fleet Hub, Mission Control, and HELM require their own verified implementation evidence before the Fleet prototype blocker can close.",
+      "SADHANA still requires the preserved truth-fix delta to land and participant-safe program evidence to be produced.",
+      "RSI exact-code synchronization does not prove research quality; bounded Meghadharma campaign receipts remain required.",
+      "Sublimation Forge remains offline-only until its held-out pilot and kill-switch evidence pass separate review."
+    ],
+    "interface_mismatches": [
+      "The previous portfolio encoded ten unrelated active lanes, while the operator now authorizes only four Mac build programs; the transition is verified by whole-state gates rather than represented as a false pre-transition admission.",
+      "Mission Control and HELM were formerly represented as independent governance tracks, but are now deliverables inside Fleet advancement rather than additional standing slots.",
+      "Historical track detail must remain inspectable even though those entries no longer confer active build authority."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "bc924cc8fd200b15bbc05a7fa45ac2fa2ec484995c0b21041f6be0824dc80ba3",
+    "rollback": "Revert the ratification commit, then separately revert 17e04edea2280cc03a237e8221e7f1b09f16d78f if the operator rejects the four-lane focus reset. Neither commit starts, stops, deploys, spends, contacts humans, or mutates remote runtime state.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-FOCUS-RESET-20260827"
+  },
+  "worktree": "."
+}

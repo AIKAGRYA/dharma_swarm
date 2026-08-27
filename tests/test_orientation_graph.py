@@ -14,6 +14,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts/governance/orientation_graph.py"
 
+# The snapshot commit must not fork git's detached auto-maintenance into the
+# measured window: on git >= 2.55 it writes .git/objects/info/commit-graphs/*
+# into the pristine clone seconds later, and the tree-snapshot equality
+# asserts would attribute that background write to the script under test.
+_GIT_NO_AUTO_MAINTENANCE = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")
+
 spec = importlib.util.spec_from_file_location("orientation_graph", SCRIPT)
 og = importlib.util.module_from_spec(spec)
 sys.modules["orientation_graph"] = og
@@ -23,7 +29,7 @@ spec.loader.exec_module(og)
 def _copy_tracked_checkout(destination: Path) -> None:
     """Create a genuine clean Git checkout of the current implementation."""
     subprocess.run(
-        ["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
+        ["git", *_GIT_NO_AUTO_MAINTENANCE, "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
         check=True,
         timeout=120,
     )
@@ -49,7 +55,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
         elif source.is_file():
             shutil.copy2(source, target)
     subprocess.run(
-        ["git", "-C", str(destination), "add", "-A"],
+        ["git", "-C", str(destination), *_GIT_NO_AUTO_MAINTENANCE, "add", "-A"],
         check=True,
         timeout=60,
     )
@@ -58,6 +64,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
             "git",
             "-C",
             str(destination),
+            *_GIT_NO_AUTO_MAINTENANCE,
             "-c",
             "user.name=Orientation Graph Test",
             "-c",
@@ -187,7 +194,7 @@ def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
     for relative in expected:
         (checkout / relative).unlink()
     subprocess.run(
-        ["git", "-C", str(checkout), "add", "-A"],
+        ["git", "-C", str(checkout), *_GIT_NO_AUTO_MAINTENANCE, "add", "-A"],
         check=True,
         timeout=30,
     )
@@ -196,6 +203,7 @@ def test_explicit_context_refresh_writes_only_two_paths(tmp_path):
             "git",
             "-C",
             str(checkout),
+            *_GIT_NO_AUTO_MAINTENANCE,
             "-c",
             "user.name=Orientation Graph Test",
             "-c",

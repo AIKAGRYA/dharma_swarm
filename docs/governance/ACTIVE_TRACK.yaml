@@ -71,15 +71,15 @@ spine_objectives:
 # TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
 # This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
 # (min_active..max_active concurrent tracks). Concurrency is authorized, not
-# mandated: the floor is 1, the current ceiling is 10, and opening beyond the floor is
-# operator discretion gated on non-overlap (owned_surfaces), not agent count.
+# mandated: the floor is 1 and the operator reset the Mac ceiling to exactly
+# four program lanes on 2026-08-27. Opening a fifth requires closing or
+# superseding one of those slots first.
 # ---------------------------------------------------------------------------
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 10            # hard ceiling — TAM retired and Titanium was
-                            # admitted one-for-one on 2026-07-17.
-  warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
+  max_active: 4             # hard operator ceiling for Mac build programs
+  warn_active: 4            # all four slots are intentional; a fifth is an error
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
@@ -132,6 +132,231 @@ vital_signs:
 #   prerequisites / completion_criteria / non_goals / next_items  (as in v1)
 # ---------------------------------------------------------------------------
 active_tracks:
+  - id: fleet-advancement-2026-08
+    name: Fleet advancement — Fleet Hub, Mission Control, and HELM operator surfaces
+    status: ACTIVE
+    opened_at: "2026-08-27"
+    verified_at: "2026-08-27"
+    ttl_days: 14
+    owner: "@dhyana"
+    serves: substrate-nativeness
+    complements:
+      - sadhana-10-day-program-2026-08
+      - rsi-lab-meghadharma-2026-08
+      - sublimation-forge-2026-08
+    depends_on: []
+    conflicts_with: []
+    owned_surfaces:
+      - dharma_swarm/mission_control*.py
+      - dashboard/src/app/dashboard/cockpit/**
+      - dashboard/src/components/cockpit/**
+      - dashboard/src/components/operator-coherence/v2/**
+      - terminal/**
+      - docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md
+      - specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
+    moves_vital_signs:
+      - tool_coverage
+      - context_efficiency
+      - quality_gates
+      - security_guardrails
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: "Fleet Hub, Mission Control, and HELM are bounded prototype deliverables inside this one program lane. A prototype, local process, or attempt record does not prove a production adapter, command authority, or executor liveness."
+    description: |
+      Advance the operator-facing fleet as one coherent program. Fleet Hub
+      remains the five-destination phone shell (Helm, Chat, Board, Trace,
+      Roster); Mission Control remains a typed TaskBoard + RuntimeStateStore
+      projection; HELM remains the terminal operator surface. Their prototype
+      packages may complete independently, but they do not consume extra
+      standing portfolio slots.
+    prerequisites: []
+    completion_criteria:
+      - id: focus_reset_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
+        fresh_ttl_days: 30
+        requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+      - id: mission_control_contract_tests_pass
+        kind: test_passes
+        test: tests/test_mission_control.py
+      - id: cockpit_route_exists
+        kind: file_exists
+        file: dashboard/src/app/dashboard/cockpit/page.tsx
+      - id: helm_shell_contract_exists
+        kind: file_exists
+        file: terminal/tests/nihongaShell.test.ts
+    non_goals:
+      - Do not add a sixth Fleet Hub destination or turn overlays into navigation.
+      - Do not infer missions by parsing prose or claim liveness from attempt records.
+      - Do not deploy, restart production, change credentials/ACLs, or grant mutation authority from prototype evidence.
+    next_items:
+      - id: fleet-prototypes-reviewed
+        what: "Merge or otherwise land the independently verified Fleet Hub, Mission Control, and HELM prototype packages with their visual evidence."
+        kind: integration
+        blocker: true
+      - id: owner-adapters-qualified
+        what: "Qualify real owner adapters and canaries separately before any production claim."
+        kind: evidence
+        blocker: true
+
+  - id: sadhana-10-day-program-2026-08
+    name: SADHANA — governed 10-day program
+    status: ACTIVE
+    opened_at: "2026-08-27"
+    verified_at: "2026-08-27"
+    ttl_days: 10
+    owner: "@dhyana"
+    serves: revenue-external-humans-served
+    complements:
+      - fleet-advancement-2026-08
+      - rsi-lab-meghadharma-2026-08
+    depends_on: []
+    conflicts_with: []
+    owned_surfaces:
+      - deploy/sadhana/**
+      - scripts/runtime/sadhana_release.py
+      - tests/test_sadhana_release.py
+      - dashboard/src/app/dashboard/sadhana/**
+    moves_vital_signs:
+      - quality_gates
+      - eval_coverage
+      - security_guardrails
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: "The active truth-fix release worktree is durable at /Users/dhyana/ds_sadhana_10day_active_20260826. Custody and code volume do not prove a live participant journey, release, or program outcome."
+    description: |
+      Finish the explicitly bounded ten-day SADHANA program through its
+      existing release contract, writer sentinel, mobile surface, and hard
+      stop. Preserve the single-writer boundary and distinguish participant
+      evidence from fixture or deployment evidence.
+    prerequisites: []
+    completion_criteria:
+      - id: focus_reset_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
+        fresh_ttl_days: 30
+        requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+      - id: sadhana_release_contract_landed
+        kind: file_exists
+        file: scripts/runtime/sadhana_release.py
+      - id: sadhana_release_tests_landed
+        kind: file_exists
+        file: tests/test_sadhana_release.py
+    non_goals:
+      - Do not extend the ten-day program silently or weaken its hard stop.
+      - Do not treat a release bundle as participant completion evidence.
+      - Do not add a second mutable writer.
+    next_items:
+      - id: sadhana-truthfix-landed
+        what: "Finish and land the preserved truth-fix release delta from the durable active worktree."
+        kind: integration
+        blocker: true
+      - id: sadhana-participant-proof
+        what: "Run the bounded program only through its authorized release path and retain participant-safe receipts."
+        kind: evidence
+        blocker: true
+
+  - id: rsi-lab-meghadharma-2026-08
+    name: RSI Lab — exact-code Mac and Meghadharma campaign lane
+    status: ACTIVE
+    opened_at: "2026-08-27"
+    verified_at: "2026-08-27"
+    ttl_days: 14
+    owner: "@dhyana"
+    serves: research-depth
+    complements:
+      - fleet-advancement-2026-08
+      - sadhana-10-day-program-2026-08
+      - sublimation-forge-2026-08
+    depends_on: []
+    conflicts_with: []
+    owned_surfaces:
+      - dharma_swarm/forge_lab/**
+      - scripts/forge_lab/**
+      - tests/forge_lab_v1/**
+      - docs/ops/RSI_LAB_SYNC.md
+    moves_vital_signs:
+      - eval_coverage
+      - memory_persistence
+      - cost_efficiency
+      - security_guardrails
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: "The rsi sync owner proves exact code identity only. Commit b148f55e is active and ready on Mac and Meghadharma under plan digest sha256:38410a2e9b3caaae29f37b9492d01261560865f452210c7c3ef582b6e6da3db7; state, secrets, provider credentials, and research quality remain separate claims."
+    description: |
+      Keep the RSI Lab exact-code release synchronized between the Mac and
+      Meghadharma, then run bounded research campaigns through the governed
+      lab controls. Release verification stays cross-host and fail-closed;
+      spend and promotion retain their own gates.
+    prerequisites: []
+    completion_criteria:
+      - id: exact_sync_observation_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
+        fresh_ttl_days: 30
+        requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    non_goals:
+      - Do not synchronize mutable state, secrets, OAuth material, or provider credentials as code.
+      - Do not equate exact code identity with research validity or production readiness.
+      - Do not bypass spend, source, container-isolation, or promotion gates.
+    next_items:
+      - id: rsi-campaign-receipts
+        what: "Produce bounded Meghadharma campaign receipts from the synchronized release and grade them independently."
+        kind: evidence
+        blocker: true
+
+  - id: sublimation-forge-2026-08
+    name: Sublimation Forge — offline-first governed foundry
+    status: ACTIVE
+    opened_at: "2026-08-27"
+    verified_at: "2026-08-27"
+    ttl_days: 14
+    owner: "@dhyana"
+    serves: research-depth
+    complements:
+      - fleet-advancement-2026-08
+      - rsi-lab-meghadharma-2026-08
+    depends_on: []
+    conflicts_with: []
+    owned_surfaces:
+      - dharma_swarm/foundry/**
+      - scripts/foundry/**
+      - tests/test_foundry_*.py
+      - docs/foundry/**
+    moves_vital_signs:
+      - quality_gates
+      - eval_coverage
+      - cost_efficiency
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion."
+    description: |
+      Consolidate the existing foundry into the Sublimation Forge: an
+      offline-first, held-out, receipted improvement loop whose candidate
+      promotion remains independent and fail-closed.
+    prerequisites: []
+    completion_criteria:
+      - id: focus_reset_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
+        fresh_ttl_days: 30
+        requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+      - id: foundry_loop_tests_pass
+        kind: test_passes
+        test: tests/test_foundry_loop.py
+      - id: foundry_heldout_tests_pass
+        kind: test_passes
+        test: tests/test_foundry_heldout.py
+    non_goals:
+      - Do not use live providers, deploy, mutate a VPS, contact external humans, or promote a candidate without separate authority.
+      - Do not let self-score or model consensus substitute for held-out evidence.
+    next_items:
+      - id: sublimation-offline-pilot
+        what: "Complete the preserved offline pilot packet and land its bounded receipts and kill-switch proof."
+        kind: evidence
+        blocker: true
+
+# Historical context retained verbatim for later reopening. This key is not an
+# active or closed registry; nested status fields are snapshots from before the
+# 2026-08-27 focus reset. Authoritative lifecycle state is above and in
+# closed_tracks below.
+parked_track_context:
   - id: loop-closure-2026-06
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
@@ -2324,6 +2549,96 @@ active_tracks:
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
 
 closed_tracks:
+  - id: loop-closure-2026-06
+    name: Cybernetic Loop Closure — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Only this portfolio slot is superseded. The loop work, evidence, and unresolved production claims remain preserved and may be explicitly re-admitted later."
+
+  - id: orchestration-arena-v1-2026-06
+    name: Orchestration Arena v1 — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Portfolio-slot transition only; no arena result or production claim is promoted, erased, or declared complete."
+
+  - id: merge-master-mike-d4-2026-06
+    name: Merge Master Mike D4 — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Portfolio-slot transition only; merge authority and unfinished blockers remain unchanged."
+
+  - id: organism-rewire-2026-07
+    name: Organism Rewire — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Portfolio-slot transition only; dormant-organ integration is not claimed complete."
+
+  - id: dharmagraph-engine-2026-07
+    name: DharmaGraph engine — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Portfolio-slot transition only; the prior 52/100 NOT_FINISHED outcome remains authoritative."
+
+  - id: helm-worldclass-terminal-2026-06
+    name: HELM world-class terminal — folded into Fleet advancement
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "The standalone slot is superseded; HELM continues as a bounded prototype deliverable inside Fleet advancement and is not claimed production-ready."
+
+  - id: sovereign-safety-tcb-2026-07
+    name: Sovereign Safety TCB — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Portfolio-slot transition only; safety gates remain binding and no trust promotion is implied."
+
+  - id: hyperbolic-time-chamber-2026-07
+    name: Hyperbolic Time Chamber — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: research-depth
+    superseded_by: rsi-lab-meghadharma-2026-08
+    claim_boundary: "Portfolio-slot transition only; prior traces remain evidence, not a completion claim."
+
+  - id: repository-titanium-hardening-2026-07
+    name: Repository titanium hardening — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: substrate-nativeness
+    superseded_by: fleet-advancement-2026-08
+    claim_boundary: "Portfolio-slot transition only; repository gates remain mandatory and known debt remains open."
+
+  - id: darshan-publication-2026-07
+    name: Darshan publication venture — parked by the four-lane Mac focus reset
+    status: SUPERSEDED
+    closure_kind: SUPERSEDED
+    closed_at: "2026-08-27"
+    serves: revenue-external-humans-served
+    superseded_by: sublimation-forge-2026-08
+    claim_boundary: "Portfolio-slot transition only; Darshan is preserved for later re-admission and no publication outcome is claimed."
+
   - id: company-builder-parity-2026-07
     name: TAM (Transdimensional Abundance Machine) — Company-Builder Parity board
     status: RETIRED

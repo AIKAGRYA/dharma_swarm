@@ -622,14 +622,21 @@ def test_manifest_registers_cybernetics_codex():
     assert "test_file_exists" in agents[AGENT_ID]["health_check_ids"]
 
 
-def test_loop_closure_track_requires_steward_packet():
+def test_superseded_loop_closure_preserves_steward_contract():
     data = yaml.safe_load(open("docs/governance/ACTIVE_TRACK.yaml", encoding="utf-8"))
-    tracks = {track["id"]: track for track in data["active_tracks"]}
+    active_ids = {track["id"] for track in data["active_tracks"]}
+    parked = {track["id"]: track for track in data["parked_track_context"]}
+    closed = {track["id"]: track for track in data["closed_tracks"]}
     criteria = {
         criterion["id"]
-        for criterion in tracks["loop-closure-2026-06"]["completion_criteria"]
+        for criterion in parked["loop-closure-2026-06"]["completion_criteria"]
     }
 
+    assert "loop-closure-2026-06" not in active_ids
+    assert closed["loop-closure-2026-06"]["closure_kind"] == "SUPERSEDED"
+    assert closed["loop-closure-2026-06"]["superseded_by"] == (
+        "fleet-advancement-2026-08"
+    )
     assert "cybernetics_codex_manifest_registered" in criteria
     assert "cybernetics_codex_seed_exists" in criteria
     assert "cybernetics_codex_soul_exists" in criteria
