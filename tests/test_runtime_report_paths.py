@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.daemon_config import runtime_report_dir
+from dharma_swarm.daemon_config import dharma_state_dir, runtime_report_dir
 
 
 def test_runtime_report_dir_honors_state_authority(monkeypatch, tmp_path: Path) -> None:
@@ -19,6 +19,31 @@ def test_runtime_report_dir_honors_state_authority(monkeypatch, tmp_path: Path) 
     assert runtime_report_dir("a2a", "send_receipts") == (
         state_root / "reports" / "a2a" / "send_receipts"
     )
+
+
+@pytest.mark.parametrize("state_value", [None, ""])
+def test_missing_or_empty_state_authority_falls_back_to_dharma_home(
+    monkeypatch,
+    tmp_path: Path,
+    state_value: str | None,
+) -> None:
+    legacy_home = tmp_path / "legacy-home"
+    if state_value is None:
+        monkeypatch.delenv("DHARMA_STATE_DIR", raising=False)
+    else:
+        monkeypatch.setenv("DHARMA_STATE_DIR", state_value)
+    monkeypatch.setenv("DHARMA_HOME", str(legacy_home))
+
+    assert dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME") == legacy_home
+    assert runtime_report_dir() == legacy_home / "reports"
+
+
+def test_empty_state_authorities_fall_back_to_user_dharma(monkeypatch) -> None:
+    monkeypatch.setenv("DHARMA_STATE_DIR", "")
+    monkeypatch.setenv("DHARMA_HOME", "")
+
+    assert dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME") == Path.home() / ".dharma"
+    assert runtime_report_dir() == Path.home() / ".dharma" / "reports"
 
 
 @pytest.mark.parametrize("parts", [("..", "repo"), ("/tmp", "receipts")])

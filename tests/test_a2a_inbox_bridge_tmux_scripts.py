@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,3 +36,26 @@ def test_a2a_inbox_bridge_status_script_reports_receipts_and_consumer() -> None:
     assert "DHARMA_STATE_DIR" in text
     assert "reports/a2a/inbox_bridge_receipts" in text
     assert "tmux capture-pane" in text
+
+
+@pytest.mark.parametrize(
+    ("script", "receipt_suffix"),
+    [
+        ("scripts/status_a2a_inbox_bridge_tmux.sh", "inbox_bridge_receipts"),
+        (
+            "scripts/status_palantir_pilot_a2a_worker_tmux.sh",
+            "palantir_pilot_worker_receipts",
+        ),
+    ],
+)
+def test_runtime_status_scripts_share_state_authority_precedence(
+    script: str,
+    receipt_suffix: str,
+) -> None:
+    text = (ROOT / script).read_text(encoding="utf-8")
+    expected = (
+        'RECEIPT_DIR="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}/'
+        f'reports/a2a/{receipt_suffix}"'
+    )
+
+    assert expected in text
