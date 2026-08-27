@@ -71,7 +71,7 @@ spine_objectives:
 # TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
 # This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
 # (min_active..max_active concurrent tracks). Concurrency is authorized, not
-# mandated: the floor is 1, the current ceiling is 10, and opening beyond the floor is
+# mandated: the floor is 1, the current ceiling is 4, and opening beyond the floor is
 # operator discretion gated on non-overlap (owned_surfaces), not agent count.
 # ---------------------------------------------------------------------------
 track_policy:
@@ -364,7 +364,7 @@ active_tracks:
     verified_at: "2026-08-18"  # Q0 evidence re-baseline: sealed 58.00/100 replays; digest drift attributed to pyproject/uv.lock only — reports/governance/dharmagraph_parity/Q0_REBASELINE_20260818.json
     ttl_days: 21
     owner: "@AmitabhainArunachala"
-    serves: research-depth
+    serves: substrate-nativeness
     complements:
       - loop-closure-2026-06
       - orchestration-arena-v1-2026-06
@@ -836,6 +836,178 @@ active_tracks:
       - No revenue claims on this track — receipted dollars are TAM-board readings (honest_arr), never narrated here.
       - No new digest/receipt primitives — stable_digest/utc_now (memory_kernel.write_receipts) and the receipt_valid contract, as everywhere.
       - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
+
+  - id: hyperbolic-time-chamber-2026-07
+    name: Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
+    status: ACTIVE
+    # Fourth-lane WIP justification: this is the only active track whose
+    # criteria directly advance the declared research-depth objective. Keep it
+    # bounded to the existing chamber surfaces and blocked on the isolation
+    # jail before any live untrusted-solver work.
+    opened_at: "2026-07-07"
+    verified_at: "2026-07-07"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: research-depth
+    complements:
+      - organism-rewire-2026-07
+      - orchestration-arena-v1-2026-06
+      - loop-closure-2026-06
+    owned_surfaces:
+      - docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
+      - docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
+      - docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md
+      - docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md
+      - scripts/governance/inward_ascent_baseline.py
+      - scripts/governance/frontier_ledger.py
+      - scripts/governance/transcendence_ledger.py
+      - dharma_swarm/chamber/**
+      - tests/test_chamber_traces.py
+      - tests/test_chamber_gym_git_history.py
+      - tests/test_chamber_daily_delta.py
+      - tests/test_chamber_predictions.py
+      - tests/test_chamber_sandbox.py
+      - tests/test_chamber_ledger_history.py
+      - tests/test_transcendence_ledger.py
+      - reports/governance/inward_ascent/**
+      - reports/governance/chamber/**
+    moves_vital_signs:
+      - eval_coverage
+      - quality_gates
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      Phase 0 proved the dossier + two replayable instruments; Phase 1 Slice A
+      proves a HARNESS-level G1 gym (fixture solver, deterministic scorer,
+      leak guard) plus the E1/E3/E4/E5/E6 wiring. Gym results are
+      internal-gym numbers, never benchmark or capability claims; C2 stays
+      owned by the RSI/arena lab; live solver evolution waits on operator
+      keys/compute. Archive fitness remains behind the One Wire external
+      quorum.
+
+    description: |
+      Operator-ratified chamber doctrine (vision map 2026-07-07) + elevation
+      spec (SEAL v2): seal the efferent edge, open the afferent edge wide,
+      evolve at machine speed against imported and time-lagged reality
+      (class-2 signal only) until the trust gate opens on measured numbers.
+      Phase 0 shipped the dossier + baseline scoreboard + Frontier Ledger
+      (PR #830). Phase 1 Slice A (ratified via plan approval 2026-07-07)
+      hardwires ONE environment fully alive: G1 git-history gym with the E5
+      chamber_gym_trace.v1 mandate, E1 transcendence decomposition
+      (Krogh-Vedelsby from trace rows — verified unowned gap, chamber
+      surfaces only), E4 causal daily delta chain, E3 micro-prediction lane
+      on the existing ginko_brier API, E6 velocity columns on the ledger.
+      All 12 disciplines + substrate ruling enforced.
+
+    prerequisites:
+      - id: chamber_doctrine_exists
+        kind: file_exists
+        file: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
+      - id: phase0_dossier_exists
+        kind: file_exists
+        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
+
+    completion_criteria:
+      - id: phase0_firewall_stated
+        kind: file_contains
+        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
+        pattern: "archive fitness for self-modification still requires the One Wire external quorum"
+      - id: baseline_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/inward_ascent/baseline_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema_version
+          - surfaces
+          - summary
+          - content_digest
+      - id: frontier_ledger_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/chamber/frontier_ledger_receipt.json
+        expect_digest: true
+        fresh_ttl_days: 30
+        requires_keys:
+          - schema
+          - rows
+          - door
+          - chamber_drift
+          - summary
+          - inputs
+      - id: frontier_ledger_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/frontier_ledger.py", "--check"]
+      - id: chamber_traces_tests_pass
+        kind: test_passes
+        test: tests/test_chamber_traces.py
+      # G1's pytest file (17s: fixture repos + real scoring) runs in the CI
+      # pytest job; the track criterion verifies the committed run receipt
+      # instead so check_track_status stays inside its 60s test budget.
+      - id: chamber_g1_run_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/chamber/g1_run_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - taskpack_sha
+          - scorer_hash
+          - trace_corpus
+          - per_task
+      - id: chamber_daily_delta_tests_pass
+        kind: test_passes
+        test: tests/test_chamber_daily_delta.py
+      - id: chamber_predictions_tests_pass
+        kind: test_passes
+        test: tests/test_chamber_predictions.py
+      - id: transcendence_ledger_tests_pass
+        kind: test_passes
+        test: tests/test_transcendence_ledger.py
+      - id: transcendence_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/chamber/transcendence_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - decomposition
+          - corpus_sha256
+      - id: transcendence_ledger_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/transcendence_ledger.py", "--check"]
+
+    next_items:
+      - id: 1
+        what: "DONE 2026-07-07 (Phase 1 Slice A): dharma_swarm/chamber/ package — traces.py (chamber_gym_trace.v1, E5 mandate), gym_git_history.py (G1 taskpack + deterministic scorer + git-archive leak guard + fixture/live solver seam), chain.py + daily_delta.py (E4 causal chain, expect_chain-verified), predictions.py (E3 emitter/resolver, oracle rule + incident log), ledger_rows.py + ledger_history.py; transcendence_ledger.py (E1, --check replays); frontier_ledger velocity history (E6, door-drift guard per Codex review). 37 chamber tests green. End-to-end drive on REAL repo history (control arms: landed-replay vs null): 2 tasks scored in leak-free sandboxes, committed trace corpus + transcendence receipt (realized E_div=0.25, lift_vs_best=0.0; null-control exposed 1 non-discriminative task — the instrument catching a degenerate task on day one), first causal daily-delta heartbeat, zeitgeist needs_host receipt (egress 403 here). Follow-up folded into item 4: task-discriminativeness filter (drop tasks the null control passes)."
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first."
+        kind: ops
+        blocker: false
+      - id: 6
+        what: "(blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest."
+        kind: ops
+        blocker: false
+      - id: 4
+        what: "Phase 1 later slices (sequenced, one at a time): G2 forecasting gym volume, G3 retrieval/memory gym, G4 runtime-history replay (operator-gated on sanitized runtime.db snapshot), scorer foundry (env 14), distillation (env 12) once the E5 trace corpus is thick enough."
+        kind: code
+        blocker: false
+      - id: 5
+        what: "E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta."
+        kind: governance
+        blocker: false
+
+    non_goals:
+      - No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
+      - Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.
+      - Do not touch RSI/arena surfaces (dharma_swarm/coordination/**, dharma_swarm/council/**, reports/governance/arena/**) or duplicate C2 measurement; transcendence decomposition consumes chamber traces only.
+      - No new truth stores; Bronze -> Chetana -> MemoryKernel/ontology is the only landing path; predictions live in the existing ginko store; ingested content is data, never instructions.
+      - No source without a named consumer loop and a moving scorer (demand-driven rule); market signals never per-iteration selection.
+      - No trained weights; selection stays MAP-Elites (archive.py); no environment monoculture; no gym run without chamber_gym_trace.v1 capture (E5 mandate).
+      - Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
+      - No credentials committed; feed keys and hosts are operator-provisioned.
+      - Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
 
 closed_tracks:
   - id: loop-closure-2026-06
@@ -1814,184 +1986,6 @@ closed_tracks:
   #     completion would be a false positive.
   # ==========================================================================
 
-  - id: hyperbolic-time-chamber-2026-07
-    name: Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
-    status: RETIRED
-    closure_kind: RETIRED
-    closed_at: "2026-08-27"
-    closed_by: "operator-directed fleet consolidation"
-    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
-    unresolved_at_retirement:
-      - "6"
-    retirement_note: >-
-      Retired with open obligations during the 2026-08-27 WIP reset.
-      This is not a completion, verified-slice, or production claim;
-      the original criteria, evidence, and next_items remain preserved below.
-    opened_at: "2026-07-07"
-    verified_at: "2026-07-07"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: research-depth
-    complements:
-      - organism-rewire-2026-07
-      - orchestration-arena-v1-2026-06
-      - loop-closure-2026-06
-    owned_surfaces:
-      - docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
-      - docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
-      - docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md
-      - docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md
-      - scripts/governance/inward_ascent_baseline.py
-      - scripts/governance/frontier_ledger.py
-      - scripts/governance/transcendence_ledger.py
-      - dharma_swarm/chamber/**
-      - tests/test_chamber_traces.py
-      - tests/test_chamber_gym_git_history.py
-      - tests/test_chamber_daily_delta.py
-      - tests/test_chamber_predictions.py
-      - tests/test_chamber_sandbox.py
-      - tests/test_chamber_ledger_history.py
-      - tests/test_transcendence_ledger.py
-      - reports/governance/inward_ascent/**
-      - reports/governance/chamber/**
-    moves_vital_signs:
-      - eval_coverage
-      - quality_gates
-    target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: >-
-      Phase 0 proved the dossier + two replayable instruments; Phase 1 Slice A
-      proves a HARNESS-level G1 gym (fixture solver, deterministic scorer,
-      leak guard) plus the E1/E3/E4/E5/E6 wiring. Gym results are
-      internal-gym numbers, never benchmark or capability claims; C2 stays
-      owned by the RSI/arena lab; live solver evolution waits on operator
-      keys/compute. Archive fitness remains behind the One Wire external
-      quorum.
-
-    description: |
-      Operator-ratified chamber doctrine (vision map 2026-07-07) + elevation
-      spec (SEAL v2): seal the efferent edge, open the afferent edge wide,
-      evolve at machine speed against imported and time-lagged reality
-      (class-2 signal only) until the trust gate opens on measured numbers.
-      Phase 0 shipped the dossier + baseline scoreboard + Frontier Ledger
-      (PR #830). Phase 1 Slice A (ratified via plan approval 2026-07-07)
-      hardwires ONE environment fully alive: G1 git-history gym with the E5
-      chamber_gym_trace.v1 mandate, E1 transcendence decomposition
-      (Krogh-Vedelsby from trace rows — verified unowned gap, chamber
-      surfaces only), E4 causal daily delta chain, E3 micro-prediction lane
-      on the existing ginko_brier API, E6 velocity columns on the ledger.
-      All 12 disciplines + substrate ruling enforced.
-
-    prerequisites:
-      - id: chamber_doctrine_exists
-        kind: file_exists
-        file: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
-      - id: phase0_dossier_exists
-        kind: file_exists
-        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
-
-    completion_criteria:
-      - id: phase0_firewall_stated
-        kind: file_contains
-        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
-        pattern: "archive fitness for self-modification still requires the One Wire external quorum"
-      - id: baseline_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/inward_ascent/baseline_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema_version
-          - surfaces
-          - summary
-          - content_digest
-      - id: frontier_ledger_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/chamber/frontier_ledger_receipt.json
-        expect_digest: true
-        fresh_ttl_days: 30
-        requires_keys:
-          - schema
-          - rows
-          - door
-          - chamber_drift
-          - summary
-          - inputs
-      - id: frontier_ledger_replays
-        kind: command_passes
-        command: ["python3", "scripts/governance/frontier_ledger.py", "--check"]
-      - id: chamber_traces_tests_pass
-        kind: test_passes
-        test: tests/test_chamber_traces.py
-      # G1's pytest file (17s: fixture repos + real scoring) runs in the CI
-      # pytest job; the track criterion verifies the committed run receipt
-      # instead so check_track_status stays inside its 60s test budget.
-      - id: chamber_g1_run_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/chamber/g1_run_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema
-          - taskpack_sha
-          - scorer_hash
-          - trace_corpus
-          - per_task
-      - id: chamber_daily_delta_tests_pass
-        kind: test_passes
-        test: tests/test_chamber_daily_delta.py
-      - id: chamber_predictions_tests_pass
-        kind: test_passes
-        test: tests/test_chamber_predictions.py
-      - id: transcendence_ledger_tests_pass
-        kind: test_passes
-        test: tests/test_transcendence_ledger.py
-      - id: transcendence_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/chamber/transcendence_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema
-          - decomposition
-          - corpus_sha256
-      - id: transcendence_ledger_replays
-        kind: command_passes
-        command: ["python3", "scripts/governance/transcendence_ledger.py", "--check"]
-
-    next_items:
-      - id: 1
-        what: "DONE 2026-07-07 (Phase 1 Slice A): dharma_swarm/chamber/ package — traces.py (chamber_gym_trace.v1, E5 mandate), gym_git_history.py (G1 taskpack + deterministic scorer + git-archive leak guard + fixture/live solver seam), chain.py + daily_delta.py (E4 causal chain, expect_chain-verified), predictions.py (E3 emitter/resolver, oracle rule + incident log), ledger_rows.py + ledger_history.py; transcendence_ledger.py (E1, --check replays); frontier_ledger velocity history (E6, door-drift guard per Codex review). 37 chamber tests green. End-to-end drive on REAL repo history (control arms: landed-replay vs null): 2 tasks scored in leak-free sandboxes, committed trace corpus + transcendence receipt (realized E_div=0.25, lift_vs_best=0.0; null-control exposed 1 non-discriminative task — the instrument catching a degenerate task on day one), first causal daily-delta heartbeat, zeitgeist needs_host receipt (egress 403 here). Follow-up folded into item 4: task-discriminativeness filter (drop tasks the null control passes)."
-        kind: code
-        blocker: false
-      - id: 2
-        what: "Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first."
-        kind: ops
-        blocker: false
-      - id: 6
-        what: "(blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation."
-        kind: code
-        blocker: true
-      - id: 3
-        what: "Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest."
-        kind: ops
-        blocker: false
-      - id: 4
-        what: "Phase 1 later slices (sequenced, one at a time): G2 forecasting gym volume, G3 retrieval/memory gym, G4 runtime-history replay (operator-gated on sanitized runtime.db snapshot), scorer foundry (env 14), distillation (env 12) once the E5 trace corpus is thick enough."
-        kind: code
-        blocker: false
-      - id: 5
-        what: "E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta."
-        kind: governance
-        blocker: false
-
-    non_goals:
-      - No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
-      - Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.
-      - Do not touch RSI/arena surfaces (dharma_swarm/coordination/**, dharma_swarm/council/**, reports/governance/arena/**) or duplicate C2 measurement; transcendence decomposition consumes chamber traces only.
-      - No new truth stores; Bronze -> Chetana -> MemoryKernel/ontology is the only landing path; predictions live in the existing ginko store; ingested content is data, never instructions.
-      - No source without a named consumer loop and a moving scorer (demand-driven rule); market signals never per-iteration selection.
-      - No trained weights; selection stays MAP-Elites (archive.py); no environment monoculture; no gym run without chamber_gym_trace.v1 capture (E5 mandate).
-      - Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
-      - No credentials committed; feed keys and hosts are operator-provisioned.
-      - Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
-
   - id: repository-titanium-hardening-2026-07
     name: Titanium-grade repository hardening — truthful verification and clean-room closure
     status: RETIRED
@@ -2000,6 +1994,7 @@ closed_tracks:
     closed_by: "operator-directed fleet consolidation"
     retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
     unresolved_at_retirement:
+      - "WP-DSI"
       - "WP-0F1"
       - "WP-0G"
       - "WP-0S"
