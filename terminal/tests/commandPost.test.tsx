@@ -80,7 +80,8 @@ describe("StatusFooter — the ONE status row (F-110/F-164)", () => {
     });
     const text = flattenText(footer);
     expect(text).toContain("● bridge");
-    expect(text.split("ready").length - 1).toBe(1);
+    expect(text.split("◇ SELECTABLE").length - 1).toBe(1);
+    expect(text).not.toContain("ready");
     expect(text).not.toContain("live");
   });
 

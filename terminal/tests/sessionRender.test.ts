@@ -6,6 +6,7 @@ import {
   compactSessionRoute,
   sessionContinuityLabel,
   sessionConversationLines,
+  sessionStatusGlyph,
 } from "../src/sessionRender.ts";
 import type {
   CanonicalEventEnvelope,
@@ -97,5 +98,10 @@ describe("compact session rendering", () => {
     expect(sessionContinuityLabel("resume", "session-1", "session-1")).toBe("resume armed");
     expect(sessionContinuityLabel("resume", "session-1", "session-2")).toBe("next fresh");
     expect(sessionContinuityLabel("fresh", undefined, "session-1")).toBe("next fresh");
+  });
+
+  test("renders terminal completion as succeeded rather than independently verified", () => {
+    expect(sessionStatusGlyph("completed")).toBe("■");
+    expect(sessionStatusGlyph("completed")).not.toBe("✓");
   });
 });

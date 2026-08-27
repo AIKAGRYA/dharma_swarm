@@ -94,7 +94,9 @@ export function paneActionsFor(
     case "sessions":
       return {
         refresh: {label: "refresh sessions", summary: "refresh session catalog", requestType: "session.catalog", payload: {limit: sessionCatalogLimit}},
-        primary: state.sessionPane.selectedSessionId
+        primary: state.bridgeStatus === "connected"
+          && state.authoritativeSurfaces.sessions
+          && state.sessionPane.selectedSessionId
           ? {
               label: "refresh detail",
               summary: "refresh selected session detail",
@@ -106,19 +108,20 @@ export function paneActionsFor(
         tertiary: {label: "/memory", summary: "run /memory", payload: {action_type: "command.run", command: "/memory"}},
       };
     case "approvals": {
+      const canResolve = state.bridgeStatus === "connected" && state.authoritativeSurfaces.approvals;
       const selectedEntry = state.approvalPane.selectedActionId
         ? state.approvalPane.entriesByActionId[state.approvalPane.selectedActionId]
         : undefined;
       const primary =
-        selectedEntry && selectedEntry.pending
+        canResolve && selectedEntry && selectedEntry.pending
           ? approvalResolveAction(selectedEntry, "approved", "approve")
-          : selectedEntry && selectedEntry.status === "observed"
+          : canResolve && selectedEntry && selectedEntry.status === "observed"
             ? approvalResolveAction(selectedEntry, "resolved", "mark resolved")
             : undefined;
       const secondary =
-        selectedEntry && selectedEntry.pending ? approvalResolveAction(selectedEntry, "denied", "deny") : undefined;
+        canResolve && selectedEntry && selectedEntry.pending ? approvalResolveAction(selectedEntry, "denied", "deny") : undefined;
       const tertiary =
-        selectedEntry && selectedEntry.pending
+        canResolve && selectedEntry && selectedEntry.pending
           ? approvalResolveAction(selectedEntry, "dismissed", "dismiss")
           : undefined;
       return {
@@ -164,12 +167,19 @@ export function footerHintFor(
   const parts = [state.footerHint, "↑/↓ scroll", `^L ${actions.refresh.label}`];
   if (tabId === "sessions") {
     parts.push("j/k or ↑/↓ select");
-    parts.push("Enter refresh detail");
-    parts.push("r arm resume");
+    if (state.bridgeStatus === "connected" && state.authoritativeSurfaces.sessions) {
+      parts.push("Enter refresh detail");
+      parts.push("r arm resume");
+    } else {
+      parts.push("detail/resume held pending fresh catalog");
+    }
     parts.push("f fresh");
   }
   if (tabId === "approvals") {
     parts.push("j/k or ↑/↓ select");
+    if (state.bridgeStatus !== "connected" || !state.authoritativeSurfaces.approvals) {
+      parts.push("resolution held pending owner history");
+    }
   }
   if (tabId === "models") {
     parts.push("j/k or ↑/↓ select route");

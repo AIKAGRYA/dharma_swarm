@@ -43,4 +43,15 @@ describe("formatTranscriptLine", () => {
     expect(formatted.segments[1]?.color).toBe("blue");
     expect(formatted.segments[3]?.color).toBe("blue");
   });
+
+  test("renders legacy executor completion as succeeded rather than independently verified", () => {
+    const formatted = formatTranscriptLine({
+      id: "legacy-tool-result",
+      kind: "tool",
+      text: "✓ shell: command completed",
+    });
+
+    expect(formatted.prefix?.text).toBe("■  ");
+    expect(formatted.prefix?.text).not.toContain("✓");
+  });
 });

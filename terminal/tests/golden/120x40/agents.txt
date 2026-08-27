@@ -1,24 +1,25 @@
- ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                                     120×40 · panorama
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ◆ DHARMA HELM  /  ACTIVITY  ·  dharma_swarm                                                          120×40 · panorama
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   ◆ Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
 ┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
 │ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
-│  Dharma Helm · Quiet Field                         ││ Agents                                 ││ correlated events ·… │
-│  Type a message below · F2 unfolds the Whole Helm  ││ route profiles and execution posture | ││                      │
-│                                                    ││  j/k or ↑/↓ select route               ││ ✖ ENOENT: no such f… │
-│                                                    ││                                        ││ ✖ bridge stdin is u… │
-│                                                    ││  Routes        Route brief             ││                      │
-│                                                    ││  typed         selected route plus     ││                      │
-│                                                    ││  routing       OpenClaw envelope       ││                      │
-│                                                    ││  intents       No selected route.      ││                      │
-│                                                    ││  No typed      OpenClaw                ││                      │
-│                                                    ││  agent         present n/a | readable  ││                      │
-│                                                    ││  routes yet.   n/a                     ││                      │
-│                                                    ││                agents n/a | providers  ││                      │
-│                                                    ││                n/a                     ││                      │
+│  Dharma Helm · Quiet Field                         ││ Agents                                 ││ owner-correlated fe… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ ?[?] UNKNOWN · agent-route owner       ││                      │
+│                                                    ││ projection absent                      ││ ✖ FAILED             │
+│                                                    ││                                        ││ bridge stdin is una… │
+│                                                    ││  Routes                                ││                      │
+│                                                    ││  typed routing intents                 ││                      │
+│                                                    ││  No current owner projection.          ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││  Route brief                           ││                      │
+│                                                    ││  selected route plus OpenClaw          ││                      │
+│                                                    ││  envelope                              ││                      │
+│                                                    ││  No selected route.                    ││                      │
+│                                                    ││  OpenClaw                              ││                      │
+│                                                    ││  owner projection absent               ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
@@ -30,8 +31,7 @@
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
-│                                                    ││                                        ││                      │
-│                                                    ││                                        ││ 2 canonical events … │
+│                                                    ││                                        ││ NO VERDICT · 1 evt   │
 └────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮

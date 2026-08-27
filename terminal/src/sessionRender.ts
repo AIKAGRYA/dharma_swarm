@@ -99,7 +99,7 @@ export function sessionConversationLines(
 export function sessionStatusGlyph(status: string): string {
   switch (status.trim().toLowerCase()) {
     case "completed":
-      return "✓";
+      return "■";
     case "running":
       return "…";
     case "cancelled":
