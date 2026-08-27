@@ -15,7 +15,11 @@ from pathlib import Path
 
 
 _RELEASE_ROOT_ENV = "DHARMA_RELEASE_ROOT"
-_ONLY_COMMAND = ("orchestrate-live",)
+_ORCHESTRATE_COMMAND = "orchestrate-live"
+_A2A_INBOX_BRIDGE_COMMAND = "a2a-inbox-bridge"
+_SUPPORTED_COMMANDS = frozenset(
+    {_ORCHESTRATE_COMMAND, _A2A_INBOX_BRIDGE_COMMAND}
+)
 
 
 def admit_release_root() -> Path:
@@ -39,17 +43,30 @@ def admit_release_root() -> Path:
     return release_root
 
 
-def main() -> None:
-    if tuple(sys.argv[1:]) != _ONLY_COMMAND:
+def main() -> int:
+    args = sys.argv[1:]
+    if not args or args[0] not in _SUPPORTED_COMMANDS:
         raise SystemExit(
-            "release entrypoint denied: only orchestrate-live is supported"
+            "release entrypoint denied: supported commands are orchestrate-live "
+            "and a2a-inbox-bridge"
+        )
+    command, command_args = args[0], args[1:]
+    if command == _ORCHESTRATE_COMMAND and command_args:
+        raise SystemExit(
+            "release entrypoint denied: orchestrate-live accepts no arguments"
         )
     admit_release_root()
 
-    from dharma_swarm.dgc_cli import main as dgc_main
+    if command == _ORCHESTRATE_COMMAND:
+        from dharma_swarm.dgc_cli import main as dgc_main
 
-    dgc_main()
+        dgc_main()
+        return 0
+
+    from scripts.runtime.a2a_inbox_bridge import main as bridge_main
+
+    return bridge_main(command_args)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

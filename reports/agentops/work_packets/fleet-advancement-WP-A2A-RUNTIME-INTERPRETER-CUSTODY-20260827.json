@@ -1,0 +1,113 @@
+{
+  "id": "fleet-advancement-WP-A2A-RUNTIME-INTERPRETER-CUSTODY-20260827",
+  "base_ref": "3498b3e0fb6f608ce55149143e10b076c148e94b",
+  "branch": "codex/a2a-bridge-interpreter-custody-20260827",
+  "worktree": ".",
+  "intent": "Put the A2A inbox bridge and its nats client under the same immutable release and copied-interpreter custody as the autonomous runtime, while preserving a closed command surface and treating bridge heartbeats as delivery observations rather than semantic standing.",
+  "allowed_files": [
+    "pyproject.toml",
+    "uv.lock",
+    "dharma_swarm/runtime_release_entrypoint.py",
+    "scripts/runtime/dharma_swarm_release_runner.sh",
+    "scripts/runtime/a2a_doctor.py",
+    "scripts/start_a2a_inbox_bridge_tmux.sh",
+    "tests/test_runtime_release_entrypoint.py",
+    "tests/test_runtime_release_runner.py",
+    "tests/test_a2a_doctor.py",
+    "tests/test_a2a_inbox_bridge_tmux_scripts.py",
+    "tests/test_a2a_runtime_dependency_contract.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-A2A-RUNTIME-INTERPRETER-CUSTODY-20260827.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "a2a-runtime-interpreter-custody-contracts",
+      "command": "python3 -m pytest -q tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_a2a_doctor.py tests/test_a2a_inbox_bridge_tmux_scripts.py tests/test_a2a_runtime_dependency_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "a2a-runtime-touched-python-ruff",
+      "command": "python3 -m ruff check dharma_swarm/runtime_release_entrypoint.py scripts/runtime/a2a_doctor.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_a2a_doctor.py tests/test_a2a_inbox_bridge_tmux_scripts.py tests/test_a2a_runtime_dependency_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check 3498b3e0fb6f608ce55149143e10b076c148e94b...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "mutable-uv-overlay-must-not-return",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('scripts/start_a2a_inbox_bridge_tmux.sh'); p.write_text(p.read_text() + '\\\\n# forbidden regression: uv run --with nats-py\\\\n'); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_a2a_inbox_bridge_tmux_scripts.py', '-k', 'locked_release_interpreter']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "ambient-release-root-must-not-be-admitted",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/runtime_release_entrypoint.py'); t=p.read_text(); a='    if release_root != package_root:'; a in t or sys.exit(3); p.write_text(t.replace(a, '    if False and release_root != package_root:', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_runtime_release_entrypoint.py', '-k', 'rejects_a_different_release_root']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "loose-nats-dependency-must-not-pass",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('pyproject.toml'); t=p.read_text(); a='nats-py==2.15.0'; a in t or sys.exit(3); p.write_text(t.replace(a, 'nats-py>=2.0', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_a2a_runtime_dependency_contract.py']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): lock A2A bridge interpreter custody"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-A2A-RUNTIME-INTERPRETER-CUSTODY-20260827",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "3498b3e0fb6f608ce55149143e10b076c148e94b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Four launchd bridge services currently execute through uv --with nats-py, so the Python child comes from a mutable uv build cache rather than the admitted release interpreter.",
+      "The immutable release runner currently dispatches only orchestrate-live. Bridge support must be a named closed command that can forward only bridge CLI arguments, never arbitrary modules or scripts.",
+      "The repository has no locked A2A runtime extra even though live bridge operation requires nats-py. The release build must sync one exact optional extra into its copied interpreter.",
+      "A2A bridge heartbeats and delivery receipts prove bounded transport handling only; they do not prove that a model read, understood, or answered a message."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/runtime_release_entrypoint.py",
+      "scripts/runtime/dharma_swarm_release_runner.sh",
+      "scripts/runtime/a2a_inbox_bridge.py",
+      "scripts/start_a2a_inbox_bridge_tmux.sh"
+    ],
+    "honest_blockers": [
+      "Repository tests and a locked dependency prove build-time custody, not a successful launchd cutover or live NATS delivery.",
+      "The six-service Mac cutover remains a separately receipted operator action after merge; the unsafe cc85 swarm must not be restarted as rollback.",
+      "The optional extra intentionally pins nats-py only. Other A2A tools that require websocket-specific dependencies remain responsible for their own explicit dependency checks.",
+      "No bridge heartbeat, durable-consumer state, or model reply is promoted into semantic truth or standing by this packet."
+    ],
+    "rollback": "Revert this pull request as one unit and restore bridge launchd plists to the last verified immutable runner configuration. If a live cutover has occurred, roll back bridge and cron services to cc85 only after stopping the new processes; never autonomously restart the quarantined cc85 swarm.",
+    "packet_digest": "a35073cc01e263d7f6c558cae240379079680f3b246275c80e895320ceaf70fd"
+  }
+}

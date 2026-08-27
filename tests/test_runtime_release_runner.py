@@ -32,7 +32,10 @@ def _fake_release(tmp_path: Path) -> tuple[Path, Path]:
     admission.parent.mkdir(parents=True)
     python.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s\\n' \"$*\" >> \"${RUNNER_CALL_LOG}\"\n",
+        "printf '%s\\n' \"$*\" >> \"$(dirname \"$0\")/../runner_calls.log\"\n"
+        "printf 'github=%s runtime=%s\\n' \"${GITHUB_TOKEN-<unset>}\" "
+        "\"${TEST_RUNTIME_ENV_LOADED-<unset>}\" >> "
+        "\"$(dirname \"$0\")/../runner_env.log\"\n",
         encoding="utf-8",
     )
     python.chmod(0o755)
@@ -68,19 +71,22 @@ def test_release_runner_uses_pinned_release_interpreter_and_guard() -> None:
     assert text.index("dharma_swarm/runtime_admission.py") < text.index(
         "dharma_swarm.runtime_release_entrypoint orchestrate-live"
     )
+    assert "a2a-inbox-bridge" in text
+    assert "bridge_env=(" in text
+    assert "env -i" in text
+    assert "uv run" not in text
     assert "/Users/dhyana/dharma_swarm/.venv" not in text
     assert "/Users/dhyana/dharma_swarm/.env" not in text
 
 
 def test_release_runner_executes_guard_before_live_command(tmp_path: Path) -> None:
     release, _python = _fake_release(tmp_path)
-    call_log = tmp_path / "calls.log"
+    call_log = release / ".venv" / "runner_calls.log"
     environment = os.environ.copy()
     environment.update(
         {
             "DHARMA_RELEASE_ROOT": str(release),
             "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
-            "RUNNER_CALL_LOG": str(call_log),
         }
     )
 
@@ -117,6 +123,79 @@ def test_release_runner_executes_guard_before_live_command(tmp_path: Path) -> No
             f"--repo {release} --expected-commit {PIN}"
         )
     ]
+
+
+def test_release_runner_dispatches_bridge_through_the_same_interpreter(
+    tmp_path: Path,
+) -> None:
+    release, _python = _fake_release(tmp_path)
+    call_log = release / ".venv" / "runner_calls.log"
+    env_log = release / ".venv" / "runner_env.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+            "GITHUB_TOKEN": "must-not-reach-bridge",
+        }
+    )
+
+    result = subprocess.run(
+        [
+            "/bin/bash",
+            str(RUNNER),
+            "a2a-inbox-bridge",
+            "--agent-uid",
+            "codex_composer",
+            "--consumer",
+            "codex_composer_inbox",
+        ],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
+        (
+            f"-B -I -S {release}/dharma_swarm/runtime_admission.py "
+            f"--repo {release} --expected-commit {PIN}"
+        ),
+        (
+            "-B -I -m dharma_swarm.runtime_release_entrypoint "
+            "a2a-inbox-bridge --agent-uid codex_composer "
+            "--consumer codex_composer_inbox"
+        ),
+    ]
+    assert env_log.read_text(encoding="utf-8").splitlines() == [
+        "github=must-not-reach-bridge runtime=<unset>",
+        "github=<unset> runtime=<unset>",
+    ]
+
+
+def test_release_runner_rejects_unknown_command_before_python(tmp_path: Path) -> None:
+    release, _python = _fake_release(tmp_path)
+    call_log = release / ".venv" / "runner_calls.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+        }
+    )
+
+    result = subprocess.run(
+        ["/bin/bash", str(RUNNER), "python", "-m", "arbitrary.module"],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 78
+    assert "unsupported command" in result.stderr
+    assert not call_log.exists()
 
 
 def test_release_runner_rejects_interpreter_from_another_checkout(
@@ -328,13 +407,12 @@ def test_release_runner_accepts_interpreter_symlinked_within_release(
     real = python.parent / "python3"
     python.rename(real)
     python.symlink_to(real.name)
-    call_log = tmp_path / "calls.log"
+    call_log = release / ".venv" / "runner_calls.log"
     environment = os.environ.copy()
     environment.update(
         {
             "DHARMA_RELEASE_ROOT": str(release),
             "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
-            "RUNNER_CALL_LOG": str(call_log),
         }
     )
 
