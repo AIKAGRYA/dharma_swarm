@@ -19,13 +19,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from dharma_swarm.opportunity_dispatcher import (
     OPPORTUNITY_STAGES,
@@ -39,6 +40,18 @@ logger = logging.getLogger(__name__)
 
 RESEARCH_BACKEND_ENV = "DHARMA_RESEARCH_BACKEND"
 QUARANTINE_MARKER = "__quarantined__"
+_OPPORTUNITY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+_CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _canonical_opportunity_id(value: str) -> str:
+    """Return an opportunity id that is safe as one path component."""
+    if not isinstance(value, str) or _CONTROL_CHARACTER_RE.search(value):
+        raise ValueError("opportunity id contains a control character")
+    component = re.sub(r"[^A-Za-z0-9_.-]", "", value)
+    if component != value or not _OPPORTUNITY_ID_RE.fullmatch(component):
+        raise ValueError("opportunity id is not a canonical path component")
+    return component
 
 
 class OpportunityRow(BaseModel):
@@ -53,6 +66,12 @@ class OpportunityRow(BaseModel):
     timeout_seconds: float = 600.0
     stale_after_seconds: float = 900.0
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: str) -> str:
+        """Reject traversal and control characters at the API model boundary."""
+        return _canonical_opportunity_id(value)
 
 
 class StageResult(BaseModel):
@@ -108,7 +127,10 @@ class OpportunityRefill:
         )
         if self._runtime_state is None:
             self._runtime_state = getattr(self._dispatcher, "_store", None)
-        self._output_dir = output_dir or (dharma_state_dir() / "revenue_packets")
+        configured_output_dir = output_dir or (dharma_state_dir() / "revenue_packets")
+        self._output_dir = Path(
+            os.path.realpath(os.fspath(configured_output_dir.expanduser()))
+        )
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
     def refill(self, row: OpportunityRow) -> RefillResult:
@@ -322,11 +344,22 @@ class OpportunityRefill:
         result: RefillResult,
     ) -> Path:
         """Write a revenue_packet.md summarizing the completed opportunity."""
-        packet_path = self._output_dir / f"revenue_packet_{row.id}.md"
+        safe_id = _canonical_opportunity_id(row.id)
+        packet_value = os.path.realpath(
+            os.path.join(
+                os.fspath(self._output_dir),
+                f"revenue_packet_{safe_id}.md",
+            )
+        )
+        output_root = os.fspath(self._output_dir)
+        root_prefix = output_root if output_root.endswith(os.sep) else output_root + os.sep
+        if not packet_value.startswith(root_prefix):
+            raise ValueError("revenue packet path escapes the output directory")
+        packet_path = Path(packet_value)
         lines = [
             f"# Revenue Packet: {row.title}",
             "",
-            f"**Opportunity ID:** {row.id}",
+            f"**Opportunity ID:** {safe_id}",
             f"**Type:** {row.type}",
             f"**Source:** {row.source}",
             f"**Estimated Value:** ${row.estimated_value_usd:.2f}",
@@ -353,7 +386,8 @@ class OpportunityRefill:
         ])
 
         packet_path.write_text("\n".join(lines), encoding="utf-8")
-        logger.info("Revenue packet written to %s", packet_path)
+        # Keep user-controlled identifiers and paths out of the log record.
+        logger.info("Revenue packet written")
         return packet_path
 
 
