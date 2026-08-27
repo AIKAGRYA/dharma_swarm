@@ -300,6 +300,82 @@ def _validated_public_collection(
     return result
 
 
+def _index_public_views(
+    values: list[dict[str, Any]],
+    *,
+    identity_field: str,
+    view_name: str,
+) -> dict[str, dict[str, Any]]:
+    """Build one unambiguous canonical identity index for a public collection."""
+    result: dict[str, dict[str, Any]] = {}
+    for value in values:
+        identity = value[identity_field]
+        if not identity or any(char.isspace() for char in identity):
+            raise ValueError(f"mission snapshot {view_name} identity is not canonical")
+        if identity in result:
+            raise ValueError(f"mission snapshot {view_name} identity is duplicated")
+        result[identity] = value
+    return result
+
+
+def _validate_snapshot_lineage(
+    *,
+    tasks: list[dict[str, Any]],
+    attempts: list[dict[str, Any]],
+    leases: list[dict[str, Any]],
+    receipts: list[dict[str, Any]],
+    reconciliation: str,
+) -> None:
+    """Require a closed joined graph whenever the provider claims coherence."""
+    task_by_id = _index_public_views(
+        tasks, identity_field="task_id", view_name="task"
+    )
+    attempt_by_id = _index_public_views(
+        attempts, identity_field="attempt_id", view_name="attempt"
+    )
+    lease_by_claim = _index_public_views(
+        leases, identity_field="claim_id", view_name="lease"
+    )
+    _index_public_views(receipts, identity_field="receipt_id", view_name="receipt")
+    if reconciliation != ReconciliationState.COHERENT.value:
+        return
+
+    for attempt in attempts:
+        lease = lease_by_claim.get(attempt["claim_id"])
+        if (
+            attempt["task_id"] not in task_by_id
+            or not attempt["assigned_to"]
+            or lease is None
+            or lease["attempt_id"] != attempt["attempt_id"]
+            or lease["task_id"] != attempt["task_id"]
+            or lease["agent_id"] != attempt["assigned_to"]
+        ):
+            raise ValueError("coherent mission snapshot has orphaned attempt lineage")
+    for lease in leases:
+        attempt = attempt_by_id.get(lease["attempt_id"])
+        if (
+            lease["task_id"] not in task_by_id
+            or not lease["agent_id"]
+            or attempt is None
+            or attempt["claim_id"] != lease["claim_id"]
+            or attempt["task_id"] != lease["task_id"]
+            or attempt["assigned_to"] != lease["agent_id"]
+        ):
+            raise ValueError("coherent mission snapshot has orphaned lease lineage")
+    for receipt in receipts:
+        attempt = attempt_by_id.get(receipt["attempt_id"])
+        lease = lease_by_claim.get(attempt["claim_id"]) if attempt else None
+        if (
+            receipt["task_id"] not in task_by_id
+            or not receipt["agent_id"]
+            or attempt is None
+            or lease is None
+            or receipt["task_id"] != attempt["task_id"]
+            or receipt["agent_id"] != attempt["assigned_to"]
+        ):
+            raise ValueError("coherent mission snapshot has orphaned receipt lineage")
+
+
 def _validated_iso_timestamp(value: Any, *, field: str) -> str:
     """Require an unambiguous ISO timestamp at a snapshot time boundary."""
     if not isinstance(value, str):
@@ -421,6 +497,13 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         raise TypeError("mission snapshot reconciliation must be a string")
     if reconciliation not in _RECONCILIATION_STATES:
         raise ValueError("mission snapshot reconciliation is not canonical")
+    _validate_snapshot_lineage(
+        tasks=tasks,
+        attempts=attempts,
+        leases=leases,
+        receipts=receipts,
+        reconciliation=reconciliation,
+    )
     observed_at = _validated_iso_timestamp(
         projected.get("observed_at"),
         field="observed_at",

@@ -412,6 +412,58 @@ def test_malformed_nested_timestamp_fails_closed(view: str, field: str) -> None:
     assert body["source_errors"][0]["error"] == "read failed (ValueError)"
 
 
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["attempts"][0].update(task_id="missing-task"),
+        lambda value: value["attempts"][0].update(claim_id="missing-claim"),
+        lambda value: value["leases"][0].update(task_id="missing-task"),
+        lambda value: value["leases"][0].update(attempt_id="missing-attempt"),
+        lambda value: value["leases"][0].update(agent_id="another-agent"),
+        lambda value: value["receipts"][0].update(task_id="missing-task"),
+        lambda value: value["receipts"][0].update(attempt_id="missing-attempt"),
+        lambda value: value["receipts"][0].update(agent_id="another-agent"),
+        lambda value: value["tasks"].append(dict(value["tasks"][0])),
+    ],
+)
+def test_coherent_snapshot_with_open_or_ambiguous_lineage_fails_closed(
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    mutate(value)
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
+def test_named_noncoherent_snapshot_preserves_orphan_evidence_for_action() -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    value["attempts"] = []
+    value["receipts"] = []
+    value["leases"][0]["attempt_id"] = "missing-attempt"
+    value["reconciliation"] = "active_claim_without_run"
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_errors"] == []
+    assert body["data"]["state"] == "observed"
+    assert body["data"]["snapshot"]["reconciliation"] == "active_claim_without_run"
+    assert body["data"]["snapshot"]["leases"][0]["attempt_id"] == "missing-attempt"
+
+
 def test_sync_provider_is_offloaded_while_event_loop_remains_live() -> None:
     mission_id = "fleet-advancement-20260826"
     started = threading.Event()
