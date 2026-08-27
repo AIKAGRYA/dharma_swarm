@@ -45,6 +45,59 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _trusted_import_roots(repo: Path) -> tuple[tuple[str, ...], bool]:
+    """Build a child import path without inheriting caller-controlled entries.
+
+    Ordinary virtualenvs carry their dependencies in site-packages and need
+    only the authenticated repository root. RSI Lab releases deliberately keep
+    portable dependencies behind ``<release>/pydeps``. Admit that second root
+    only when the official launcher names the physical release, the source is
+    its exact ``repo`` directory, and the release symlink resolves to the
+    lab-owned ``runtime/pydeps`` anchor.
+    """
+
+    try:
+        source = repo.expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise TaskpackError(
+            "RUNTIME_IMPORT_ROOT_UNSAFE", "execution source is unavailable"
+        ) from exc
+
+    base_text = os.environ.get("RSI_LAB_BASE", "").strip()
+    pydeps_text = os.environ.get("RSI_LAB_PYDEPS", "").strip()
+    if not base_text and not pydeps_text:
+        return (str(source),), False
+    if not base_text or not pydeps_text:
+        raise TaskpackError(
+            "RUNTIME_IMPORT_ROOT_UNSAFE",
+            "release dependency authority is incomplete",
+        )
+
+    try:
+        base = Path(base_text).expanduser().resolve(strict=True)
+        expected_source = (base / "repo").resolve(strict=True)
+        configured_pydeps = Path(
+            os.path.abspath(str(Path(pydeps_text).expanduser()))
+        )
+        release_pydeps = base / "pydeps"
+        runtime_pydeps = base.parent.parent / "runtime" / "pydeps"
+        if source != expected_source:
+            raise ValueError("source does not match RSI_LAB_BASE")
+        if configured_pydeps != release_pydeps or not release_pydeps.is_symlink():
+            raise ValueError("pydeps is not the release-owned anchor")
+        if not runtime_pydeps.is_dir() or not release_pydeps.is_dir():
+            raise ValueError("runtime dependency anchor is unavailable")
+        if release_pydeps.resolve(strict=True) != runtime_pydeps.resolve(strict=True):
+            raise ValueError("release dependency anchor differs from runtime authority")
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise TaskpackError(
+            "RUNTIME_IMPORT_ROOT_UNSAFE",
+            "release dependency authority failed validation",
+        ) from exc
+
+    return (str(source), str(release_pydeps)), True
+
+
 def _redact(value: Any, secrets: set[str] | None = None) -> Any:
     secrets = (
         secrets
@@ -257,6 +310,9 @@ def apply_taskpack_impl(
     fresh = _fresh_plan(claimed, plan_builder)
     if fresh != claimed:
         raise TaskpackError("PLAN_STALE", "plan no longer matches current bytes/source")
+    import_roots, runtime_pydeps_admitted = _trusted_import_roots(
+        Path(fresh["execution_source"]["repo"])
+    )
 
     root = _action_root()
     action_path = root / f"{request_id}.json"
@@ -322,7 +378,7 @@ def apply_taskpack_impl(
                     f"{Path(executable).resolve().parent}:"
                     "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
                 ),
-                "PYTHONPATH": fresh["execution_source"]["repo"],
+                "PYTHONPATH": os.pathsep.join(import_roots),
                 "PYTHONDONTWRITEBYTECODE": "1",
                 "PYTHONNOUSERSITE": "1",
             }
@@ -398,6 +454,11 @@ def apply_taskpack_impl(
             "execution_source": fresh["execution_source"],
             "importer": fresh["importer"],
             "importer_argv_digest": content_digest(fresh["importer_argv"]),
+            "importer_environment": {
+                "inherited_pythonpath": False,
+                "pythonpath_digest": content_digest(import_roots),
+                "runtime_pydeps_admitted": runtime_pydeps_admitted,
+            },
             "importer_returncode": returncode,
             "importer_result": _redact(result),
             "stderr": _redact(stderr),

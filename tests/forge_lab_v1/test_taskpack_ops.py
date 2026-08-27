@@ -47,6 +47,10 @@ def _search_row(instance_id: str = "django__django-123") -> dict[str, Any]:
 
 @pytest.fixture
 def admitted_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # Unit fixtures must not inherit an enclosing immutable-release identity.
+    # The dedicated runtime-anchor test below installs its own exact authority.
+    monkeypatch.delenv("RSI_LAB_BASE", raising=False)
+    monkeypatch.delenv("RSI_LAB_PYDEPS", raising=False)
     repo = tmp_path / "release" / ("a" * 40) / "repo"
     importer = repo / "scripts/runtime/forge_fresh_task_oracle.py"
     importer.parent.mkdir(parents=True)
@@ -566,6 +570,80 @@ def test_apply_revalidates_runs_owned_importer_redacts_and_is_idempotent(
     assert receipt["importer_result"]["diagnostic"].endswith("[REDACTED_SECRET]")
     assert receipt["importer_result"]["api_key"] == "[REDACTED_SECRET]"
     assert receipt["action_digest"].startswith("sha256:")
+    assert receipt["importer_environment"] == {
+        "inherited_pythonpath": False,
+        "pythonpath_digest": taskpack_apply.content_digest((str(admitted_source),)),
+        "runtime_pydeps_admitted": False,
+    }
+
+
+def test_apply_admits_only_release_owned_runtime_pydeps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    admitted_source: Path,
+) -> None:
+    plan = _plan(tmp_path, monkeypatch, admitted_source)
+    release = admitted_source.parent
+    runtime_pydeps = release.parent.parent / "runtime" / "pydeps"
+    runtime_pydeps.mkdir(parents=True)
+    release_pydeps = release / "pydeps"
+    release_pydeps.symlink_to(runtime_pydeps, target_is_directory=True)
+    monkeypatch.setenv("RSI_LAB_BASE", str(release))
+    monkeypatch.setenv("RSI_LAB_PYDEPS", str(release_pydeps))
+    monkeypatch.setenv("PYTHONPATH", "/attacker/controlled")
+    calls: list[dict[str, Any]] = []
+
+    def _run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append({"argv": argv, **kwargs})
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=_importer_summary(plan), stderr=""
+        )
+
+    monkeypatch.setattr(taskpack_ops.subprocess, "run", _run)
+    applied = taskpack_ops.apply_taskpack(
+        plan,
+        plan_digest=plan["plan_digest"],
+        request_id="release-pydeps-e2e",
+    )
+
+    expected_roots = (str(admitted_source.resolve()), str(release_pydeps))
+    assert calls[0]["env"]["PYTHONPATH"] == ":".join(expected_roots)
+    assert "/attacker/controlled" not in json.dumps(calls[0]["env"])
+    assert applied["receipt"]["importer_environment"] == {
+        "inherited_pythonpath": False,
+        "pythonpath_digest": taskpack_apply.content_digest(expected_roots),
+        "runtime_pydeps_admitted": True,
+    }
+
+
+@pytest.mark.parametrize("failure", ["missing_base", "wrong_target"])
+def test_apply_rejects_unowned_runtime_pydeps_before_intent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    admitted_source: Path,
+    failure: str,
+) -> None:
+    plan = _plan(tmp_path, monkeypatch, admitted_source)
+    release = admitted_source.parent
+    runtime_pydeps = release.parent.parent / "runtime" / "pydeps"
+    runtime_pydeps.mkdir(parents=True)
+    release_pydeps = release / "pydeps"
+    target = runtime_pydeps if failure == "missing_base" else tmp_path / "attacker"
+    target.mkdir(exist_ok=True)
+    release_pydeps.symlink_to(target, target_is_directory=True)
+    if failure != "missing_base":
+        monkeypatch.setenv("RSI_LAB_BASE", str(release))
+    monkeypatch.setenv("RSI_LAB_PYDEPS", str(release_pydeps))
+
+    with pytest.raises(taskpack_ops.TaskpackError) as error:
+        taskpack_ops.apply_taskpack(
+            plan,
+            plan_digest=plan["plan_digest"],
+            request_id=f"unsafe-pydeps-{failure}",
+        )
+
+    assert error.value.code == "RUNTIME_IMPORT_ROOT_UNSAFE"
+    assert not (tmp_path / "state/forge_lab/taskpack_actions").exists()
 
 
 def test_apply_search_receipt_keeps_never_confirm_custody(
