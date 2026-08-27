@@ -162,6 +162,22 @@ active_tracks:
       - dashboard/src/components/cockpit/**
       - dashboard/src/components/operator-coherence/v2/**
       - terminal/**
+      - dharma_swarm/terminal_commands/surfaces.py
+      - dharma_swarm/runtime_activity.py
+      - dharma_swarm/operator_views.py
+      - dharma_swarm/runtime_graph_views.py
+      - dharma_swarm/runtime_platform_views.py
+      - dharma_swarm/runtime_agent_server_views.py
+      - dharma_swarm/operator_core/adapters.py
+      - dharma_swarm/terminal_bridge.py
+      - dharma_swarm/tui_helpers.py
+      - tests/test_terminal_surfaces.py
+      - tests/test_routing_surface_inventory.py
+      - tests/test_runtime_activity.py
+      - tests/test_operator_views.py
+      - tests/test_runtime_graph_api.py
+      - tests/test_operator_core_adapters.py
+      - tests/test_tui_helpers.py
       - docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md
       - specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
     moves_vital_signs:
