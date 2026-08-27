@@ -253,7 +253,9 @@ def test_admission_requires_halt_absent_exact_state_and_two_routes(
 ) -> None:
     state = tmp_path / "state"
     state.mkdir()
-    monkeypatch.setenv("RSI_LAB_STATE", str(state))
+    logical_state = tmp_path / "state-current"
+    logical_state.symlink_to(state, target_is_directory=True)
+    monkeypatch.setenv("RSI_LAB_STATE", str(logical_state))
     monkeypatch.setattr(
         unattended,
         "require_execution_source",
@@ -632,6 +634,8 @@ def test_unattended_wrapper_and_systemd_timer_are_bounded() -> None:
     timer = (root / "systemd" / "rsi-lab-explore.timer").read_text()
 
     assert "RSI_LAB_DEV_SOURCE is forbidden" in wrapper
+    assert 'state="$(cd -- "${state}" && pwd -P)"' in wrapper
+    assert 'export RSI_LAB_PYDEPS="${pydeps}"' in wrapper
     assert '--state-root "${state}"' in wrapper
     assert "Type=oneshot" in service
     assert "TimeoutStartSec=2800" in service

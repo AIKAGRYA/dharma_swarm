@@ -317,7 +317,15 @@ def admission_status(state_root: Path) -> dict[str, Any]:
     if os.environ.get("RSI_LAB_DEV_SOURCE") == "1":
         reasons.append("development_source_forbidden")
     configured_state = os.environ.get("RSI_LAB_STATE", "").strip()
-    if not configured_state or Path(configured_state).expanduser() != state_root:
+    try:
+        configured_state_root = (
+            Path(configured_state).expanduser().resolve(strict=True)
+            if configured_state
+            else None
+        )
+    except OSError:
+        configured_state_root = None
+    if configured_state_root != state_root:
         reasons.append("explicit_state_root_not_anchored")
     try:
         source = require_execution_source()
