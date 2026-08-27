@@ -66,3 +66,17 @@ def test_control_surface_projects_semantic_receipt_cards(tmp_path, monkeypatch):
     assert card["render_hints"]["lane_hint"] == "semantic_receipts"
     assert "provider: ollama" in card["body"]
     assert card["receipt_refs"][0]["kind"] == "semantic_receipt"
+
+
+def test_control_surface_reads_live_semantic_receipts_from_runtime_state() -> None:
+    import api.routers.control_surface as control_surface_router
+
+    assert control_surface_router._SEMANTIC_RECEIPT_ROOT.is_relative_to(
+        control_surface_router._SEMANTIC_RESPONDER_STATE_ROOT
+    )
+    assert control_surface_router._A2A_DOMAIN_REPLY_RECEIPT_ROOT.is_relative_to(
+        control_surface_router._SEMANTIC_RESPONDER_STATE_ROOT
+    )
+    assert not control_surface_router._SEMANTIC_RECEIPT_ROOT.is_relative_to(
+        control_surface_router._REPO_ROOT
+    )

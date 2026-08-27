@@ -19,14 +19,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.runtime.a2a_domain_reply_artifact import (  # noqa: E402
-    DEFAULT_ARTIFACT_RECEIPT_DIR,
     artifact_path_for,
     build_domain_reply_artifact,
     write_artifact_author_receipt,
 )
 from scripts.runtime.a2a_domain_reply_worker import DEFAULT_OUTBOX_ROOT  # noqa: E402
-from scripts.runtime.model_critic_runner import DEFAULT_OUT_DIR as DEFAULT_SEMANTIC_RECEIPT_DIR  # noqa: E402
-from scripts.runtime.model_critic_runner import run_model_critic  # noqa: E402
+from scripts.runtime.model_critic_runner import (  # noqa: E402
+    DEFAULT_OUT_DIR as DEFAULT_SEMANTIC_RECEIPT_DIR,
+    DEFAULT_SEMANTIC_RESPONDER_STATE_DIR,
+    run_model_critic,
+)
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
 from dharma_swarm.models import ProviderType  # noqa: E402
 from dharma_swarm.runtime_provider import (  # noqa: E402
@@ -35,7 +37,12 @@ from dharma_swarm.runtime_provider import (  # noqa: E402
     resolve_runtime_provider_config,
 )
 
-DEFAULT_DRAIN_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "semantic_inbox_drains"
+DEFAULT_ARTIFACT_RECEIPT_DIR = (
+    DEFAULT_SEMANTIC_RESPONDER_STATE_DIR / "domain_reply_artifacts"
+)
+DEFAULT_DRAIN_RECEIPT_DIR = (
+    DEFAULT_SEMANTIC_RESPONDER_STATE_DIR / "semantic_inbox_drains"
+)
 DEFAULT_AGENT_UID = "codex_composer"
 LEGACY_SCHEMA_VERSION = "dharma.a2a.codex_composer_semantic_inbox_drain.v1"
 GENERIC_SCHEMA_VERSION = "dharma.a2a.semantic_inbox_drain.v1"

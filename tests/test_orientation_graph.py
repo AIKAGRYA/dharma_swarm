@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -159,6 +160,133 @@ def test_custody_counts_registered_canon():
     custody = og.build_custody()
     assert custody.registered_total > 0
     assert custody.present + len(custody.missing) == custody.registered_total
+
+
+def _write_census_receipt(
+    path: Path,
+    *,
+    generated_at: str,
+    status: str = "live",
+) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "generated_at": generated_at,
+                "surfaces": [
+                    {
+                        "id": "agent.example",
+                        "label": "Example agent",
+                        "status": status,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _current_probe(observation: str) -> dict[str, object]:
+    return {
+        "generated_at": "2026-08-13T12:00:00Z",
+        "surfaces": [
+            {
+                "id": "agent.example",
+                "label": "Example agent",
+                "status": observation,
+                "observation": observation,
+                "process_observation": (
+                    "positive"
+                    if observation == "live"
+                    else "negative"
+                    if observation == "stopped"
+                    else "unavailable"
+                ),
+                "port_observation": "not_applicable",
+            }
+        ],
+    }
+
+
+def test_liveness_stale_saved_live_is_not_promoted(monkeypatch, tmp_path: Path):
+    receipt = tmp_path / "live_process_census.json"
+    _write_census_receipt(
+        receipt,
+        generated_at="2026-08-13T09:59:59Z",
+        status="live",
+    )
+    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
+    monkeypatch.setattr(og, "_current_liveness_payload", lambda: _current_probe("unknown"))
+
+    result = og.build_liveness(now=datetime(2026, 8, 13, 12, 0, tzinfo=timezone.utc))
+
+    assert result.receipt_freshness == "stale"
+    assert result.receipt_age_seconds == 7201.0
+    assert result.surfaces == [
+        {
+            "id": "agent.example",
+            "label": "Example agent",
+            "status": "stale",
+            "receipt_status": "live",
+            "observation": "unknown",
+            "process_observation": "unavailable",
+            "port_observation": "not_applicable",
+        }
+    ]
+
+
+def test_liveness_fresh_positive_probe_reports_live(monkeypatch, tmp_path: Path):
+    receipt = tmp_path / "live_process_census.json"
+    _write_census_receipt(
+        receipt,
+        generated_at="2026-08-13T11:59:00Z",
+        status="stopped",
+    )
+    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
+    monkeypatch.setattr(og, "_current_liveness_payload", lambda: _current_probe("live"))
+
+    result = og.build_liveness(now=datetime(2026, 8, 13, 12, 0, tzinfo=timezone.utc))
+
+    assert result.receipt_freshness == "fresh"
+    assert result.observed_at == "2026-08-13T12:00:00Z"
+    assert result.surfaces[0]["status"] == "live"
+    assert result.surfaces[0]["receipt_status"] == "stopped"
+
+
+def test_liveness_current_negative_probe_reports_stopped(monkeypatch, tmp_path: Path):
+    receipt = tmp_path / "live_process_census.json"
+    _write_census_receipt(
+        receipt,
+        generated_at="2026-08-13T11:59:00Z",
+        status="live",
+    )
+    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
+    monkeypatch.setattr(og, "_current_liveness_payload", lambda: _current_probe("stopped"))
+
+    result = og.build_liveness(now=datetime(2026, 8, 13, 12, 0, tzinfo=timezone.utc))
+
+    assert result.surfaces[0]["status"] == "stopped"
+    assert result.surfaces[0]["receipt_status"] == "live"
+
+
+def test_liveness_unknown_probe_never_inherits_fresh_saved_live(
+    monkeypatch,
+    tmp_path: Path,
+):
+    receipt = tmp_path / "live_process_census.json"
+    _write_census_receipt(
+        receipt,
+        generated_at="2026-08-13T10:00:00Z",
+        status="live",
+    )
+    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
+    monkeypatch.setattr(og, "_current_liveness_payload", lambda: _current_probe("unknown"))
+
+    result = og.build_liveness(now=datetime(2026, 8, 13, 12, 0, tzinfo=timezone.utc))
+
+    assert result.receipt_age_seconds == og.CENSUS_RECEIPT_FRESH_AFTER_SECONDS
+    assert result.receipt_freshness == "fresh"
+    assert result.surfaces[0]["status"] == "unknown"
+    assert result.surfaces[0]["receipt_status"] == "live"
 
 
 def test_orientation_graph_render_is_read_only(tmp_path):

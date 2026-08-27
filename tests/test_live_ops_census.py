@@ -83,6 +83,8 @@ def test_live_ops_census_folds_in_canonical_sources(tmp_path: Path) -> None:
 
     surfaces = {surface["id"]: surface for surface in payload["surfaces"]}
     assert surfaces["substrate.dharma_daemon"]["status"] == "live"
+    assert surfaces["substrate.dharma_daemon"]["human_authority_required"] is True
+    assert "issue #1246" in surfaces["substrate.dharma_daemon"]["next_action"]
     assert surfaces["transport.nats"]["status"] == "live"
     assert surfaces["evidence.a2a_mirrors"]["status"] == "live"
     assert surfaces["evidence.a2a_mirrors"]["desired_state"] == "evidence-mirror-not-authority"
@@ -116,9 +118,12 @@ def test_live_ops_census_surface_contract_is_complete(tmp_path: Path) -> None:
         "human_authority_required",
         "vps_candidate",
         "raw",
+        "observation",
+        "process_observation",
+        "port_observation",
     }
 
-    assert payload["summary"]["total"] == len(surfaces) == 15
+    assert payload["summary"]["total"] == len(surfaces) == 16
     for surface in surfaces:
         assert required <= set(surface)
         assert isinstance(surface["evidence"], list)
@@ -135,12 +140,79 @@ def test_live_ops_census_surface_contract_is_complete(tmp_path: Path) -> None:
         if surface["human_authority_required"]
     }
     assert {
+        "substrate.dharma_daemon",
         "revenue.cashclaw_gate",
         "remote.agni",
         "agent.merge_master_mike",
         "load.colima_openclaw",
     } <= human_authority_ids
     assert payload["summary"]["human_authority_required"] == len(human_authority_ids)
+
+
+def test_probe_observation_distinguishes_positive_negative_and_unavailable(
+    monkeypatch,
+) -> None:
+    def fake_run(args: list[str], **_kwargs):
+        pattern = args[-1]
+        if pattern == live_ops_census.PROCESS_PATTERNS["dharma_cron"]:
+            return 1, ""
+        if pattern == live_ops_census.PROCESS_PATTERNS["terminal_tui"]:
+            return 0, "4321 python terminal_tui_interaction.py"
+        return 127, "pgrep unavailable"
+
+    monkeypatch.setattr(live_ops_census, "_run", fake_run)
+
+    processes = live_ops_census._process_snapshot(run_probes=True)
+
+    assert live_ops_census._process_observation("dharma_cron", processes) == "negative"
+    assert live_ops_census._process_observation("terminal_tui", processes) == "positive"
+    assert live_ops_census._process_observation("merge_master_mike", processes) == "unavailable"
+
+
+def test_process_or_port_status_requires_current_probe_evidence() -> None:
+    assert (
+        live_ops_census._live_if_process_or_port(
+            "dharma_cron",
+            {"dharma_cron": []},
+            {},
+        )
+        == "stopped"
+    )
+    assert (
+        live_ops_census._live_if_process_or_port(
+            "dharma_cron",
+            {},
+            {},
+        )
+        == "unknown"
+    )
+    assert (
+        live_ops_census._live_if_process_or_port(
+            "dharma_cron",
+            {"dharma_cron": [{"pid": "99", "command": "cron daemon"}]},
+            {},
+        )
+        == "live"
+    )
+
+
+def test_launchd_crash_loop_is_current_stopped_evidence(monkeypatch) -> None:
+    monkeypatch.setattr(
+        live_ops_census,
+        "_run",
+        lambda *_args, **_kwargs: (
+            0,
+            "state = not running\nruns = 13648\nlast exit code = 2",
+        ),
+    )
+
+    result = live_ops_census._launchd_observation(
+        "com.dharma.fugu-ultra-semantic-responder",
+        run_probes=True,
+    )
+
+    assert result["observation"] == "stopped"
+    assert "last exit code = 2" in result["evidence"]
 
 
 def test_live_ops_census_projects_into_control_surface_rows(tmp_path: Path) -> None:
@@ -385,7 +457,7 @@ def test_live_ops_census_has_no_process_control_api_calls() -> None:
 
 def test_live_ops_census_only_uses_read_only_probe_commands_static() -> None:
     tree = ast.parse((REPO_ROOT / "scripts/runtime/live_ops_census.py").read_text())
-    allowed = {"git", "pgrep", "lsof", "tmux"}
+    allowed = {"git", "launchctl", "pgrep", "lsof", "tmux"}
     observed: set[str] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -416,7 +488,7 @@ def test_live_ops_census_does_not_execute_displayed_policy_commands(monkeypatch,
         run_probes=True,
     )
 
-    allowed = {"git", "pgrep", "lsof", "tmux"}
+    allowed = {"git", "launchctl", "pgrep", "lsof", "tmux"}
     observed = {call[0] for call in calls}
     display_first_words = {
         str(surface.get("restart_command", "")).split()[0]

@@ -120,6 +120,9 @@ reports/model_routing/e2e/
 
 # Runtime receipts are loop-generated artifacts, not source.
 reports/a2a/*_receipts/
+reports/a2a/domain_reply_artifacts/
+reports/a2a/semantic_inbox_drains/
+reports/agentops/semantic_receipts/
 reports/model_*/e2e/
 reports/model_pool/
 

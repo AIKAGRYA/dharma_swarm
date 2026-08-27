@@ -1,0 +1,99 @@
+{
+  "id": "runtime-truth-receipt-custody-WP-RTRC1",
+  "base_ref": "1366d819ceb321424c3b059f9243644df4d77d52",
+  "branch": "agent/runtime-truth-receipt-custody-20260813",
+  "worktree": ".",
+  "intent": "Make whole-organism orientation fail closed on stale liveness receipts while projecting fresh PID and port evidence as an explicit tri-state observation, and move the Codex Composer semantic responder's live receipt defaults from the source checkout into its canonical ~/.dharma runtime-state slice. Preserve explicit CLI and state-root overrides, keep repository fixture paths opt-in, and prove default execution cannot churn a checkout.",
+  "allowed_files": [
+    ".gitignore",
+    "api/routers/control_surface.py",
+    "reports/agentops/work_packets/runtime-truth-receipt-custody-WP-RTRC1.json",
+    "scripts/governance/orientation_graph.py",
+    "scripts/runtime/codex_composer_semantic_inbox_drain.py",
+    "scripts/runtime/codex_composer_semantic_responder.py",
+    "scripts/runtime/live_ops_census.py",
+    "scripts/runtime/model_critic_runner.py",
+    "tests/test_codex_composer_semantic_responder_dlq.py",
+    "tests/test_control_surface_semantic_receipt_cards.py",
+    "tests/test_live_ops_census.py",
+    "tests/test_model_critic_runner.py",
+    "tests/test_orientation_graph.py"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "runtime-truth-receipt-custody-tests",
+      "command": "python3 -m pytest -q tests/test_orientation_graph.py tests/test_live_ops_census.py tests/test_model_critic_runner.py tests/test_codex_composer_semantic_responder_dlq.py tests/test_control_surface_semantic_receipt_cards.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "runtime-truth-receipt-custody-ruff",
+      "command": "python3 -m ruff check scripts/governance/orientation_graph.py scripts/runtime/live_ops_census.py scripts/runtime/model_critic_runner.py scripts/runtime/codex_composer_semantic_inbox_drain.py scripts/runtime/codex_composer_semantic_responder.py api/routers/control_surface.py tests/test_orientation_graph.py tests/test_live_ops_census.py tests/test_model_critic_runner.py tests/test_codex_composer_semantic_responder_dlq.py tests/test_control_surface_semantic_receipt_cards.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 30
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "repo-owned-semantic-default-is-rejected",
+      "command": "python3 -c \"from pathlib import Path; text=Path('scripts/runtime/model_critic_runner.py').read_text(); raise SystemExit(0 if 'DEFAULT_OUT_DIR = REPO_ROOT' in text else 1)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 30
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): make liveness and receipt custody truthful"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RTRC1",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "1366d819ceb321424c3b059f9243644df4d77d52",
+      "details": []
+    },
+    "interface_mismatches": [
+      "orientation_graph copied status=live from a persisted census without checking generated_at or reconciling it against a current PID/port probe",
+      "the semantic responder inherited model, artifact-author, drain, and domain-reply receipt defaults rooted under repository reports even though its durable responder state already lives under ~/.dharma/external_agents/codex_composer/nest/semantic_responder"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/live_ops_census.py",
+      "scripts/governance/orientation_graph.py",
+      "scripts/runtime/codex_composer_semantic_responder.py",
+      "dharma_swarm/daemon_config.py"
+    ],
+    "honest_blockers": [
+      "Repository tests prove classification and path custody, not current production daemon liveness.",
+      "The installed responder must be restarted or otherwise reloaded by the operator after merge before the running process adopts the new defaults; this packet does not restart any service.",
+      "Historical checkout-local runtime receipts remain immutable on disk and are not deleted or rewritten by this change."
+    ],
+    "rollback": "Revert this pull request as one unit. Do not delete historical runtime receipts and do not restart or stop the installed semantic responder as part of repository rollback.",
+    "packet_digest": "1998244cd3358acc5ac37c5acf2bdfda74e8b4b2b274b8c78f22ffcc4e991205"
+  }
+}
