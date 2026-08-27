@@ -1,5 +1,247 @@
 # RSI Lab exact-code synchronization
 
+## START_HERE
+
+The only supported code deployment path is the versioned `rsi sync` controller.
+On the Mac operator host, inspect, plan, apply the returned content-addressed
+manifest, and read back all three identities:
+
+```bash
+rsi sync status --json
+rsi sync plan --json
+rsi sync apply \
+  --manifest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-daily-lane \
+  --remote meghadharma \
+  --json
+rsi sync status --remote meghadharma --json
+```
+
+An explicitly requested one-step plan/apply and a verified-release rollback are:
+
+```bash
+rsi sync converge \
+  --request-id operator-YYYYMMDD-converge \
+  --remote meghadharma \
+  --json
+
+rsi sync rollback \
+  --release <40-character-lowercase-release-sha> \
+  --request-id operator-YYYYMMDD-release-rollback \
+  --remote meghadharma \
+  --json
+```
+
+Do not substitute `rsync`, `scp` of a working tree, a pull in the active
+checkout, or a state-directory copy. Sync receipts establish release/code
+identity only. They do not establish provider availability, evaluation quality,
+promotion authority, scientific improvement, or mutable-state equivalence.
+
+After activation, run the single read-only daily projection on Meghadharma:
+
+```bash
+rsi daily status --json
+```
+
+It stays non-ready until reconciliation, the model/API on-ramp, a sealed
+admitted taskpack, the installed scheduler, and the last bounded closeout all satisfy
+their own authorities.
+`ready_for_next_run`, `last_cycle_healthy`, and `awaiting_first_run` distinguish
+pre-run readiness from historical cycle health; closeout success is rederived
+from the exact child-result and log artifacts, not trusted from path strings.
+
+### Model/API on-ramp
+
+Credential handoff is one provider at a time. Apply prompts with hidden input;
+no supported argument carries the secret value:
+
+```bash
+rsi provider credential status --provider zhipu --json
+rsi provider credential plan --provider zhipu --json
+rsi provider credential apply \
+  --provider zhipu \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-zhipu-key \
+  --json
+```
+
+For a secret-manager pipe, add `--stdin`; it reads exactly one line. Never put
+a secret literal in argv, shell history, JSON, logs, or a request ID. Repeat the
+value-free status/plan/apply flow for every required provider.
+
+Inspect the exact source-owned catalog and active profile, then plan/apply the
+same three role bindings:
+
+```bash
+rsi provider models list --json
+rsi provider models status --json
+
+rsi provider models plan \
+  --mutator-provider zhipu --mutator-model glm-5.2 \
+  --solver-provider ollama --solver-model deepseek-v4-pro:cloud \
+  --verifier-provider zhipu --verifier-model glm-5.2 \
+  --json
+
+rsi provider models apply \
+  --mutator-provider zhipu --mutator-model glm-5.2 \
+  --solver-provider ollama --solver-model deepseek-v4-pro:cloud \
+  --verifier-provider zhipu --verifier-model glm-5.2 \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-model-profile \
+  --json
+
+rsi provider models status --json
+```
+
+Omit `--expected-current-digest` only when status reports that no current
+profile exists. For every replacement, add
+`--expected-current-digest sha256:<current-profile-digest>` to both plan and
+apply. Rollback is a new monotonic activation of an ancestor profile:
+
+```bash
+rsi provider models rollback \
+  --request-id operator-YYYYMMDD-model-rollback \
+  --expected-current-digest sha256:<current-profile-digest> \
+  --target-profile-digest sha256:<ancestor-profile-digest> \
+  --json
+```
+
+Only `runtime_selectable: true` catalog rows are configuration-onboardable.
+Unknown providers and provider/model IDs whose execution is ambiguous require a
+provider-qualified runtime implementation; unknown exact routes require a
+reviewed source change. A plan reporting `implementation_required` or
+`source_change_required` must not be forced through apply. Model activation is
+role selection only: it makes no provider call, loads no credential, edits no
+source or weights, attests no quality/availability, and grants no promotion
+authority.
+
+Run the bounded staged live proof after credentials and role activation:
+
+```bash
+rsi provider selftest \
+  --profile staged --live --require-independent-routes 2 \
+  --timeout-s 20 --max-probes 6 --min-refresh-interval-s 3000 \
+  --json
+```
+
+### Taskpack and reconciliation gates
+
+The taskpack manifest is a sealed, newline-terminated `.jsonl` path, not a
+digest reference. Plan and apply must use identical manifest bytes, cutoff, and
+mode:
+
+```bash
+rsi taskpack status --json
+rsi taskpack plan \
+  --manifest /root/rsi-lab/state/intake/<sealed-taskpack>.jsonl \
+  --manifest-digest sha256:<64-hex-manifest-digest> \
+  --model-cutoff <ISO-8601-model-cutoff> \
+  --mode search_only_public_swebench \
+  --json
+
+rsi taskpack apply \
+  --manifest /root/rsi-lab/state/intake/<sealed-taskpack>.jsonl \
+  --manifest-digest sha256:<64-hex-manifest-digest> \
+  --model-cutoff <ISO-8601-model-cutoff> \
+  --mode search_only_public_swebench \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-taskpack \
+  --timeout-seconds 90 \
+  --json
+rsi taskpack status --json
+```
+
+The admitted daily `search_only_public_swebench` mode validates an exact
+official-SWE-bench-shaped public row contract, but does not cryptographically
+prove membership against a pinned official dataset seal. Because public
+pretraining contamination remains possible, its evidence is permanently
+`EXPLORE_ONLY`, `promotion_eligible: false`, and `confirm_eligible: false`.
+It is the admitted daily lane. `governed_fresh` remains fail-closed with
+`MODEL_CUTOFF_AUTHORITY_REQUIRED` until authoritative cutoff evidence exists
+for every active role; an operator-entered date is not sufficient authority.
+
+Default reconciliation is read-only. The only supported repair is the
+receipt-backed stale projection finding `ACTIVE_CAMPAIGN_MISSING_RUN`:
+
+```bash
+rsi reconcile --json
+rsi reconcile --plan --campaign <campaign-id> --json
+rsi reconcile --apply \
+  --campaign <campaign-id> \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-reconcile \
+  --json
+rsi reconcile --json
+```
+
+Retry an unknown reconciliation outcome only with the exact same plan digest,
+campaign ID, and request ID. There is no generic `rsi recover` operation.
+
+### Daily scheduler, HALT, and evidence boundary
+
+The provider refresh installer is separately plan/apply controlled. Its single
+managed cron entry runs hourly at minute `:17`:
+
+```bash
+/root/rsi-lab/bin/rsi-provider-refresh-install --plan
+/root/rsi-lab/bin/rsi-provider-refresh-install \
+  --apply --plan-digest sha256:<digest-from-plan> \
+  --request-id operator-YYYYMMDD-provider-refresh
+rsi doctor --json
+```
+
+The EXPLORE timer runs once per UTC day at `03:35` with at most `25m` randomized
+delay (`OnCalendar=*-*-* 03:35:00 UTC`, `RandomizedDelaySec=25m`). Sync installs
+the versioned wrapper but never writes `/etc/systemd/system` and never enables a
+timer. First obtain a green doctor, a fresh two-provider receipt, and one
+operator-supervised proof:
+
+```bash
+/root/rsi-lab/bin/rsi-unattended-explore --timeout-seconds 2700
+```
+
+Only after that proof succeeds, manually install and verify the units with the
+commands in [Install the bounded systemd oneshot](#install-the-bounded-systemd-oneshot).
+
+Emergency stop is a host latch followed by stopping future scheduling; there
+are no `rsi halt/start/stop` commands:
+
+```bash
+install -o root -g root -m 0600 /dev/null \
+  /root/rsi-lab/state/.dharma/forge_lab/HALT
+systemctl stop rsi-lab-explore.timer
+systemctl status rsi-lab-explore.service --no-pager
+rsi daily status --json
+```
+
+If HALT polling does not terminate an active oneshot, use
+`systemctl stop rsi-lab-explore.service`. Before recovery, inspect doctor,
+reconciliation, alerts, journals, Docker, the receipt chain, and the budget
+chain. Only after the underlying finding is repaired may the operator remove
+the latch and restart the installed timer:
+
+```bash
+rsi doctor --json
+rsi reconcile --json
+rsi alerts list --json
+journalctl -u rsi-lab-explore.service --since '36 hours ago' --no-pager
+unlink /root/rsi-lab/state/.dharma/forge_lab/HALT
+systemctl start rsi-lab-explore.timer
+systemctl status rsi-lab-explore.timer --no-pager
+rsi daily status --json
+```
+
+The fixed `1 x 1 x 1` run reserves `$1.25`/five logical slots, with hard ceilings
+of `$3`/12 per UTC day and `$40`/120 per UTC month. Reservations are not
+refunded after crashes and are not vendor billing telemetry. Provider receipts,
+model profiles, taskpack actions, reconciliation receipts/quarantine, and the
+unattended ledger/receipts/runs live under
+`/root/rsi-lab/state/.dharma/forge_lab/`. Every unattended closeout is
+`EXPLORE_ONLY` with `positive_rsi_claim: false`; neither sync nor daily operation
+is a promotion or scientific recursive-improvement claim. The expanded
+operator sequence and exact artifact paths are in
+[`FORGE_LAB_V0_1_RUNBOOK.md`](FORGE_LAB_V0_1_RUNBOOK.md#start_here).
+
 ## Authority and meaning of “exact”
 
 The canonical authority is the full commit at
@@ -46,14 +288,15 @@ Apply the returned content-addressed manifest with an auditable request ID:
 ```bash
 rsi sync apply \
   --manifest sha256:<64-hex-plan-digest> \
-  --request-id operator-YYYYMMDD-purpose
+  --request-id operator-YYYYMMDD-purpose \
+  --json
 ```
 
 For an explicitly requested one-command convergence, plan and apply can be
 combined:
 
 ```bash
-rsi sync converge --request-id operator-YYYYMMDD-purpose
+rsi sync converge --request-id operator-YYYYMMDD-purpose --json
 ```
 
 The explicit command is idempotent. It prepares detached releases on both
@@ -66,10 +309,11 @@ drift from GitHub when that SHA is not the canonical branch head:
 ```bash
 rsi sync rollback \
   --release <40-character-release-sha> \
-  --request-id operator-YYYYMMDD-rollback
+  --request-id operator-YYYYMMDD-rollback \
+  --json
 ```
 
-Always run `rsi sync status` after rollback or repair.
+Always run `rsi sync status --json` after rollback or repair.
 
 ## Host layout
 
@@ -176,7 +420,8 @@ request ID:
 ```bash
 /root/rsi-lab/bin/rsi-provider-refresh-install --plan
 /root/rsi-lab/bin/rsi-provider-refresh-install \
-  --apply --request-id operator-YYYYMMDD-retire-legacy-refresh
+  --apply --plan-digest sha256:<digest-from-plan> \
+  --request-id operator-YYYYMMDD-retire-legacy-refresh
 rsi doctor --json
 ```
 
@@ -184,12 +429,14 @@ The installer removes the legacy refresh and `current-main` log entries,
 renames the old executable to a recoverable timestamped `legacy-*` custody
 path, similarly renames the obsolete `current-main` run log and legacy
 `keys_status.json` artifacts, deduplicates any prior managed entry, and
-installs one hourly invocation of `rsi-provider-refresh`. The replacement
-invokes the versioned provider
-selftest with at most four probes, a one-hour minimum refresh interval, and a
-two-provider requirement. Provider credential values are resolved in-process;
-they never appear in cron argv or its receipt. The installer is plan-only by
-default and must not be run from an unverified release.
+installs one hourly invocation of `rsi-provider-refresh` at minute `:17`
+(`17 * * * *`). The replacement invokes the versioned provider selftest with at
+most six probes, a 3,000-second minimum refresh interval, and a two-provider
+requirement. Provider credential values are resolved in-process; they never
+appear in cron argv or its receipt. The installer is plan-only by default. Its
+apply rechecks the exact pre-install crontab digest, requires the inspected plan
+digest, and binds a stable request ID to one immutable receipt; it must not be
+run from an unverified release.
 
 The replacement writes append-only `rsi_lab.provider_selftest.v2` receipts.
 Cooldown reuse is valid only when the receipt digest and its source/config/probe
@@ -202,7 +449,8 @@ cache hit.
 The sync activation installs the immutable `rsi-unattended-explore` wrapper,
 but it deliberately does not mutate `/etc/systemd/system` or enable a timer.
 After release activation, legacy-provider retirement, one fresh two-provider
-selftest, and an operator-supervised oneshot, install the versioned unit bytes:
+selftest, and a **successful operator-supervised oneshot**, manually install and
+verify the versioned unit bytes:
 
 ```bash
 install -o root -g root -m 0644 \
@@ -225,8 +473,10 @@ sets, makes home and the immutable release read-only, writes only
 hardening plus an external timeout. Docker remains a daemon-mediated Unix
 socket client; candidate containers never receive that socket. Verify both the
 unit syntax and Docker reachability through `rsi doctor --json` before enabling
-the timer. The timer fires after the hourly provider-refresh window; the runner's
-daily/monthly reservation ledger remains the authoritative admission fuse.
+the timer. The provider refresh is independent and runs hourly at minute `:17`.
+The persistent EXPLORE timer fires once per UTC day at `03:35` plus no more than
+`25m` randomized delay; the runner's daily/monthly reservation ledger remains
+the authoritative admission fuse.
 Create the following file to stop new runs without editing code or units:
 
 ```bash
@@ -234,10 +484,13 @@ install -o root -g root -m 0600 /dev/null \
   /root/rsi-lab/state/.dharma/forge_lab/HALT
 ```
 
-Removing `HALT` is an operator action. Before doing so, inspect doctor,
-receipts, alerts, Docker health, and the hash-chained budget ledger. This timer
-is a bounded EXPLORE collector, not the missing general campaign supervisor and
-not evidence that RSI is scientifically humming.
+Removing `HALT` is an operator action. Before doing so, stop the timer and
+inspect doctor, reconciliation, receipts, alerts, Docker health, journals, and
+the hash-chained budget ledger. Repair through the owning plan/apply or rollback
+surface; then `unlink /root/rsi-lab/state/.dharma/forge_lab/HALT`, restart the
+timer, and verify `rsi daily status --json`. This timer is a bounded EXPLORE
+collector, not the missing general campaign supervisor and not evidence that
+RSI is scientifically humming.
 
 Do not repair drift with `rsync`, `scp` of a working tree, a force-push, or by
 copying state directories. Preserve evidence, fix the canonical branch, create

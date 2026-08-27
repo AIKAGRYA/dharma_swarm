@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from dharma_swarm.forge_lab import provider_selftest
 from dharma_swarm.forge_lab.newrun import (
     DEFAULT_DIVERSE_MUTATOR,
@@ -77,6 +79,24 @@ def test_provider_selftest_requires_live_for_independent_route_claim(monkeypatch
     assert payload["ok"] is False
     assert "config_only_no_callable_route_attestation" in payload["failures"]
     assert "live_probe_required_for_independent_routes" in payload["failures"]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"require_independent_routes": -1},
+        {"timeout_s": 0},
+        {"max_probes": 0},
+        {"min_refresh_interval_s": -1},
+    ],
+)
+def test_provider_selftest_rejects_invalid_bounds(kwargs):
+    with pytest.raises(ValueError):
+        provider_selftest.run_provider_selftest(
+            profile="staged",
+            live=False,
+            **kwargs,
+        )
 
 
 def test_provider_selftest_live_counts_attested_independent_families(monkeypatch, tmp_path):
@@ -168,22 +188,120 @@ def test_different_model_families_on_one_provider_are_not_independent_routes(
     assert "independent_routes:1/2" in payload["failures"]
 
 
-def test_empty_staged_profile_and_zero_callable_routes_never_report_ok(
+def test_staged_profile_has_source_reviewed_bootstrap_pair_without_activation(
+    monkeypatch,
+):
+    monkeypatch.delenv("RSI_LAB_STAGED_MODELS", raising=False)
+    monkeypatch.setattr(
+        "dharma_swarm.forge_lab.model_onboarding.activation_status",
+        lambda: {"active": False},
+    )
+    payload = provider_selftest.run_provider_selftest(
+        profile="staged",
+        live=False,
+        require_independent_routes=2,
+    )
+    assert payload["ok"] is False
+    assert payload["callable_count"] == 0
+    assert payload["requested_models"] == list(provider_selftest.STAGED_FALLBACK_MODELS)
+    assert payload["policy"]["configuration"]["model_selection"] == {
+        "source": "source_reviewed_bootstrap_fallback",
+        "activation_profile_digest": None,
+        "role_bindings": [],
+    }
+
+
+def test_staged_receipt_policy_binds_active_role_profile(monkeypatch):
+    monkeypatch.delenv("RSI_LAB_STAGED_MODELS", raising=False)
+    bindings = [
+        {"role": "mutator", "provider": "zhipu", "model_id": "glm-5.2"},
+        {
+            "role": "solver",
+            "provider": "ollama",
+            "model_id": "deepseek-v4-pro:cloud",
+        },
+        {"role": "verifier", "provider": "zhipu", "model_id": "glm-5.2"},
+    ]
+    monkeypatch.setattr(
+        "dharma_swarm.forge_lab.model_onboarding.activation_status",
+        lambda: {
+            "active": True,
+            "current_profile_digest": "sha256:" + "a" * 64,
+            "role_bindings": bindings,
+            "staged_models": ["glm-5.2", "deepseek-v4-pro:cloud"],
+        },
+    )
+
+    payload = provider_selftest.run_provider_selftest(profile=" STAGED ", live=False)
+
+    assert payload["profile"] == "staged"
+    selection = payload["policy"]["configuration"]["model_selection"]
+    assert selection["source"] == "active_model_role_profile"
+    assert selection["activation_profile_digest"] == "sha256:" + "a" * 64
+    assert selection["role_bindings"] == bindings
+
+
+def test_active_staged_profile_probes_every_role_route_before_success(
     monkeypatch,
     tmp_path,
 ):
     monkeypatch.setenv("RSI_LAB_PROVIDER_SELFTEST_ROOT", str(tmp_path))
     monkeypatch.delenv("RSI_LAB_STAGED_MODELS", raising=False)
+    models = ["role-mutator", "role-solver", "role-verifier"]
+    bindings = [
+        {"role": "mutator", "provider": "zhipu", "model_id": models[0]},
+        {"role": "solver", "provider": "ollama", "model_id": models[1]},
+        {"role": "verifier", "provider": "openrouter", "model_id": models[2]},
+    ]
+    monkeypatch.setattr(
+        "dharma_swarm.forge_lab.model_onboarding.activation_status",
+        lambda: {
+            "active": True,
+            "current_profile_digest": "sha256:" + "a" * 64,
+            "role_bindings": bindings,
+            "staged_models": models,
+        },
+    )
+    from dharma_swarm.forge_v1.forge_v2 import runner_slots
+
+    providers = {
+        models[0]: ProviderType.ZHIPU,
+        models[1]: ProviderType.OLLAMA,
+        models[2]: ProviderType.OPENROUTER,
+    }
+    monkeypatch.setattr(
+        runner_slots,
+        "_slot_for_id",
+        lambda model_id: _slot(model_id, providers[model_id]),
+    )
+    calls: list[str] = []
+
+    def probe(slot, timeout_s):
+        del timeout_s
+        calls.append(slot.model_id)
+        return {
+            "outcome": "callable",
+            "callable": True,
+            "requested_model": slot.model_id,
+            "requested_family": slot.model_id,
+            "served_model": slot.model_id,
+            "served_family": slot.model_id,
+            "stage": "complete",
+            "latency_ms": 1,
+        }
+
+    monkeypatch.setattr(runner_slots, "_probe_with_receipt", probe)
+
     payload = provider_selftest.run_provider_selftest(
         profile="staged",
         live=True,
         require_independent_routes=2,
+        max_probes=6,
     )
-    assert payload["ok"] is False
-    assert payload["callable_count"] == 0
-    assert payload["rows"] == []
-    assert "zero_profile_targets" in payload["failures"]
-    assert "zero_callable_routes" in payload["failures"]
+
+    assert payload["ok"] is True
+    assert payload["require_all_profile_routes"] is True
+    assert calls == models
 
 
 def test_versioned_refresh_model_names_resolve_to_two_provider_entitlements(monkeypatch):

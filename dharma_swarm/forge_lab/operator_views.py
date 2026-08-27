@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import sqlite3
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,11 +61,11 @@ def provider_readiness(*, ttl_seconds: int = 3600) -> dict[str, Any]:
     checked = _parse_time((payload or {}).get("checked_at"))
     age: float | None = None
     if checked is not None:
-        age = max(0.0, (datetime.now(timezone.utc) - checked).total_seconds())
+        age = (datetime.now(timezone.utc) - checked).total_seconds()
     routes = int((payload or {}).get("independent_route_count") or 0)
     live = bool((payload or {}).get("live"))
     callable_count = int((payload or {}).get("callable_count") or 0)
-    fresh = age is not None and age <= ttl_seconds
+    fresh = age is not None and 0 <= age <= ttl_seconds
     ready = bool(
         payload
         and not validation_failures
@@ -289,46 +288,21 @@ def grader_readiness() -> dict[str, Any]:
 def taskbed_readiness() -> dict[str, Any]:
     """Read-only proof that the anchored ledger can supply one EXPLORE task."""
 
-    from dharma_swarm.forge_v1.forge_v2.pr_suite_grader import is_pr_suite_task_id
+    from dharma_swarm.forge_lab.taskpack_ops import taskpack_status
 
-    path = dharma_home() / "forge_v1" / "taskbed.db"
-    reasons: list[str] = []
-    eligible_ids: list[str] = []
-    if path.is_symlink() or not path.is_file():
-        reasons.append("anchored_taskbed_missing_or_unsafe")
-    else:
-        try:
-            uri = f"{path.resolve().as_uri()}?mode=ro"
-            with sqlite3.connect(uri, uri=True, timeout=2) as connection:
-                rows = connection.execute(
-                    """
-                    SELECT task.task_id FROM taskbed_tasks task
-                     WHERE task.active=1
-                       AND NOT EXISTS (
-                         SELECT 1 FROM taskbed_allocations prior
-                          WHERE prior.task_id=task.task_id
-                            AND prior.split='confirm'
-                       )
-                     ORDER BY task.created_at ASC,
-                              task.first_seen_at ASC,
-                              task.task_id ASC
-                    """
-                ).fetchall()
-                eligible_ids = [
-                    str(row[0]) for row in rows if not is_pr_suite_task_id(str(row[0]))
-                ]
-        except (OSError, sqlite3.Error, TypeError, ValueError):
-            reasons.append("anchored_taskbed_unreadable_or_schema_invalid")
-    if not reasons and not eligible_ids:
-        reasons.append("zero_eligible_isolated_swebench_tasks")
+    canonical = taskpack_status()
+    reasons = list(canonical.get("reasons") or [])
+    if reasons == ["taskbed_missing"]:
+        reasons = ["anchored_taskbed_missing_or_unsafe"]
     return {
-        "ready": not reasons,
-        "path": str(path),
-        "eligible_explore_tasks": len(eligible_ids),
-        "next_explore_task_id": eligible_ids[0] if eligible_ids else None,
+        "ready": bool(canonical.get("ready")),
+        "path": canonical.get("taskbed_db"),
+        "eligible_explore_tasks": canonical.get("eligible_explore_task_count", 0),
+        "next_explore_task_id": canonical.get("next_explore_task_id"),
         "required": 1,
         "read_only": True,
         "reasons": reasons,
+        "canonical_status": canonical,
     }
 
 

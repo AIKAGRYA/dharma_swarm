@@ -284,6 +284,11 @@ def _dispatch_provider(args: argparse.Namespace) -> int:
             min_refresh_interval_s=args.min_refresh_interval_s,
         )
     except ValueError as exc:
+        code = (
+            "INVALID_PROFILE"
+            if str(exc).startswith("unknown provider selftest profile")
+            else "INVALID_ARGUMENT"
+        )
         if args.json:
             print(
                 json.dumps(
@@ -291,12 +296,12 @@ def _dispatch_provider(args: argparse.Namespace) -> int:
                         "schema": CLI_RESULT_SCHEMA,
                         "ok": False,
                         "command": command_path,
-                        "error": {"code": "INVALID_PROFILE", "message": str(exc)},
+                        "error": {"code": code, "message": str(exc)},
                     },
                     sort_keys=True,
                 )
             )
-        print(f"rsi {command_path} failed [INVALID_PROFILE]: {exc}", file=sys.stderr)
+        print(f"rsi {command_path} failed [{code}]: {exc}", file=sys.stderr)
         return PROVIDER_FAILURE_EXIT
     _emit_provider_selftest_payload(result, as_json=args.json)
     return 0 if result.get("ok") else PROVIDER_FAILURE_EXIT
@@ -378,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
         from dharma_swarm.forge_lab.newrun import run_newrun
 
         return run_newrun(args)
-    if command_path.startswith("provider "):
+    if command_path == "provider selftest":
         return _dispatch_provider(args)
     if command_path.startswith("sync "):
         return _dispatch_sync(args)

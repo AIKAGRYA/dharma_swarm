@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 import subprocess
+
+from dharma_swarm.forge_lab.provider_selftest import STAGED_FALLBACK_MODELS
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -114,11 +117,12 @@ def test_canonical_launcher_is_never_custodied_as_legacy() -> None:
 def test_versioned_provider_refresh_is_credential_safe_and_spend_bounded() -> None:
     refresh = (FORGE_SCRIPT_ROOT / "rsi-provider-refresh").read_text(encoding="utf-8")
     assert "provider selftest" in refresh
-    assert "moonshot:kimi-k2.7-code,glm-5.2" in refresh
+    assert STAGED_FALLBACK_MODELS == ("glm-5.2", "deepseek-v4-pro:cloud")
+    assert 'export RSI_LAB_STAGED_MODELS=' not in refresh
     assert "--profile staged" in refresh
     assert "--require-independent-routes 2" in refresh
-    assert "--max-probes 4" in refresh
-    assert "--min-refresh-interval-s 3600" in refresh
+    assert "--max-probes 6" in refresh
+    assert "--min-refresh-interval-s 3000" in refresh
     assert "curl" not in refresh
     assert "Authorization" not in refresh
     assert "API_KEY" not in refresh
@@ -133,6 +137,17 @@ def test_versioned_provider_refresh_is_credential_safe_and_spend_bounded() -> No
     assert syntax.returncode == 0, syntax.stderr
 
 
+def test_unattended_timer_has_one_persistent_daily_utc_admission() -> None:
+    timer = (FORGE_SCRIPT_ROOT / "systemd" / "rsi-lab-explore.timer").read_text(
+        encoding="utf-8"
+    )
+
+    assert "OnCalendar=*-*-* 03:35:00 UTC" in timer
+    assert "RandomizedDelaySec=25m" in timer
+    assert "Persistent=true" in timer
+    assert "*:35:00" not in timer
+
+
 def test_refresh_installer_is_plan_only_by_default_and_retires_legacy_markers() -> None:
     installer = (FORGE_SCRIPT_ROOT / "rsi-provider-refresh-install").read_text(
         encoding="utf-8"
@@ -140,6 +155,9 @@ def test_refresh_installer_is_plan_only_by_default_and_retires_legacy_markers() 
     assert "apply=0" in installer
     assert "--apply" in installer
     assert "--request-id" in installer
+    assert "--plan-digest" in installer
+    assert "crontab_before_digest" in installer
+    assert "ALREADY_APPLIED" in installer
     assert "/rsi-keys-refresh/ { next }" in installer
     assert "/current-main\\/state\\/rsi_runs/ { next }" in installer
     assert "17 * * * *" in installer
@@ -155,3 +173,134 @@ def test_refresh_installer_is_plan_only_by_default_and_retires_legacy_markers() 
         text=True,
     )
     assert syntax.returncode == 0, syntax.stderr
+
+
+def _refresh_installer_fixture(tmp_path: Path) -> tuple[dict[str, str], Path]:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    cron_store = tmp_path / "crontab.txt"
+    crontab = fake_bin / "crontab"
+    crontab.write_text(
+        """#!/bin/sh
+if [ "${1:-}" = "-l" ]; then
+    if [ -f "$CRON_STORE" ]; then
+        /bin/cat "$CRON_STORE"
+        exit 0
+    fi
+    echo 'no crontab for fixture' >&2
+    exit 1
+fi
+/bin/cp "$1" "$CRON_STORE"
+""",
+        encoding="utf-8",
+    )
+    crontab.chmod(0o755)
+    home = tmp_path / "home"
+    refresh = home / ".dharma" / "bin" / "rsi-provider-refresh"
+    refresh.parent.mkdir(parents=True)
+    refresh.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    refresh.chmod(0o755)
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:/usr/bin:/bin",
+            "HOME": str(home),
+            "CRON_STORE": str(cron_store),
+            "RSI_LAB_STATE": str(tmp_path / "state"),
+        }
+    )
+    return env, cron_store
+
+
+def test_refresh_installer_plan_cas_apply_and_replay(tmp_path: Path) -> None:
+    env, cron_store = _refresh_installer_fixture(tmp_path)
+    installer = FORGE_SCRIPT_ROOT / "rsi-provider-refresh-install"
+    cron_store.write_text(
+        "5 * * * * /legacy/rsi-keys-refresh\n",
+        encoding="utf-8",
+    )
+    planned = subprocess.run(
+        [str(installer), "--plan"],
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    digest = re.search(r"plan_digest: (sha256:[0-9a-f]{64})", planned.stdout)
+    assert planned.returncode == 0, planned.stderr
+    assert digest is not None
+
+    command = [
+        str(installer),
+        "--apply",
+        "--plan-digest",
+        digest.group(1),
+        "--request-id",
+        "fixture-refresh-install",
+    ]
+    applied = subprocess.run(
+        command, env=env, capture_output=True, check=False, text=True
+    )
+    replay = subprocess.run(
+        command, env=env, capture_output=True, check=False, text=True
+    )
+
+    assert applied.returncode == 0, applied.stderr
+    assert "result: APPLIED" in applied.stdout
+    assert replay.returncode == 0, replay.stderr
+    assert "result: ALREADY_APPLIED" in replay.stdout
+    assert cron_store.read_text(encoding="utf-8").count("rsi-provider-refresh") == 1
+    receipt_line = next(
+        line for line in applied.stdout.splitlines() if line.startswith("receipt: ")
+    )
+    receipt = json.loads(Path(receipt_line.removeprefix("receipt: ")).read_text())
+    assert receipt["schema"] == "rsi_lab.provider_refresh_install.v2"
+    assert receipt["plan_digest"] == digest.group(1)
+    assert receipt["secret_values_recorded"] is False
+
+
+def test_refresh_installer_refuses_stale_plan_and_unsafe_state_path(
+    tmp_path: Path,
+) -> None:
+    env, cron_store = _refresh_installer_fixture(tmp_path)
+    installer = FORGE_SCRIPT_ROOT / "rsi-provider-refresh-install"
+    cron_store.write_text("MAILTO=operator@example.invalid\n", encoding="utf-8")
+    planned = subprocess.run(
+        [str(installer), "--plan"],
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    digest = re.search(r"plan_digest: (sha256:[0-9a-f]{64})", planned.stdout)
+    assert digest is not None
+    cron_store.write_text("MAILTO=changed@example.invalid\n", encoding="utf-8")
+    stale = subprocess.run(
+        [
+            str(installer),
+            "--apply",
+            "--plan-digest",
+            digest.group(1),
+            "--request-id",
+            "stale-refresh-install",
+        ],
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert stale.returncode != 0
+    assert "plan digest changed" in stale.stderr
+    assert cron_store.read_text() == "MAILTO=changed@example.invalid\n"
+
+    env["RSI_LAB_STATE"] = str(tmp_path / "unsafe;injected")
+    unsafe = subprocess.run(
+        [str(installer), "--plan"],
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert unsafe.returncode != 0
+    assert "not canonical shell-safe" in unsafe.stderr
+    assert not (tmp_path / "unsafe;injected").exists()

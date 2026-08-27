@@ -138,6 +138,14 @@ def test_provider_readiness_requires_fresh_live_callable_independent_routes(
     assert ready["ready"] is True
     assert ready["independent_route_count"] == 2
 
+    payload["checked_at"] = "2999-01-01T00:00:00Z"
+    payload["receipt_digest"] = provider_selftest._receipt_digest(payload)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    future = operator_views.provider_readiness()
+    assert future["ready"] is False
+    assert future["age_seconds"] < 0
+    assert "provider_receipt_stale_or_unparseable" in future["reasons"]
+
 
 def test_read_only_worker_alert_archive_and_reconcile_surfaces(
     anchored_state: tuple[Path, Path],
@@ -209,18 +217,33 @@ def test_taskbed_readiness_is_read_only_and_state_anchored(
             """
             CREATE TABLE taskbed_tasks (
               task_id TEXT PRIMARY KEY,
+              task_json TEXT NOT NULL,
+              source TEXT NOT NULL,
+              taskbed TEXT NOT NULL,
+              contamination_state TEXT NOT NULL,
+              provenance_json TEXT NOT NULL,
               active INTEGER NOT NULL,
               created_at TEXT NOT NULL,
-              first_seen_at REAL NOT NULL
+              first_seen_at REAL NOT NULL,
+              max_uses_per_epoch INTEGER NOT NULL
             );
             CREATE TABLE taskbed_allocations (
+              allocation_id TEXT NOT NULL,
               task_id TEXT NOT NULL,
-              split TEXT NOT NULL
+              split TEXT NOT NULL,
+              epoch_id TEXT NOT NULL,
+              lane_id TEXT NOT NULL,
+              candidate_id TEXT NOT NULL,
+              allocated_at REAL NOT NULL,
+              status TEXT NOT NULL
             );
-            INSERT INTO taskbed_tasks(task_id, active, created_at, first_seen_at)
-            VALUES ('fixture-task', 1, '2026-08-25T00:00:00Z', 1.0);
-            INSERT INTO taskbed_tasks(task_id, active, created_at, first_seen_at)
-            VALUES ('pr::host-unsafe', 1, '2026-08-24T00:00:00Z', 0.5);
+            INSERT INTO taskbed_tasks VALUES
+              ('fixture-task', '{}', 'official_swebench_search_only',
+               'search_only_public_swebench', 'possible_pretrain', '{}', 1,
+               '2026-08-25T00:00:00Z', 1.0, 1);
+            INSERT INTO taskbed_tasks VALUES
+              ('pr::host-unsafe', '{}', 'post_cutoff_pr_suite', 'fresh_pr_suite',
+               'fresh_post_cutoff', '{}', 1, '2026-08-24T00:00:00Z', 0.5, 1);
             """
         )
 

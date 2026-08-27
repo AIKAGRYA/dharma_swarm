@@ -47,6 +47,7 @@ from dharma_swarm.forge_lab.version import (
 PROVIDER_SELFTEST_SCHEMA = "rsi_lab.provider_selftest.v2"
 DEFAULT_PROFILE = "frontier"
 ALIAS_POLICY_VERSION = "provider_declared_successor.v1"
+STAGED_FALLBACK_MODELS = (DEFAULT_FAST_VERIFIER, DEFAULT_DIVERSE_SOLVER)
 _ZHIPU_SUCCESSOR_RE = re.compile(r"^glm-(?P<major>[0-9]+)\.(?P<minor>[0-9]+)$")
 
 
@@ -80,9 +81,23 @@ def profile_model_ids(profile: str, *, current_model: str | None = None) -> list
     if profile in {"fast", "offline"}:
         return _dedupe(fast)
     if profile == "staged":
-        # Staged means operator-proven names, never a prose default that can
-        # silently drift into authority. Values are model IDs, not secrets.
-        return _dedupe(os.environ.get("RSI_LAB_STAGED_MODELS", "").split(","))
+        # An explicit process-local override remains useful for bounded probes.
+        # Otherwise consume the active, state-owned role profile.  The final
+        # fallback is a source-reviewed two-provider pair so a fresh host can
+        # establish evidence before its first activation; it grants no role or
+        # run authority by itself.
+        override = _dedupe(os.environ.get("RSI_LAB_STAGED_MODELS", "").split(","))
+        if override:
+            return override
+        try:
+            from dharma_swarm.forge_lab.model_onboarding import activation_status
+
+            activation = activation_status()
+        except Exception:
+            activation = {}
+        if activation.get("active") and activation.get("staged_models"):
+            return _dedupe(list(activation["staged_models"]))
+        return list(STAGED_FALLBACK_MODELS)
     if profile in {"current", "newrun"}:
         return _dedupe(([current] if current else []) + fast + diverse)
     if profile == "frontier":
@@ -97,6 +112,57 @@ def profile_model_ids(profile: str, *, current_model: str | None = None) -> list
         f"unknown provider selftest profile {profile!r}; "
         "choose staged, frontier, fast, current, newrun, or offline"
     )
+
+
+def _model_selection_context(
+    profile: str,
+    *,
+    requested_models: list[str],
+) -> dict[str, Any]:
+    """Describe the authority that selected a profile's exact model IDs.
+
+    This context is part of the live probe policy digest.  Changing only role
+    assignments therefore invalidates a cached receipt even when the set of
+    model IDs happens to remain identical.
+    """
+
+    if (profile or "").strip().casefold() != "staged":
+        return {"source": "source_profile"}
+    override = _dedupe(os.environ.get("RSI_LAB_STAGED_MODELS", "").split(","))
+    if override and override == requested_models:
+        return {
+            "source": "environment_override",
+            "activation_profile_digest": None,
+            "role_bindings": [],
+        }
+    try:
+        from dharma_swarm.forge_lab.model_onboarding import activation_status
+
+        activation = activation_status()
+    except Exception:
+        activation = {}
+    if (
+        activation.get("active")
+        and _dedupe(list(activation.get("staged_models") or [])) == requested_models
+    ):
+        return {
+            "source": "active_model_role_profile",
+            "activation_profile_digest": activation.get("current_profile_digest"),
+            "role_bindings": activation.get("role_bindings") or [],
+        }
+    if requested_models == list(STAGED_FALLBACK_MODELS):
+        return {
+            "source": "source_reviewed_bootstrap_fallback",
+            "activation_profile_digest": None,
+            "role_bindings": [],
+        }
+    # This can occur in tests or an embedding that overrides the resolver.  It
+    # is truthfully bound but cannot authorize unattended role consumption.
+    return {
+        "source": "custom_profile_resolver",
+        "activation_profile_digest": None,
+        "role_bindings": [],
+    }
 
 
 def _receipt_root() -> Path:
@@ -169,6 +235,8 @@ def _policy_payload(
     require: int,
     timeout_s: int,
     max_probes: int,
+    model_selection: dict[str, Any],
+    require_all_profile_routes: bool,
 ) -> dict[str, Any]:
     """Bind a live observation to source, configuration, and probe policy."""
 
@@ -182,11 +250,13 @@ def _policy_payload(
             "profile": profile,
             "current_model": (current_model or "").strip() or None,
             "requested_models": requested_models,
+            "model_selection": model_selection,
         },
         "probe_policy": {
             "require_independent_routes": require,
             "timeout_s": timeout_s,
             "max_provider_calls": max_probes,
+            "require_all_profile_routes": require_all_profile_routes,
             "alias_policy": ALIAS_POLICY_VERSION,
         },
     }
@@ -213,7 +283,8 @@ def _latest_compatible_receipt(
             checked = datetime.fromisoformat(str(payload["checked_at"]).replace("Z", "+00:00"))
         except (KeyError, TypeError, ValueError):
             continue
-        if (now - checked).total_seconds() <= min_refresh_interval_s:
+        age_seconds = (now - checked).total_seconds()
+        if 0 <= age_seconds <= min_refresh_interval_s:
             return payload, path
     return None, None
 
@@ -398,10 +469,28 @@ def run_provider_selftest(
 ) -> dict[str, Any]:
     """Run or plan a provider selftest and return a redacted result."""
 
-    require = max(0, int(require_independent_routes or 0))
-    timeout_s = max(1, min(int(timeout_s), 60))
-    max_probes = max(1, min(int(max_probes), 8))
+    profile = (profile or DEFAULT_PROFILE).strip().casefold()
+    require = int(require_independent_routes or 0)
+    timeout_s = int(timeout_s)
+    max_probes = int(max_probes)
+    min_refresh_interval_s = int(min_refresh_interval_s)
+    if not 0 <= require <= 8:
+        raise ValueError("require_independent_routes must be between 0 and 8")
+    if not 1 <= timeout_s <= 60:
+        raise ValueError("timeout_s must be between 1 and 60")
+    if not 1 <= max_probes <= 8:
+        raise ValueError("max_probes must be between 1 and 8")
+    if min_refresh_interval_s < 0:
+        raise ValueError("min_refresh_interval_s must be non-negative")
     model_ids = profile_model_ids(profile, current_model=current_model)
+    model_selection = _model_selection_context(
+        profile,
+        requested_models=model_ids,
+    )
+    require_all_profile_routes = bool(
+        profile == "staged"
+        and model_selection.get("source") == "active_model_role_profile"
+    )
     policy = _policy_payload(
         profile=profile,
         current_model=current_model,
@@ -409,12 +498,14 @@ def run_provider_selftest(
         require=require,
         timeout_s=timeout_s,
         max_probes=max_probes,
+        model_selection=model_selection,
+        require_all_profile_routes=require_all_profile_routes,
     )
     policy_digest = content_digest(policy)
     if live:
         cached, cached_path = _latest_compatible_receipt(
             policy_digest=policy_digest,
-            min_refresh_interval_s=max(0, int(min_refresh_interval_s)),
+            min_refresh_interval_s=min_refresh_interval_s,
         )
         if cached is not None:
             return {
@@ -441,7 +532,12 @@ def run_provider_selftest(
         )
         rows.append(row)
         probe_call_count += int(row.get("probe_calls") or 0)
-        if live and require and len(_independent_routes(rows)) >= require:
+        if (
+            live
+            and require
+            and len(_independent_routes(rows)) >= require
+            and (not require_all_profile_routes or len(rows) == len(model_ids))
+        ):
             break
 
     callable_rows = [row for row in rows if row.get("callable")]
@@ -460,6 +556,16 @@ def run_provider_selftest(
         failures.append(
             f"independent_routes:{len(independent)}/{require}"
         )
+    if live and require_all_profile_routes:
+        callable_models = {
+            str(row.get("model_id") or "") for row in rows if row.get("callable")
+        }
+        missing_models = [model for model in model_ids if model not in callable_models]
+        if missing_models:
+            ok = False
+            failures.append(
+                f"callable_profile_routes:{len(model_ids) - len(missing_models)}/{len(model_ids)}"
+            )
     if not live and require:
         failures.append("live_probe_required_for_independent_routes")
     unresolved = [row for row in rows if not row.get("slot_resolved", True)]
@@ -478,6 +584,7 @@ def run_provider_selftest(
         "max_probes": max_probes,
         "probe_call_count": probe_call_count,
         "require_independent_routes": require,
+        "require_all_profile_routes": require_all_profile_routes,
         "callable_count": len(callable_rows),
         "independent_route_count": len(independent),
         "independent_routes": independent,
