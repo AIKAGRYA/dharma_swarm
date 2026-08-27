@@ -22,6 +22,11 @@ if [[ ! -d "${logical_base}" ]]; then
     exit 9
 fi
 base="$(cd -- "${logical_base}" && pwd -P)"
+if [[ ! -d "${state}" ]]; then
+    printf 'rsi-unattended-explore: stable state root is missing\n' >&2
+    exit 9
+fi
+state="$(cd -- "${state}" && pwd -P)"
 repo="${base}/repo"
 python="${base}/.venv/bin/python"
 pydeps="${base}/pydeps"
@@ -33,6 +38,7 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 export RSI_LAB_BASE="${base}"
 export RSI_LAB_REPO="${repo}"
+export RSI_LAB_PYDEPS="${pydeps}"
 export RSI_LAB_STATE="${state}"
 export DHARMA_HOME="${state}/.dharma"
 export RSI_LAB_GRADER_MODE="official-swebench-docker"
