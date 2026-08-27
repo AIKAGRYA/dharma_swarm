@@ -27,6 +27,10 @@ from scripts.runtime.a2a_send import (  # noqa: E402
     ACK_TIER_HANDLER_ACKED,
     ROUTE_AGENT_INBOX,
 )
+from dharma_swarm.a2a.envelope_schema import (  # noqa: E402
+    EnvelopeValidationError,
+    validate_send_envelope,
+)
 from scripts.runtime.a2a_topology import (  # noqa: E402
     DEFAULT_COMPATIBILITY_STREAM,
     DLQ_SUBJECT_TEMPLATE,
@@ -237,13 +241,10 @@ def _parse_envelope(message: NatsMessageLike) -> dict[str, Any]:
         payload = json.loads(message.data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise MalformedEnvelope(f"A2A inbox payload is not valid UTF-8 JSON: {type(exc).__name__}") from exc
-    if not isinstance(payload, dict):
-        raise MalformedEnvelope("A2A inbox payload must be a JSON object")
-    if not isinstance(payload.get("packet_id"), str) or not payload["packet_id"].strip():
-        raise MalformedEnvelope("A2A inbox payload is missing packet_id")
-    if not isinstance(payload.get("ack_subject"), str) or not payload["ack_subject"]:
-        raise MalformedEnvelope("A2A inbox payload is missing ack_subject")
-    return payload
+    try:
+        return validate_send_envelope(payload)
+    except EnvelopeValidationError as exc:
+        raise MalformedEnvelope(str(exc)) from exc
 
 
 def _delivery_path(config: InboxBridgeConfig, payload: dict[str, Any]) -> Path:

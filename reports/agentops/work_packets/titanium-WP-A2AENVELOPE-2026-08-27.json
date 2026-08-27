@@ -1,0 +1,88 @@
+{
+  "allowed_files": [
+    "reports/agentops/work_packets/titanium-WP-A2AENVELOPE-2026-08-27.json",
+    "dharma_swarm/a2a/__init__.py",
+    "dharma_swarm/a2a/envelope_schema.py",
+    "scripts/runtime/a2a_inbox_bridge.py",
+    "scripts/runtime/a2a_send.py",
+    "tests/test_a2a_envelope_schema.py"
+  ],
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "base_ref": "abc8bd35c34c729ed421f9615df504f5615868bd",
+  "branch": "wp02-a2a-envelope-schema",
+  "commit": {
+    "allowed": false,
+    "message": "fix(a2a): one shared send-envelope schema kills the dead-letter drift (WP-02)"
+  },
+  "forbidden_files": [
+    ".github/workflows/**",
+    "Makefile",
+    "Dockerfile",
+    "Dockerfile.swarm",
+    "docker-compose.yml",
+    "api/**",
+    "dashboard/**",
+    "docs/**",
+    "terminal/**",
+    "packages/**",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/sandbox.py",
+    "dharma_swarm/organism.py",
+    "pyproject.toml"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest tests/test_a2a_envelope_schema.py tests/test_a2a_send.py tests/test_a2a_inbox_bridge.py tests/test_a2a.py tests/test_a2a_inbox_bridge_tmux_scripts.py -q",
+      "expected_exit": 0,
+      "name": "a2a-envelope-schema-suite",
+      "timeout_seconds": 300
+    }
+  ],
+  "id": "titanium-WP-A2AENVELOPE-2026-08-27",
+  "intent": "Hub-bulletproof WP-02 (14-point map item #7, HIGH, live bug): the A2A send path and the inbox-bridge drain each formatted their own envelope, so envelopes emitted by a2a_send.py carried no ack_subject while the drain demanded it, dead-lettering every grok_build/codex reply. This packet introduces one shared schema module (dharma_swarm/a2a/envelope_schema.py) that both emitters now call, keeping the DLQ for genuinely malformed envelopes (negative control holds). Known follow-up tracked outside this packet: scripts/runtime/devin_a2a_agent.py is a third emitter still on the inline schema. Built by hub-bulletproof Wave-0; independently re-verified by RUDRA W0 in a fresh workcell at the exact candidate SHA (146 tests green).",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest tests/test_a2a_envelope_schema.py -q -k nonexistent_test_ever",
+      "expected_exit": 5,
+      "name": "no-tests-matching-nothing",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/a2a_inbox_bridge.py",
+      "scripts/runtime/a2a_send.py"
+    ],
+    "collision": {
+      "checked_at_sha": "abc8bd35c34c729ed421f9615df504f5615868bd",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "packet originally bound to repository-titanium-hardening-2026-07; that track was superseded by governance PR #1444 while this branch was in review, so the binding moved to the live fleet-advancement-2026-08 track (same A2A bus substrate scope)"
+    ],
+    "interface_mismatches": [],
+    "owner": "@dhyana",
+    "packet_digest": "34e33125ed5b6d2c1b2f961ebfe0f7e8a6294293d3009d87a473417d1ee95966",
+    "rollback": "git revert the WP-02 commit on branch wp02-a2a-envelope-schema; both emitters return to their inline schemas and the ack_subject dead-letter condition resurfaces",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-A2AENVELOPE"
+  },
+  "worktree": "."
+}

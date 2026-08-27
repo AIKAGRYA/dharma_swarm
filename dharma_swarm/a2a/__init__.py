@@ -57,6 +57,10 @@ _LAZY_EXPORTS = {
     "bounce_payload": "dharma_swarm.a2a.task_receipt",
     "validate_or_quarantine_file": "dharma_swarm.a2a.task_receipt",
     "validate_task_receipt": "dharma_swarm.a2a.task_receipt",
+    "SEND_SCHEMA_VERSION": "dharma_swarm.a2a.envelope_schema",
+    "EnvelopeValidationError": "dharma_swarm.a2a.envelope_schema",
+    "build_send_envelope": "dharma_swarm.a2a.envelope_schema",
+    "validate_send_envelope": "dharma_swarm.a2a.envelope_schema",
 }
 
 __all__ = [
@@ -92,6 +96,10 @@ __all__ = [
     "bounce_payload",
     "validate_or_quarantine_file",
     "validate_task_receipt",
+    "SEND_SCHEMA_VERSION",
+    "EnvelopeValidationError",
+    "build_send_envelope",
+    "validate_send_envelope",
 ]
 
 
