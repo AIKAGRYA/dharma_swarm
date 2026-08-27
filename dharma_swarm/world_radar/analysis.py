@@ -22,6 +22,7 @@ DEFAULT_SOURCE_WEIGHTS = {
     "arxiv": 0.84,
     "news": 0.78,
     "hacker_news": 0.68,
+    "youtube": 0.64,
     "reddit": 0.58,
     "llm_scan": 0.5,
     "unknown": 0.45,

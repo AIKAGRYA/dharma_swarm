@@ -76,6 +76,7 @@ CLASSES: tuple[str, ...] = tuple(CLASS_RULES)
 SELF_COVERAGE_PATHS: tuple[str, ...] = (
     ".github/workflows/tests.yml",
     "scripts/ci/classify_changed_paths.py",
+    "scripts/ci/agent_fast.py",
 )
 
 

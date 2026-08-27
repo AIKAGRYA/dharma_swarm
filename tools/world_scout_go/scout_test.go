@@ -152,6 +152,58 @@ func scoutTextResponse(status int, body string, headers map[string]string) *http
 	return resp
 }
 
+func TestParseYouTubeAtomEmitsWatchURL(t *testing.T) {
+	body := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">
+  <entry>
+    <id>yt:video:xnUYnd-Pgeg</id>
+    <yt:videoId>xnUYnd-Pgeg</yt:videoId>
+    <title>Most companies are NOT READY for background agents</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=xnUYnd-Pgeg"/>
+    <media:group>
+      <media:description>Background agents need fast CI.</media:description>
+    </media:group>
+  </entry>
+</feed>`)
+	rows := parseYouTubeAtom(Source{Name: "yt", Kind: "youtube_atom"}, body)
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %+v", rows)
+	}
+	if rows[0].URL != "https://www.youtube.com/watch?v=xnUYnd-Pgeg" {
+		t.Fatalf("url = %q", rows[0].URL)
+	}
+	if rows[0].Title == "" || !strings.Contains(rows[0].Description, "fast CI") {
+		t.Fatalf("unexpected row: %+v", rows[0])
+	}
+	if rows[0].SourceType != "youtube_atom" {
+		t.Fatalf("source type = %q", rows[0].SourceType)
+	}
+}
+
+func TestParseRSSEmitsItems(t *testing.T) {
+	body := []byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+  <item>
+    <title>New skill: prototype</title>
+    <link>https://www.aihero.dev/skills/prototype</link>
+    <guid>https://www.aihero.dev/skills/prototype</guid>
+    <description>Throwaway code that answers a question.</description>
+  </item>
+</channel></rss>`)
+	rows := parseRSS(Source{Name: "skills", Kind: "rss"}, body)
+	if len(rows) != 1 || rows[0].URL == "" || rows[0].Title != "New skill: prototype" {
+		t.Fatalf("unexpected rows: %+v", rows)
+	}
+}
+
+func TestInferKindYouTubeAndRSS(t *testing.T) {
+	if got := inferKind("https://www.youtube.com/feeds/videos.xml?channel_id=UCswG6FSbgZjbWtdf_hMLaow"); got != "youtube_atom" {
+		t.Fatalf("youtube kind = %q", got)
+	}
+	if got := inferKind("https://www.aihero.dev/skills/rss.xml"); got != "rss" {
+		t.Fatalf("rss kind = %q", got)
+	}
+}
+
 func TestDefaultSourcesTrackAgenticDesignPatterns(t *testing.T) {
 	// The world_scout radar must track the agentic-design-patterns /
 	// agentic-engineering knowledge class on its regular cycle (companion to
@@ -162,6 +214,8 @@ func TestDefaultSourcesTrackAgenticDesignPatterns(t *testing.T) {
 		"arxiv_llm_agent_architecture":    "arxiv",
 		"hacker_news_agentic_engineering": "hn_algolia",
 		"github_agentic_design_patterns":  "github_repos",
+		"youtube_matt_pocock":             "youtube_atom",
+		"aihero_skills_rss":               "rss",
 	}
 	got := map[string]Source{}
 	for _, s := range DefaultSources() {

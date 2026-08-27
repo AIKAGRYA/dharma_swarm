@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check desktop-shell-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test test-fast agent-fast lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check desktop-shell-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -361,6 +361,9 @@ test:
 
 test-fast:
 	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10 -m "not slow and not docker and not network"
+
+agent-fast:
+	$(VENV_PYTHON) scripts/ci/agent_fast.py
 
 lint:
 	$(RUFF) check dharma_swarm/ --select=E,F,W --ignore=E501

@@ -83,6 +83,26 @@ def test_bronze_reingest_same_signal_is_noop(tmp_path: Path) -> None:
     assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
 
 
+def test_bronze_admits_youtube_host_and_rejects_query_spoof(tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    ok = {
+        "title": "Most companies are NOT READY for background agents",
+        "url": "https://www.youtube.com/watch?v=xnUYnd-Pgeg",
+        "source_type": "youtube_atom",
+        "description": "Background agents need fast CI.",
+    }
+    spoof = {
+        "title": "Host spoof attempt",
+        "url": "https://attacker.example/read?next=https://www.youtube.com/watch?v=xnUYnd-Pgeg",
+        "description": "The allowed host appears only in untrusted URL data.",
+    }
+
+    result = ingest_rows_to_bronze([ok, spoof], state_dir=state)
+
+    assert result.queued_receipts == 1
+    assert result.errors == ("unsupported_source_type:unknown",)
+
+
 def test_bronze_source_type_uses_parsed_host_not_url_substring(tmp_path: Path) -> None:
     state = tmp_path / ".dharma"
     row = {
