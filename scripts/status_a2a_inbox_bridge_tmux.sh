@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RECEIPT_DIR="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}/reports/a2a/inbox_bridge_receipts"
+STATE_ROOT="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}"
+case "${STATE_ROOT}" in
+  "~") STATE_ROOT="${HOME}" ;;
+  "~/"*) STATE_ROOT="${HOME}/${STATE_ROOT#\~/}" ;;
+esac
+RECEIPT_DIR="${STATE_ROOT}/reports/a2a/inbox_bridge_receipts"
 SESSION="${SESSION_NAME:-dharma_a2a_inbox_bridge_hermes_m5}"
 AGENT_UID="${AGENT_UID:-hermes-m5}"
 CONSUMER="${CONSUMER:-hermes_inbox}"

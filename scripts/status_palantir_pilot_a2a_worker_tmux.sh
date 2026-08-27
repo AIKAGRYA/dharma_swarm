@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RECEIPT_DIR="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}/reports/a2a/palantir_pilot_worker_receipts"
+STATE_ROOT="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}"
+case "${STATE_ROOT}" in
+  "~") STATE_ROOT="${HOME}" ;;
+  "~/"*) STATE_ROOT="${HOME}/${STATE_ROOT#\~/}" ;;
+esac
+RECEIPT_DIR="${STATE_ROOT}/reports/a2a/palantir_pilot_worker_receipts"
 SESSION="${SESSION_NAME:-dharma_palantir_pilot_a2a_worker}"
 SUBJECT="${SUBJECT:-dharma.a2a.palantir-pilot}"
 CONSUMER="${CONSUMER:-palantir_pilot_a2a}"
