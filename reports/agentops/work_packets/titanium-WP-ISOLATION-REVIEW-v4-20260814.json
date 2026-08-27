@@ -1,0 +1,91 @@
+{
+  "allowed_files": [
+    "dharma_swarm/sandbox.py",
+    "reports/agentops/work_packets/titanium-WP-ISOLATION-REVIEW-v4-20260814.json",
+    "tests/test_sandbox.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "ab9f8f9a343f6013f6d446ab63a220cb4146a2b8",
+  "branch": "agent/isolation-review-hardening-v4-20260814",
+  "commit": {
+    "allowed": true,
+    "message": "test(titanium): close isolation review escapes"
+  },
+  "forbidden_files": [
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_sandbox.py tests/test_subprocess_cancellation.py",
+      "expected_exit": 0,
+      "name": "sandbox-and-regression-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/sandbox.py tests/test_sandbox.py",
+      "expected_exit": 0,
+      "name": "touched-files-ruff",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "titanium-WP-ISOLATION-REVIEW-v4-20260814",
+  "intent": "Close the independent review gaps on the already bounded SandboxManager fail-closed change. Prove required local and prefer_docker=false requests cannot reach LocalSandbox, Docker adapter construction failure cannot downgrade a required request, permissive auto fallback remains compatible, and explicit Docker selection refreshes a stale negative daemon probe. This remains manager-level adapter selection only and does not claim production callers opt into isolation or that a container has already been created.",
+  "negative_controls": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); old='        if isolation_required:\\n            raise IsolationUnavailableError(\\n                \\\"Execution isolation is required; refusing LocalSandbox fallback\\\"\\n            )'; new='        if isolation_required:\\n            sb = LocalSandbox(workdir=workdir)\\n            self._active[id(sb)] = sb\\n            return sb'; t.count(old)==1 or sys.exit(3); p.write_text(t.replace(old,new)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_sandbox.py::test_required_local_isolation_is_rejected'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "required-isolation-final-guard-must-fail",
+      "timeout_seconds": 60
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -c \"from pathlib import Path; import subprocess,sys; p=Path('dharma_swarm/sandbox.py'); t=p.read_text(); old='        if explicit_docker and not await self._check_docker(refresh=True):'; new='        if explicit_docker and not await self._check_docker():'; t.count(old)==1 or sys.exit(3); p.write_text(t.replace(old,new)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_sandbox.py::test_explicit_docker_refreshes_cached_unavailability'],check=False); sys.exit(r.returncode)\"",
+      "expected_exit": 1,
+      "name": "explicit-docker-stale-cache-must-fail",
+      "timeout_seconds": 60
+    }
+  ],
+  "session_entry": {
+    "active_track": "repository-titanium-hardening-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/sandbox.py SandboxManager._check_docker and create_async",
+      "dharma_swarm/docker_sandbox.py DockerSandbox.docker_available",
+      "tests/test_sandbox.py"
+    ],
+    "collision": {
+      "checked_at_sha": "ab9f8f9a343f6013f6d446ab63a220cb4146a2b8",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Production execution sites still instantiate LocalSandbox directly and do not yet opt into require_isolation; this follow-up does not claim organism isolation is re-armed.",
+      "DockerSandbox creates its container lazily on first execute. Adapter selection is proved here; live container creation remains environment-dependent.",
+      "The local Docker daemon is stopped, so live-Docker tests remain environment-blocked; mocked unit tests and two independent negative controls prove this bounded contract.",
+      "Hosted exact-head CI and human merge authority remain required."
+    ],
+    "interface_mismatches": [
+      "The first fix had durable tests for only three entry cases, leaving required local, disabled preference, and adapter-construction failure to one-off review probes.",
+      "Docker availability was cached for the manager lifetime, so explicit Docker selection could retain a stale negative result after daemon recovery."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "fb7d0954bb630ba5b035457e09b5d0bd3a8a42f5fbb6c949aff29e35fe0b9a9b",
+    "rollback": "Revert this follow-up packet, sandbox.py refresh behavior, and its added tests together. The prior manager-level fail-closed behavior remains, but the review coverage and explicit daemon-recovery compatibility are lost.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-ISOLATION-REVIEW"
+  },
+  "worktree": "."
+}

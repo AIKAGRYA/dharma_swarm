@@ -26,6 +26,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 RUNNER = "scripts/governance/run_agent_work_packet.py"
 
+# The snapshot commit must not fork git's detached auto-maintenance into the
+# measured window: on git >= 2.55 it writes .git/objects/info/commit-graphs/*
+# into the pristine clone seconds later, and the tree-snapshot equality
+# asserts would attribute that background write to the target under test.
+_GIT_NO_AUTO_MAINTENANCE = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")
+
 
 @pytest.fixture(autouse=True)
 def _no_bytecode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -69,7 +75,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
     write.  A shared local clone avoids copying the repository object store.
     """
     subprocess.run(
-        ["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
+        ["git", *_GIT_NO_AUTO_MAINTENANCE, "clone", "--quiet", "--shared", str(REPO_ROOT), str(destination)],
         check=True,
         timeout=120,
     )
@@ -95,7 +101,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
         elif source.is_file():
             shutil.copy2(source, target)
     subprocess.run(
-        ["git", "-C", str(destination), "add", "-A"],
+        ["git", "-C", str(destination), *_GIT_NO_AUTO_MAINTENANCE, "add", "-A"],
         check=True,
         timeout=60,
     )
@@ -104,6 +110,7 @@ def _copy_tracked_checkout(destination: Path) -> None:
             "git",
             "-C",
             str(destination),
+            *_GIT_NO_AUTO_MAINTENANCE,
             "-c",
             "user.name=Session Contract Test",
             "-c",

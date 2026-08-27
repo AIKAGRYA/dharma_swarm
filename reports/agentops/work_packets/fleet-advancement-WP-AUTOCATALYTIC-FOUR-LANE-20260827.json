@@ -1,0 +1,112 @@
+{
+  "id": "fleet-advancement-WP-AUTOCATALYTIC-FOUR-LANE-20260827",
+  "base_ref": "fd1c203d87550d1c71103c3dd44da29593b1bab4",
+  "branch": "governance/four-active-mac-lanes-20260827",
+  "worktree": ".",
+  "intent": "Repair the four-lane focus reset's missed typed dependency by rebinding the existing ten-node autocatalytic local-rehearsal portfolio from the ten superseded project ids to the four operator-authorized Mac programs. Preserve every node role, authority, proof obligation, source adapter, edge, and local_rehearsal claim ceiling; this metadata repair grants no runtime, deployment, mutation, external-effect, or promotion authority.",
+  "allowed_files": [
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "reports/agentops/work_packets/fleet-advancement-WP-AUTOCATALYTIC-FOUR-LANE-20260827.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "CLAUDE.md",
+    "dharma_swarm/**",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/foundry/**",
+    "dashboard/**",
+    "dashboard/src/app/dashboard/sadhana/**",
+    "deploy/**",
+    "deploy/sadhana/**",
+    "docs/**",
+    "docs/foundry/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "scripts/**",
+    "scripts/forge_lab/**",
+    "scripts/foundry/**",
+    "scripts/runtime/sadhana_release.py",
+    "terminal/**",
+    "tests/**",
+    "tests/forge_lab_v1/**",
+    "tests/test_foundry_*.py",
+    "tests/test_sadhana_release.py",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "autocatalytic-four-lane-closure",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "four-lane-governance-regression",
+      "command": "python3 -m pytest -q tests/test_track_portfolio.py tests/test_check_track_status_lifecycle.py tests/test_active_track_governance.py tests/test_agent_onboard.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "committed-range-whitespace",
+      "command": "git diff --check fd1c203d87550d1c71103c3dd44da29593b1bab4...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "superseded-project-binding-remains-rejected",
+      "command": "python3 -c \"import copy; from dharma_swarm.autocatalytic_manifest_contracts import load_portfolio_manifest, validate_portfolio; p=copy.deepcopy(load_portfolio_manifest()); p['nodes'][0]['project_bindings']=['organism-rewire-2026-07']; raise SystemExit(0 if any('non-active project bindings' in e for e in validate_portfolio(p, require_files=False)) else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: bind metabolism to four active programs"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-AUTOCATALYTIC-FOUR-LANE-20260827",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "fd1c203d87550d1c71103c3dd44da29593b1bab4",
+      "details": []
+    },
+    "interface_mismatches": [
+      "ACTIVE_TRACK.yaml now authorizes exactly four programs, but autocatalytic_portfolio.nodes[*].project_bindings still closes over ten superseded project ids, causing both validator errors and full-suite failures.",
+      "Project bindings are typed routing metadata only; changing them cannot honestly alter a node's proof refs, semantic adapter, authority, promotion checks, or external-effect claim."
+    ],
+    "closest_existing_implementation": [
+      "ACTIVE_SURFACE_MANIFEST.yaml:autocatalytic_portfolio.nodes[*].project_bindings",
+      "dharma_swarm/autocatalytic_manifest_contracts.py:validate_portfolio",
+      "tests/test_autocatalytic_portfolio.py:test_every_active_project_is_bound_into_the_metabolism"
+    ],
+    "honest_blockers": [
+      "This change proves only exact metadata closure between the active-track set and a local-rehearsal topology; it does not prove any node, program, daemon, remote host, participant journey, external effect, or promotion is live.",
+      "The four programs share several metabolic membranes because assurance, evaluation, and operator projection are cross-cutting; a binding records relevance, not ownership or execution authority.",
+      "PR #1444 remains unmergeable until its fresh exact-head required CI contexts pass after this repair."
+    ],
+    "rollback": "Revert this packet and the ACTIVE_SURFACE_MANIFEST.yaml binding edit together. Rollback restores the known full-suite failure and the stale superseded-track closure but performs no runtime, deployment, provider, participant, remote-host, or external-state mutation.",
+    "packet_digest": "1f96ef99269d2bbdd8f98992db5d2b8a9781b3bf1c1909c823af4350f47a3898"
+  }
+}
