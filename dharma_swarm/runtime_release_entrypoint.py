@@ -18,11 +18,15 @@ _RELEASE_ROOT_ENV = "DHARMA_RELEASE_ROOT"
 _ORCHESTRATE_COMMAND = "orchestrate-live"
 _A2A_INBOX_BRIDGE_COMMAND = "a2a-inbox-bridge"
 _CODEX_COMPOSER_SEMANTIC_RESPONDER_COMMAND = "codex-composer-semantic-responder"
+_GOVERNED_PATCH_FOUNDRY_VERIFIER_COMMAND = "governed-patch-foundry-verifier"
+_GOVERNED_PATCH_VIBE_VERIFIER_COMMAND = "governed-patch-vibe-verifier"
 _SUPPORTED_COMMANDS = frozenset(
     {
         _ORCHESTRATE_COMMAND,
         _A2A_INBOX_BRIDGE_COMMAND,
         _CODEX_COMPOSER_SEMANTIC_RESPONDER_COMMAND,
+        _GOVERNED_PATCH_FOUNDRY_VERIFIER_COMMAND,
+        _GOVERNED_PATCH_VIBE_VERIFIER_COMMAND,
     }
 )
 
@@ -53,7 +57,8 @@ def main() -> int:
     if not args or args[0] not in _SUPPORTED_COMMANDS:
         raise SystemExit(
             "release entrypoint denied: supported commands are orchestrate-live, "
-            "a2a-inbox-bridge, and codex-composer-semantic-responder"
+            "a2a-inbox-bridge, codex-composer-semantic-responder, "
+            "governed-patch-foundry-verifier, and governed-patch-vibe-verifier"
         )
     command, command_args = args[0], args[1:]
     if command == _ORCHESTRATE_COMMAND and command_args:
@@ -79,6 +84,20 @@ def main() -> int:
         )
 
         return semantic_responder_main(command_args)
+
+    if command == _GOVERNED_PATCH_FOUNDRY_VERIFIER_COMMAND:
+        from scripts.runtime.governed_patch_foundry_verifier import (
+            main as foundry_verifier_main,
+        )
+
+        return foundry_verifier_main(command_args)
+
+    if command == _GOVERNED_PATCH_VIBE_VERIFIER_COMMAND:
+        from scripts.runtime.governed_patch_vibe_verifier import (
+            main as vibe_verifier_main,
+        )
+
+        return vibe_verifier_main(command_args)
 
     raise AssertionError("supported release command was not dispatched")
 
