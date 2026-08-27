@@ -24,6 +24,7 @@ import logging
 import re
 import threading
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -293,6 +294,22 @@ def _validated_public_collection(
     return result
 
 
+def _validated_observed_at(value: Any) -> str:
+    """Require an unambiguous ISO timestamp before promoting observed state."""
+    if not isinstance(value, str):
+        raise TypeError("mission snapshot observed_at must be an ISO timestamp")
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(
+            "mission snapshot observed_at must be an ISO timestamp"
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("mission snapshot observed_at must include a timezone")
+    return value
+
+
 def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]:
     """Validate a provider result against the public MissionSnapshot shape."""
     projected = jsonable_encoder(snapshot)
@@ -393,8 +410,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
     )
     if not isinstance(projected.get("reconciliation"), str):
         raise TypeError("mission snapshot reconciliation must be a string")
-    if not isinstance(projected.get("observed_at"), str):
-        raise TypeError("mission snapshot observed_at must be an ISO timestamp")
+    observed_at = _validated_observed_at(projected.get("observed_at"))
     if projected.get("authority") != _MISSION_AUTHORITY:
         raise ValueError("mission snapshot authority is not canonical")
     if projected.get("proves_executor_liveness") is not False:
@@ -406,7 +422,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         "leases": leases,
         "receipts": receipts,
         "reconciliation": projected["reconciliation"],
-        "observed_at": projected["observed_at"],
+        "observed_at": observed_at,
         "authority": projected["authority"],
         "proves_executor_liveness": False,
     }

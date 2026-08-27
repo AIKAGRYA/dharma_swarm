@@ -334,6 +334,27 @@ def test_mismatch_or_forged_claim_fails_closed(
     assert "different-mission" not in body["source_errors"][0]["error"]
 
 
+@pytest.mark.parametrize(
+    "observed_at",
+    ["definitely-not-a-timestamp", "2026-08-26T01:10:00", ""],
+)
+def test_malformed_or_ambiguous_observation_time_fails_closed(
+    observed_at: str,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _snapshot(mission_id, observed_at=observed_at)
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
 def test_sync_provider_is_offloaded_while_event_loop_remains_live() -> None:
     mission_id = "fleet-advancement-20260826"
     started = threading.Event()
