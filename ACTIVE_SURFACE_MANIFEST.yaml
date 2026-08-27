@@ -1222,7 +1222,7 @@ autocatalytic_portfolio:
       ordinal: 6
       label: "Chamber Research & Evolution"
       role: "Turn selected experiments into falsifiable, source-resolvable change proposals."
-      project_bindings: [dharmagraph-engine-2026-07]
+      project_bindings: [hyperbolic-time-chamber-2026-07]
       authority: local_evidence
       input_signal: selected_experiment
       cross_inputs:

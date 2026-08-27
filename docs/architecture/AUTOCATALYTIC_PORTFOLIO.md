@@ -21,7 +21,7 @@ This portfolio is the metabolism of the currently active governance tracks, not 
 | 3 | [DharmaGraph Execution](autocatalytic_nodes/dharmagraph_execution.md) | `prioritized_work -> execution_receipt` | `local_evidence` | DharmaGraph |
 | 4 | [Cybernetic Supervision](autocatalytic_nodes/cybernetic_supervision.md) | `execution_receipt -> closure_gap` | `local_evidence` | Organism Rewire |
 | 5 | [Arena Selection](autocatalytic_nodes/arena_selection.md) | `closure_gap -> selected_experiment` | `local_evidence` | DharmaGraph |
-| 6 | [Chamber Research](autocatalytic_nodes/chamber_research.md) | `selected_experiment -> proposed_change` | `local_evidence` | DharmaGraph |
+| 6 | [Chamber Research](autocatalytic_nodes/chamber_research.md) | `selected_experiment -> proposed_change` | `local_evidence` | Hyperbolic Time Chamber |
 | 7 | [Assurance & Merge](autocatalytic_nodes/assurance_merge.md) | `proposed_change -> verified_release` | `local_evidence` | Organism Rewire, DharmaGraph |
 | 8 | [Operator Experience](autocatalytic_nodes/operator_experience.md) | `verified_release -> authorized_action` | `projection_only` | Organism Rewire |
 | 9 | [External Value Delivery](autocatalytic_nodes/external_value_delivery.md) | `authorized_action -> external_outcome` | `external_gated` | Darshan |
