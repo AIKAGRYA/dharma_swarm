@@ -301,7 +301,7 @@ For v1, "sandbox" means:
 
 ```
 Docker container:
-  - Base image: python:3.11-slim + dharma_swarm dependencies
+  - Base image: python:3.13-slim + dharma_swarm dependencies
   - CPU: 2 cores max
   - Memory: 2GB max
   - Network: DISABLED (--network none)
@@ -483,7 +483,7 @@ class DarwinEngine:
 
 ```dockerfile
 # Dockerfile.sandbox
-FROM python:3.11-slim
+FROM python:3.13-slim
 WORKDIR /dharma_sandbox
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
