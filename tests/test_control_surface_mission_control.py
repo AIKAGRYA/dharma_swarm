@@ -274,6 +274,25 @@ def test_collection_member_from_another_mission_fails_closed() -> None:
     assert body["data"]["snapshot"] is None
 
 
+@pytest.mark.parametrize("view", ["mission", "attempts", "leases"])
+def test_foreign_session_identity_fails_closed(view: str) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    if view == "mission":
+        value[view]["session_id"] = "mission:another-mission"
+    else:
+        value[view][0]["session_id"] = "mission:another-mission"
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert "another-mission" not in body["source_errors"][0]["error"]
+
+
 @pytest.mark.parametrize(
     "mission_id",
     ["-leading-dash", "has space", "slash/value", "a" * 201, "semi;colon"],

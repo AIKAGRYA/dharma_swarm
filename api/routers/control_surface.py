@@ -258,6 +258,7 @@ def _validated_public_collection(
     *,
     field: str,
     mission_id: str,
+    expected_session_id: str | None = None,
     string_fields: tuple[str, ...],
     mapping_fields: tuple[str, ...] = (),
     boolean_fields: tuple[str, ...] = (),
@@ -281,6 +282,13 @@ def _validated_public_collection(
             raise ValueError(
                 f"mission snapshot {field}[{index}] identity does not match the request"
             )
+        if (
+            expected_session_id is not None
+            and public_view.get("session_id") != expected_session_id
+        ):
+            raise ValueError(
+                f"mission snapshot {field}[{index}] session does not match the request"
+            )
         result.append(public_view)
     return result
 
@@ -292,6 +300,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         raise TypeError("mission snapshot provider returned a non-object")
     if set(projected) != _MISSION_SNAPSHOT_FIELDS:
         raise ValueError("mission snapshot fields do not match the public contract")
+    expected_session_id = f"mission:{mission_id}"
     mission = _validated_public_view(
         projected.get("mission"),
         view_name="mission",
@@ -308,6 +317,8 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
     )
     if mission["mission_id"] != mission_id:
         raise ValueError("mission snapshot identity does not match the request")
+    if mission["session_id"] != expected_session_id:
+        raise ValueError("mission snapshot session does not match the request")
     tasks = _validated_public_collection(
         projected,
         field="tasks",
@@ -329,6 +340,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         projected,
         field="attempts",
         mission_id=mission_id,
+        expected_session_id=expected_session_id,
         string_fields=(
             "attempt_id",
             "mission_id",
@@ -348,6 +360,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         projected,
         field="leases",
         mission_id=mission_id,
+        expected_session_id=expected_session_id,
         string_fields=(
             "claim_id",
             "mission_id",
