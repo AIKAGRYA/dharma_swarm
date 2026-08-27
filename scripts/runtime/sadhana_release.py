@@ -200,8 +200,8 @@ _UV_0_11_2_EGG_INFO_FILES = (
     (
         "SOURCES.txt",
         0o600,
-        74905,
-        "047f1a940ced32aa04573350679ddd3f38a44f4338646b57a89e3fec17a6af00",
+        74947,
+        "c1fd29d8c8b6ca7bd7f4ca8f3bc490809a4f49f061cb36658a0ae1c4270fd0fc",
     ),
     (
         "dependency_links.txt",
@@ -3817,8 +3817,12 @@ def install_input_set(
                 for name in names:
                     child = Path(directory) / name
                     os.chown(child, expected_root_uid, account.pw_gid)
+                    # Service-group traversal is required; read and write remain owner-only.
+                    # codeql[py/overly-permissive-file]
                     os.chmod(child, 0o710)
             os.chown(staging, expected_root_uid, account.pw_gid)
+            # Service-group traversal is required; read and write remain owner-only.
+            # codeql[py/overly-permissive-file]
             os.chmod(staging, 0o710)
             os.replace(staging, target_root)
             directory_descriptor = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
@@ -4486,6 +4490,8 @@ def provision_pinned_uv(
     if tooling_root.is_symlink():
         raise ReleaseContractError("pinned uv tooling root cannot be a symlink")
     os.chown(tooling_root, os.geteuid(), custody_gid)
+    # The exact build custody group needs traversal, never read or write.
+    # codeql[py/overly-permissive-file]
     os.chmod(tooling_root, 0o710)
     target = tooling_root / f"uv-{UV_VERSION}"
     if target.exists() or target.is_symlink():
@@ -11698,7 +11704,8 @@ def _publish_predispatch_account_ui_gate(
     )
     # Root ownership is the authority boundary; the exact control group needs
     # read-only access to consume this non-secret NoDispatch projection.
-    os.chmod(  # lgtm[py/overly-permissive-file]
+    # codeql[py/overly-permissive-file]
+    os.chmod(
         PREDISPATCH_ACCOUNT_UI_GATE,
         0o640,
         follow_symlinks=False,
@@ -18246,7 +18253,8 @@ def _ensure_host_directory(path: Path, *, uid: int, gid: int, mode: int) -> None
     os.chown(path, uid, gid)
     # These are directories, not secret-bearing files. Some exact service-group
     # paths require traversal, listing, or inbox writes; world write is never admitted.
-    os.chmod(path, mode)  # lgtm[py/overly-permissive-file]
+    # codeql[py/overly-permissive-file]
+    os.chmod(path, mode)
     final = path.lstat()
     if (
         final.st_uid != uid
@@ -21473,7 +21481,8 @@ def _install_exact_build_driver(
     _atomic_private_bytes(destination, raw, uid=0, gid=build_gid)
     # The unprivileged build interpreter must read the trusted driver, while
     # root ownership and no write bit preserve the authority boundary.
-    os.chmod(destination, 0o440)  # lgtm[py/overly-permissive-file]
+    # codeql[py/overly-permissive-file]
+    os.chmod(destination, 0o440)
     return destination
 
 

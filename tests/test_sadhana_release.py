@@ -10798,8 +10798,8 @@ _PINNED_UV_EGG_INFO_SPECS = {
     ),
     "SOURCES.txt": (
         0o600,
-        74905,
-        "047f1a940ced32aa04573350679ddd3f38a44f4338646b57a89e3fec17a6af00",
+        74947,
+        "c1fd29d8c8b6ca7bd7f4ca8f3bc490809a4f49f061cb36658a0ae1c4270fd0fc",
     ),
     "dependency_links.txt": (
         0o600,
@@ -10839,7 +10839,7 @@ def _pinned_uv_egg_info_bytes() -> dict[str, bytes]:
         path.relative_to(source_root).as_posix()
         for path in (source_root / "tests").glob("test*.py")
     ]
-    assert (len(package_sources), len(test_sources)) == (1128, 973)
+    assert (len(package_sources), len(test_sources)) == (1128, 974)
     source_paths = [
         "README.md",
         "pyproject.toml",
