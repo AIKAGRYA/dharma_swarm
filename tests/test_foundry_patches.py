@@ -278,6 +278,17 @@ def test_immutable_writer_does_not_follow_existing_symlink_leaf(tmp_path):
     assert outside.read_bytes() == b"operator-owned"
 
 
+def test_content_addressed_writer_rejects_size_before_existing_file_read(tmp_path):
+    root = tmp_path / "state"
+    target = root / "artifacts" / "blob.patch"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"x" * (1024 * 1024))
+    target.chmod(0o600)
+
+    with pytest.raises(PatchReplayError, match="content-address collision"):
+        write_immutable_beneath(root, "artifacts/blob.patch", b"short")
+
+
 def _synthetic_lineage(depth):
     return [
         {"lineage_digest": "sha256:" + f"{index:064x}", "index": index}
