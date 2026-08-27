@@ -134,9 +134,9 @@ def _probe_targets(reg: dict[str, Any]) -> list[dict[str, str]]:
 def _require_ws_transport_deps(url: str) -> None:
     """Fail honestly (not with nats-py traceback spew) when the hub URL is a
     websocket endpoint but aiohttp — required by nats-py's ws/wss transport
-    and, like nats-py itself, deliberately not a declared repo dependency —
-    is not installed. find_spec keeps this probe out of the import-provenance
-    ratchet."""
+    but not supplied by the minimal locked ``a2a-runtime`` extra — is not
+    installed. find_spec keeps this probe out of the import-provenance ratchet.
+    """
     if not url.startswith(("ws://", "wss://")):
         return
     import importlib.util
@@ -401,7 +401,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         import nats  # noqa: F401
     except ImportError:
-        print("[error] nats-py not installed. Install with: pip install nats-py", file=sys.stderr)
+        print(
+            "[error] locked nats-py is absent from this interpreter. "
+            "Run: uv sync --frozen --extra a2a-runtime",
+            file=sys.stderr,
+        )
         return 1
 
     live: dict[str, Any] | None = None

@@ -31,11 +31,28 @@ resolve_file() {
 }
 
 verify_only=false
-if [[ "${1-}" == "--verify-only" ]]; then
-    verify_only=true
-elif [[ "$#" -ne 0 ]]; then
-    fail "unsupported argument"
-fi
+runtime_command="orchestrate-live"
+runtime_args=()
+case "${1-}" in
+    "")
+        ;;
+    --verify-only)
+        [[ "$#" -eq 1 ]] || fail "--verify-only accepts no arguments"
+        verify_only=true
+        ;;
+    orchestrate-live)
+        shift
+        [[ "$#" -eq 0 ]] || fail "orchestrate-live accepts no arguments"
+        ;;
+    a2a-inbox-bridge)
+        runtime_command="a2a-inbox-bridge"
+        shift
+        runtime_args=("$@")
+        ;;
+    *)
+        fail "unsupported command"
+        ;;
+esac
 
 release_root="${DHARMA_RELEASE_ROOT:?DHARMA_RELEASE_ROOT is required}"
 expected_commit="${DHARMA_RUNTIME_EXPECTED_COMMIT-}"
@@ -129,11 +146,46 @@ if [[ "${verify_only}" == "true" ]]; then
 fi
 
 cd "${release_root}"
-# shellcheck disable=SC1090
-source "${runtime_env_helper}"
-
-exec env \
-    DHARMA_RUNTIME_EXPECTED_COMMIT="${expected_commit}" \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONNOUSERSITE=1 \
-    "${runtime_python}" -B -I -m dharma_swarm.runtime_release_entrypoint orchestrate-live
+case "${runtime_command}" in
+    orchestrate-live)
+        # The autonomous runtime owns provider routing and therefore loads the
+        # versioned environment only after provenance admission.
+        # shellcheck disable=SC1090
+        source "${runtime_env_helper}"
+        exec env \
+            DHARMA_RUNTIME_EXPECTED_COMMIT="${expected_commit}" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            PYTHONNOUSERSITE=1 \
+            "${runtime_python}" -B -I -m \
+            dharma_swarm.runtime_release_entrypoint orchestrate-live
+        ;;
+    a2a-inbox-bridge)
+        # The transport bridge needs no model/provider credentials. Give it a
+        # minimal environment rather than sourcing the runtime key bundle.
+        bridge_env=(
+            env -i
+            "HOME=${HOME:?HOME is required}"
+            "PATH=${safe_path}"
+            "TMPDIR=${TMPDIR:-/tmp}"
+            "DHARMA_RELEASE_ROOT=${release_root}"
+            "DHARMA_RUNTIME_EXPECTED_COMMIT=${expected_commit}"
+            "DHARMA_PYTHON=${runtime_python}"
+            "PYTHONDONTWRITEBYTECODE=1"
+            "PYTHONNOUSERSITE=1"
+            "PYTHONUNBUFFERED=1"
+        )
+        if [[ -n "${DHARMA_STATE_DIR-}" ]]; then
+            bridge_env+=("DHARMA_STATE_DIR=${DHARMA_STATE_DIR}")
+        fi
+        if [[ -n "${DHARMA_HOME-}" ]]; then
+            bridge_env+=("DHARMA_HOME=${DHARMA_HOME}")
+        fi
+        exec "${bridge_env[@]}" \
+            "${runtime_python}" -B -I -m \
+            dharma_swarm.runtime_release_entrypoint \
+            a2a-inbox-bridge "${runtime_args[@]}"
+        ;;
+    *)
+        fail "unsupported command"
+        ;;
+esac

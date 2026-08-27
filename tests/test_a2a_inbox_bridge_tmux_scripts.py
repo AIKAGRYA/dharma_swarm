@@ -19,13 +19,16 @@ def test_a2a_inbox_bridge_tmux_scripts_are_syntax_valid() -> None:
         subprocess.run(["bash", "-n", str(ROOT / script)], check=True)
 
 
-def test_a2a_inbox_bridge_start_script_uses_receipt_bridge_not_ad_hoc_bus() -> None:
+def test_a2a_inbox_bridge_start_script_uses_locked_release_interpreter() -> None:
     text = (ROOT / "scripts/start_a2a_inbox_bridge_tmux.sh").read_text(encoding="utf-8")
 
     assert "scripts/runtime/a2a_inbox_bridge.py" in text
-    assert "uv run --with nats-py" in text
+    assert "uv run --with" not in text
+    assert 'RUNTIME_PYTHON="${ROOT}/.venv/bin/python"' in text
+    assert 'version("nats-py") != "2.15.0"' in text
+    assert "uv sync --frozen --extra a2a-runtime" in text
     assert "PYTHONDONTWRITEBYTECODE=1" in text
-    assert "python -B scripts/runtime/a2a_inbox_bridge.py" in text
+    assert "'${RUNTIME_PYTHON}' -B scripts/runtime/a2a_inbox_bridge.py" in text
     assert "--loop --suppress-no-messages" in text
     assert "dharma_a2a_inbox_bridge_hermes_m5" in text
 

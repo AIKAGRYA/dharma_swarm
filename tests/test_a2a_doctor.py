@@ -1,4 +1,5 @@
 import asyncio
+import builtins
 import json
 import sys
 import types
@@ -123,3 +124,21 @@ def test_main_json_includes_outbound_reachability(monkeypatch, capsys):
     assert payload["outbound_reachability"] == [
         {"lane": "codex", "subject": "dharma.a2a.codex", "status": "ALLOWED", "detail": ""}
     ]
+
+
+def test_missing_nats_points_to_locked_runtime_extra(monkeypatch, capsys):
+    real_import = builtins.__import__
+
+    def fail_nats_import(name, *args, **kwargs):
+        if name == "nats":
+            raise ImportError("test-only missing nats")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fail_nats_import)
+
+    code = a2a_doctor.main([])
+
+    assert code == 1
+    error = capsys.readouterr().err
+    assert "uv sync --frozen --extra a2a-runtime" in error
+    assert "pip install nats-py" not in error

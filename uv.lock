@@ -606,6 +606,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+a2a-runtime = [
+    { name = "nats-py" },
+]
 dev = [
     { name = "hypothesis" },
     { name = "mutmut" },
@@ -669,6 +672,7 @@ requires-dist = [
     { name = "markitdown", marker = "extra == 'ingest'", specifier = ">=0.1.6" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.28.1" },
     { name = "mutmut", marker = "extra == 'dev'", specifier = ">=3.5" },
+    { name = "nats-py", marker = "extra == 'a2a-runtime'", specifier = "==2.15.0" },
     { name = "neo4j", marker = "extra == 'infra'", specifier = ">=5.25.0" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "openai", specifier = ">=1.0" },
@@ -691,7 +695,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.24" },
     { name = "yfinance", marker = "extra == 'ginko'", specifier = ">=0.2" },
 ]
-provides-extras = ["mcp", "ingest", "dev", "router", "infra", "ginko", "test-oracle", "test-oracle-vocab"]
+provides-extras = ["a2a-runtime", "mcp", "ingest", "dev", "router", "infra", "ginko", "test-oracle", "test-oracle-vocab"]
 
 [[package]]
 name = "distro"
@@ -1483,6 +1487,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/62/3c/c4ef2164a71c1a63d7f1ae411c4082c5fa872405106db60a4b7114989ad7/narwhals-2.22.1.tar.gz", hash = "sha256:d62920805a0a43b7ff8b54b0c0d3142d796f8a9301836ada37e573d6a33cbcd9", size = 647493, upload-time = "2026-06-05T12:34:34.051Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/48/ca/36339329c4604adbcc99c899b7eb1ce1a555c499b6a6860757dc9bfed36d/narwhals-2.22.1-py3-none-any.whl", hash = "sha256:60567d774edf77db53906f89d9fbd164e66e56d66d388e1e6990f17ac33cfb53", size = 454815, upload-time = "2026-06-05T12:34:32.289Z" },
+]
+
+[[package]]
+name = "nats-py"
+version = "2.15.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/f0/fc5e93f2b0dd14a202590ad9d30eda1955ea872039b5204357348d0f4b1e/nats_py-2.15.0.tar.gz", hash = "sha256:6622c547d9a7d2313d9c147d46c386188f4ec2c7b5c9f9a0438a4d1b55f54a93", size = 75995, upload-time = "2026-06-05T07:34:03.904Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/a8/b55606c7c621fb813c8ec78baf201d2c78bf6051091ec0c7ada572999e95/nats_py-2.15.0-py3-none-any.whl", hash = "sha256:9f8d36aa52a9926a88b8f1d70cf1fdce0ad387941479b500ee9ab3e51073cefd", size = 90334, upload-time = "2026-06-05T07:34:02.81Z" },
 ]
 
 [[package]]
