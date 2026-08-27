@@ -26,6 +26,7 @@ jobs:
     outputs:
       go: ${{ steps.classify.outputs.go }}
       dashboard: ${{ steps.classify.outputs.dashboard }}
+      desktop: ${{ steps.classify.outputs.desktop }}
       terminal: ${{ steps.classify.outputs.terminal }}
       python: ${{ steps.classify.outputs.python }}
     steps:
@@ -252,6 +253,29 @@ jobs:
 
       - name: Build dashboard
         run: npm run build
+
+  desktop-shell:
+    needs: changes
+    if: >-
+      !cancelled() && needs.changes.outputs.desktop != 'false'
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # serde_with 3.21.0 is the first release patched for
+      # GHSA-7gcf-g7xr-8hxj and requires Rust 1.88. Test the lockfile on that
+      # exact compiler, not the runner's floating stable toolchain.
+      - name: Install exact desktop-shell Rust toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+
+      - name: Check desktop shell from locked dependencies
+        run: cargo +1.88.0 check --locked --manifest-path desktop-shell/src-tauri/Cargo.toml
+
+      - name: Test desktop shell from locked dependencies
+        run: cargo +1.88.0 test --locked --manifest-path desktop-shell/src-tauri/Cargo.toml
 
   terminal:
     needs: changes
