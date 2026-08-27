@@ -72,6 +72,53 @@ def test_entrypoint_forwards_only_bridge_arguments(monkeypatch) -> None:
     ]
 
 
+def test_entrypoint_forwards_only_semantic_responder_arguments(monkeypatch) -> None:
+    called: list[list[str]] = []
+    monkeypatch.setenv("DHARMA_RELEASE_ROOT", str(REPO_ROOT))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "runtime-release",
+            "codex-composer-semantic-responder",
+            "loop",
+            "--interval-s",
+            "60",
+            "--limit",
+            "1",
+        ],
+    )
+    monkeypatch.setattr(
+        "scripts.runtime.codex_composer_semantic_responder.main",
+        lambda args: called.append(args) or 9,
+    )
+
+    result = runtime_release_entrypoint.main()
+
+    assert result == 9
+    assert called == [["loop", "--interval-s", "60", "--limit", "1"]]
+
+
+def test_entrypoint_leaves_responder_argument_validation_to_responder(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_RELEASE_ROOT", str(REPO_ROOT))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "runtime-release",
+            "codex-composer-semantic-responder",
+            "arbitrary.module",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        runtime_release_entrypoint.main()
+
+    assert exc_info.value.code == 2
+
+
 def test_entrypoint_rejects_unknown_commands(monkeypatch) -> None:
     monkeypatch.setenv("DHARMA_RELEASE_ROOT", str(REPO_ROOT))
     monkeypatch.setattr(sys, "argv", ["runtime-release", "cron", "daemon"])

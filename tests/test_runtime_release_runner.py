@@ -32,14 +32,20 @@ def _fake_release(tmp_path: Path) -> tuple[Path, Path]:
     admission.parent.mkdir(parents=True)
     python.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s\\n' \"$*\" >> \"$(dirname \"$0\")/../runner_calls.log\"\n"
+        'printf \'%s\\n\' "$*" >> "$(dirname "$0")/../runner_calls.log"\n'
         "printf 'github=%s runtime=%s\\n' \"${GITHUB_TOKEN-<unset>}\" "
-        "\"${TEST_RUNTIME_ENV_LOADED-<unset>}\" >> "
-        "\"$(dirname \"$0\")/../runner_env.log\"\n",
+        '"${TEST_RUNTIME_ENV_LOADED-<unset>}" >> '
+        '"$(dirname "$0")/../runner_env.log"\n',
         encoding="utf-8",
     )
     python.chmod(0o755)
-    loader.write_text("export TEST_RUNTIME_ENV_LOADED=1\n", encoding="utf-8")
+    loader.write_text(
+        'if [[ -n "${TEST_RUNTIME_LOADER_LOG-}" ]]; then\n'
+        "    printf 'loaded\\n' >> \"${TEST_RUNTIME_LOADER_LOG}\"\n"
+        "fi\n"
+        "export TEST_RUNTIME_ENV_LOADED=1\n",
+        encoding="utf-8",
+    )
     admission.write_text("# fake admission target\n", encoding="utf-8")
     (release / ".gitignore").write_text(".venv/\n*.pyc\n", encoding="utf-8")
     _git(release, "init", "-b", "main")
@@ -72,6 +78,7 @@ def test_release_runner_uses_pinned_release_interpreter_and_guard() -> None:
         "dharma_swarm.runtime_release_entrypoint orchestrate-live"
     )
     assert "a2a-inbox-bridge" in text
+    assert "codex-composer-semantic-responder" in text
     assert "bridge_env=(" in text
     assert "env -i" in text
     assert '"PYTHONUNBUFFERED=1"' in text
@@ -175,6 +182,93 @@ def test_release_runner_dispatches_bridge_through_the_same_interpreter(
     ]
 
 
+def test_release_runner_dispatches_semantic_responder_after_admission(
+    tmp_path: Path,
+) -> None:
+    release, _python = _fake_release(tmp_path)
+    call_log = release / ".venv" / "runner_calls.log"
+    env_log = release / ".venv" / "runner_env.log"
+    loader_log = tmp_path / "runtime_loader.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+            "GITHUB_TOKEN": "provider-visible-to-responder",
+            "TEST_RUNTIME_LOADER_LOG": str(loader_log),
+        }
+    )
+
+    result = subprocess.run(
+        [
+            "/bin/bash",
+            str(RUNNER),
+            "codex-composer-semantic-responder",
+            "loop",
+            "--interval-s",
+            "60",
+            "--limit",
+            "1",
+        ],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
+        (
+            f"-B -I -S {release}/dharma_swarm/runtime_admission.py "
+            f"--repo {release} --expected-commit {PIN}"
+        ),
+        (
+            "-B -I -m dharma_swarm.runtime_release_entrypoint "
+            "codex-composer-semantic-responder loop --interval-s 60 --limit 1"
+        ),
+    ]
+    assert env_log.read_text(encoding="utf-8").splitlines() == [
+        "github=provider-visible-to-responder runtime=<unset>",
+        "github=provider-visible-to-responder runtime=1",
+    ]
+    assert loader_log.read_text(encoding="utf-8").splitlines() == ["loaded"]
+
+
+def test_release_runner_rejects_dirty_release_before_responder_env_or_dispatch(
+    tmp_path: Path,
+) -> None:
+    release, _python = _fake_release(tmp_path)
+    call_log = release / ".venv" / "runner_calls.log"
+    loader_log = tmp_path / "runtime_loader.log"
+    (release / "uncommitted.py").write_text("# dirty release\n", encoding="utf-8")
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+            "TEST_RUNTIME_LOADER_LOG": str(loader_log),
+        }
+    )
+
+    result = subprocess.run(
+        [
+            "/bin/bash",
+            str(RUNNER),
+            "codex-composer-semantic-responder",
+            "once",
+        ],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 78
+    assert "release checkout has uncommitted paths" in result.stderr
+    assert not loader_log.exists()
+    assert not call_log.exists()
+
+
 def test_release_runner_rejects_unknown_command_before_python(tmp_path: Path) -> None:
     release, _python = _fake_release(tmp_path)
     call_log = release / ".venv" / "runner_calls.log"
@@ -231,8 +325,7 @@ def test_release_runner_rejects_lexical_parent_traversal_before_execution(
     outside = tmp_path / "outside" / "python"
     outside.parent.mkdir()
     outside.write_text(
-        "#!/usr/bin/env bash\n"
-        "printf 'executed\\n' >> \"${RUNNER_CALL_LOG}\"\n",
+        "#!/usr/bin/env bash\nprintf 'executed\\n' >> \"${RUNNER_CALL_LOG}\"\n",
         encoding="utf-8",
     )
     outside.chmod(0o755)
@@ -371,8 +464,7 @@ def test_release_runner_rejects_interpreter_symlinked_outside_release(
     release, python = _fake_release(tmp_path)
     outside = tmp_path / "outside-python"
     outside.write_text(
-        "#!/usr/bin/env bash\n"
-        "printf 'OUTSIDE %s\\n' \"$*\" >> \"${RUNNER_CALL_LOG}\"\n",
+        '#!/usr/bin/env bash\nprintf \'OUTSIDE %s\\n\' "$*" >> "${RUNNER_CALL_LOG}"\n',
         encoding="utf-8",
     )
     outside.chmod(0o755)

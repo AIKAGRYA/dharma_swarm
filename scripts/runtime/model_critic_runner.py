@@ -110,7 +110,13 @@ def _call_ollama(
 ) -> tuple[str, dict[str, Any], int]:
     if not endpoint.lower().startswith(("http://", "https://")):
         raise ValueError(f"unsupported critic endpoint scheme: {endpoint!r}")
-    payload = {"model": model, "prompt": prompt, "stream": False}
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "format": semantic_receipt_json_schema(),
+        "options": {"temperature": 0},
+    }
     started = time.perf_counter()
     req = urllib.request.Request(
         endpoint,
@@ -198,6 +204,7 @@ def _apply_runner_provenance(
     evidence_refs: list[str],
 ) -> dict[str, Any]:
     """Overwrite fields that must come from the runner, not model prose."""
+    receipt["receipt_id"] = f"semr_{uuid4().hex}"
     receipt["schema_version"] = SCHEMA_VERSION
     receipt["created_at"] = utc_now_iso()
     receipt["agent_uid"] = agent_uid
@@ -266,7 +273,6 @@ def run_model_critic(
 
         try:
             receipt = _extract_json_object(response_text)
-            receipt.setdefault("receipt_id", f"semr_{uuid4().hex}")
             receipt = _apply_runner_provenance(
                 receipt,
                 provider=provider,
@@ -300,7 +306,6 @@ def run_model_critic(
                 timeout_seconds=timeout_seconds,
             )
             receipt = _extract_json_object(response_text)
-            receipt.setdefault("receipt_id", f"semr_{uuid4().hex}")
             receipt = _apply_runner_provenance(
                 receipt,
                 provider=provider,
