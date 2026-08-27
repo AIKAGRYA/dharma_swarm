@@ -8,6 +8,7 @@ object that exposes ``publish``.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import uuid4
@@ -37,6 +38,9 @@ from dharma_swarm.a2a.nats_transport_support import (
 )
 from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
+
+
+_LOG = logging.getLogger(__name__)
 
 
 class JetStreamLike(Protocol):
@@ -73,6 +77,13 @@ class NatsTransportConfig:
     max_deliveries: int = 3
     publish_timeout_s: float = 2.0
     idempotency_stale_after_s: float | None = 300.0
+    # Reconnect policy: a transient broker drop should be retried with a
+    # bounded backoff rather than being immediately fatal. ``max_reconnect_attempts``
+    # stays a finite positive int so retries never become unbounded (nats-py
+    # treats -1 as infinite, which we deliberately do not use).
+    allow_reconnect: bool = True
+    max_reconnect_attempts: int = 60
+    reconnect_time_wait_s: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -147,10 +158,21 @@ class A2ANatsTransport:
             return
         import nats
 
+        endpoint = self.config.endpoint
+
+        async def _on_disconnected() -> None:
+            _LOG.warning("NATS transport disconnected from %s; awaiting reconnect", endpoint)
+
+        async def _on_reconnected() -> None:
+            _LOG.info("NATS transport reconnected to %s", endpoint)
+
         self._nats_connection = await nats.connect(
-            servers=[self.config.endpoint],
-            allow_reconnect=False,
-            max_reconnect_attempts=0,
+            servers=[endpoint],
+            allow_reconnect=self.config.allow_reconnect,
+            max_reconnect_attempts=self.config.max_reconnect_attempts,
+            reconnect_time_wait=self.config.reconnect_time_wait_s,
+            disconnected_cb=_on_disconnected,
+            reconnected_cb=_on_reconnected,
         )
         self.jetstream = self._nats_connection.jetstream()
 
