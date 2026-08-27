@@ -44,7 +44,6 @@ from dharma_swarm.api_keys import (
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
-import dharma_swarm.campaign_provider_guard as campaign_guard
 from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
@@ -1070,10 +1069,6 @@ class OllamaProvider(LLMProvider):
             model = OLLAMA_DEFAULT_LOCAL_MODEL
 
         return await self._complete_native(model, messages, request)
-
-    async def complete_exact_model(self, request: LLMRequest) -> LLMResponse:
-        """Serve one exact logical model without Ollama's frontier fallback."""
-        return await campaign_guard.complete_exact_ollama_cloud(self, request)
 
     async def _complete_openai_compat(
         self, model: str, messages: list[dict[str, str]], request: LLMRequest,
@@ -2875,15 +2870,9 @@ class ModelRouter:
         request: LLMRequest,
         *,
         available_provider_types: list[ProviderType] | None = None,
-        campaign_effect_boundary: campaign_guard.CampaignProviderEffectBoundary
-        | None = None,
     ) -> tuple[ProviderRouteDecision, LLMResponse]:
         signals = build_routing_signals(request)
         enriched_request = enrich_route_request(route_request, request)
-        campaign_provider_call = campaign_guard.campaign_exact_provider_call(
-            enriched_request, request,
-            available_provider_types, campaign_effect_boundary,
-        )
         decision = self.route_request(
             enriched_request,
             available_provider_types=available_provider_types,
@@ -2908,8 +2897,6 @@ class ModelRouter:
             live_provider=request_key_liveness,
         )
         if not chain:
-            if campaign_provider_call is not None:
-                raise RuntimeError("campaign exact provider is unavailable")
             # Routing filter found nothing — fall back to any registered provider
             fallback_set = (
                 set(self._providers)
@@ -3028,12 +3015,6 @@ class ModelRouter:
                 canary_aliases,
             )
             canary_applied = False
-        campaign_invocation = campaign_guard.capture_routed_campaign_invocation(
-            campaign_provider_call,
-            decision=decision, chain=chain, model_hints=model_hints,
-            providers=self._providers, request=request,
-            inject_request=self._inject_survival_directive,
-        )
         if affinity_applied:
             decision = replace(
                 decision,
@@ -3064,16 +3045,11 @@ class ModelRouter:
             chain=chain,
             task_signature=task_signature,
         )
-        campaign_guard.require_routed_campaign_invocation(
-            campaign_invocation, providers=self._providers,
-            chain=chain, model_hints=model_hints,
-        )
 
         for provider_type in chain:
-            request_for_provider = (
-                campaign_invocation.request
-                if campaign_invocation is not None
-                else self._request_with_model_hint(request, model_hints.get(provider_type))
+            request_for_provider = self._request_with_model_hint(
+                request,
+                model_hints.get(provider_type),
             )
             reward_model = request_for_provider.model
             lane_key = f"{provider_type.value}:{request_for_provider.model}"
@@ -3128,22 +3104,11 @@ class ModelRouter:
 
             try:
                 attempt_started = time.monotonic()
-                if campaign_invocation is not None:
-                    assert campaign_effect_boundary is not None
-                    response = await campaign_guard.execute_routed_campaign_invocation(
-                        campaign_invocation,
-                        campaign_effect_boundary,
-                        providers=self._providers,
-                        chain=chain,
-                        model_hints=model_hints,
-                        on_provider_error=_on_retry_error,
-                    )
-                else:
-                    response = await run_with_retry(
-                        lambda: self.complete(provider_type, request_for_provider),
-                        policy=self._retry_policy,
-                        on_error=_on_retry_error,
-                    )
+                response = await run_with_retry(
+                    lambda: self.complete(provider_type, request_for_provider),
+                    policy=self._retry_policy,
+                    on_error=_on_retry_error,
+                )
                 latency_ms = (time.monotonic() - attempt_started) * 1000.0
                 response_error = self._response_indicates_failure(response)
                 if response_error:
@@ -3300,10 +3265,6 @@ class ModelRouter:
                     response.provider = selected_provider.value
                 return (routed_decision, response)
             except Exception as exc:
-                if campaign_invocation is not None and not campaign_guard.effect_started(
-                    campaign_effect_boundary
-                ):
-                    raise
                 latency_ms = (
                     (time.monotonic() - attempt_started) * 1000.0
                     if "attempt_started" in locals()

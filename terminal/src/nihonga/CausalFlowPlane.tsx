@@ -4,15 +4,19 @@ import {Box, Text} from "ink";
 import {THEME} from "../theme";
 import type {CanonicalExecutionEvent} from "../types";
 
-function eventGlyph(event: CanonicalExecutionEvent): {glyph: string; color: string} {
-  if (event.kind === "error" || event.phase === "failed") return {glyph: "✖", color: THEME.vermilion};
-  if (event.phase === "complete") return {glyph: "✓", color: THEME.moss};
-  if (event.phase === "running") return {glyph: "▶", color: THEME.crest};
-  return {glyph: "○", color: THEME.stone};
+export function executionPhasePresentation(event: CanonicalExecutionEvent): {glyph: string; word: string; color: string} {
+  if (event.kind === "error" || event.phase === "failed") return {glyph: "✖", word: "FAILED", color: THEME.vermilion};
+  // A terminal completion is executor-owned success, not independent
+  // verification. Reserve ✓ for a future verifier-owned projection.
+  if (event.phase === "complete") return {glyph: "■", word: "SUCCEEDED", color: THEME.pine};
+  if (event.phase === "running") return {glyph: "▶", word: "RUNNING", color: THEME.crest};
+  return {glyph: "○", word: "QUEUED", color: THEME.stone};
 }
 
-function eventRowCost(event: CanonicalExecutionEvent): number {
-  return event.summary ? 2 : 1;
+function eventRowCost(): number {
+  // Phase and content deliberately occupy separate rows. The semantic word
+  // must survive narrow-panel truncation alongside its glyph and colour.
+  return 2;
 }
 
 // Panorama owns six rows above the workspace and five below it. The Causal
@@ -31,7 +35,7 @@ export function visibleCausalEvents(
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
     if (!event) continue;
-    const cost = eventRowCost(event);
+    const cost = eventRowCost();
     if (selected.length > 0 && cost > remaining) break;
     selected.push(event);
     remaining -= cost;
@@ -44,28 +48,29 @@ export function CausalFlowPlane({events, rowBudget}: {events: CanonicalExecution
   const visible = visibleCausalEvents(events, rowBudget);
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
-      <Box flexShrink={0}><Text color={THEME.stone} wrap="truncate-end">correlated events · gaps stay visible</Text></Box>
+      <Box flexShrink={0}><Text color={THEME.stone} wrap="truncate-end">owner-correlated feed</Text></Box>
       <Box flexShrink={0}><Text color={THEME.ink}> </Text></Box>
       {visible.length === 0 ? (
         <>
-          <Text color={THEME.stone}>○ no correlated events yet</Text>
-          <Text color={THEME.ink}>  configured is not contacted</Text>
-          <Text color={THEME.ink}>  returned is not verified</Text>
+          <Text color={THEME.stone}>? no owner-correlated events yet</Text>
+          <Text color={THEME.stone}>  ◇ configured ≠ contacted</Text>
+          <Text color={THEME.stone}>  ■ succeeded ≠ ✓ verified</Text>
         </>
       ) : visible.map((event) => {
-        const presentation = eventGlyph(event);
+        const presentation = executionPhasePresentation(event);
         return (
           <Box key={event.id} flexDirection="column" flexShrink={0}>
             <Text wrap="truncate-end">
-              <Text color={presentation.color}>{presentation.glyph} </Text>
-              <Text color={THEME.mist}>{event.title}</Text>
+              <Text color={presentation.color}>{presentation.glyph} {presentation.word}</Text>
             </Text>
-            {event.summary ? <Text color={THEME.stone} wrap="truncate-end">  {event.summary}</Text> : null}
+            <Text color={THEME.stone} wrap="truncate-end">
+              {event.title}{event.summary ? `—${event.summary}` : ""}
+            </Text>
           </Box>
         );
       })}
       <Box flexGrow={1} />
-      <Box flexShrink={0}><Text color={THEME.stone} wrap="truncate-end">{events.length} canonical events retained</Text></Box>
+      <Box flexShrink={0}><Text color={THEME.stone} wrap="truncate-end">NO VERDICT · {events.length} evt</Text></Box>
     </Box>
   );
 }

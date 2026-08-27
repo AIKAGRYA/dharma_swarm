@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useReducer, useRef, useState} from "react";
-import {Box, Text, useApp, useInput, useStdin} from "ink";
+import {Box, Text, useApp, useInput, useStdin, useWindowSize} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {normalizeCommandOutcome} from "./commandOutcome.ts";
@@ -38,7 +38,7 @@ import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
 import {ActiveFacet} from "./nihonga/ActiveFacet.tsx";
 import {NihongaCockpit} from "./nihonga/NihongaCockpit.tsx";
 import {projectWholeOrganism} from "./nihonga/organismView.ts";
-import {contextControlForLayout, usesNihongaShell, viewportProfile} from "./nihonga/shellModel.ts";
+import {contextControlForLayout, contextualPlaneNeedsCompact, usesNihongaShell, viewportProfile} from "./nihonga/shellModel.ts";
 import {
   continuityStateFromSession,
   messagesForNextTurn,
@@ -2106,12 +2106,8 @@ export function createBridgeEventHandler({
       surfaceRefreshActions.forEach((action) => dispatch(action));
       if (actionType === "surface.refresh") {
         const surface = String(typed.surface ?? "").trim().toLowerCase();
-        const workspaceIsAuthoritative = workspaceEventHasAuthoritativeRepoSignal(typed);
-        const runtimePayload = runtimeSnapshotPayloadFromEvent(typed);
-        const runtimeIsAuthoritative = Boolean(
-          runtimePayload && runtimePayloadHasAuthoritativeControlSignal(runtimePayload),
-        );
-        if ((surface === "repo" || surface === "workspace") && workspaceIsAuthoritative) {
+        const authoritativeSurface = authoritativeSurfaceForRefresh(typed, surfaceRefreshActions);
+        if ((surface === "repo" || surface === "workspace") && authoritativeSurface === "repo") {
           dispatch({type: "surface.truth.mark", surface: "repo"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "repo");
@@ -2119,7 +2115,7 @@ export function createBridgeEventHandler({
             resyncPending = !authoritativeResyncComplete(nextAuthority);
           }
         }
-        if ((surface === "control" || surface === "runtime") && runtimeIsAuthoritative) {
+        if ((surface === "control" || surface === "runtime") && authoritativeSurface === "control") {
           dispatch({type: "surface.truth.mark", surface: "control"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "control");
@@ -2127,7 +2123,7 @@ export function createBridgeEventHandler({
             resyncPending = !authoritativeResyncComplete(nextAuthority);
           }
         }
-        if (surface === "sessions" || surface === "session") {
+        if ((surface === "sessions" || surface === "session") && authoritativeSurface === "sessions") {
           dispatch({type: "surface.truth.mark", surface: "sessions"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "sessions");
@@ -2135,7 +2131,7 @@ export function createBridgeEventHandler({
             resyncPending = !authoritativeResyncComplete(nextAuthority);
           }
         }
-        if (surface === "models" || surface === "model") {
+        if ((surface === "models" || surface === "model") && authoritativeSurface === "models") {
           dispatch({type: "surface.truth.mark", surface: "models"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "models");
@@ -2143,7 +2139,7 @@ export function createBridgeEventHandler({
             resyncPending = !authoritativeResyncComplete(nextAuthority);
           }
         }
-        if (surface === "agents" || surface === "agent") {
+        if ((surface === "agents" || surface === "agent") && authoritativeSurface === "agents") {
           dispatch({type: "surface.truth.mark", surface: "agents"});
           if (resyncPending && state.bridgeStatus === "connected") {
             const nextAuthority = markAuthoritativeSurface(state.authoritativeSurfaces, "agents");
@@ -2371,6 +2367,47 @@ export function surfaceRefreshActionsForBridgeEvent(
   return [];
 }
 
+/**
+ * Name the owner surface only when a refresh carries its typed evidence.
+ * Display-only prose and malformed payloads may still update a preview, but
+ * they cannot promote retained UI state into current authority.
+ */
+export function authoritativeSurfaceForRefresh(
+  event: BridgeEvent,
+  refreshActions: AppAction[],
+): keyof SurfaceAuthorityState | undefined {
+  const typed = event as Record<string, unknown>;
+  if (String(typed.type ?? "") !== "action.result" || String(typed.action_type ?? "") !== "surface.refresh") {
+    return undefined;
+  }
+  const surface = String(typed.surface ?? typed.target_pane ?? "").trim().toLowerCase();
+  if ((surface === "repo" || surface === "workspace") && workspaceEventHasAuthoritativeRepoSignal(typed)) {
+    return "repo";
+  }
+  if (surface === "control" || surface === "runtime") {
+    const runtimePayload = runtimeSnapshotPayloadFromEvent(typed);
+    if (runtimePayload && runtimePayloadHasAuthoritativeControlSignal(runtimePayload)) {
+      return "control";
+    }
+  }
+  if (
+    (surface === "sessions" || surface === "session")
+    && refreshActions.some((action) => action.type === "session.catalog.set")
+  ) {
+    return "sessions";
+  }
+  if ((surface === "models" || surface === "model") && routingDecisionPayloadFromEvent(typed)) {
+    return "models";
+  }
+  if (
+    (surface === "agents" || surface === "agent")
+    && refreshActions.some((action) => action.type === "tab.replace" && action.tabId === "agents")
+  ) {
+    return "agents";
+  }
+  return undefined;
+}
+
 export function paneActionStartActions(action: {summary: string; payload: Record<string, unknown>} | undefined): AppAction[] {
   const commandRunEvent = commandRunEventFromPaneAction(action);
   if (commandRunEvent) {
@@ -2390,29 +2427,13 @@ export function paneActionStartActions(action: {summary: string; payload: Record
 
 export function App(): React.ReactElement {
   const {exit} = useApp();
+  const {columns: terminalWidth, rows: terminalHeight} = useWindowSize();
   const [state, dispatch] = useReducer(reduceApp, initialState, createInitialAppState);
-  // FACE-1 regression fix: ink re-lays-out the EXISTING tree on stdout resize,
-  // but width-derived React props (zen 100-col clamp, compactShell, window
-  // sizes) stay stale until the next state event — offline that is the 15s
-  // probe, so a live 120->80 resize garbled for seconds. This tick forces a
-  // React re-render the moment the terminal resizes.
-  const [, setViewportTick] = useState(0);
   // FACE-3 the scroll: the telemetry drawer is view-local — never persisted,
   // reset each boot, meaningless outside the scroll face.
   const [scrollDrawerOpen, setScrollDrawerOpen] = useState(false);
-  useEffect(() => {
-    const handleResize = (): void => {
-      setViewportTick((tick) => tick + 1);
-    };
-    process.stdout.on("resize", handleResize);
-    return () => {
-      process.stdout.off("resize", handleResize);
-    };
-  }, []);
 
   const activeTab = state.tabs.find((tab) => tab.id === state.uiMode.activeTabId) ?? state.tabs[0];
-  const terminalWidth = (process.stdout.columns ?? Number(process.env.COLUMNS ?? "0")) || 120;
-  const terminalHeight = (process.stdout.rows ?? Number(process.env.LINES ?? "0")) || 30;
   const helmViewportProfile = viewportProfile(terminalWidth, terminalHeight);
   const compactShell = helmViewportProfile === "compact"
     || helmViewportProfile === "survival"
@@ -2599,20 +2620,25 @@ export function App(): React.ReactElement {
     const entries = queuedOfflinePrompts.current.splice(0, queuedOfflinePrompts.current.length);
     for (const entry of entries) {
       try {
+        const resumeSessionId = state.authoritativeSurfaces.sessions
+          && state.sessionContinuity.continuityMode === "resume"
+          && state.sessionContinuity.resumeSessionId === entry.resumeSessionId
+          ? entry.resumeSessionId
+          : undefined;
         const requestId = bridge.send("session.bootstrap", {
           provider: entry.provider,
           model: entry.model,
           strategy: entry.strategy,
           prompt: entry.prompt,
           active_tab: entry.activeTabId,
-          resume_session_id: entry.resumeSessionId,
+          resume_session_id: resumeSessionId,
         });
         pendingBootstraps.current[requestId] = {
           prompt: entry.prompt,
           provider: entry.provider,
           model: entry.model,
           messages: entry.messages,
-          resumeSessionId: entry.resumeSessionId,
+          resumeSessionId,
         };
         queueAppActions(dispatch, [
           {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "dispatched")]},
@@ -2687,7 +2713,7 @@ export function App(): React.ReactElement {
   function runLocalUiAction(submitted: string, intent: UiIntent): void {
     // The confirmation rides the SAME assistant-event canonicalization as real
     // backend answers (F-173), so steering the UI reads like a conversation:
-    // you ask, the Helm answers, the turn closes ✓ — multi-line tour included.
+    // you ask, the Helm answers, the turn closes ■ — multi-line tour included.
     const respond = (message: string, activateTabId: string | null = "chat"): void => {
       const actions: AppAction[] = [
         {
@@ -2986,7 +3012,20 @@ export function App(): React.ReactElement {
       markPendingCommandStream(pendingCommandStream, {command: submitted});
       bridge.send("command.run", {command: submitted});
     } else {
-      const messages = messagesForNextTurn(state, rawPrompt);
+      const resumeIsCurrent = state.bridgeStatus === "connected" && state.authoritativeSurfaces.sessions;
+      const resumeSessionId = resumeIsCurrent ? state.sessionContinuity.resumeSessionId : undefined;
+      const turnState = resumeSessionId
+        ? state
+        : {
+            ...state,
+            sessionContinuity: {
+              ...state.sessionContinuity,
+              activeSessionId: undefined,
+              resumeSessionId: undefined,
+              continuityMode: "fresh" as const,
+            },
+          };
+      const messages = messagesForNextTurn(turnState, rawPrompt);
       const userLine: TranscriptLine = {
         id: `user-${Date.now()}`,
         kind: "user",
@@ -3005,7 +3044,7 @@ export function App(): React.ReactElement {
           strategy: state.routePolicy.strategy,
           activeTabId: state.uiMode.activeTabId,
           messages,
-          resumeSessionId: state.sessionContinuity.resumeSessionId,
+          resumeSessionId,
         });
         queueAppActions(dispatch, [
           {type: "tab.activate", tabId: "chat"},
@@ -3037,20 +3076,20 @@ export function App(): React.ReactElement {
         strategy: state.routePolicy.strategy,
         prompt: rawPrompt,
         active_tab: state.uiMode.activeTabId,
-        resume_session_id: state.sessionContinuity.resumeSessionId,
+        resume_session_id: resumeSessionId,
       });
       pendingBootstraps.current[requestId] = {
         prompt: rawPrompt,
         provider: state.routePolicy.provider,
         model: state.routePolicy.model,
         messages,
-        resumeSessionId: state.sessionContinuity.resumeSessionId,
+        resumeSessionId,
       };
       dispatch({
         type: "status.set",
         value:
-          state.sessionContinuity.resumeSessionId
-            ? `resuming ${state.sessionContinuity.resumeSessionId} via ${routeLabel(state.routePolicy)} (${state.routePolicy.strategy})`
+          resumeSessionId
+            ? `resuming ${resumeSessionId} via ${routeLabel(state.routePolicy)} (${state.routePolicy.strategy})`
             : `bootstrapping ${routeLabel(state.routePolicy)} (${state.routePolicy.strategy})`,
       });
     }
@@ -3058,6 +3097,22 @@ export function App(): React.ReactElement {
 
   function runPaneAction(action: PaneAction | undefined): void {
     if (!action) {
+      return;
+    }
+    const currentState = stateRef.current;
+    const actionType = String(action.payload.action_type ?? "");
+    if (
+      actionType === "approval.resolve"
+      && (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.approvals)
+    ) {
+      dispatch({type: "status.set", value: "approval resolution held: fresh permission history required"});
+      return;
+    }
+    if (
+      action.requestType === "session.detail"
+      && (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.sessions)
+    ) {
+      dispatch({type: "status.set", value: "session detail held: fresh catalog required"});
       return;
     }
     queueAppActions(dispatch, paneActionStartActions(action));
@@ -3115,6 +3170,10 @@ export function App(): React.ReactElement {
 
   function armSelectedSessionResume(): void {
     const currentState = stateRef.current;
+    if (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.sessions) {
+      dispatch({type: "status.set", value: "resume held: fresh session owner projection required"});
+      return;
+    }
     const sessionId = currentState.sessionPane.selectedSessionId;
     const detail = sessionId ? currentState.sessionPane.detailsBySessionId[sessionId] : undefined;
     const eligibility = sessionResumeEligibility(currentState, detail);
@@ -3307,8 +3366,12 @@ export function App(): React.ReactElement {
       }
       if (key.return) {
         if (state.sessionPane.selectedSessionId) {
-          requestSessionDetail(bridge, dispatch, state.sessionPane.selectedSessionId);
-          dispatch({type: "status.set", value: `refresh detail ${state.sessionPane.selectedSessionId}`});
+          if (state.bridgeStatus !== "connected" || !state.authoritativeSurfaces.sessions) {
+            dispatch({type: "status.set", value: "session detail held: fresh catalog required"});
+          } else {
+            requestSessionDetail(bridge, dispatch, state.sessionPane.selectedSessionId);
+            dispatch({type: "status.set", value: `refresh detail ${state.sessionPane.selectedSessionId}`});
+          }
         }
         return;
       }
@@ -3663,6 +3726,7 @@ export function App(): React.ReactElement {
       activeTab={activeTab}
       modelChoices={modelChoices}
       compact={compactShell}
+      contextualCompact={contextualPlaneNeedsCompact(terminalWidth, terminalHeight, activeTab?.kind)}
       scrollOffset={activeScrollOffset}
       windowSize={paneWindowSize}
       repoPreview={decorateSurfacePreview(

@@ -72,10 +72,6 @@ paths = [
 regexes = [
     # Common test/example token shapes that match generic-api-key heuristics
     '''(?i)(example|test|placeholder|your[-_]?api[-_]?key|xxxxx+|todo|fake[-_]?token)''',
-    # Co-located SADHANA TypeScript tests use this exact deterministic,
-    # three-digit idempotency fixture. Keep this value-shaped exception
-    # narrower than a dashboard/test path allowlist.
-    '''^idempotency-[0-9]{3}$''',
     # Anthropic / OpenAI documented placeholder shapes
     '''sk-ant-api03-AAAAA[A-Za-z0-9_-]{20,}''',
     '''sk-proj-XXXXX''',
@@ -87,16 +83,6 @@ regexes = [
 # =============================================================================
 # Per-rule overrides
 # =============================================================================
-# The default generic-api-key heuristic can treat this public cryptography
-# class name as a credential. Bind the exception to that rule and exact type
-# identifier; do not suppress its containing paths or commits.
-[[rules]]
-id = "generic-api-key"
-[rules.allowlist]
-description = "exact public Ed25519 private-key type identifier"
-regexTarget = "secret"
-regexes = ['''^Ed25519PrivateKey$''']
-
 # The bundled `finnhub-access-token` rule is tuned for finnhub.io tokens.
 # dharma_swarm does not use Finnhub. The rule false-positives on identifiers
 # like `FinnhubBackend = ...` (a class assignment in web_search.py).

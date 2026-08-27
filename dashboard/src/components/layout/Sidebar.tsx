@@ -83,69 +83,7 @@ export function Sidebar() {
   const { level, levelUp, levelDown } = useLevel();
 
   return (
-    <>
-      <header
-        data-testid="mobile-dashboard-nav"
-        className="fixed inset-x-0 top-0 z-50 flex h-12 items-center justify-between gap-2 border-b border-sumi-700/40 bg-sumi-900/95 px-3 backdrop-blur-md lg:hidden"
-      >
-        <Link
-          href="/dashboard"
-          prefetch={false}
-          className="flex min-w-0 items-center gap-1.5 text-aozora"
-          aria-label="Dharma Command overview"
-        >
-          <Sparkles size={16} aria-hidden="true" />
-          <span className="font-heading text-[10px] font-bold tracking-[0.12em]">
-            DHARMA
-          </span>
-        </Link>
-        <nav
-          aria-label="Mobile dashboard navigation"
-          className="flex items-center gap-1"
-        >
-          <Link
-            href="/dashboard"
-            prefetch={false}
-            aria-current={pathname === "/dashboard" ? "page" : undefined}
-            className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-torinoko/75 hover:bg-sumi-800/70 hover:text-torinoko"
-          >
-            <LayoutDashboard size={14} aria-hidden="true" />
-            Overview
-          </Link>
-          <Link
-            href="/dashboard/control-surface#mission-sarathi-title"
-            prefetch={false}
-            aria-current={
-              pathname.startsWith("/dashboard/control-surface")
-                ? "page"
-                : undefined
-            }
-            className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-torinoko/75 hover:bg-sumi-800/70 hover:text-torinoko"
-          >
-            <Network size={14} aria-hidden="true" />
-            Constellation
-          </Link>
-          <Link
-            href="/dashboard/sadhana-control"
-            prefetch={false}
-            aria-label="Operator control"
-            aria-current={
-              pathname.startsWith("/dashboard/sadhana-control")
-                ? "page"
-                : undefined
-            }
-            className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-torinoko/75 hover:bg-sumi-800/70 hover:text-torinoko"
-          >
-            <Shield size={14} aria-hidden="true" />
-            Control
-          </Link>
-        </nav>
-      </header>
-
-      <aside
-        data-testid="desktop-dashboard-sidebar"
-        className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-sumi-700/40 bg-sumi-900/80 backdrop-blur-md lg:flex"
-      >
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[260px] flex-col border-r border-sumi-700/40 bg-sumi-900/80 backdrop-blur-md">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5">
         <Sparkles className="text-aozora" size={20} />
@@ -159,19 +97,6 @@ export function Sidebar() {
 
       {/* Nav sections */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <Link
-          href="/dashboard/sadhana-control"
-          prefetch={false}
-          aria-current={
-            pathname.startsWith("/dashboard/sadhana-control")
-              ? "page"
-              : undefined
-          }
-          className="mb-3 flex items-center gap-3 rounded-lg border border-bengara/20 bg-bengara/5 px-3 py-2 text-xs text-torinoko/80 hover:border-bengara/40 hover:bg-bengara/10 hover:text-torinoko"
-        >
-          <Shield size={16} aria-hidden="true" />
-          <span>Operator control</span>
-        </Link>
         {sections.map((section) => (
           <SectionGroup
             key={section.label}
@@ -214,8 +139,7 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-      </aside>
-    </>
+    </aside>
   );
 }
 

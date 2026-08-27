@@ -1,27 +1,19 @@
- ◆ DHARMA HELM  /  EVIDENCE  ·  ds_nihonga_helm_frontier_20260814                                     120×40 · panorama
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ◆ DHARMA HELM  /  EVIDENCE  ·  dharma_swarm                                                          120×40 · panorama
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   · Activity   ◆ Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
  Fable 5 ?  GPT 5.6 ?  Grok 4.5/4.6 ?  Fugu Ultra ?  Kimi K3 ?  Opus 5.0 ?  Opus 4.8 ?
 ┌────────────────────────────────────────────────────┐ECOSYSTEM / ORGANISM                      ┌──────────────────────┐
 │ CONVERSATION / INTENT                              │╭────────────────────────────────────────╮│ CAUSAL / PROOF       │
-│  Dharma Helm · Quiet Field                         ││ Repo                                   ││ correlated events ·… │
-│  Type a message below · F2 unfolds the Whole Helm  ││ section focus active | j/k or ↑/↓ move ││                      │
-│                                                    ││  between repo sections                 ││ ✖ ENOENT: no such f… │
-│                                                    ││                                        ││ ✖ bridge stdin is u… │
-│                                                    ││  Sections      Repo Snapshot           ││                      │
-│                                                    ││  repo          selected repo card      ││                      │
-│                                                    ││  posture and   Workspace snapshot      ││                      │
-│                                                    ││   live risk    loading...              ││                      │
-│                                                    ││                The terminal should     ││                      │
-│                                                    ││                know what repo it is    ││                      │
-│                                                    ││  ▶ Repo        standing in.            ││                      │
-│                                                    ││  Snapshot                              ││                      │
-│                                                    ││    2 rows                              ││                      │
-│                                                    ││    Workspace                           ││                      │
-│                                                    ││   snapshot                             ││                      │
-│                                                    ││  loading...                            ││                      │
+│  Dharma Helm · Quiet Field                         ││ Repo · Repo Snapshot                   ││ owner-correlated fe… │
+│  Type a message below · F2 unfolds the Whole Helm  ││ 1/1 sections · j/k select              ││                      │
+│                                                    ││                                        ││ ✖ FAILED             │
+│                                                    ││ ?[?] UNKNOWN · workspace owner         ││ bridge stdin is una… │
+│                                                    ││ projection not observed.               ││                      │
+│                                                    ││ Path labels are local context; Git     ││                      │
+│                                                    ││ state awaits an authoritative          ││                      │
+│                                                    ││ snapshot.                              ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
@@ -31,7 +23,15 @@
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
 │                                                    ││                                        ││                      │
-│                                                    ││                                        ││ 2 canonical events … │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││                      │
+│                                                    ││                                        ││ NO VERDICT · 1 evt   │
 └────────────────────────────────────────────────────┘╰────────────────────────────────────────╯└──────────────────────┘
  BOUNDARY · chat no-tools · narration authority NONE · effects owner-gated                                         idle
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮

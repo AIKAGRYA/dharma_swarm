@@ -96,39 +96,24 @@ async def _cancel_barrier_stragglers(
     for straggler in still_pending:
         task_id = atask_to_task_id.get(straggler)
         if task_id is not None:
-            recovered += await _settle_cancelled_straggler(
-                orch, task_id, straggler, barrier_timeout
-            )
+            recovered += await _settle_cancelled_straggler(orch, task_id, barrier_timeout)
     return recovered
 
 
 async def _settle_cancelled_straggler(
     orch: "Orchestrator",
     task_id: str,
-    atask: asyncio.Task,
     barrier_timeout: float,
 ) -> int:
-    """Settle only a stopped straggler whose exact custody was released."""
-    if not atask.done() or orch._running_tasks.get(task_id) is not atask:
-        logger.error("BSP barrier retained live custody for task %s", task_id)
-        return 0
     td = orch._active_dispatches.get(task_id)
+    orch._running_tasks.pop(task_id, None)
     if td is None:
-        orch._running_tasks.pop(task_id, None)
-        owner = orch._running_dispatch_owners.get(task_id)
-        if owner is not None and owner[0] is atask:
-            orch._running_dispatch_owners.pop(task_id, None)
+        orch._active_dispatches.pop(task_id, None)
         return 0
     task = await orch._safe_get_task(task_id)
-    from dharma_swarm.orchestrator_execution import release_generic_dispatch
-
-    if not await release_generic_dispatch(orch, td):
-        logger.error("BSP barrier retained unreleased custody for task %s", task_id)
-        return 0
-    orch._running_tasks.pop(task_id, None)
-    owner = orch._running_dispatch_owners.get(task_id)
-    if owner is not None and owner[0] is atask:
-        orch._running_dispatch_owners.pop(task_id, None)
+    if orch._pool is not None:
+        await orch._pool.release(td.agent_id)
+    orch._active_dispatches.pop(task_id, None)
     await orch._handle_task_failure(
         td=td,
         task=task,

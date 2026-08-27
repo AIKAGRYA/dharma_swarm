@@ -239,26 +239,6 @@ async def lifespan(app: FastAPI):
             f"or select {DASHBOARD_API_MODE_ENV}={API_MODE_LOCAL_DEV} for the "
             "loopback-bound development lane."
         )
-    from api.mission_snapshot_provider import (
-        mission_snapshot_provider_from_environment,
-    )
-
-    mission_snapshot_provider = mission_snapshot_provider_from_environment()
-    existing_snapshot_provider = getattr(
-        app.state, "mission_snapshot_provider", None
-    )
-    if mission_snapshot_provider is not None:
-        # Admission deliberately precedes the existing PID, trace, swarm, and
-        # BoardStore startup writes. A partial, stale, foreign, or insecure
-        # configured source therefore fails without those side effects.
-        await mission_snapshot_provider.admit()
-        if (
-            existing_snapshot_provider is not None
-            and existing_snapshot_provider is not mission_snapshot_provider
-        ):
-            raise RuntimeError(
-                "configured mission snapshot provider conflicts with app state"
-            )
     logger.info("DHARMA COMMAND API starting...")
     operator_pid = os.getpid()
     _publish_operator_pid(operator_pid)
@@ -325,14 +305,6 @@ async def lifespan(app: FastAPI):
             "AgentDirectory init failed; existing registries remain active: %s", exc
         )
 
-    installed_snapshot_provider = False
-    if (
-        mission_snapshot_provider is not None
-        and existing_snapshot_provider is None
-    ):
-        app.state.mission_snapshot_provider = mission_snapshot_provider
-        installed_snapshot_provider = True
-
     _log_auth_mode()
     logger.info("DHARMA COMMAND API ready on port 8420")
     try:
@@ -348,12 +320,6 @@ async def lifespan(app: FastAPI):
             from dharma_swarm.organism import set_organism
 
             set_organism(None)
-        if (
-            installed_snapshot_provider
-            and getattr(app.state, "mission_snapshot_provider", None)
-            is mission_snapshot_provider
-        ):
-            del app.state.mission_snapshot_provider
         _state.clear()
         _clear_operator_pid(operator_pid)
 

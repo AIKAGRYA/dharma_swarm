@@ -109,7 +109,7 @@ async def test_execute_topology_genome_projects_node_and_edge_ids_into_traces_an
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_rejects_multi_entry_genome_without_breaking_enum_dispatch() -> None:
+async def test_orchestrator_accepts_topology_genome_without_breaking_enum_dispatch() -> None:
     genome = _fan_in_genome()
     task = Task(title="Topology task")
 
@@ -135,17 +135,20 @@ async def test_orchestrator_rejects_multi_entry_genome_without_breaking_enum_dis
     orchestrator = Orchestrator(agent_pool=_Pool())
 
     async def _record_only(td):
-        return True
+        return None
 
     orchestrator._assign_dispatch = _record_only  # type: ignore[method-assign]
 
-    with pytest.raises(
-        NotImplementedError,
-        match="multi-entrypoint topology genomes are unsupported",
-    ):
-        await orchestrator.dispatch(task, topology=genome)
+    genome_dispatches = await orchestrator.dispatch(task, topology=genome)
     enum_dispatches = await orchestrator.dispatch(Task(title="Enum task"), topology=TopologyType.PIPELINE)
 
+    assert len(genome_dispatches) == 2
+    assert {dispatch.metadata["topology_node_id"] for dispatch in genome_dispatches} == {
+        "plan",
+        "sources",
+    }
+    assert all(dispatch.metadata["topology_genome_id"] == genome.genome_id for dispatch in genome_dispatches)
+    assert all(dispatch.topology == TopologyType.FAN_OUT for dispatch in genome_dispatches)
     assert len(enum_dispatches) == 1
     assert "topology_genome_id" not in enum_dispatches[0].metadata
     assert enum_dispatches[0].topology == TopologyType.PIPELINE
@@ -184,7 +187,7 @@ async def test_orchestrator_live_langgraph_topologies_stamp_graph_state() -> Non
     orchestrator = Orchestrator(agent_pool=_Pool())
 
     async def _record_only(td):
-        return True
+        return None
 
     orchestrator._assign_dispatch = _record_only  # type: ignore[method-assign]
 

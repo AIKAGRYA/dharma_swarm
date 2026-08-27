@@ -4,22 +4,15 @@ import asyncio
 import builtins
 import json
 import re
-from pathlib import Path
 import sqlite3
+import time
+from pathlib import Path
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from dharma_swarm.base_provider import ProviderCapabilities
-from dharma_swarm.models import (
-    AgentConfig,
-    AgentRole,
-    AgentStatus,
-    LLMResponse,
-    ProviderType,
-    Task,
-    TaskDispatch,
-)
+from dharma_swarm.models import AgentConfig, AgentRole, AgentStatus, LLMResponse, ProviderType, Task
 from dharma_swarm.agent_runner import AgentPool, AgentRunner, _build_prompt
 from dharma_swarm.lineage import LineageGraph
 from dharma_swarm.message_bus import MessageBus
@@ -98,206 +91,6 @@ async def test_runner_mock_task(config, fast_gate, tmp_path: Path):
     assert "Write tests" in result
     assert runner.state.status == AgentStatus.IDLE
     assert runner.state.tasks_completed == 1
-
-
-@pytest.mark.asyncio
-async def test_campaign_effect_fence_reaches_exact_provider_boundary_once(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    events: list[str] = []
-    provider = AsyncMock()
-
-    async def complete(_request):
-        events.append("provider")
-        return LLMResponse(
-            content=(
-                "Completed the bounded read-only analysis with explicit evidence, "
-                "limitations, and a reproducible verification result."
-            ),
-            model="fixture-model",
-        )
-
-    provider.complete = AsyncMock(side_effect=complete)
-    runner = AgentRunner(
-        _with_state_dir(config, tmp_path),
-        provider=provider,
-        ontology_path=_ontology_path(tmp_path),
-    )
-    await runner.start()
-
-    async def fence() -> None:
-        events.append("fence")
-
-    def ready() -> None:
-        events.append("ready")
-
-    task = Task(
-        title="Analyze bounded evidence",
-        description="Return a concise finding.",
-    )
-    async with runner._lock:
-        runner._state.status = AgentStatus.BUSY
-        runner._state.current_task = task.id
-    await runner.run_task(
-        task,
-        campaign_effect_fence=fence,
-        campaign_effect_ready=ready,
-    )
-
-    assert events == ["fence", "ready", "provider"]
-    provider.complete.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_campaign_effect_fence_failure_never_calls_provider(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    provider = AsyncMock()
-    provider.complete = AsyncMock()
-    runner = AgentRunner(
-        _with_state_dir(config, tmp_path),
-        provider=provider,
-        ontology_path=_ontology_path(tmp_path),
-    )
-    await runner.start()
-    ready = AsyncMock()
-
-    async def reject() -> None:
-        raise RuntimeError("campaign control position changed")
-
-    task = Task(title="Blocked campaign effect")
-    async with runner._lock:
-        runner._state.status = AgentStatus.BUSY
-        runner._state.current_task = task.id
-    with pytest.raises(RuntimeError, match="control position changed"):
-        await runner.run_task(
-            task,
-            campaign_effect_fence=reject,
-            campaign_effect_ready=ready,
-        )
-
-    ready.assert_not_called()
-    provider.complete.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_campaign_effect_ready_failure_remains_preeffect(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    provider = AsyncMock()
-    provider.complete = AsyncMock()
-    runner = AgentRunner(
-        _with_state_dir(config, tmp_path),
-        provider=provider,
-        ontology_path=_ontology_path(tmp_path),
-    )
-    await runner.start()
-
-    async def fence() -> None:
-        return None
-
-    def ready() -> None:
-        raise RuntimeError("reservation CAS failed")
-
-    task = Task(title="Blocked readiness callback")
-    async with runner._lock:
-        runner._state.status = AgentStatus.BUSY
-        runner._state.current_task = task.id
-    with pytest.raises(RuntimeError, match="reservation CAS failed"):
-        await runner.run_task(
-            task,
-            campaign_effect_fence=fence,
-            campaign_effect_ready=ready,
-        )
-
-    provider.complete.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_campaign_runner_entry_never_overwrites_foreign_busy_task(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    provider = AsyncMock()
-    provider.complete = AsyncMock()
-    runner = AgentRunner(
-        _with_state_dir(config, tmp_path),
-        provider=provider,
-        ontology_path=_ontology_path(tmp_path),
-    )
-    await runner.start()
-    task = Task(title="Exact campaign task")
-    async with runner._lock:
-        runner._state.status = AgentStatus.BUSY
-        runner._state.current_task = "foreign-task"
-    fence = AsyncMock()
-    ready = MagicMock()
-
-    with pytest.raises(RuntimeError, match="lost its exact reserved task"):
-        await runner.run_task(
-            task,
-            campaign_effect_fence=fence,
-            campaign_effect_ready=ready,
-        )
-
-    fence.assert_not_awaited()
-    ready.assert_not_called()
-    provider.complete.assert_not_awaited()
-    assert runner.state.status is AgentStatus.BUSY
-    assert runner.state.current_task == "foreign-task"
-
-
-@pytest.mark.asyncio
-async def test_campaign_effect_queued_before_pause_cannot_start_after_pause(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    provider = AsyncMock()
-    provider.complete = AsyncMock()
-    runner = AgentRunner(
-        _with_state_dir(config, tmp_path),
-        provider=provider,
-        ontology_path=_ontology_path(tmp_path),
-    )
-    await runner.start()
-    boundary_entered = asyncio.Event()
-    continue_check = asyncio.Event()
-    campaign_paused = False
-    ready = AsyncMock()
-
-    async def fence() -> None:
-        boundary_entered.set()
-        await continue_check.wait()
-        if campaign_paused:
-            raise RuntimeError("campaign control position changed before provider effect")
-
-    task = Task(title="Queued campaign effect")
-    async with runner._lock:
-        runner._state.status = AgentStatus.BUSY
-        runner._state.current_task = task.id
-    queued = asyncio.create_task(
-        runner.run_task(
-            task,
-            campaign_effect_fence=fence,
-            campaign_effect_ready=ready,
-        )
-    )
-    await asyncio.wait_for(boundary_entered.wait(), timeout=2)
-    campaign_paused = True
-    continue_check.set()
-
-    with pytest.raises(RuntimeError, match="changed before provider effect"):
-        await asyncio.wait_for(queued, timeout=2)
-    ready.assert_not_called()
-    provider.complete.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -940,331 +733,6 @@ async def test_pool_get():
 
 
 @pytest.mark.asyncio
-async def test_pool_reserve_is_exact_atomic_idle_transition() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="reserved-agent")
-    runner = await pool.spawn(config)
-
-    results = await asyncio.gather(
-        pool.reserve(config.id, "task-a"),
-        pool.reserve(config.id, "task-b"),
-    )
-
-    assert sorted(results) == [False, True]
-    assert runner.state.status is AgentStatus.BUSY
-    assert runner.state.current_task in {"task-a", "task-b"}
-    assert await pool.reserve("missing-agent", "task-c") is False
-
-
-@pytest.mark.asyncio
-async def test_pool_release_reservation_is_exact_owner_cas() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="reservation-owner")
-    runner = await pool.spawn(config)
-
-    assert await pool.reserve(config.id, "task-owner") is True
-    assert await pool.release_reservation(config.id, "task-foreign") is False
-    assert runner.state.status is AgentStatus.BUSY
-    assert runner.state.current_task == "task-owner"
-    assert await pool.release_reservation(config.id, "task-owner") is True
-    assert runner.state.status is AgentStatus.IDLE
-    assert runner.state.current_task is None
-    assert await pool.release_reservation(config.id, "task-owner") is False
-
-
-@pytest.mark.asyncio
-@pytest.mark.timeout(90)
-async def test_pool_releases_exact_generic_token_after_runner_self_clears(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    pool = AgentPool()
-    isolated = _with_state_dir(config, tmp_path)
-    runner = await pool.spawn(isolated, ontology_path=_ontology_path(tmp_path))
-    task = Task(title="Complete one exact generic reservation")
-    token = TaskDispatch(task_id=task.id, agent_id=isolated.id)
-
-    assert await pool.reserve(
-        isolated.id,
-        task.id,
-        reservation_token=token,
-    ) is True
-    await runner.run_task(task)
-
-    assert runner.state.status in {AgentStatus.IDLE, AgentStatus.INACTIVE}
-    assert runner.state.current_task is None
-    assert await pool.get_idle_agents() == []
-    assert await pool.release_reservation(
-        isolated.id,
-        task.id,
-        reservation_token=token,
-    ) is True
-    assert isolated.id not in pool._reservation_tokens
-    assert runner.state.status is AgentStatus.IDLE
-    assert [agent.id for agent in await pool.get_idle_agents()] == [isolated.id]
-
-
-@pytest.mark.asyncio
-@pytest.mark.timeout(180)
-async def test_pool_releases_exact_generic_token_after_runner_failure(
-    config,
-    fast_gate,
-    tmp_path: Path,
-) -> None:
-    provider = AsyncMock()
-    provider.complete = AsyncMock(
-        return_value=LLMResponse(content="ERROR: fixture failure", model="test")
-    )
-    pool = AgentPool()
-    isolated = _with_state_dir(config, tmp_path)
-    runner = await pool.spawn(
-        isolated,
-        provider=provider,
-        ontology_path=_ontology_path(tmp_path),
-    )
-    task = Task(title="Fail one exact generic reservation")
-    token = TaskDispatch(task_id=task.id, agent_id=isolated.id)
-
-    assert await pool.reserve(
-        isolated.id,
-        task.id,
-        reservation_token=token,
-    ) is True
-    with pytest.raises(RuntimeError, match="fixture failure"):
-        await runner.run_task(task)
-
-    assert runner.state.status in {AgentStatus.IDLE, AgentStatus.INACTIVE}
-    assert runner.state.current_task is None
-    assert await pool.release_reservation(
-        isolated.id,
-        task.id,
-        reservation_token=token,
-    ) is True
-    assert isolated.id not in pool._reservation_tokens
-    assert runner.state.status is AgentStatus.IDLE
-
-
-@pytest.mark.asyncio
-async def test_pool_releases_generic_token_during_busy_post_task_handoff() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="busy-post-task-handoff")
-    runner = await pool.spawn(config)
-    task_id = "busy-post-task"
-    token = TaskDispatch(task_id=task_id, agent_id=config.id)
-    assert await pool.reserve(
-        config.id,
-        task_id,
-        reservation_token=token,
-    ) is True
-    async with runner._lock:
-        runner._state.status = AgentStatus.BUSY
-        runner._state.current_task = None
-
-    assert await pool.release_reservation(
-        config.id,
-        task_id,
-        reservation_token=token,
-    ) is True
-    assert config.id not in pool._reservation_tokens
-    assert runner.state.status is AgentStatus.IDLE
-    assert runner.state.current_task is None
-
-
-@pytest.mark.asyncio
-async def test_pool_campaign_reservation_requires_opaque_owner_token() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="opaque-reservation-owner")
-    runner = await pool.spawn(config)
-    token = {"provider_task_scheduled": False, "nonce": "attempt-zero"}
-    equal_but_foreign = dict(token)
-
-    assert await pool.reserve(
-        config.id, "same-task", reservation_token=token
-    ) is True
-    assert pool.owns_reservation(
-        config.id, "same-task", reservation_token=token
-    ) is True
-    assert pool.owns_reservation(
-        config.id, "same-task", reservation_token=equal_but_foreign
-    ) is False
-    assert await pool.release_reservation(
-        config.id, "same-task", reservation_token=equal_but_foreign
-    ) is False
-    with pytest.raises(RuntimeError, match="opaque campaign reservation"):
-        await pool.assign(config.id, "generic-overwrite")
-    await pool.release(config.id)
-    assert runner.state.status is AgentStatus.BUSY
-    assert runner.state.current_task == "same-task"
-    assert await pool.release_reservation(
-        config.id, "same-task", reservation_token=token
-    ) is True
-
-
-@pytest.mark.asyncio
-async def test_pool_reservation_binds_exact_registered_runner_identity() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="runner-identity-owner")
-    original = await pool.spawn(config)
-    token = {"provider_task_scheduled": False, "nonce": "runner-identity"}
-    assert await pool.reserve(
-        config.id,
-        "runner-identity-task",
-        reservation_token=token,
-    ) is True
-    assert pool._reservation_runners[config.id] is original
-
-    substitute = AgentRunner(config)
-    substitute._state.status = AgentStatus.BUSY
-    substitute._state.current_task = "runner-identity-task"
-    async with pool._lock:
-        pool._agents[config.id] = substitute
-
-    assert pool.owns_reservation(
-        config.id,
-        "runner-identity-task",
-        reservation_token=token,
-    ) is False
-    assert await pool.release_reservation(
-        config.id,
-        "runner-identity-task",
-        reservation_token=token,
-    ) is False
-    assert pool._agents[config.id] is substitute
-    assert pool._reservation_runners[config.id] is original
-    assert pool._reservation_tokens[config.id] == ("runner-identity-task", token)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["reserve", "release"])
-async def test_pool_exact_reservation_rechecks_registry_after_runner_lock_wait(
-    operation: str,
-) -> None:
-    pool = AgentPool()
-    config = AgentConfig(name=f"runner-registry-{operation}")
-    original = await pool.spawn(config)
-    token = {"provider_task_scheduled": False, "nonce": operation}
-    if operation == "release":
-        assert await pool.reserve(
-            config.id,
-            "registry-race-task",
-            reservation_token=token,
-        ) is True
-    substitute = AgentRunner(config)
-    substitute._state.status = (
-        AgentStatus.BUSY if operation == "release" else AgentStatus.IDLE
-    )
-    substitute._state.current_task = (
-        "registry-race-task" if operation == "release" else None
-    )
-
-    await original._lock.acquire()
-    try:
-        pending = asyncio.create_task(
-            pool.reserve(
-                config.id,
-                "registry-race-task",
-                reservation_token=token,
-            )
-            if operation == "reserve"
-            else pool.release_reservation(
-                config.id,
-                "registry-race-task",
-                reservation_token=token,
-            )
-        )
-        await asyncio.sleep(0)
-        async with pool._lock:
-            pool._agents[config.id] = substitute
-    finally:
-        original._lock.release()
-
-    assert await pending is False
-    assert pool._agents[config.id] is substitute
-    if operation == "reserve":
-        assert config.id not in pool._reservation_tokens
-        assert config.id not in pool._reservation_runners
-        assert original.state.status is AgentStatus.IDLE
-        assert original.state.current_task is None
-    else:
-        assert pool._reservation_tokens[config.id] == (
-            "registry-race-task",
-            token,
-        )
-        assert pool._reservation_runners[config.id] is original
-        assert substitute.state.status is AgentStatus.BUSY
-        assert substitute.state.current_task == "registry-race-task"
-
-
-@pytest.mark.asyncio
-async def test_pool_token_owned_idle_runner_is_not_exposed_or_reassigned() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="self-cleared-reservation-owner")
-    runner = await pool.spawn(config)
-    token = {"provider_task_scheduled": False, "nonce": "attempt-self-cleared"}
-    assert await pool.reserve(
-        config.id, "self-cleared-task", reservation_token=token
-    ) is True
-
-    token["provider_task_scheduled"] = True
-    async with runner._lock:
-        runner._state.status = AgentStatus.IDLE
-        runner._state.current_task = None
-
-    assert runner not in await pool.get_idle()
-    assert await pool.reserve(config.id, "foreign-task") is False
-    assert await pool.release_reservation(
-        config.id, "self-cleared-task", reservation_token=token
-    ) is False
-    assert pool._reservation_tokens[config.id] == ("self-cleared-task", token)
-
-
-@pytest.mark.asyncio
-async def test_pool_self_cleared_attempt_cannot_release_foreign_scheduled_owner() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="foreign-self-cleared-owner")
-    runner = await pool.spawn(config)
-    stale_token = {"provider_task_scheduled": True, "nonce": "attempt-stale"}
-    foreign_token = {"provider_task_scheduled": True, "nonce": "attempt-foreign"}
-    assert await pool.reserve(
-        config.id, "shared-task", reservation_token=foreign_token
-    ) is True
-    async with runner._lock:
-        runner._state.status = AgentStatus.INACTIVE
-        runner._state.current_task = None
-
-    assert await pool.release_reservation(
-        config.id, "shared-task", reservation_token=stale_token
-    ) is False
-    assert pool._reservation_tokens[config.id] == ("shared-task", foreign_token)
-    assert runner.state.status is AgentStatus.INACTIVE
-    assert runner.state.current_task is None
-
-
-@pytest.mark.asyncio
-async def test_pool_scheduled_campaign_reservation_requires_exact_completion_release() -> None:
-    pool = AgentPool()
-    config = AgentConfig(name="scheduled-reservation-owner")
-    runner = await pool.spawn(config)
-    token = {"provider_task_scheduled": False, "nonce": "attempt-one"}
-    assert await pool.reserve(
-        config.id, "scheduled-task", reservation_token=token
-    ) is True
-
-    token["provider_task_scheduled"] = True
-    await pool.release(config.id)
-
-    assert runner.state.status is AgentStatus.BUSY
-    assert runner.state.current_task == "scheduled-task"
-    assert await pool.release_reservation(
-        config.id, "scheduled-task", reservation_token=token
-    ) is True
-
-    assert runner.state.status is AgentStatus.IDLE
-    assert runner.state.current_task is None
-
-
-@pytest.mark.asyncio
 async def test_pool_shutdown_all():
     pool = AgentPool()
     for i in range(3):
@@ -1356,3 +824,270 @@ async def test_post_task_lifecycle_bus_error_stays_idle(config, tmp_path: Path):
     await runner._post_task_lifecycle(task)
 
     assert runner.state.status == AgentStatus.IDLE
+
+
+def _local_tool_runner_and_task(
+    config: AgentConfig,
+    tmp_path: Path,
+) -> tuple[AgentRunner, Task]:
+    local_config = config.model_copy(
+        update={"metadata": {**config.metadata, "working_dir": str(tmp_path)}}
+    )
+    task = Task(
+        title="Exercise bounded local tools",
+        metadata={"working_dir": str(tmp_path)},
+    )
+    return AgentRunner(local_config), task
+
+
+def _slow_empty_bounded_glob(*_args, **_kwargs):
+    from dharma_swarm.bounded_fs import BoundedGlobResult
+
+    time.sleep(0.05)
+    return BoundedGlobResult((), 0, True)
+
+
+@pytest.mark.asyncio
+async def test_local_glob_stops_after_truncation_probe(
+    config,
+    tmp_path: Path,
+):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    for index in range(100):
+        (tmp_path / f"candidate-{index:03d}.txt").write_text("x\n")
+
+    output = await runner._execute_local_tool(
+        "glob_files",
+        {"pattern": "*.txt"},
+        task=task,
+    )
+
+    lines = output.splitlines()
+    assert len(lines[:-1]) == 50
+    assert lines[-1].startswith("[truncated: more than 50 paths matched")
+
+
+@pytest.mark.asyncio
+async def test_local_glob_runs_blocking_scan_off_event_loop(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    monkeypatch.setattr(
+        agent_runner_module, "bounded_glob", _slow_empty_bounded_glob
+    )
+    call = asyncio.create_task(
+        runner._execute_local_tool("glob_files", {"pattern": "*.txt"}, task=task)
+    )
+    await asyncio.sleep(0.01)
+
+    assert not call.done()
+    assert await asyncio.wait_for(call, timeout=1) == "No paths matching '*.txt'"
+
+
+@pytest.mark.asyncio
+async def test_local_read_file_streams_requested_lines(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "streamed.txt"
+    source.write_text("".join(f"line-{index}\n" for index in range(100)))
+
+    def reject_bulk_read(*_args, **_kwargs):
+        raise AssertionError("read_text must not be used by bounded local reads")
+
+    monkeypatch.setattr(Path, "read_text", reject_bulk_read)
+
+    output = await runner._execute_local_tool(
+        "read_file",
+        {"path": source.name, "offset": 90, "limit": 2},
+        task=task,
+    )
+
+    assert output.splitlines() == [
+        "   90 | line-89",
+        "   91 | line-90",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_local_read_file_rejects_oversized_file_without_opening(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    oversized = tmp_path / "oversized.txt"
+    with oversized.open("wb") as stream:
+        stream.truncate(agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1)
+    original_open = Path.open
+
+    def reject_oversized_open(path: Path, *args, **kwargs):
+        if path == oversized:
+            raise AssertionError("oversized local-tool file must not be opened")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reject_oversized_open)
+
+    output = await runner._execute_local_tool(
+        "read_file",
+        {"path": oversized.name},
+        task=task,
+    )
+
+    assert "ERROR: File exceeds the 4 MiB local-tool limit" in output
+
+
+@pytest.mark.asyncio
+async def test_local_edit_file_rejects_oversized_file_without_opening(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    oversized = tmp_path / "oversized.txt"
+    with oversized.open("wb") as stream:
+        stream.truncate(agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1)
+    original_open = Path.open
+
+    def reject_oversized_open(path: Path, *args, **kwargs):
+        if path == oversized:
+            raise AssertionError("oversized local-tool edit must not open the file")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reject_oversized_open)
+
+    output = await runner._execute_local_tool(
+        "edit_file",
+        {"path": oversized.name, "old_string": "old", "new_string": "new"},
+        task=task,
+    )
+
+    assert "ERROR: File exceeds the 4 MiB local-tool limit" in output
+
+
+@pytest.mark.asyncio
+async def test_local_edit_file_rejects_oversized_result(config, tmp_path: Path):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "editable.txt"
+    source.write_text("old")
+
+    output = await runner._execute_local_tool(
+        "edit_file",
+        {
+            "path": source.name,
+            "old_string": "old",
+            "new_string": "x" * (agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1),
+        },
+        task=task,
+    )
+
+    assert output == "ERROR: Edit would exceed the 4 MiB local-tool limit"
+    assert source.read_text() == "old"
+
+
+@pytest.mark.asyncio
+async def test_local_edit_file_replaces_one_occurrence(config, tmp_path: Path):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "editable.txt"
+    source.write_text("before old after\n")
+
+    output = await runner._execute_local_tool(
+        "edit_file",
+        {"path": source.name, "old_string": "old", "new_string": "new"},
+        task=task,
+    )
+
+    assert output == f"OK: edited {source}"
+    assert source.read_text() == "before new after\n"
+
+
+@pytest.mark.asyncio
+async def test_local_grep_streams_and_skips_oversized_files(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "matches.txt"
+    source.write_text("needle one\nno match\nneedle two\n")
+    oversized = tmp_path / "oversized.txt"
+    with oversized.open("wb") as stream:
+        stream.truncate(agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1)
+    original_open = Path.open
+
+    def guarded_open(path: Path, *args, **kwargs):
+        if path == oversized:
+            raise AssertionError("grep must not open oversized candidates")
+        return original_open(path, *args, **kwargs)
+
+    def reject_bulk_read(*_args, **_kwargs):
+        raise AssertionError("grep must stream candidates instead of using read_text")
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(Path, "read_text", reject_bulk_read)
+
+    output = await runner._execute_local_tool(
+        "grep_search",
+        {"pattern": "needle", "glob": "*.txt", "max_results": 10},
+        task=task,
+    )
+
+    lines = output.splitlines()
+    assert len([line for line in lines if line.startswith(str(source))]) == 2
+    assert "[skipped: 1 file(s) exceeded the 4 MiB local-tool limit]" in lines
+
+
+@pytest.mark.asyncio
+async def test_local_grep_caps_results_truthfully(config, tmp_path: Path):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    (tmp_path / "matches.txt").write_text(
+        "needle one\nneedle two\nneedle three\n"
+    )
+
+    output = await runner._execute_local_tool(
+        "grep_search",
+        {"pattern": "needle", "glob": "*.txt", "max_results": 2},
+        task=task,
+    )
+
+    lines = output.splitlines()
+    assert len([line for line in lines if ":needle " in line]) == 2
+    assert "[truncated: more than 2 matches; showing the first 2]" in lines
+
+
+@pytest.mark.asyncio
+async def test_local_grep_candidate_cap_reports_bounded_no_match(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    for index in range(4):
+        (tmp_path / f"candidate-{index}.txt").write_text("nothing here\n")
+
+    monkeypatch.setattr(agent_runner_module, "_LOCAL_TOOL_GREP_CANDIDATE_LIMIT", 2)
+
+    output = await runner._execute_local_tool(
+        "grep_search",
+        {"pattern": "needle", "glob": "*.txt"},
+        task=task,
+    )
+
+    assert "No matches for 'needle' within the bounded scan" in output
+    assert "more than 2 candidates matched" in output

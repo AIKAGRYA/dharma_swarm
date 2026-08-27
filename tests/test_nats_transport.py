@@ -344,12 +344,10 @@ async def test_consume_failure_redelivery_retries_handler_instead_of_duplicate_a
     identity = _identity(run_id="run-redelivery", idempotency_key="idem-redelivery")
     server = A2AServer(runtime_state=runtime, persist=False, require_execution_identity=True)
     calls = 0
-    contexts: list[str] = []
 
     def handler(task: A2ATask) -> A2ATask:
         nonlocal calls
         calls += 1
-        contexts.append(task.context_id)
         if calls == 1:
             raise RuntimeError("transient handler failed")
         task.status = A2ATaskStatus.COMPLETED
@@ -366,21 +364,8 @@ async def test_consume_failure_redelivery_retries_handler_instead_of_duplicate_a
         await transport.consume_message(first)
     ack = await transport.consume_message(second)
 
-    expected_context = hashlib.sha256(
-        json.dumps(
-            [
-                identity.correlation_id,
-                identity.task_id,
-                identity.run_id,
-                "a2a-redelivery",
-            ],
-            ensure_ascii=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()[:12]
     assert ack.status == "ack"
     assert calls == 2
-    assert contexts == [expected_context, expected_context]
     assert first.acked == 0
     assert first.nacked == 1
     assert second.acked == 1
@@ -392,70 +377,6 @@ async def test_consume_failure_redelivery_retries_handler_instead_of_duplicate_a
     ]
     assert any(record.status == "failed" and ":retry:" not in record.side_effect_key for record in consume_records)
     assert any(record.status == "completed" and ":retry:" in record.side_effect_key for record in consume_records)
-
-
-@pytest.mark.asyncio
-async def test_consume_preserves_explicit_context_id(tmp_path: Path) -> None:
-    runtime = RuntimeStateStore(tmp_path / "runtime.db")
-    fake_js = _FakeJetStream()
-    identity = _identity(run_id="run-explicit-context", idempotency_key="idem-explicit-context")
-    server = A2AServer(runtime_state=runtime, persist=False, require_execution_identity=True)
-    seen: list[str] = []
-
-    def handler(task: A2ATask) -> A2ATask:
-        seen.append(task.context_id)
-        task.status = A2ATaskStatus.COMPLETED
-        return task
-
-    server.register_handler("probe", handler)
-    transport = A2ANatsTransport(runtime_state=runtime, server=server, jetstream=fake_js)
-    task = _task(identity, task_id="a2a-explicit-context")
-    task.context_id = "operator-context"
-    await transport.publish_task(task, identity=identity)
-    message = _FakeMessage("dharma.a2a.task.worker.probe", fake_js.published[0][1])
-
-    ack = await transport.consume_message(message)
-
-    assert ack.status == "ack"
-    assert seen == ["operator-context"]
-
-
-@pytest.mark.asyncio
-async def test_missing_context_id_is_distinct_across_durable_wire_identities(
-    tmp_path: Path,
-) -> None:
-    runtime = RuntimeStateStore(tmp_path / "runtime.db")
-    fake_js = _FakeJetStream()
-    server = A2AServer(runtime_state=runtime, persist=False, require_execution_identity=True)
-    seen: list[str] = []
-
-    def handler(task: A2ATask) -> A2ATask:
-        seen.append(task.context_id)
-        task.status = A2ATaskStatus.COMPLETED
-        return task
-
-    server.register_handler("probe", handler)
-    transport = A2ANatsTransport(runtime_state=runtime, server=server, jetstream=fake_js)
-    for suffix in ("a", "b"):
-        identity = _identity(
-            task_id=f"task-context-{suffix}",
-            run_id=f"run-context-{suffix}",
-            claim_id=f"claim-context-{suffix}",
-            idempotency_key=f"idem-context-{suffix}",
-        )
-        await transport.publish_task(
-            _task(identity, task_id=f"a2a-context-{suffix}"),
-            identity=identity,
-        )
-        message = _FakeMessage(
-            "dharma.a2a.task.worker.probe",
-            fake_js.published[-1][1],
-        )
-        assert (await transport.consume_message(message)).status == "ack"
-
-    assert len(seen) == 2
-    assert all(len(context_id) == 12 for context_id in seen)
-    assert len(set(seen)) == 2
 
 
 @pytest.mark.asyncio

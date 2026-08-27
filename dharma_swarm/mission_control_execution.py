@@ -18,9 +18,8 @@ executor process is alive.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 
 from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_contract import (
@@ -30,16 +29,7 @@ from dharma_swarm.mission_control_contract import (
     MissionControlError,
     clean_identifier,
     session_id as mission_session_id,
-    stable_id,
     utc_now,
-)
-from dharma_swarm.mission_control_evidence import (
-    EVIDENCE_DELTA_RECEIPT_TYPE,
-    EvidenceDelta,
-)
-from dharma_swarm.mission_control_executor_guard import campaign_principal
-from dharma_swarm.mission_control_operator_state import (
-    validate_operator_control_state,
 )
 from dharma_swarm.mission_control_execution_support import (
     EXECUTION_METADATA_KEY as EXECUTION_METADATA_KEY,
@@ -49,8 +39,6 @@ from dharma_swarm.mission_control_execution_support import (
     OWNER_RUN_STATUSES as OWNER_RUN_STATUSES,
     OWNER_TERMINAL_STATUSES as OWNER_TERMINAL_STATUSES,
     _OwnerExecutionValidationMixin,
-    terminal_projection_is_acknowledged,
-    terminal_projection_is_pending,
 )
 from dharma_swarm.models import Task, TaskStatus, TopologyType
 from dharma_swarm.orchestrator import Orchestrator
@@ -58,7 +46,6 @@ from dharma_swarm.runtime_state import (
     DelegationRun,
     RuntimeReceipt,
     RuntimeStateStore,
-    TaskClaim,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
@@ -77,7 +64,6 @@ class OwnerExecutionRef:
     agent_id: str
     idempotency_key: str
     owner_session_id: str
-    attempt_generation: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,8 +115,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
         task_id: str,
         *,
         dispatch_key: str = "default",
-        authenticated_principal_id: str = "",
-        attempt_generation: int | None = None,
     ) -> OwnerExecutionRef:
         """Dispatch once locally or recover the matching durable owner run.
 
@@ -144,42 +128,14 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
         mission_id = clean_identifier(mission_id, "mission_id")
         task_id = clean_identifier(task_id, "task_id")
         dispatch_key = clean_identifier(dispatch_key, "dispatch_key")
-        if (
-            attempt_generation is not None
-            and (
-                isinstance(attempt_generation, bool)
-                or not isinstance(attempt_generation, int)
-                or attempt_generation < 0
-            )
-        ):
-            raise MissionControlError("owner attempt generation is invalid")
         lock = self._task_locks.setdefault(task_id, asyncio.Lock())
         async with lock:
             task = await self._require_task(mission_id, task_id)
-            campaign_bound, principal = campaign_principal(task)
-            if campaign_bound and (
-                not principal or authenticated_principal_id != principal
-            ):
-                raise MissionControlError(
-                    "campaign owner dispatch requires the exact authenticated principal"
-                )
-            if campaign_bound:
-                authority = task.metadata.get("mission_campaign_authority")
-                if not isinstance(authority, dict) or (
-                    authority.get("dispatch_key"),
-                    authority.get("attempt_generation"),
-                ) != (dispatch_key, attempt_generation):
-                    raise MissionControlError(
-                        "campaign owner dispatch names a foreign attempt generation"
-                    )
-            expected = self._expected_identity(
-                mission_id, task_id, dispatch_key, attempt_generation
-            )
+            expected = self._expected_identity(mission_id, task_id, dispatch_key)
             recovered = await self._recover_owner_ref(
                 mission_id,
                 task_id,
                 dispatch_key,
-                attempt_generation,
                 expected_run_id=expected["run_id"],
                 expected_idempotency_key=expected["idempotency_key"],
             )
@@ -192,39 +148,15 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
                 task,
                 mission_id=mission_id,
                 dispatch_key=dispatch_key,
-                attempt_generation=attempt_generation,
                 expected=expected,
             )
             await self._board.update_task(task_id, metadata=stamped)
             task = await self._require_task(mission_id, task_id)
-            self._require_stamp(
-                task, mission_id, dispatch_key, attempt_generation, expected
-            )
-            if campaign_bound:
-                authority = task.metadata.get("mission_campaign_authority")
-                if not isinstance(authority, dict) or (
-                    authority.get("dispatch_key"),
-                    authority.get("attempt_generation"),
-                ) != (dispatch_key, attempt_generation):
-                    raise MissionControlError(
-                        "campaign owner authority changed after identity stamp"
-                    )
-            campaign_effect_fence = (
-                await self._capture_campaign_effect_fence(mission_id)
-                if campaign_bound
-                else None
-            )
+            self._require_stamp(task, mission_id, dispatch_key, expected)
+
             dispatches = await self._orchestrator.dispatch(
                 task,
                 TopologyType.PIPELINE,
-                **(
-                    {
-                        "authenticated_principal_id": principal,
-                        "campaign_effect_fence": campaign_effect_fence,
-                    }
-                    if campaign_bound
-                    else {}
-                ),
             )
             if len(dispatches) != 1:
                 raise MissionControlError(
@@ -233,9 +165,7 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             dispatch = dispatches[0]
             if dispatch.task_id != task_id or dispatch.topology != TopologyType.PIPELINE:
                 raise MissionControlError("Orchestrator returned a foreign dispatch")
-            self._require_dispatch_metadata(
-                dispatch.metadata, expected, attempt_generation
-            )
+            self._require_dispatch_metadata(dispatch.metadata, expected)
 
             run = await self._runtime.get_delegation_run(expected["run_id"])
             identity = await self._runtime.get_execution_identity(expected["run_id"])
@@ -247,102 +177,10 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
                 mission_id,
                 task_id,
                 dispatch_key,
-                attempt_generation,
                 expected["idempotency_key"],
                 run,
                 identity,
             )
-
-    async def _capture_campaign_effect_fence(
-        self,
-        mission_id: str,
-    ) -> Callable[[], Awaitable[None]]:
-        """Capture the exact active control position for one provider start.
-
-        The production CampaignService calls this adapter while it holds the
-        campaign control gate.  The returned callback re-reads the durable
-        session at AgentRunner's final provider boundary.  Any pause, stop,
-        restart generation, or metadata mutation therefore fails closed before
-        the provider coroutine is entered.
-        """
-
-        session_id = f"mission_campaign:{mission_id}"
-        expected = await self._runtime.get_session(session_id)
-        if expected is None:
-            raise MissionControlError("campaign has no active supervisor session")
-        generation = expected.metadata.get("generation")
-        if (
-            expected.session_id != session_id
-            or expected.status != "active"
-            or expected.metadata.get("mission_id") != mission_id
-            or expected.metadata.get("stop_requested") is not False
-            or isinstance(generation, bool)
-            or not isinstance(generation, int)
-            or generation < 1
-        ):
-            raise MissionControlError("campaign effects are not active")
-        try:
-            state = validate_operator_control_state(
-                expected.metadata.get("operator_control_state"),
-                expected_generation=generation,
-            )
-        except ValueError as exc:
-            raise MissionControlError(
-                "campaign operator control position is invalid"
-            ) from exc
-        if state["control_state"] != "RUNNING":
-            raise MissionControlError("campaign provider effects are paused")
-
-        async def require_same_active_position() -> None:
-            current = await self._runtime.get_session(session_id)
-            if current != expected:
-                raise MissionControlError(
-                    "campaign control position changed before provider effect"
-                )
-
-        return require_same_active_position
-
-    async def recover(
-        self,
-        mission_id: str,
-        task_id: str,
-        *,
-        dispatch_key: str = "default",
-        attempt_generation: int | None = None,
-    ) -> OwnerExecutionRef | None:
-        """Recover an already stamped owner execution without dispatching."""
-        mission_id = clean_identifier(mission_id, "mission_id")
-        task_id = clean_identifier(task_id, "task_id")
-        dispatch_key = clean_identifier(dispatch_key, "dispatch_key")
-        if (
-            attempt_generation is not None
-            and (
-                isinstance(attempt_generation, bool)
-                or not isinstance(attempt_generation, int)
-                or attempt_generation < 0
-            )
-        ):
-            raise MissionControlError("owner attempt generation is invalid")
-        task = await self._require_task(mission_id, task_id)
-        marker = task.metadata.get(EXECUTION_METADATA_KEY)
-        if marker is None:
-            return None
-        if not isinstance(marker, dict):
-            raise MissionControlError("owner execution metadata has an invalid shape")
-        expected = self._expected_identity(
-            mission_id, task_id, dispatch_key, attempt_generation
-        )
-        self._require_stamp(
-            task, mission_id, dispatch_key, attempt_generation, expected
-        )
-        return await self._recover_owner_ref(
-            mission_id,
-            task_id,
-            dispatch_key,
-            attempt_generation,
-            expected_run_id=expected["run_id"],
-            expected_idempotency_key=expected["idempotency_key"],
-        )
 
     async def observe(
         self,
@@ -355,7 +193,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             ref.mission_id,
             ref.task_id,
             ref.dispatch_key,
-            ref.attempt_generation,
         )
         if (
             ref.run_id != expected["run_id"]
@@ -374,16 +211,13 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             ref.mission_id,
             ref.task_id,
             ref.dispatch_key,
-            ref.attempt_generation,
             ref.idempotency_key,
             run,
             identity,
         )
         if validated != ref:
             raise MissionControlError("owner execution reference conflicts with durable state")
-        self._require_claim(
-            claim, run, identity, ref.mission_id, ref.attempt_generation
-        )
+        self._require_claim(claim, run, identity, ref.mission_id)
 
         receipts = await self._runtime.list_runtime_receipts(
             run_id=ref.run_id,
@@ -404,54 +238,11 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             and claim.stale_after <= observed_at
         )
         terminal = run_status in OWNER_TERMINAL_STATUSES
-        expected_task_status = (
-            TaskStatus.COMPLETED if run_status == "completed" else TaskStatus.FAILED
-        )
-        if terminal:
-            projection_kwargs = {
-                "task": task,
-                "run": run,
-                "identity": identity,
-                "task_id": ref.task_id,
-                "run_id": ref.run_id,
-                "claim_id": ref.claim_id,
-                "agent_id": ref.agent_id,
-                "session_id": ref.owner_session_id,
-                "idempotency_key": ref.idempotency_key,
-            }
-            pending_projection = await terminal_projection_is_pending(
-                self._runtime,
-                **projection_kwargs,
+        succeeded = run_status == "completed" and task.status == TaskStatus.COMPLETED
+        if run_status == "completed" and task.status != TaskStatus.COMPLETED:
+            raise MissionControlError(
+                "completed owner run conflicts with non-completed TaskBoard state"
             )
-            if pending_projection:
-                terminal = False
-            else:
-                acknowledged = await terminal_projection_is_acknowledged(
-                    self._runtime,
-                    self._board,
-                    **projection_kwargs,
-                )
-                if not acknowledged:
-                    # Board commit precedes the runtime acknowledgement. Re-read
-                    # once so an ACK racing this observation does not become a
-                    # false conflict; exact receipt/target proof is still owed.
-                    task = await self._require_task(ref.mission_id, ref.task_id)
-                    projection_kwargs["task"] = task
-                    acknowledged = await terminal_projection_is_acknowledged(
-                        self._runtime,
-                        self._board,
-                        **projection_kwargs,
-                    )
-                if not acknowledged or task.status != expected_task_status:
-                    raise MissionControlError(
-                        "terminal owner run conflicts with TaskBoard state; "
-                        "terminal owner execution is not proven"
-                    )
-        succeeded = (
-            terminal
-            and run_status == "completed"
-            and task.status == TaskStatus.COMPLETED
-        )
         return OwnerExecutionObservation(
             ref=ref,
             task_status=task.status,
@@ -465,180 +256,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             failure_code=str(run.failure_code or ""),
             observed_at=observed_at,
         )
-
-    async def renew_with_evidence(
-        self,
-        ref: OwnerExecutionRef,
-        delta: EvidenceDelta,
-        *,
-        lease_seconds: float = 300.0,
-        max_evidence_age_seconds: float = 300.0,
-    ) -> TaskClaim:
-        """Renew only the exact live claim generation cited by new evidence."""
-        if lease_seconds <= 0 or max_evidence_age_seconds <= 0:
-            raise ValueError("evidence renewal budgets must be positive")
-        if not isinstance(delta, EvidenceDelta):
-            raise MissionControlError("typed EvidenceDelta is required")
-        observation = await self.observe(ref)
-        if observation.terminal:
-            raise MissionControlError("terminal owner execution cannot be renewed")
-        if observation.stale:
-            raise MissionControlError("stale owner claim cannot be renewed")
-        if (
-            delta.mission_id,
-            delta.task_id,
-            delta.run_id,
-            delta.claim_id,
-            delta.agent_id,
-        ) != (
-            ref.mission_id,
-            ref.task_id,
-            ref.run_id,
-            ref.claim_id,
-            ref.agent_id,
-        ):
-            raise MissionControlError("evidence delta names a foreign owner execution")
-
-        claim = await self._runtime.get_task_claim(ref.claim_id)
-        if claim is None:
-            raise MissionControlError("owner claim was not found")
-        evidence_state = claim.metadata.get("mission_control_evidence", {})
-        if not isinstance(evidence_state, dict):
-            raise MissionControlError("claim evidence state has a foreign shape")
-        last_sequence = evidence_state.get("last_sequence", 0)
-        if isinstance(last_sequence, bool) or not isinstance(last_sequence, int):
-            raise MissionControlError("claim evidence sequence has a foreign shape")
-        now = utc_now()
-        delta.require_fresh(
-            now=now,
-            last_sequence=last_sequence,
-            max_age=timedelta(seconds=max_evidence_age_seconds),
-        )
-        consumed_artifacts = self._consumed_evidence_ids(
-            evidence_state,
-            "consumed_artifact_ids",
-            fallback_key="artifact_ids",
-        )
-        consumed_receipts = self._consumed_evidence_ids(
-            evidence_state,
-            "consumed_receipt_ids",
-            fallback_key="receipt_ids",
-        )
-        if consumed_artifacts.intersection(delta.artifact_ids) or (
-            consumed_receipts.intersection(delta.receipt_ids)
-        ):
-            raise MissionControlError("evidence delta reuses already consumed evidence")
-        await self._require_evidence_refs(
-            delta,
-            ref,
-            not_before=claim.heartbeat_at or claim.claimed_at,
-        )
-        if claim.heartbeat_at is not None and delta.observed_at <= claim.heartbeat_at:
-            raise MissionControlError("evidence heartbeat does not advance monotonically")
-        new_expiry = delta.observed_at + timedelta(seconds=lease_seconds)
-        if new_expiry <= now:
-            raise MissionControlError("evidence delta cannot create an expired renewal")
-        replacement = replace(
-            claim,
-            heartbeat_at=delta.observed_at,
-            stale_after=new_expiry,
-            metadata={
-                **claim.metadata,
-                "mission_control_evidence": {
-                    "last_sequence": delta.sequence,
-                    "last_delta_id": delta.delta_id,
-                    "last_observed_at": delta.observed_at.isoformat(),
-                    "artifact_ids": list(delta.artifact_ids),
-                    "receipt_ids": list(delta.receipt_ids),
-                    "consumed_artifact_ids": sorted(
-                        consumed_artifacts.union(delta.artifact_ids)
-                    ),
-                    "consumed_receipt_ids": sorted(
-                        consumed_receipts.union(delta.receipt_ids)
-                    ),
-                },
-            },
-        )
-        identity = await self._runtime.get_execution_identity(ref.run_id)
-        if identity is None:
-            raise MissionControlError("owner execution identity disappeared before renewal")
-        evidence_receipt = RuntimeReceipt(
-            receipt_id=stable_id("evidence_delta_receipt", delta.delta_id),
-            receipt_type=EVIDENCE_DELTA_RECEIPT_TYPE,
-            status="recorded",
-            run_id=ref.run_id,
-            task_id=ref.task_id,
-            trace_id=identity.trace_id,
-            correlation_id=identity.correlation_id,
-            causation_id=identity.causation_id,
-            parent_run_id=identity.parent_run_id,
-            agent_id=ref.agent_id,
-            idempotency_key=ref.idempotency_key,
-            side_effect_key=f"mission_evidence:{delta.delta_id}",
-            payload={"mission_id": ref.mission_id, **delta.to_payload()},
-            created_at=delta.observed_at,
-        )
-        renewed = await self._runtime.compare_and_swap_task_claim(
-            claim,
-            replacement,
-            require_unexpired_at=now,
-            require_open_run_id=ref.run_id,
-            atomic_receipt=evidence_receipt,
-        )
-        if renewed is None:
-            raise MissionControlError("owner claim fence changed during evidence renewal")
-        return renewed
-
-    async def _require_evidence_refs(
-        self,
-        delta: EvidenceDelta,
-        ref: OwnerExecutionRef,
-        *,
-        not_before: datetime,
-    ) -> None:
-        receipts = await self._runtime.list_runtime_receipts(
-            run_id=ref.run_id,
-            limit=self._scan_limit,
-        )
-        if len(receipts) >= self._scan_limit:
-            raise MissionControlError(
-                "runtime receipt scan saturated; evidence cannot be proven"
-            )
-        indexed = {receipt.receipt_id: receipt for receipt in receipts}
-        for receipt_id in delta.receipt_ids:
-            receipt = indexed.get(receipt_id)
-            if receipt is None:
-                raise MissionControlError("evidence delta cites a missing runtime receipt")
-            if receipt.task_id != ref.task_id:
-                raise MissionControlError("evidence delta cites a foreign task receipt")
-            if receipt.agent_id != ref.agent_id:
-                raise MissionControlError("evidence delta cites a foreign agent receipt")
-            if not not_before < receipt.created_at <= delta.observed_at:
-                raise MissionControlError("evidence delta receipt is not fresh")
-        for artifact_id in delta.artifact_ids:
-            artifact = await self._runtime.get_artifact(artifact_id)
-            if artifact is None:
-                raise MissionControlError("evidence delta cites a missing artifact")
-            if artifact.run_id != ref.run_id or artifact.task_id != ref.task_id:
-                raise MissionControlError("evidence delta cites a foreign artifact")
-            if not not_before < artifact.created_at <= delta.observed_at:
-                raise MissionControlError("evidence delta artifact is not fresh")
-
-    @staticmethod
-    def _consumed_evidence_ids(
-        evidence_state: dict[str, object],
-        key: str,
-        *,
-        fallback_key: str,
-    ) -> set[str]:
-        raw = evidence_state.get(key, evidence_state.get(fallback_key, ()))
-        if not isinstance(raw, (list, tuple)) or any(
-            not isinstance(item, str) or not item for item in raw
-        ):
-            raise MissionControlError("claim consumed evidence state has a foreign shape")
-        if len(set(raw)) != len(raw):
-            raise MissionControlError("claim consumed evidence state contains duplicates")
-        return set(raw)
 
     async def wait(
         self,
@@ -686,7 +303,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
         mission_id: str,
         task_id: str,
         dispatch_key: str,
-        attempt_generation: int | None,
         *,
         expected_run_id: str,
         expected_idempotency_key: str,
@@ -735,7 +351,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             mission_id,
             task_id,
             dispatch_key,
-            attempt_generation,
             expected_idempotency_key,
             run,
             identity,
@@ -746,14 +361,11 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
         mission_id: str,
         task_id: str,
         dispatch_key: str,
-        attempt_generation: int | None,
         expected_idempotency_key: str,
         run: DelegationRun,
         identity: ExecutionIdentity,
     ) -> OwnerExecutionRef:
-        expected = self._expected_identity(
-            mission_id, task_id, dispatch_key, attempt_generation
-        )
+        expected = self._expected_identity(mission_id, task_id, dispatch_key)
         if (
             run.run_id != expected["run_id"]
             or expected_idempotency_key != expected["idempotency_key"]
@@ -765,11 +377,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             raise MissionControlError("execution identity names a foreign task")
         if identity.idempotency_key != expected_idempotency_key:
             raise MissionControlError("owner idempotency key conflicts with dispatch key")
-        if (
-            attempt_generation is not None
-            and identity.claim_id != expected.get("claim_id")
-        ):
-            raise MissionControlError("owner claim conflicts with attempt generation")
         if not identity.claim_id or run.claim_id != identity.claim_id:
             raise MissionControlError("owner claim identity is missing or inconsistent")
         if not identity.agent_id or run.assigned_to != identity.agent_id:
@@ -791,9 +398,7 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
         claim = await self._runtime.get_task_claim(identity.claim_id)
         if claim is None:
             raise MissionControlError("owner claim was not found")
-        self._require_claim(
-            claim, run, identity, mission_id, attempt_generation
-        )
+        self._require_claim(claim, run, identity, mission_id)
         return OwnerExecutionRef(
             backend=OWNER_BACKEND,
             mission_id=mission_id,
@@ -804,7 +409,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             agent_id=identity.agent_id,
             idempotency_key=identity.idempotency_key,
             owner_session_id=identity.session_id,
-            attempt_generation=attempt_generation,
         )
 
     @staticmethod
@@ -862,15 +466,6 @@ class OrchestratorMissionAdapter(_OwnerExecutionValidationMixin):
             ("owner_session_id", ref.owner_session_id),
         ):
             clean_identifier(value, label)
-        if (
-            ref.attempt_generation is not None
-            and (
-                isinstance(ref.attempt_generation, bool)
-                or not isinstance(ref.attempt_generation, int)
-                or ref.attempt_generation < 0
-            )
-        ):
-            raise MissionControlError("owner reference attempt generation is invalid")
 
 
 __all__ = [

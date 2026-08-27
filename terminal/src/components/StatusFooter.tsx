@@ -1,12 +1,14 @@
 import React from "react";
 import {Box, Text} from "ink";
+import {routeStatePresentation} from "../routePresentation.ts";
 import {THEME} from "../theme";
+import type {BridgeStatus, RouteState} from "../types.ts";
 
 type Props = {
   mode: string;
   routeLabel: string;
-  bridgeStatus: string;
-  routeState: string;
+  bridgeStatus: BridgeStatus;
+  routeState: RouteState;
   strategy?: string;
   reason?: string;
   compact?: boolean;
@@ -20,7 +22,7 @@ type Gate = {glyph: string; word: string; color: string};
 function gateFor(bridgeStatus: string): Gate {
   switch (bridgeStatus) {
     case "connected":
-      return {glyph: "●", word: "bridge", color: THEME.moss};
+      return {glyph: "●", word: "bridge", color: THEME.wave};
     case "degraded":
       return {glyph: "⚠", word: "degraded", color: THEME.persimmon};
     case "offline":
@@ -30,16 +32,6 @@ function gateFor(bridgeStatus: string): Gate {
   }
 }
 
-function routeStateColor(routeState: string): string {
-  if (routeState === "ready") {
-    return THEME.moss;
-  }
-  if (routeState === "unverified" || routeState === "degraded" || routeState === "slow") {
-    return THEME.persimmon;
-  }
-  return THEME.vermilion;
-}
-
 // FACE-2 command post status line (F-110 + F-164): EXACTLY one row at every
 // size, and the SINGLE source of status truth per frame — mode, route, gate
 // state, provider summary. offline / model name / ready never render anywhere
@@ -47,6 +39,7 @@ function routeStateColor(routeState: string): string {
 // (a dead bridge cannot certify a ready route).
 export function StatusFooter({mode, routeLabel, bridgeStatus, routeState, strategy, reason, compact = false}: Props): React.ReactElement {
   const gate = gateFor(bridgeStatus);
+  const route = routeStatePresentation(routeState);
   return (
     <Box paddingX={1} height={1} overflow="hidden">
       <Text wrap="truncate-end">
@@ -61,7 +54,7 @@ export function StatusFooter({mode, routeLabel, bridgeStatus, routeState, strate
         {bridgeStatus === "connected" ? (
           <>
             <Text color={THEME.ink}>{"  ·  "}</Text>
-            <Text color={routeStateColor(routeState)}>{routeState}</Text>
+            <Text color={route.color}>{route.glyph} {route.word}</Text>
           </>
         ) : null}
         {!compact && strategy ? (

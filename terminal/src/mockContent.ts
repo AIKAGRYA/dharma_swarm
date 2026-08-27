@@ -21,11 +21,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Mission",
       kind: "mission",
       lines: [
-        line("mission-1", "system", "# Operator Shell"),
-        line("mission-2", "system", "## Goal"),
-        line("mission-3", "assistant", "Provide one clean operator shell with continuity, visible execution, and repo-aware state."),
-        line("mission-4", "system", "## Principles"),
-        line("mission-5", "assistant", "One state model. One bridge. Visible tools. Minimal chrome. No duplicate output."),
+        line("mission-1", "system", "?[?] UNKNOWN · Mission Control projection not observed."),
+        line("mission-2", "thinking", "No live mission, task, or execution state is claimed in this frame."),
       ],
     },
     {
@@ -33,8 +30,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Repo",
       kind: "repo",
       lines: [
-        line("repo-1", "system", "Workspace snapshot loading..."),
-        line("repo-2", "assistant", "The terminal should know what repo it is standing in."),
+        line("repo-1", "system", "?[?] UNKNOWN · workspace owner projection not observed."),
+        line("repo-2", "thinking", "Path labels are local context; Git state awaits an authoritative snapshot."),
       ],
     },
     {
@@ -42,8 +39,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Commands",
       kind: "commands",
       lines: [
-        line("commands-1", "system", "Command graph loading..."),
-        line("commands-2", "assistant", "Plain language should resolve into Dharma-native commands when confidence is high."),
+        line("commands-1", "system", "STATIC GUIDE · local command catalog; execution state UNKNOWN."),
+        line("commands-2", "thinking", "A listed command grants no authority and proves no effect."),
       ],
     },
     {
@@ -51,7 +48,7 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Models",
       kind: "models",
       lines: [
-        line("models-1", "system", "Model policy loading..."),
+        line("models-1", "system", "?[?] UNVERIFIED · route policy owner projection not observed."),
       ],
     },
     {
@@ -59,8 +56,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Ontology",
       kind: "ontology",
       lines: [
-        line("ontology-1", "system", "Ontology snapshot loading..."),
-        line("ontology-2", "assistant", "The shell should surface DHARMA concepts, not just provider chat."),
+        line("ontology-1", "system", "?[?] UNKNOWN · ontology owner projection not observed."),
+        line("ontology-2", "thinking", "No concept freshness or authority is inferred from local labels."),
       ],
     },
     {
@@ -68,9 +65,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Runtime",
       kind: "runtime",
       lines: [
-        line("runtime-1", "system", "Bridge: booting"),
-        line("runtime-2", "system", "Python runtime: expected 3.11+"),
-        line("runtime-3", "system", "Frontend runtime: Bun"),
+        line("runtime-1", "system", "?[?] UNKNOWN · runtime owner projection not observed."),
+        line("runtime-2", "thinking", "Bridge presence alone is not executor liveness."),
       ],
     },
     {
@@ -78,8 +74,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Sessions",
       kind: "sessions",
       lines: [
-        line("sessions-1", "system", "# Session Memory"),
-        line("sessions-2", "assistant", "Resumable sessions, replay integrity, and compaction truth should be first-class operator surfaces."),
+        line("sessions-1", "system", "?[?] UNKNOWN · session catalog owner projection not observed."),
+        line("sessions-2", "thinking", "No session is resumed or active from this placeholder."),
       ],
     },
     {
@@ -87,8 +83,8 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Approvals",
       kind: "approvals",
       lines: [
-        line("approvals-1", "system", "# Approval Queue"),
-        line("approvals-2", "assistant", "Dangerous actions should surface as explicit operator work, not transcript accidents."),
+        line("approvals-1", "system", "?[?] UNKNOWN · permission owner projection not observed."),
+        line("approvals-2", "thinking", "An empty view grants no permission and authorizes no effect."),
       ],
     },
     {
@@ -96,7 +92,7 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Control",
       kind: "control",
       lines: [
-        line("control-1", "system", "Control-plane snapshot loading..."),
+        line("control-1", "system", "?[?] UNKNOWN · control owner projection not observed."),
       ],
     },
     {
@@ -104,7 +100,7 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Agents",
       kind: "agents",
       lines: [
-        line("agents-1", "system", "Operator snapshot loading..."),
+        line("agents-1", "system", "?[?] UNKNOWN · agent-route owner projection not observed."),
       ],
     },
     {
@@ -112,7 +108,7 @@ export function buildInitialTabs(): TabSpec[] {
       title: "Evolution",
       kind: "evolution",
       lines: [
-        line("evolution-1", "system", "Cascade and self-improvement surface loading..."),
+        line("evolution-1", "system", "?[?] UNKNOWN · evolution owner projection not observed."),
       ],
     },
   ];

@@ -71,15 +71,22 @@ spine_objectives:
 # TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
 # This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
 # (min_active..max_active concurrent tracks). Concurrency is authorized, not
-# mandated: the floor is 1 and the operator reset the Mac ceiling to exactly
-# four program lanes on 2026-08-27. Opening a fifth requires closing or
-# superseding one of those slots first.
+# mandated. The repository-wide portfolio keeps its existing global ceiling;
+# the operator's 2026-08-27 directive is narrower and is enforced separately
+# by scoped_wip_limits.mac_build. Opening a fifth Mac build lane requires
+# closing or superseding one of those scoped slots first. A non-Mac track does
+# not consume that scoped capacity merely because it is represented here.
 # ---------------------------------------------------------------------------
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 4             # hard operator ceiling for Mac build programs
-  warn_active: 4            # all four slots are intentional; a fifth is an error
+  max_active: 10            # repository-wide ceiling; independent of host-scoped admission
+  warn_active: 5            # repository-wide focus warning
+  scoped_wip_limits:
+    mac_build:
+      scope: "Mac build admission only"
+      max_active: 4         # hard operator ceiling for programs building on the Mac
+      warn_active: 4        # all four Mac slots are intentional; a fifth is an error
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
@@ -124,6 +131,7 @@ vital_signs:
 #   depends_on:       [<track id>, ...]         (hard ordering; must form a DAG)
 #   conflicts_with:   [<track id>, ...]         (shared surface; not both ACTIVE)
 #   owned_surfaces:   [<glob>, ...]             (coordination plane; overlap => WARN)
+#   admission_scopes: [<scoped WIP id>, ...]    (host/context-specific capacity)
 #   moves_vital_signs:[<vital_sign id>, ...]    (which live-status dims it improves)
 #   graduation_profile: <profile id>            (profile-aware final-boss gate)
 #   target_closure_kind / closure_kind:
@@ -146,8 +154,10 @@ active_tracks:
       - sublimation-forge-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - dharma_swarm/mission_control*.py
+      - tests/test_mission_control.py
       - dashboard/src/app/dashboard/cockpit/**
       - dashboard/src/components/cockpit/**
       - dashboard/src/components/operator-coherence/v2/**
@@ -168,13 +178,13 @@ active_tracks:
       projection; HELM remains the terminal operator surface. Their prototype
       packages may complete independently, but they do not consume extra
       standing portfolio slots.
-    prerequisites: []
-    completion_criteria:
+    prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
       - id: mission_control_contract_tests_pass
         kind: test_passes
         test: tests/test_mission_control.py
@@ -211,6 +221,7 @@ active_tracks:
       - rsi-lab-meghadharma-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - deploy/sadhana/**
       - scripts/runtime/sadhana_release.py
@@ -221,25 +232,25 @@ active_tracks:
       - eval_coverage
       - security_guardrails
     target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "The active truth-fix release worktree is durable at /Users/dhyana/ds_sadhana_10day_active_20260826. Custody and code volume do not prove a live participant journey, release, or program outcome."
+    claim_boundary: "The provisional release package is preserved at /Users/dhyana/ds_sadhana_10day_release_final_20260827 and on draft PR #1453. Custody, tests in that worktree, and code volume do not prove the package is landed or a participant journey, release, or program outcome is live."
     description: |
       Finish the explicitly bounded ten-day SADHANA program through its
       existing release contract, writer sentinel, mobile surface, and hard
       stop. Preserve the single-writer boundary and distinguish participant
       evidence from fixture or deployment evidence.
-    prerequisites: []
-    completion_criteria:
+    prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
       - id: sadhana_release_contract_landed
         kind: file_exists
         file: scripts/runtime/sadhana_release.py
       - id: sadhana_release_tests_landed
-        kind: file_exists
-        file: tests/test_sadhana_release.py
+        kind: test_passes
+        test: tests/test_sadhana_release.py
     non_goals:
       - Do not extend the ten-day program silently or weaken its hard stop.
       - Do not treat a release bundle as participant completion evidence.
@@ -268,6 +279,7 @@ active_tracks:
       - sublimation-forge-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - dharma_swarm/forge_lab/**
       - scripts/forge_lab/**
@@ -285,13 +297,37 @@ active_tracks:
       Meghadharma, then run bounded research campaigns through the governed
       lab controls. Release verification stays cross-host and fail-closed;
       spend and promotion retain their own gates.
-    prerequisites: []
-    completion_criteria:
-      - id: exact_sync_observation_receipt_valid
+    prerequisites:
+      - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
+      - id: exact_sync_observation_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
+        fresh_ttl_days: 30
+        expect_digest: true
+        requires_keys: [schema, observed_at, authority, claim, host_observations, comparison, exclusions, digest]
+      - id: exact_sync_host_commits_match
+        kind: json_collection_values_match
+        file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
+        collection: host_observations
+        key_field: node
+        value_field: commit
+        expected:
+          mac: b148f55e00f668fa84774f299610eaae4d8283e4
+          meghadharma: b148f55e00f668fa84774f299610eaae4d8283e4
+      - id: exact_sync_host_trees_match
+        kind: json_collection_values_match
+        file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
+        collection: host_observations
+        key_field: node
+        value_field: tree
+        expected:
+          mac: 9d24a2a2b32e7a16e070d4126d2dde1938728475
+          meghadharma: 9d24a2a2b32e7a16e070d4126d2dde1938728475
     non_goals:
       - Do not synchronize mutable state, secrets, OAuth material, or provider credentials as code.
       - Do not equate exact code identity with research validity or production readiness.
@@ -315,6 +351,7 @@ active_tracks:
       - rsi-lab-meghadharma-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - dharma_swarm/foundry/**
       - scripts/foundry/**
@@ -330,13 +367,13 @@ active_tracks:
       Consolidate the existing foundry into the Sublimation Forge: an
       offline-first, held-out, receipted improvement loop whose candidate
       promotion remains independent and fail-closed.
-    prerequisites: []
-    completion_criteria:
+    prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
       - id: foundry_loop_tests_pass
         kind: test_passes
         test: tests/test_foundry_loop.py
@@ -1095,115 +1132,9 @@ parked_track_context:
       - dashboard/src/app/dashboard/control-surface/page.tsx
       - dashboard/src/hooks/useMissionSarathi.ts
       - dashboard/src/components/cockpit/MissionSarathiStrip.tsx
-      # Operator-authorized SADHANA mobile-shell admission (2026-08-23): the
-      # Constellation cannot be iPhone-readable while the shared root shell
-      # reserves a fixed 260px sidebar at every viewport. These exact paths
-      # admit only the responsive shell seam and its browser proof; they do not
-      # create another dashboard or grant the UI runtime authority.
-      - dashboard/src/app/layout.tsx
-      # The first real-route 390px oracle exposed a second owner: the nested
-      # dashboard flex item retained min-width:auto and expanded to 720px even
-      # after the root sidebar offset was removed. Admit that exact layout seam
-      # so content can shrink into the viewport without being clipped.
-      - dashboard/src/app/dashboard/layout.tsx
-      - dashboard/src/components/layout/Sidebar.tsx
-      - dashboard/playwright/sadhana-constellation-mobile.spec.ts
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-SHELL-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-FLEX-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-MOBILE-SHELL-P0.json
       - dharma_swarm/operator_brief/mission_control_citations.py
       - tests/test_operator_brief_mission_control_citations.py
       - reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-P2-ADMISSION.json
-      # Operator-authorized SADHANA P0 admission (2026-08-23): one durable,
-      # single-writer campaign supervisor over the existing Mission Control,
-      # TaskBoard, RuntimeStateStore, and governed executor seams. These exact
-      # additive paths do not admit a second scheduler, task store, dashboard,
-      # transport, evaluator, or promotion authority.
-      - dharma_swarm/mission_control_evidence.py
-      - dharma_swarm/mission_control_campaign.py
-      - dharma_swarm/mission_control_service.py
-      - dharma_swarm/mission_control_authority.py
-      - scripts/runtime/mission_control_campaign.py
-      - tests/test_mission_control_evidence.py
-      - tests/test_mission_control_campaign.py
-      - tests/test_mission_control_service.py
-      - tests/test_runtime_state_claim_cas.py
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-SUPERVISOR-P0.json
-      # Operator-authorized SADHANA A2A identity repair (2026-08-23): the
-      # governed adapter must never select a latest-wins execution identity
-      # when an external A2A task identifier maps to multiple durable runs.
-      # These packet records admit only the fail-closed exact-one lookup and
-      # its adversarial insertion-order proof on already-owned P2 surfaces.
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-IDENTITY-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-A2A-IDENTITY-P0.json
-      # Operator-authorized SADHANA bootstrap P0 (2026-08-23): one
-      # contract-digest-pinned initializer may seed the existing Mission
-      # Control and TaskBoard owners before the supervisor starts. The
-      # initializer is not a scheduler, executor, campaign-session writer,
-      # acceptance oracle, or deployment unit.
-      - dharma_swarm/mission_control_bootstrap.py
-      - scripts/runtime/sadhana_campaign_bootstrap.py
-      - tests/test_mission_control_bootstrap.py
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-BOOTSTRAP-P0.json
-      # Operator-authorized SADHANA campaign authority binding P0
-      # (2026-08-23): seeded goal contracts remain non-dispatchable until one
-      # explicit manifest binds every goal to an exact live runtime principal,
-      # deterministic workspace, zero-dollar scope, and task-correlated file
-      # lease. Orchestrator may use that nested principal only; ordinary tasks
-      # without the typed campaign envelope retain their generic routing.
-      - dharma_swarm/mission_control_binding.py
-      - tests/test_mission_control_binding.py
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-BINDING-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-BINDING-P0.json
-      # Operator-authorized SADHANA bounded-attempt amendment (2026-08-23):
-      # exact campaign dispatches carry a zero-based attempt generation through
-      # authority, lease, request, owner identity, run, and claim evidence.
-      # Only a proven pre-provider indeterminate attempt may advance, within the
-      # goal contract ceiling; prior generations remain terminal evidence. The
-      # same leader also runs the already-governed inference-only verifier so a
-      # completed candidate cannot strand the dependency graph awaiting manual
-      # SSH. Generic tasks and generic retry/routing remain unchanged.
-      - dharma_swarm/mission_control_attempts.py
-      - dharma_swarm/mission_control_auto_verifier.py
-      - dharma_swarm/mission_control_binding_render.py
-      - dharma_swarm/mission_control_binding_seed.py
-      - dharma_swarm/mission_control_bootstrap_lock.py
-      - dharma_swarm/mission_control_executor_guard.py
-      - dharma_swarm/runtime_lifecycle.py
-      - dharma_swarm/runtime_lifecycle_identity.py
-      - dharma_swarm/runtime_lifecycle_payloads.py
-      - dharma_swarm/task_board.py
-      - tests/test_mission_control_attempts.py
-      - tests/test_mission_control_auto_verifier.py
-      - tests/test_runtime_state_campaign_attempts.py
-      - tests/test_task_board.py
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-ATTEMPT-GENERATION-P0-ADMISSION.json
-      # Operator-authorized SADHANA authority-extension scope correction
-      # (2026-08-23): bind the extracted activation, observed-input, held-out
-      # oracle, operator-control, roster, runtime-manifest, and attempt-helper
-      # modules that the sealed semantics require. AgentRunner/Orchestrator
-      # remain owned by the sibling dharmagraph pre-effect-fence packet.
-      - dharma_swarm/mission_control_activation.py
-      - dharma_swarm/mission_control_binding_manifest.py
-      - dharma_swarm/mission_control_held_out_oracle.py
-      - dharma_swarm/mission_control_observed_input.py
-      - dharma_swarm/mission_control_operator_authority.py
-      - dharma_swarm/mission_control_operator_state.py
-      - dharma_swarm/mission_control_operator_runtime.py
-      - dharma_swarm/mission_control_oracle_custody.py
-      - dharma_swarm/mission_control_oracle_launcher.py
-      - dharma_swarm/mission_control_roster.py
-      - dharma_swarm/mission_control_runtime_manifests.py
-      - dharma_swarm/mission_control_task_attempts.py
-      - scripts/runtime/sadhana_render_campaign_manifests.py
-      - tests/test_mission_control_activation.py
-      - tests/test_mission_control_held_out_oracle.py
-      - tests/test_mission_control_observed_input.py
-      - tests/test_mission_control_oracle_launcher.py
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-EXTENSIONS-P0-ADMISSION.json
-      - reports/agentops/work_packets/organism-rewire-WP-SADHANA-AUTHORITY-EXTENSIONS-P0.json
       # Operator-approved 2026-08-18 (implements next-item 8, the external-gradient
       # portfolio): the Sublimation Foundry — a target-agnostic verified evolutionary
       # refinery (free-model army as mutation operator, three-ring verification as
@@ -1329,30 +1260,6 @@ parked_track_context:
         what: "Sublimation Foundry (implements item 8): build dharma_swarm/foundry/ as a target-agnostic AlphaEvolve-style refinery — Evaluator Protocol + target ingest + runner isolation + three verification rings (blind hermetic fitness with AST/diff/determinism/timing tripwires; held-out re-verification; external confirmation) + seven-link improvement receipts + free-model army selection (composes model_pool/evolution_roster) under an llm_burn budget cap + a draft-only kill-switch-guarded foundry-lane workflow + guardian quorum feed + standing kill-metrics. Fitness NEVER selects on daily P&L (non_goals). External receipts are the only permitted quorum feed; foundry receipts stay lab-local until guardian quorum. Revenue spearhead (agent-behavior verification report cards via the audit_kit sealed-receipt pattern) is outreach-ready but graduates to its own revenue-serving track on first paid receipt."
         kind: code
         blocker: false
-      - id: 16
-        what: "SADHANA Mission Control supervisor P0: implement start/run/status/verify/stop as one nonblocking fcntl-fenced writer over canonical MissionSnapshot plus separately owned executor references; renew only an exact, unexpired fenced claim through atomic CAS after a fresh monotonic EvidenceDelta; preserve queued work on durable stop/restart; treat producer completion as a candidate until an independent acceptance receipt (same generator/verifier forbidden except a deterministic held-out oracle); verify exact file-backed authority and revocation immediately before GovernedMissionDispatcher effects; and report process, transport, model execution, and canary acceptance as separate evidence classes, never PID-as-success."
-        kind: code
-        blocker: true
-      - id: 17
-        what: "SADHANA mobile shell P0: remove the shared dashboard's unconditional 260px mobile offset, make the nested dashboard flex chain shrink below its 720px min-content width without clipping, render a bounded mobile navigation seam while preserving the desktop sidebar contract, and prove the real unmodified control-surface route at a 390px viewport has no horizontal document overflow. Component isolation is supporting evidence only; the completion oracle is a Playwright browser run against the actual root layout."
-        kind: code
-        blocker: true
-      - id: 18
-        what: "SADHANA governed A2A identity P0: replace latest-wins lookup of external A2A task identifiers with a bounded exact-one identity proof before status recovery or any publish decision. Zero matches may follow only the typed new-dispatch path; two or more matches are ambiguity and must fail closed independent of insertion order, timestamps, or otherwise-valid authority. Prove duplicate ambiguity performs no transport publish and cannot be hidden by metadata refresh."
-        kind: code
-        blocker: true
-      - id: 19
-        what: "SADHANA campaign bootstrap P0: verify the exact external ten-goal contract bytes, schema, campaign identity, and acyclic dependency graph before opening canonical owners; then, under a one-shot bootstrap fence, preflight every existing Mission Control mission/task identity before effects, topologically seed only missing dependency-closed tasks with stable idempotency keys, and emit a byte-stable goal-to-task map plus the G05 canary ID for supervisor configuration. Drift or conflicting partial state must add zero writes; task existence and canary identity never imply execution or acceptance."
-        kind: code
-        blocker: true
-      - id: 20
-        what: "SADHANA campaign authority binding P0: after the canonical swarm roster is live and before the first supervisor cycle, consume one exact campaign manifest and bind each seeded goal task to exactly one stable-name AgentState ID, one deterministic relative workspace, one zero-dollar task-correlated execution lease, and the canonical governance allowed-file scope. Preserve bootstrap's authority_unbound marker as seed provenance; the separately typed campaign authority envelope is the only dispatch readiness evidence. Fail closed on roster ambiguity, foreign partial state, expired or over-broad authority, unavailable exact principals, and executor identity substitution while leaving generic routing unchanged for tasks without campaign authority."
-        kind: code
-        blocker: true
-      - id: 21
-        what: "SADHANA bounded attempt and automatic verification P0: bind zero-based attempt_generation through the exact campaign authority/request/lease/run/claim identity, preserve every prior generation as immutable terminal evidence, and advance only an exact dispatch_indeterminate pre-provider failure below the goal's precommitted attempt ceiling. Under the sole campaign leader, replay or run one distinct-family inference-only verifier for each unadjudicated completed candidate and immediately submit its typed verdict to CampaignSupervisor.accept; verifier failure must remain visible and must never imply acceptance or dependency readiness."
-        kind: code
-        blocker: true
 
     non_goals:
       - Do not weaken, remove, or bypass any telos gate or ratchet to wire an organ (gates are hardest exactly when revenue/deadline pressure arrives).
@@ -1385,37 +1292,6 @@ parked_track_context:
       - dharma_swarm/checkpoint.py
       - dharma_swarm/swarm.py            # Phase 0b reconciler wiring only (hot-path; [impact-checked])
       - dharma_swarm/orchestrator.py     # Phase 0b seam call only (at module-budget ceiling; minimal edit)
-      # Operator-authorized cross-track SADHANA security seam (2026-08-23):
-      # only tasks carrying the typed campaign authority envelope may require
-      # one exact authenticated AgentState ID before normal topology routing.
-      # No generic routing, topology, lifecycle, or dharmagraph ownership moves.
-      - tests/test_orchestrator.py
-      # Operator-authorized shared execution seam for SADHANA generation
-      # (2026-08-23): AgentPool exposes only exact ownership-CAS reserve/release,
-      # while Orchestrator disables its generic same-generation retry for typed
-      # campaign authority and records the pre-provider scheduling witness. No
-      # generic route, retry, topology, or worker behavior may change.
-      - dharma_swarm/agent_runner.py
-      - tests/test_agent_runner.py
-      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0-ADMISSION.json
-      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-EXACT-PRINCIPAL-P0.json
-      # Operator-authorized SADHANA pre-effect-fence scope correction
-      # (2026-08-23): bind the exact AgentPool reservation/release CAS and the
-      # Orchestrator provider-boundary readiness handshake plus the provider's
-      # request-scoped exact-model entry point as one six-file shared seam.
-      # Campaign-less generic routing remains behaviorally fixed.
-      - dharma_swarm/providers.py
-      - tests/test_providers.py
-      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0-ADMISSION.json
-      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-FENCE-P0.json
-      # Governed line-budget decomposition (2026-08-23): move the existing
-      # Orchestrator background execution body behind one import-leaf async
-      # helper and isolate the restriction-only campaign provider fence. The
-      # same-signature host wrapper passes the host logger explicitly;
-      # no ceiling waiver, routing authority, or lifecycle ownership moves.
-      - dharma_swarm/orchestrator_execution.py
-      - dharma_swarm/campaign_provider_guard.py
-      - reports/agentops/work_packets/dharmagraph-WP-SADHANA-PRE-EFFECT-MODULE-SPLIT-P0-ADMISSION.json
       - pyproject.toml                   # [test-oracle] extra only (shared file; coordinate)
       - .github/workflows/langgraph-oracle.yml
       - tests/test_workflow.py
@@ -2272,14 +2148,6 @@ parked_track_context:
       - dharma_swarm/docker_sandbox.py
       - docs/docops/AUTO_INVENTORY.md
       - api/main.py
-      # Operator-authorized SADHANA read-model composition (2026-08-23): one
-      # exact-path, read-only provider may be injected into the existing API
-      # composition root. It reads only the supervisor's atomically replaced
-      # JSON projection and never constructs or opens a canonical state owner.
-      - api/mission_snapshot_provider.py
-      - tests/test_mission_snapshot_provider.py
-      - reports/agentops/work_packets/titanium-WP-SADHANA-READMODEL-P0-ADMISSION.json
-      - reports/agentops/work_packets/titanium-WP-SADHANA-READMODEL-P0.json
       - tests/test_api_auth.py
       - tests/test_verify_api.py
       - tests/test_bootstrap_contract.py
@@ -2409,10 +2277,6 @@ parked_track_context:
           - verdict
 
     next_items:
-      - id: WP-SADHANA-READMODEL
-        what: "Inject one exact-path SADHANA campaign JSON provider at the existing api/main.py composition root. Per request, open the configured path with no-follow semantics, require one regular same-owner non-world/group-writable bounded file, verify the producer content digest and exact mission/config/minimum-generation/freshness bindings, reject generation rollback, and return only an immutable deep copy of the nested MissionSnapshot. The provider must never import or construct MissionControl, TaskBoard, RuntimeStateStore, SQLite, a scheduler, or a transport. It must not advertise generic runtime graph/event readiness: those endpoints can initialize a database and owner Orchestrator runs intentionally use a session distinct from mission:<id>."
-        kind: code
-        blocker: true
       - id: WP-DSI
         what: "Implement a validated argv-based explicit entrypoint plus keepalive selection in dharma_swarm/docker_sandbox.py, with tests/test_docker_sandbox.py proving an explicitly configured digest-pinned dependency-complete image starts under NetworkMode.NONE with the workspace mounted read-only. Invalid entrypoint or keepalive configuration must fail closed; an omitted override must preserve the existing image-default behavior. This item is open and admits no evolution, DiffApplier, sealed-packet, agent-runner, or other production-caller wiring."
         kind: code
@@ -2443,7 +2307,6 @@ parked_track_context:
       - No new truth store, receipt primitive, policy engine, test framework, or catch-all module.
       - No ownership transfer from Mike, Safety TCB, DharmaGraph, Organism, Terminal, or Loop Closure.
       - No production, liveness, complete-security, deployment, or full-campaign claim from a hermetic or fixture-only result.
-      - A secure campaign JSON projection must not authorize generic runtime-DB reads, prove a live writer, or coerce an owner observation, model receipt, producer completion, or dashboard state into independent acceptance.
       - No missing tool, skipped required test, stale receipt, NEEDS_HOST, or BLOCKED_OPERATOR result may be promoted to PASS.
       - No operator credential, live branch-protection decision, deployment change, reviewer nomination, or external action is silently assumed.
 

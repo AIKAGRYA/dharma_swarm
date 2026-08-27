@@ -4,6 +4,15 @@ This is a deliberately unpromoted, unmerged, time-bounded release lane. It is
 not an authority source and does not promote a branch, merge a PR, transfer writer authority, expose a
 public listener, spend money, or convert process health into evidence of work.
 
+This source tree is not currently sealable, deployable, or activatable. It
+intentionally does not own the Fleet campaign implementation. Checkout
+verification and `seal` fail closed unless the separately Fleet-owned
+`docs/governance/FLEET_SADHANA_CAMPAIGN_INTERFACE.json` binds the exact tracked
+implementation and runner bytes with `NoEffectAuthority`. That manifest and
+those implementation paths are absent from this change. The manifest is an
+asserted interface locator, not independent proof of campaign semantics,
+participant activity, provider contact, deployment, or activation.
+
 The release envelope binds one exact Git commit to the pinned
 `AIKAGRYA/dharma_swarm` origin, accepted-base ancestry, an exact fully
 integrated sole parent, full Git bundle, a controller-authored closed ledger of

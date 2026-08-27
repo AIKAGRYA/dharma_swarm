@@ -7,7 +7,6 @@ GET  /api/control-surface/ds-goal/cards   -> ds-goal ledgers as BoardStore cards
 GET  /api/control-surface/agentops/cards  -> AgentOps work packets as BoardStore cards (envelope)
 GET  /api/control-surface/a2a/cards       -> A2A receipts as BoardStore cards (envelope)
 GET  /api/control-surface/semantic-receipts/cards -> SemanticReceipt artifacts as BoardStore cards (envelope)
-GET  /api/control-surface/missions/{id}/snapshot -> injected read-only MissionSnapshot
 POST /api/control-surface/rows/{id}/handoff-prompt -> agent handoff prompt
 GET  /api/control-surface/stream          -> SSE stream of updated rows
 
@@ -18,7 +17,6 @@ runtime/code/evidence adapters.
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import logging
 import threading
@@ -26,8 +24,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.encoders import jsonable_encoder
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
@@ -41,13 +38,6 @@ _A2A_INBOX_BRIDGE_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "inbox_bridge_
 _A2A_DOMAIN_REPLY_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "domain_reply_receipts"
 _A2A_REPLY_RECEIPT_ROOT = _REPO_ROOT / "reports" / "a2a" / "reply_receipts"
 _SEMANTIC_RECEIPT_ROOT = _REPO_ROOT / "reports" / "agentops" / "semantic_receipts"
-_OPERATOR_CONTROL_EVIDENCE_SCHEMA = "dharma.sadhana.operator_control_evidence.v1"
-_OPERATOR_CONTROL_EVIDENCE_FIELDS = frozenset(
-    "schema_version claim_stage control_state campaign_generation transition_sequence "
-    "request_id idempotency_key action source_envelope_sha256 authority_receipt_ref "
-    "authority_receipt_sha256 authority_applied_at effect_state effect_receipt_ref "
-    "effect_receipt_sha256 effect_observed_at".split()
-)
 _IMPORT_LOCK = threading.Lock()
 _ENVELOPE_TYPES: tuple[Any, Any, Any] | None = None
 _CONTROL_SURFACE_FUNCS: tuple[Any, Any, Any] | None = None
@@ -178,62 +168,6 @@ def _find_row_object(row_id: str, *, memory_depth: str = "snapshot"):  # noqa: A
         if row.id == row_id:
             return row
     return None
-
-
-def _mission_snapshot_projection(
-    mission_id: str,
-    *,
-    state: str,
-    snapshot: dict[str, Any] | None = None,
-    operator_control_evidence: dict[str, Any] | None = None,
-    runtime_projection_ready: bool = False,
-) -> dict[str, Any]:
-    """Return the non-promotional projection for one explicit mission."""
-    projection = {
-        "schema_version": "dharma.control_surface.mission_snapshot_projection.v1",
-        "mission_id": mission_id,
-        "state": state,
-        "source_mode": "injected_read_only",
-        "snapshot": snapshot,
-        "runtime_projection_ready": runtime_projection_ready,
-        "runtime_projection_mode": (
-            "immutable_copy" if runtime_projection_ready else "unavailable"
-        ),
-        # This observation surface never upgrades a lease, heartbeat,
-        # acknowledgement, identifier, or receipt into proof.
-        "proves_executor_liveness": False,
-    }
-    if operator_control_evidence is not None:
-        projection["operator_control_evidence"] = operator_control_evidence
-    return projection
-
-
-def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]:
-    projected = jsonable_encoder(snapshot)
-    if not isinstance(projected, dict):
-        raise TypeError("mission snapshot provider returned a non-object")
-    mission = projected.get("mission")
-    if not isinstance(mission, dict) or mission.get("mission_id") != mission_id:
-        raise ValueError("mission snapshot identity does not match the request")
-    for field in ("tasks", "attempts", "leases", "receipts"):
-        if not isinstance(projected.get(field), list):
-            raise TypeError(f"mission snapshot field {field!r} must be a list")
-    if not isinstance(projected.get("reconciliation"), str):
-        raise TypeError("mission snapshot reconciliation must be a string")
-    if not isinstance(projected.get("observed_at"), str):
-        raise TypeError("mission snapshot observed_at must be an ISO timestamp")
-    return projected
-
-
-def _project_operator_control_evidence(evidence: Any) -> dict[str, Any]:
-    projected = jsonable_encoder(evidence)
-    if (
-        not isinstance(projected, dict)
-        or set(projected) != _OPERATOR_CONTROL_EVIDENCE_FIELDS
-        or projected.get("schema_version") != _OPERATOR_CONTROL_EVIDENCE_SCHEMA
-    ):
-        raise TypeError("operator control evidence has a foreign shape")
-    return projected
 
 
 @router.get("/summary")
@@ -453,110 +387,6 @@ def control_surface_semantic_receipt_cards(
                 "cards": [],
             },
             [{"source": "semantic_receipt_cards", "error": str(e)}],
-        )
-
-
-@router.get("/missions/{mission_id}/snapshot")
-async def control_surface_mission_snapshot(
-    mission_id: str,
-    request: Request,
-) -> dict[str, Any]:
-    """Project one canonical MissionSnapshot through an injected reader only.
-
-    The endpoint deliberately has no default provider. In particular, it does
-    not construct MissionControl, TaskBoard, RuntimeStateStore, or an MCP
-    client merely because a dashboard asked for a mission.
-    """
-    mission_id = mission_id.strip()
-    if (
-        not mission_id
-        or len(mission_id) > 200
-        or any(character.isspace() for character in mission_id)
-    ):
-        raise HTTPException(
-            status_code=422, detail="mission_id must be a bounded identifier"
-        )
-
-    provider = getattr(request.app.state, "mission_snapshot_provider", None)
-    if provider is None:
-        return _build_envelope(
-            _mission_snapshot_projection(
-                mission_id,
-                **{"state": "uninitialized"},
-            ),
-            [
-                {
-                    "source": "mission_snapshot_provider",
-                    "error": "read-only provider is not injected",
-                }
-            ],
-        )
-
-    bundle_reader = getattr(provider, "get_snapshot_with_operator_control", None)
-    reads_bundle = callable(bundle_reader)
-    reader = bundle_reader if reads_bundle else getattr(provider, "get_snapshot", None)
-    if reader is None and callable(provider):
-        reader = provider
-    if not callable(reader):
-        return _build_envelope(
-            _mission_snapshot_projection(mission_id, state="unknown"),
-            [
-                {
-                    "source": "mission_snapshot_provider",
-                    "error": "injected provider has no read-only get_snapshot callable",
-                }
-            ],
-        )
-
-    try:
-        candidate = reader(mission_id)
-        admitted = await candidate if inspect.isawaitable(candidate) else candidate
-        if admitted is None:
-            return _build_envelope(
-                _mission_snapshot_projection(mission_id, state="unknown"),
-                [
-                    {
-                        "source": "mission_snapshot",
-                        "error": "canonical state was not observed for this mission",
-                    }
-                ],
-            )
-        operator_evidence = None
-        snapshot = admitted
-        if reads_bundle:
-            if not isinstance(admitted, tuple) or len(admitted) != 2:
-                raise TypeError("mission snapshot provider returned a malformed bundle")
-            snapshot, raw_operator_evidence = admitted
-            operator_evidence = _project_operator_control_evidence(
-                raw_operator_evidence
-            )
-        projected = _project_injected_snapshot(snapshot, mission_id)
-        runtime_projection_ready = (
-            getattr(provider, "runtime_projection_mode", None) == "immutable_copy"
-        )
-        return _build_envelope(
-            _mission_snapshot_projection(
-                mission_id,
-                state="observed",
-                snapshot=projected,
-                operator_control_evidence=operator_evidence,
-                runtime_projection_ready=runtime_projection_ready,
-            )
-        )
-    except Exception as exc:
-        logger.warning(
-            "mission snapshot provider failed for explicit mission %r (%s)",
-            mission_id,
-            type(exc).__name__,
-        )
-        return _build_envelope(
-            _mission_snapshot_projection(mission_id, state="unknown"),
-            [
-                {
-                    "source": "mission_snapshot_provider",
-                    "error": f"read failed ({type(exc).__name__})",
-                }
-            ],
         )
 
 

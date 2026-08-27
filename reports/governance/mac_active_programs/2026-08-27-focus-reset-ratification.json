@@ -2,11 +2,15 @@
   "schema": "dharma.mac_active_programs.focus_reset_ratification.v1",
   "observed_at": "2026-08-27T00:33:05+09:00",
   "authority": {
-    "kind": "session_entry_ratification",
-    "work_packet": "reports/agentops/work_packets/fleet-advancement-WP-FOCUS-RESET-20260827.json",
+    "kind": "historical_session_entry_ratification",
+    "packet_commit": "fd1c203d87550d1c71103c3dd44da29593b1bab4",
+    "packet_path_at_commit": "reports/agentops/work_packets/fleet-advancement-WP-FOCUS-RESET-20260827.json",
+    "packet_blob_sha256": "bf24b4f46247a59fce703003a64319d8129932b4f6062de6fab5f24005ce2260",
     "packet_digest": "bc924cc8fd200b15bbc05a7fa45ac2fa2ec484995c0b21041f6be0824dc80ba3",
     "base_ref": "17e04edea2280cc03a237e8221e7f1b09f16d78f",
-    "preflight_report": "/private/tmp/dharma-agentops-501/reports/agentops/fleet-advancement-WP-FOCUS-RESET-20260827/preflight-17e04edea2280cc03a237e8221e7f1b09f16d78f/report.json"
+    "preflight_report": "/private/tmp/dharma-agentops-501/reports/agentops/fleet-advancement-WP-FOCUS-RESET-20260827/preflight-17e04edea2280cc03a237e8221e7f1b09f16d78f/report.json",
+    "final_tree_packet_present": false,
+    "custody_note": "The incremental packet remains retrievable at packet_commit:packet_path_at_commit and is bound by packet_blob_sha256. It is intentionally absent from the final pull-request tree because CI binds the complete merge-base-to-head event to one consolidated Session Entry packet; this note does not upgrade the historical local preflight into a committed closeout receipt."
   },
   "claim": {
     "modality": "verified_local_governance_state",

@@ -11,17 +11,20 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
 import json
-import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from dharma_swarm.models import (
+    AgentConfig,
     AgentRole,
     AgentState,
     AgentStatus,
+    Task,
+    TaskPriority,
     TaskStatus,
 )
 from dharma_swarm.swarm import SwarmManager
@@ -162,43 +165,6 @@ class TestReapOrphanedTasks:
         assert len(reaped) == 1
         assert reaped[0].id == task.id
         assert reaped[0].status == TaskStatus.PENDING
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("status", [TaskStatus.ASSIGNED, TaskStatus.RUNNING])
-    async def test_campaign_orphan_is_never_generically_requeued(
-        self,
-        status: TaskStatus,
-        tmp_path: Path,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        board = await _make_board(tmp_path)
-        task = await board.create(
-            "indeterminate campaign call",
-            metadata={"mission_campaign_authority": {}},
-        )
-        stale_time = datetime.now(timezone.utc) - timedelta(minutes=60)
-        await _force_task_state(
-            board,
-            task.id,
-            status=status.value,
-            assigned_to="prior-campaign-agent",
-            updated_at=stale_time,
-            metadata=task.metadata,
-        )
-
-        sm = await _make_swarm(tmp_path, board, _FakeAgentPool([]))
-        with caplog.at_level(logging.WARNING, logger="dharma_swarm.swarm"):
-            reaped = await sm.reap_orphaned_tasks(stale_minutes=30)
-
-        preserved = await board.get(task.id)
-        assert reaped == []
-        assert preserved is not None
-        assert preserved.status is status
-        assert preserved.result is None
-        assert preserved.assigned_to == "prior-campaign-agent"
-        assert preserved.metadata == {"mission_campaign_authority": {}}
-        assert "nonterminal/indeterminate" in caplog.text
-        assert "cannot authorize retry or claim provider cessation" in caplog.text
 
     @pytest.mark.asyncio
     async def test_task_on_live_agent_is_not_reaped(self, tmp_path: Path) -> None:
@@ -402,36 +368,6 @@ class TestPropagateDependencyFailures:
         assert propagated[0].id == child.id
         assert propagated[0].status == TaskStatus.FAILED
         assert "permanently failed" in (propagated[0].result or "").lower()
-
-    @pytest.mark.asyncio
-    async def test_campaign_child_is_not_generically_failed_from_dependency(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        board = await _make_board(tmp_path)
-        parent = await board.create("permanently failed parent")
-        campaign_metadata = {"mission_campaign_authority": {}}
-        child = await board.create(
-            "campaign child remains typed",
-            metadata=campaign_metadata,
-        )
-        await _add_dependency(board, child.id, parent.id)
-        await _force_task_state(
-            board,
-            parent.id,
-            status=TaskStatus.FAILED.value,
-            metadata={"auto_rescue_count": 3},
-        )
-
-        sm = await _make_swarm(tmp_path, board, _FakeAgentPool([]))
-        propagated = await sm._propagate_dependency_failures()
-
-        assert propagated == []
-        preserved = await board.get(child.id)
-        assert preserved is not None
-        assert preserved.status == TaskStatus.PENDING
-        assert preserved.result is None
-        assert preserved.metadata == campaign_metadata
 
     @pytest.mark.asyncio
     async def test_pending_with_rescuable_dep_is_not_propagated(
@@ -822,7 +758,7 @@ class TestTaskQueueSnapshot:
         # or a running task stale >15min, per task_board._READY_QUERY.
         blocking_parent = await board.create("running parent")
         blocked_child = await board.create("blocked child")
-        await board.create("independent ready task")
+        ready_task = await board.create("independent ready task")
         failed_task = await board.create("failed task")
         await _add_dependency(board, blocked_child.id, blocking_parent.id)
 

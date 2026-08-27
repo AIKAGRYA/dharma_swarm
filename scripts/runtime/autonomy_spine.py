@@ -461,7 +461,7 @@ def _complete_denied_runtime_dispatch(
     runtime_dispatch["store"].complete_idempotent_side_effect_sync(
         identity,
         str(runtime_dispatch["side_effect_key"]),
-        status="failed",
+        status="blocked",
         result_receipt_id=str(warrant_ref.get("receipt_id") or ""),
         metadata={
             **dict(runtime_dispatch["metadata"]),

@@ -1,5 +1,5 @@
- ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                 100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ◆ DHARMA HELM  /  ACTIVITY  ·  dharma_swarm                                      100×30 · standard
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   ◆ Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
@@ -7,17 +7,17 @@
 ┌────────────────────────────────────────┐CONTEXT / ORGANISM
 │ CONVERSATION / INTENT                  │╭────────────────────────────────────────────────────────╮
 │  Dharma Helm · Quiet Field             ││ Agents                                                 │
-│  Type a message below · F2 unfolds     ││ route profiles and execution posture | j/k or ↑/↓      │
-│  the Whole Helm                        ││ select route                                           │
+│  Type a message below · F2 unfolds     ││ ?[?] UNKNOWN · agent-route owner projection absent     │
+│  the Whole Helm                        ││                                                        │
+│                                        ││  Routes                                                │
+│                                        ││  typed routing intents                                 │
+│                                        ││  No current owner projection.                          │
 │                                        ││                                                        │
-│                                        ││  Routes              Route brief                       │
-│                                        ││  typed routing       selected route plus OpenClaw      │
-│                                        ││  intents             envelope                          │
-│                                        ││  No typed agent      No selected route.                │
-│                                        ││  routes yet.         OpenClaw                          │
-│                                        ││                      present n/a | readable n/a        │
-│                                        ││                      agents n/a | providers n/a        │
-│                                        ││                                                        │
+│                                        ││  Route brief                                           │
+│                                        ││  selected route plus OpenClaw envelope                 │
+│                                        ││  No selected route.                                    │
+│                                        ││  OpenClaw                                              │
+│                                        ││  owner projection absent                               │
 │                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │

@@ -199,8 +199,8 @@ _UV_0_11_2_EGG_INFO_FILES = (
     (
         "SOURCES.txt",
         0o600,
-        77856,
-        "ed8884b7bb6c85d2fa54a39fdb6ca6e9e864eecfc88ca910075c3d561fc0c610",
+        74679,
+        "a4c59aedbfc8d2e6e03a1f137dee2c5c4aedbe93578822b873a4bb20fbf89d5c",
     ),
     (
         "dependency_links.txt",
@@ -574,6 +574,28 @@ INPUT_SET_RECEIPT_TARGET = Path("/etc/dharma-sadhana/input-set.receipt.json")
 INPUT_SET_MANIFEST_FILE = "input-set.manifest.json"
 INPUT_SET_ARCHIVE_FILE = "dharma-sadhana-input-set.zip"
 TRACKED_SOURCE_SCHEMA_VERSION = "dharma.sadhana.tracked_source_manifest.v1"
+FLEET_CAMPAIGN_INTERFACE_SCHEMA_VERSION = (
+    "dharma.fleet.sadhana_campaign_interface.v1"
+)
+FLEET_CAMPAIGN_INTERFACE_MANIFEST = (
+    "docs/governance/FLEET_SADHANA_CAMPAIGN_INTERFACE.json"
+)
+FLEET_CAMPAIGN_IMPLEMENTATION = "dharma_swarm/mission_control_campaign.py"
+FLEET_CAMPAIGN_RUNNER = "scripts/runtime/mission_control_campaign.py"
+_FLEET_CAMPAIGN_INTERFACE_FIELDS = {
+    "schema_version",
+    "authority_track",
+    "claim_modality",
+    "protocol_version",
+    "implementation_path",
+    "implementation_sha256",
+    "runner_path",
+    "runner_sha256",
+    "required_exports",
+    "required_commands",
+    "effect_authority",
+    "manifest_digest",
+}
 TRACKED_SOURCE_MANIFEST_FILE = "tracked-source.manifest.json"
 TRACKED_SOURCE_BUILD_OUTPUT_ROOTS = (
     ".venv",
@@ -4972,6 +4994,69 @@ def verify_tracked_source_tree(
     }
 
 
+def validate_fleet_campaign_prerequisite(
+    repo_root: Path,
+) -> dict[str, Any]:
+    """Bind a Fleet-owned campaign interface without importing its implementation.
+
+    The manifest is an asserted locator, not activation authority. Its owning Fleet
+    packet must land the implementation separately; SADHANA only verifies tracked
+    path custody and exact bytes before a release can be sealed or admitted.
+    """
+    repo = repo_root.resolve(strict=True)
+    manifest_path = repo / FLEET_CAMPAIGN_INTERFACE_MANIFEST
+    payload = _secure_json(manifest_path, require_private=False)
+    if set(payload) != _FLEET_CAMPAIGN_INTERFACE_FIELDS:
+        raise ReleaseContractError("Fleet campaign interface fields differ")
+    expected = {
+        "schema_version": FLEET_CAMPAIGN_INTERFACE_SCHEMA_VERSION,
+        "authority_track": "fleet-advancement-2026-08",
+        "claim_modality": "asserted_interface_locator",
+        "protocol_version": "dharma.sadhana.campaign_runtime.v1",
+        "implementation_path": FLEET_CAMPAIGN_IMPLEMENTATION,
+        "runner_path": FLEET_CAMPAIGN_RUNNER,
+        "required_exports": ["CampaignConfig", "CampaignSupervisor"],
+        "required_commands": ["run", "stop"],
+        "effect_authority": "NoEffectAuthority",
+    }
+    if any(payload.get(key) != value for key, value in expected.items()):
+        raise ReleaseContractError("Fleet campaign interface assertion differs")
+    digest = _require_hash(payload.get("manifest_digest"), "Fleet manifest_digest")
+    if digest != manifest_digest(payload):
+        raise ReleaseContractError("Fleet campaign interface self-digest differs")
+    for path_field, digest_field, executable in (
+        ("implementation_path", "implementation_sha256", False),
+        ("runner_path", "runner_sha256", True),
+    ):
+        relative = str(payload[path_field])
+        if _git(repo, "ls-files", "--error-unmatch", "--", relative) != relative:
+            raise ReleaseContractError("Fleet campaign prerequisite is not tracked")
+        target = repo / relative
+        try:
+            identity = target.lstat()
+        except OSError as exc:
+            raise ReleaseContractError(
+                "Fleet campaign prerequisite is unavailable"
+            ) from exc
+        mode = stat.S_IMODE(identity.st_mode)
+        if (
+            not stat.S_ISREG(identity.st_mode)
+            or target.is_symlink()
+            or identity.st_uid != os.geteuid()
+            or identity.st_nlink != 1
+            or mode & 0o022
+            or executable != bool(mode & 0o111)
+        ):
+            raise ReleaseContractError("Fleet campaign prerequisite custody differs")
+        expected_digest = _require_hash(
+            payload.get(digest_field),
+            f"Fleet {digest_field}",
+        )
+        if sha256_file(target, max_bytes=2 * 1024 * 1024) != expected_digest:
+            raise ReleaseContractError("Fleet campaign prerequisite bytes differ")
+    return dict(payload)
+
+
 def verify_checkout(repo_root: Path, manifest: Mapping[str, Any]) -> None:
     """Prove exact candidate source without asserting merge/canonical status."""
     if os.geteuid() == 0:
@@ -5010,6 +5095,7 @@ def verify_checkout(repo_root: Path, manifest: Mapping[str, Any]) -> None:
     )
     if ancestry.returncode != 0:
         raise ReleaseContractError("accepted base is not an ancestor of release_sha")
+    validate_fleet_campaign_prerequisite(repo)
     packet_path = repo / manifest["work_packet_path"]
     if (
         sha256_file(packet_path, max_bytes=_MAX_JSON_BYTES)
@@ -22660,6 +22746,7 @@ def seal_envelope(
         raise ReleaseContractError("release checkout must be clean before sealing")
     if _git(repo, "remote", "get-url", "origin") != CANONICAL_ORIGIN:
         raise ReleaseContractError("release checkout origin is not canonical")
+    validate_fleet_campaign_prerequisite(repo)
     parents = _git(repo, "rev-list", "--parents", "-n", "1", release_sha).split()
     if parents != [release_sha, integration_base_sha]:
         raise ReleaseContractError(

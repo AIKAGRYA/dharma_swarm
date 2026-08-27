@@ -421,6 +421,8 @@ class A2AServer:
 
         if not task.trace_id:
             task.trace_id = _inherit_trace_id()
+        if not task.context_id:
+            task.context_id = uuid.uuid4().hex[:12]
 
         identity = self._ensure_execution_identity(task)
         side_effect_key = f"a2a_handler:{task.id}:{task.capability or 'default'}"
@@ -532,48 +534,6 @@ class A2AServer:
         meta = dict(task.metadata or {})
         nested = meta.get("execution_identity")
         explicit = dict(nested) if isinstance(nested, dict) else {}
-        run_id = str(
-            meta.get("run_id")
-            or meta.get("runtime_run_id")
-            or explicit.get("run_id")
-            or ""
-        ).strip()
-        durable_identity = (
-            self._runtime_state.get_execution_identity_snapshot_sync(run_id)
-            if self._runtime_state is not None and run_id
-            else None
-        )
-        nested_metadata = explicit.get("metadata")
-        nested_metadata = (
-            dict(nested_metadata) if isinstance(nested_metadata, dict) else {}
-        )
-        context_sources = (
-            ("task.context_id", task.context_id),
-            ("metadata.context_id", meta.get("context_id")),
-            (
-                "metadata.execution_identity.metadata.context_id",
-                nested_metadata.get("context_id"),
-            ),
-            (
-                "durable_execution_identity.metadata.context_id",
-                durable_identity.metadata.get("context_id")
-                if durable_identity is not None
-                else "",
-            ),
-        )
-        contexts = [
-            (source, str(value or ""))
-            for source, value in context_sources
-            if str(value or "").strip()
-        ]
-        if len({value for _, value in contexts}) > 1:
-            details = ", ".join(
-                f"{source}={value!r}" for source, value in contexts
-            )
-            raise MissingExecutionIdentity(
-                f"A2A task has conflicting context_id values: {details}"
-            )
-        task.context_id = contexts[0][1] if contexts else uuid.uuid4().hex[:12]
         trace_id = task.trace_id or str(meta.get("trace_id") or explicit.get("trace_id") or "")
         if self._require_execution_identity and not trace_id:
             raise MissingExecutionIdentity("A2A task requires trace_id")
@@ -585,7 +545,7 @@ class A2AServer:
             correlation_id=str(meta.get("correlation_id") or explicit.get("correlation_id") or trace_id),
             causation_id=str(meta.get("causation_id") or explicit.get("causation_id") or ""),
             parent_run_id=str(meta.get("parent_run_id") or explicit.get("parent_run_id") or ""),
-            run_id=run_id,
+            run_id=str(meta.get("run_id") or meta.get("runtime_run_id") or explicit.get("run_id") or ""),
             claim_id=str(meta.get("claim_id") or explicit.get("claim_id") or ""),
             idempotency_key=str(meta.get("idempotency_key") or explicit.get("idempotency_key") or ""),
             external_a2a_task_id=task.id,
@@ -607,7 +567,6 @@ class A2AServer:
                 "claim_id": identity.claim_id,
                 "idempotency_key": identity.idempotency_key,
                 "external_a2a_task_id": identity.external_a2a_task_id,
-                "context_id": task.context_id,
             }
         )
         return identity.require_for_dispatch()

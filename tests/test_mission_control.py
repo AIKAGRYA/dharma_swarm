@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1109,36 +1107,9 @@ async def test_snapshot_reports_foreign_runtime_receipt_identity(
         limit=100,
     )
     assert len(terminal) == 1
-    receipt = terminal[0]
-    with sqlite3.connect(mission_control._runtime.db_path) as db:
-        db.execute("BEGIN IMMEDIATE")
-        cursor = db.execute(
-            "UPDATE runtime_receipts SET trace_id = ? WHERE receipt_id = ?"
-            " AND receipt_type = ? AND run_id = ? AND task_id = ?"
-            " AND trace_id = ? AND correlation_id = ? AND causation_id = ?"
-            " AND parent_run_id = ? AND agent_id = ? AND idempotency_key = ?"
-            " AND side_effect_key = ? AND status = ? AND payload_json = ?"
-            " AND created_at = ?",
-            (
-                "foreign-trace",
-                receipt.receipt_id,
-                receipt.receipt_type,
-                receipt.run_id,
-                receipt.task_id,
-                receipt.trace_id,
-                receipt.correlation_id,
-                receipt.causation_id,
-                receipt.parent_run_id,
-                receipt.agent_id,
-                receipt.idempotency_key,
-                receipt.side_effect_key,
-                receipt.status,
-                json.dumps(receipt.payload, sort_keys=True, ensure_ascii=True),
-                receipt.created_at.isoformat(),
-            ),
-        )
-        assert cursor.rowcount == 1
-        db.commit()
+    await mission_control._runtime.record_runtime_receipt(
+        replace(terminal[0], trace_id="foreign-trace")
+    )
 
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
@@ -1346,36 +1317,7 @@ async def test_snapshot_rejects_terminal_claim_outcome_mismatch(
     )
     claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
     assert claim is not None
-    assert claim.status == "completed"
-    # Fixture-only impossible terminal fork. Public runtime writers reject this;
-    # seed pre-existing corruption below that boundary to test reconciliation.
-    with sqlite3.connect(mission_control._runtime.db_path) as db:
-        db.execute("BEGIN IMMEDIATE")
-        cursor = db.execute(
-            "UPDATE task_claims SET status = 'failed'"
-            " WHERE claim_id = ? AND task_id = ? AND session_id = ?"
-            " AND agent_id = ? AND status = ? AND claimed_at = ?"
-            " AND acked_at IS ? AND heartbeat_at IS ? AND stale_after IS ?"
-            " AND recovered_at IS ? AND retry_count = ? AND metadata_json = ?"
-            " AND trace_id = ?",
-            (
-                claim.claim_id,
-                claim.task_id,
-                claim.session_id,
-                claim.agent_id,
-                claim.status,
-                claim.claimed_at.isoformat(),
-                claim.acked_at.isoformat() if claim.acked_at else None,
-                claim.heartbeat_at.isoformat() if claim.heartbeat_at else None,
-                claim.stale_after.isoformat() if claim.stale_after else None,
-                claim.recovered_at.isoformat() if claim.recovered_at else None,
-                claim.retry_count,
-                json.dumps(claim.metadata, sort_keys=True, ensure_ascii=True),
-                runtime_state_module._trace_from_metadata(claim.metadata),
-            ),
-        )
-        assert cursor.rowcount == 1
-        db.commit()
+    await mission_control._runtime.record_task_claim(replace(claim, status="failed"))
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
     assert (
@@ -1887,36 +1829,9 @@ async def test_snapshot_rejects_forged_recovery_receipt_contract(
         limit=2,
     )
     assert len(recovery) == 1
-    receipt = recovery[0]
-    with sqlite3.connect(mission_control._runtime.db_path) as db:
-        db.execute("BEGIN IMMEDIATE")
-        cursor = db.execute(
-            "UPDATE runtime_receipts SET side_effect_key = ? WHERE receipt_id = ?"
-            " AND receipt_type = ? AND run_id = ? AND task_id = ?"
-            " AND trace_id = ? AND correlation_id = ? AND causation_id = ?"
-            " AND parent_run_id = ? AND agent_id = ? AND idempotency_key = ?"
-            " AND side_effect_key = ? AND status = ? AND payload_json = ?"
-            " AND created_at = ?",
-            (
-                "forged-recovery-effect",
-                receipt.receipt_id,
-                receipt.receipt_type,
-                receipt.run_id,
-                receipt.task_id,
-                receipt.trace_id,
-                receipt.correlation_id,
-                receipt.causation_id,
-                receipt.parent_run_id,
-                receipt.agent_id,
-                receipt.idempotency_key,
-                receipt.side_effect_key,
-                receipt.status,
-                json.dumps(receipt.payload, sort_keys=True, ensure_ascii=True),
-                receipt.created_at.isoformat(),
-            ),
-        )
-        assert cursor.rowcount == 1
-        db.commit()
+    await mission_control._runtime.record_runtime_receipt(
+        replace(recovery[0], side_effect_key="forged-recovery-effect")
+    )
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
     assert (

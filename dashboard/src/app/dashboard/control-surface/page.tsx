@@ -26,7 +26,6 @@ import { DsGoalMissionCardsPanel } from "@/components/cockpit/DsGoalMissionCards
 import { AgentOpsWorkPacketCardsPanel } from "@/components/cockpit/AgentOpsWorkPacketCardsPanel";
 import { A2ASendCardsPanel } from "@/components/cockpit/A2ASendCardsPanel";
 import { SemanticReceiptCardsPanel } from "@/components/cockpit/SemanticReceiptCardsPanel";
-import { MissionSarathiStrip } from "@/components/cockpit/MissionSarathiStrip";
 
 export default function OperatorCockpitPage() {
   const { rows, isLoading, error, refetch } = useControlSurfaceRows();
@@ -62,7 +61,7 @@ export default function OperatorCockpitPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-3">
+    <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
       {/* Zone 1: Needs John Queue — always visible top bar */}
       <NeedsJohnQueue
         rows={needsJohnRows}
@@ -72,7 +71,6 @@ export default function OperatorCockpitPage() {
         isLoading={isLoading}
       />
 
-      <MissionSarathiStrip missionId="sadhana-10-20260823" />
       <OpsRunbookPanel rows={rows} selectedRow={selectedRow} />
       <DsGoalMissionCardsPanel />
       <AgentOpsWorkPacketCardsPanel />
@@ -80,9 +78,9 @@ export default function OperatorCockpitPage() {
       <SemanticReceiptCardsPanel />
 
       {/* Zones 2-5: Split layout */}
-      <div className="flex min-h-[520px] flex-1 flex-col gap-0 overflow-hidden rounded-xl border border-sumi-700/30 lg:flex-row">
+      <div className="flex flex-1 gap-0 overflow-hidden rounded-xl border border-sumi-700/30">
         {/* Left: System Truth Matrix */}
-        <div className={`flex-1 overflow-hidden transition-all ${selectedRow ? "lg:basis-[55%]" : "basis-full"}`}>
+        <div className={`flex-1 overflow-hidden transition-all ${selectedRow ? "basis-[55%]" : "basis-full"}`}>
           <SystemTruthMatrix
             rows={rows}
             isLoading={isLoading}
@@ -95,7 +93,7 @@ export default function OperatorCockpitPage() {
 
         {/* Right: Evidence Drawer + Runtime Rail (visible when a row is selected) */}
         {selectedRow && (
-          <div className="flex min-h-[420px] flex-col border-t border-sumi-800/40 lg:min-h-0 lg:basis-[45%] lg:border-l lg:border-t-0">
+          <div className="flex basis-[45%] flex-col border-l border-sumi-800/40">
             {/* Evidence Drawer — top portion */}
             <div className="flex-1 overflow-hidden border-b border-sumi-800/40">
               <EvidenceDrawer

@@ -6870,10 +6870,15 @@ async def test_campaign_activation_preflight_principal_binding_is_typed_seq2(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from dharma_swarm.mission_control import MissionControl
-    from dharma_swarm.mission_control_campaign import (
-        CampaignConfig,
-        CampaignSupervisor,
+    campaign_module = pytest.importorskip(
+        "dharma_swarm.mission_control_campaign",
+        reason=(
+            "Fleet advancement owns the Mission Control campaign implementation; "
+            "SADHANA cannot import that sibling-owned surface before it lands"
+        ),
     )
+    CampaignConfig = campaign_module.CampaignConfig
+    CampaignSupervisor = campaign_module.CampaignSupervisor
     from dharma_swarm.runtime_state import RuntimeStateStore, TaskClaim
     from dharma_swarm.task_board import TaskBoard
     from scripts.runtime.sadhana_prepare_runtime import _PreparationPauseRequest
@@ -10661,8 +10666,8 @@ _PINNED_UV_EGG_INFO_SPECS = {
     ),
     "SOURCES.txt": (
         0o600,
-        77856,
-        "ed8884b7bb6c85d2fa54a39fdb6ca6e9e864eecfc88ca910075c3d561fc0c610",
+        74679,
+        "a4c59aedbfc8d2e6e03a1f137dee2c5c4aedbe93578822b873a4bb20fbf89d5c",
     ),
     "dependency_links.txt": (
         0o600,
@@ -10702,7 +10707,7 @@ def _pinned_uv_egg_info_bytes() -> dict[str, bytes]:
         path.relative_to(source_root).as_posix()
         for path in (source_root / "tests").glob("test*.py")
     ]
-    assert (len(package_sources), len(test_sources)) == (1170, 999)
+    assert (len(package_sources), len(test_sources)) == (1126, 969)
     source_paths = [
         "README.md",
         "pyproject.toml",
@@ -11905,6 +11910,80 @@ def _git(cwd: Path, *args: str) -> str:
     ).stdout.strip()
 
 
+def _write_fleet_campaign_interface(repo: Path) -> dict[str, object]:
+    implementation = repo / release.FLEET_CAMPAIGN_IMPLEMENTATION
+    runner = repo / release.FLEET_CAMPAIGN_RUNNER
+    implementation.parent.mkdir(parents=True, exist_ok=True)
+    runner.parent.mkdir(parents=True, exist_ok=True)
+    implementation.write_text(
+        "class CampaignConfig:\n    pass\n\nclass CampaignSupervisor:\n    pass\n",
+        encoding="ascii",
+    )
+    runner.write_text(
+        "#!/usr/bin/env python3\ndef main():\n    return 0\n",
+        encoding="ascii",
+    )
+    implementation.chmod(0o644)
+    runner.chmod(0o755)
+    payload: dict[str, object] = {
+        "schema_version": release.FLEET_CAMPAIGN_INTERFACE_SCHEMA_VERSION,
+        "authority_track": "fleet-advancement-2026-08",
+        "claim_modality": "asserted_interface_locator",
+        "protocol_version": "dharma.sadhana.campaign_runtime.v1",
+        "implementation_path": release.FLEET_CAMPAIGN_IMPLEMENTATION,
+        "implementation_sha256": release.sha256_file(implementation),
+        "runner_path": release.FLEET_CAMPAIGN_RUNNER,
+        "runner_sha256": release.sha256_file(runner),
+        "required_exports": ["CampaignConfig", "CampaignSupervisor"],
+        "required_commands": ["run", "stop"],
+        "effect_authority": "NoEffectAuthority",
+        "manifest_digest": "1" * 64,
+    }
+    payload["manifest_digest"] = release.manifest_digest(payload)
+    manifest = repo / release.FLEET_CAMPAIGN_INTERFACE_MANIFEST
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="ascii",
+    )
+    manifest.chmod(0o644)
+    return payload
+
+
+def test_fleet_campaign_prerequisite_is_digest_bound_and_has_no_effect_authority(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.invalid")
+    _git(repo, "config", "user.name", "Verifier")
+    (repo / "docs/governance").mkdir(parents=True)
+    with pytest.raises(release.ReleaseContractError, match="cannot stat JSON"):
+        release.validate_fleet_campaign_prerequisite(repo)
+    payload = _write_fleet_campaign_interface(repo)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "fleet interface fixture")
+    assert release.validate_fleet_campaign_prerequisite(repo) == payload
+
+    implementation = repo / release.FLEET_CAMPAIGN_IMPLEMENTATION
+    implementation.write_text("class CampaignConfig: pass\n", encoding="ascii")
+    with pytest.raises(release.ReleaseContractError, match="bytes differ"):
+        release.validate_fleet_campaign_prerequisite(repo)
+    _git(repo, "restore", release.FLEET_CAMPAIGN_IMPLEMENTATION)
+
+    manifest = repo / release.FLEET_CAMPAIGN_INTERFACE_MANIFEST
+    hostile = dict(payload)
+    hostile["effect_authority"] = "ProviderDispatchAuthority"
+    hostile["manifest_digest"] = release.manifest_digest(hostile)
+    manifest.write_text(
+        json.dumps(hostile, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="ascii",
+    )
+    with pytest.raises(release.ReleaseContractError, match="assertion differs"):
+        release.validate_fleet_campaign_prerequisite(repo)
+
+
 def test_verify_checkout_binds_sha_origin_ancestry_and_packet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -11924,6 +12003,7 @@ def test_verify_checkout_binds_sha_origin_ancestry_and_packet(
         json.dumps({"session_entry": {"packet_digest": "4" * 64}}) + "\n",
         encoding="utf-8",
     )
+    _write_fleet_campaign_interface(repo)
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "base")
     head = _git(repo, "rev-parse", "HEAD")
@@ -11984,6 +12064,7 @@ def test_seal_then_verify_full_bundle_packet_and_closeout_receipt(
         json.dumps({"session_entry": {"packet_digest": "7" * 64}}) + "\n",
         encoding="utf-8",
     )
+    _write_fleet_campaign_interface(repo)
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "candidate")
     head = _git(repo, "rev-parse", "HEAD")

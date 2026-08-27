@@ -61,10 +61,7 @@ export default function RootLayout({
           {/* Layout shell: sidebar + main */}
           <div className="flex min-h-screen">
             <Sidebar />
-            <main
-              data-testid="dashboard-main"
-              className="ml-0 min-w-0 w-full flex-1 pt-12 lg:ml-[260px] lg:pt-0"
-            >
+            <main className="ml-[260px] flex-1">
               {children}
             </main>
           </div>

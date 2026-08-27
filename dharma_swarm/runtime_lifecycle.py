@@ -8,27 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import Task, TaskDispatch, _new_id
-from dharma_swarm.runtime_state import (
-    ArtifactRecord,
-    DelegationRun,
-    RuntimeReceipt,
-    TaskClaim,
-)
-from dharma_swarm.runtime_topology import (
-    record_subagent_tool_children,
-    record_topology_state,
-)
-from dharma_swarm.runtime_lifecycle_identity import (
-    ensure_execution_identity_for_dispatch,
-)
-from dharma_swarm.runtime_lifecycle_payloads import (
-    mission_payload,
-    route_truth,
-    runtime_metadata,
-)
+from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, RuntimeReceipt, TaskClaim
+from dharma_swarm.runtime_topology import record_subagent_tool_children, record_topology_state
+from dharma_swarm.runtime_lifecycle_identity import ensure_execution_identity_for_dispatch
+from dharma_swarm.runtime_lifecycle_payloads import mission_payload, route_truth, runtime_metadata
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
-from dharma_swarm.task_board_campaign_guard import runtime_campaign_fence_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +40,7 @@ class RuntimeLifecycle:
     @staticmethod
     def _utc_datetime_from(value: Any, fallback: datetime | None = None) -> datetime:
         if isinstance(value, datetime):
-            return (
-                value
-                if value.tzinfo is not None
-                else value.replace(tzinfo=timezone.utc)
-            )
+            return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
         if isinstance(value, (int, float)):
             try:
                 return datetime.fromtimestamp(float(value), timezone.utc)
@@ -68,11 +49,7 @@ class RuntimeLifecycle:
         if isinstance(value, str) and value.strip():
             try:
                 parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                return (
-                    parsed
-                    if parsed.tzinfo is not None
-                    else parsed.replace(tzinfo=timezone.utc)
-                )
+                return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
             except Exception:
                 pass
         return fallback or datetime.now(timezone.utc)
@@ -125,9 +102,7 @@ class RuntimeLifecycle:
         claim_id = str(td.metadata.get("claim_id", "") or "").strip()
         if store is None or not claim_id:
             if require_identity:
-                raise MissingExecutionIdentity(
-                    "RuntimeStateStore and claim_id are required"
-                )
+                raise MissingExecutionIdentity("RuntimeStateStore and claim_id are required")
             return
         identity = self.ensure_execution_identity(
             td,
@@ -147,7 +122,7 @@ class RuntimeLifecycle:
             td.metadata,
             identity.metadata,
             task_id=td.task_id,
-            session_id=identity.session_id,
+            session_id=self._ledger.session_id,
         )
         active_claim = task_meta.get("active_claim")
         if not isinstance(active_claim, dict):
@@ -157,15 +132,13 @@ class RuntimeLifecycle:
         heartbeat_at = now if status in {"running", "completed", "failed"} else None
         stale_after = None
         if active_claim.get("claim_expires_at_epoch") is not None:
-            stale_after = self._utc_datetime_from(
-                active_claim.get("claim_expires_at_epoch")
-            )
+            stale_after = self._utc_datetime_from(active_claim.get("claim_expires_at_epoch"))
         claim = TaskClaim(
             claim_id=claim_id,
             task_id=td.task_id,
             agent_id=td.agent_id,
             status=status,
-            session_id=identity.session_id,
+            session_id=self._ledger.session_id,
             claimed_at=self._utc_datetime_from(active_claim.get("claimed_at"), now),
             acked_at=acked_at,
             heartbeat_at=heartbeat_at,
@@ -179,7 +152,6 @@ class RuntimeLifecycle:
             )
             | route_payload
             | mission
-            | runtime_campaign_fence_metadata(td.task_id, task_meta)
             | identity.to_metadata()
             | {
                 "trace_id": identity.trace_id,
@@ -194,11 +166,6 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "claim_id": identity.claim_id,
                 "failure_code": failure_code,
-                **(
-                    {"attempt_generation": td.metadata["attempt_generation"]}
-                    if "attempt_generation" in td.metadata
-                    else {}
-                ),
                 **mission,
                 "receipt_status": status,
                 **route_payload,
@@ -253,8 +220,6 @@ class RuntimeLifecycle:
         error: str = "",
         result: str | None = None,
         require_identity: bool = False,
-        project_task_board: bool = False,
-        task_board_projection_action: str = "receipt",
     ) -> None:
         store = self._runtime_state_store()
         if store is None:
@@ -288,16 +253,29 @@ class RuntimeLifecycle:
             td.metadata,
             identity.metadata,
             task_id=td.task_id,
-            session_id=identity.session_id,
+            session_id=self._ledger.session_id,
         )
         artifact_refs = (
-            [f"artifact_records:{current_artifact_id}"] if current_artifact_id else []
+            [f"artifact_records:{current_artifact_id}"]
+            if current_artifact_id
+            else []
         )
-        completed_at = (
-            datetime.now(timezone.utc) if status in {"completed", "failed"} else None
-        )
-        run_metadata = (
-            runtime_metadata(
+        completed_at = datetime.now(timezone.utc) if status in {"completed", "failed"} else None
+        run = DelegationRun(
+            run_id=run_id,
+            task_id=td.task_id,
+            assigned_to=td.agent_id,
+            status=status,
+            session_id=self._ledger.session_id,
+            claim_id=str(td.metadata.get("claim_id", "") or ""),
+            parent_run_id=str(task_meta.get("parent_run_id", "") or ""),
+            assigned_by="orchestrator",
+            requested_output=[str(item) for item in requested_output],
+            current_artifact_id=current_artifact_id,
+            started_at=started_at,
+            completed_at=completed_at,
+            failure_code=failure_code,
+            metadata=runtime_metadata(
                 td,
                 status=status,
                 failure_code=failure_code,
@@ -306,62 +284,12 @@ class RuntimeLifecycle:
             )
             | route_payload
             | mission
-            | runtime_campaign_fence_metadata(td.task_id, task_meta)
             | identity.to_metadata()
             | {
                 "trace_id": identity.trace_id,
                 "correlation_id": identity.correlation_id,
                 "idempotency_key": identity.idempotency_key,
-            }
-        )
-        if project_task_board:
-            from dharma_swarm.graph.reconcile_board import (
-                BOARD_COMPLETION_BINDING_KEY,
-                terminal_task_board_projection_metadata,
-            )
-
-            board_result = result if status == "completed" else error
-            binding = task_meta.get(BOARD_COMPLETION_BINDING_KEY)
-            run_metadata = terminal_task_board_projection_metadata(
-                run_metadata,
-                task_id=td.task_id,
-                run_id=run_id,
-                run_status=status,
-                board_result=str(board_result or ""),
-                completion_binding=binding,
-                now=completed_at or datetime.now(timezone.utc),
-                source="runtime_lifecycle.terminal_result",
-                action=task_board_projection_action,
-                board_metadata_set=(
-                    td.metadata.get("_task_board_projection_metadata_set")
-                    if isinstance(
-                        td.metadata.get("_task_board_projection_metadata_set"), dict
-                    )
-                    else {}
-                ),
-                board_metadata_remove=(
-                    td.metadata.get("_task_board_projection_metadata_remove")
-                    if isinstance(
-                        td.metadata.get("_task_board_projection_metadata_remove"), list
-                    )
-                    else []
-                ),
-            )
-        run = DelegationRun(
-            run_id=run_id,
-            task_id=td.task_id,
-            assigned_to=td.agent_id,
-            status=status,
-            session_id=identity.session_id,
-            claim_id=identity.claim_id,
-            parent_run_id=identity.parent_run_id,
-            assigned_by="orchestrator",
-            requested_output=[str(item) for item in requested_output],
-            current_artifact_id=current_artifact_id,
-            started_at=started_at,
-            completed_at=completed_at,
-            failure_code=failure_code,
-            metadata=run_metadata,
+            },
         )
         try:
             side_effect_key = f"delegation_run:{identity.run_id}:{status}"
@@ -369,11 +297,6 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "failure_code": failure_code,
                 "result_chars": len(result or ""),
-                **(
-                    {"attempt_generation": td.metadata["attempt_generation"]}
-                    if "attempt_generation" in td.metadata
-                    else {}
-                ),
                 **mission,
                 "artifact_refs": artifact_refs,
                 "no_artifact_refs_reason": ""
@@ -396,7 +319,7 @@ class RuntimeLifecycle:
                 store=store,
                 identity=identity,
                 td=td,
-                session_id=identity.session_id,
+                session_id=self._ledger.session_id,
                 status=status,
                 started_at=started_at,
                 mission=mission,
@@ -407,7 +330,7 @@ class RuntimeLifecycle:
                 identity=identity,
                 td=td,
                 task_meta=task_meta,
-                session_id=identity.session_id,
+                session_id=self._ledger.session_id,
                 status=status,
             )
             await store.record_runtime_receipt(
@@ -463,7 +386,7 @@ class RuntimeLifecycle:
                     },
                 )
         except Exception:
-            if require_identity or project_task_board:
+            if require_identity:
                 raise
             logger.debug("Runtime delegation run recording failed", exc_info=True)
 
@@ -489,6 +412,13 @@ class RuntimeLifecycle:
             **self._task_meta(task),
             **dict(metadata or {}),
         }
+        mission = mission_payload(
+            artifact_metadata,
+            {},
+            {},
+            task_id=task.id,
+            session_id=self._ledger.session_id,
+        )
         route_payload = route_truth(artifact_metadata, {}, {})
         identity = ExecutionIdentity.from_metadata(
             artifact_metadata,
@@ -498,29 +428,17 @@ class RuntimeLifecycle:
         )
         if identity is None:
             if require_identity:
-                raise MissingExecutionIdentity(
-                    "ExecutionIdentity is required for artifact"
-                )
+                raise MissingExecutionIdentity("ExecutionIdentity is required for artifact")
             trace_id = str(artifact_metadata.get("trace_id") or "")
             correlation_id = str(artifact_metadata.get("correlation_id") or trace_id)
         else:
             trace_id = identity.trace_id
             correlation_id = identity.correlation_id
             run_id = run_id or identity.run_id
-        artifact_session_id = (
-            identity.session_id if identity is not None else self._ledger.session_id
-        )
-        mission = mission_payload(
-            artifact_metadata,
-            {},
-            {},
-            task_id=task.id,
-            session_id=artifact_session_id,
-        )
         artifact = ArtifactRecord(
             artifact_id=artifact_id,
             artifact_kind=artifact_kind,
-            session_id=artifact_session_id,
+            session_id=self._ledger.session_id,
             task_id=task.id,
             run_id=run_id,
             trace_id=trace_id,

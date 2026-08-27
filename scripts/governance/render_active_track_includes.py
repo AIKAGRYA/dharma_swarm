@@ -62,6 +62,12 @@ def _render_one_track(t: dict, lines: list) -> None:
     owned = t.get("owned_surfaces") or []
     if owned:
         lines.append(f"  - owns: {', '.join(str(s) for s in owned)}")
+    scopes = t.get("admission_scopes") or []
+    if scopes:
+        lines.append(
+            f"  - admission scopes: {', '.join(str(s) for s in scopes)} "
+            "(declared build authority; not runtime evidence)"
+        )
 
 
 def render_block(track: dict) -> str:
@@ -77,11 +83,27 @@ def render_block(track: dict) -> str:
     tracks = p["active_tracks"]
     active = [t for t in tracks if _is_active(t)]
     policy = p["track_policy"]
+    scoped_limits = policy.get("scoped_wip_limits") or {}
     spine = p["spine_objectives"]
     closed = p["closed_tracks"]
 
     verified = sorted(str(t["verified_at"]) for t in tracks if t.get("verified_at"))
     as_of = verified[-1] if verified else "(unset)"
+
+    scoped_summary = ""
+    if isinstance(scoped_limits, dict) and scoped_limits:
+        rendered_scopes = []
+        for scope, limit in sorted(scoped_limits.items()):
+            if not isinstance(limit, dict):
+                continue
+            scoped_count = sum(
+                1 for t in active if scope in (t.get("admission_scopes") or [])
+            )
+            rendered_scopes.append(
+                f"`{scope}` {scoped_count} active / max {limit.get('max_active')}"
+            )
+        if rendered_scopes:
+            scoped_summary = "; scoped WIP: " + ", ".join(rendered_scopes)
 
     lines = [
         START,
@@ -96,13 +118,15 @@ def render_block(track: dict) -> str:
         "",
         f"**Active portfolio — declared intent only:** {len(active)} co-equal "
         f"track(s) (WIP warn {policy.get('warn_active')}, max "
-        f"{policy.get('max_active')}; model: {policy.get('model')}). "
+        f"{policy.get('max_active')}{scoped_summary}; model: {policy.get('model')}). "
         "This stamped digest carries track identity and surface ownership, "
         "NOT runtime truth and NOT full track detail (descriptions, next-items, "
         "non-goals stay in the YAML). Declared intent comes from "
         "`docs/governance/ACTIVE_TRACK.yaml`; evaluate it with "
         "`python3 scripts/governance/check_track_status.py`. Never answer "
-        "runtime or liveness questions from this block or another prose copy.",
+        "runtime or liveness questions from this block or another prose copy. "
+        "Admission scopes constrain declared build authority; they do not prove "
+        "where a process is running.",
         "",
     ]
 

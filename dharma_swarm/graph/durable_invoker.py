@@ -474,11 +474,7 @@ class DurableInvoker:
         claim_token: datetime | None = None
 
         # 1) Memo check: a completed claim row replays the prior receipt.
-        memo = await self._check_memo(
-            task_id,
-            claim,
-            operation_hash=operation_hash,
-        )
+        memo = await self._check_memo(task_id, claim)
         if memo is not None:
             return memo
 
@@ -487,7 +483,6 @@ class DurableInvoker:
         #    errors fail open (dispatch availability doctrine) — loudly,
         #    never silently.
         begin_metadata = {_META_OPERATION_HASH: operation_hash, "task_id": task_id}
-        begin_rejected: ValueError | None = None
         try:
             claim_token = await self._store.try_begin_idempotent_side_effect_with_token(
                 claim,
@@ -495,19 +490,6 @@ class DurableInvoker:
                 metadata=begin_metadata,
                 stale_after_seconds=self._stale_after_seconds,
                 ownership_time=self._effects.now(),
-            )
-        except ValueError as exc:
-            # RuntimeStateStore rejects a re-minted identity before it can
-            # classify the existing deterministic claim. That rejection is
-            # authority evidence, not an infrastructure outage: inspect the
-            # row and recover only through its authority-preserving CAS path.
-            # If the row cannot justify recovery, fail closed before provider
-            # execution rather than treating the ValueError as fail-open.
-            begin_rejected = exc
-            logger.info(
-                "durable_invoker: idempotency begin rejected for %s;"
-                " inspecting the existing claim before provider execution",
-                self._side_effect_key,
             )
         except Exception:
             logger.warning(
@@ -525,23 +507,7 @@ class DurableInvoker:
                 record = await self._store.get_idempotency_record(
                     claim.idempotency_key, self._side_effect_key
                 )
-            except ValueError:
-                logger.warning(
-                    "durable_invoker: record fetch rejected for %s; refusing"
-                    " provider execution",
-                    self._side_effect_key,
-                    exc_info=True,
-                )
-                raise
-            except Exception as exc:
-                if begin_rejected is not None:
-                    logger.warning(
-                        "durable_invoker: record fetch failed for %s after"
-                        " authority rejection; refusing provider execution",
-                        self._side_effect_key,
-                        exc_info=True,
-                    )
-                    raise begin_rejected from exc
+            except Exception:
                 logger.warning(
                     "durable_invoker: record fetch failed for %s after lost"
                     " begin; treating as retryable",
@@ -549,17 +515,9 @@ class DurableInvoker:
                     exc_info=True,
                 )
                 record = None
-            if record is None and begin_rejected is not None:
-                raise begin_rejected
-            if record is not None:
-                self._require_operation_hash_match(record, operation_hash)
             status = getattr(record, "status", "") if record is not None else ""
             if status == "completed":
-                memo = await self._check_memo(
-                    task_id,
-                    claim,
-                    operation_hash=operation_hash,
-                )
+                memo = await self._check_memo(task_id, claim)
                 if memo is not None:
                     return memo
                 # Completed but NOT replayable (result omitted, or receipt
@@ -677,46 +635,16 @@ class DurableInvoker:
             raise DuplicateDispatchInFlight(self._side_effect_key)
         return token
 
-    def _require_operation_hash_match(
-        self,
-        record: Any,
-        operation_hash: str,
-    ) -> None:
-        """Reject a deterministic claim row bound to another operation."""
-        metadata = getattr(record, "metadata", None)
-        if not isinstance(metadata, dict):
-            raise ValueError(
-                "idempotency record metadata is invalid for "
-                f"{self._side_effect_key}"
-            )
-        existing_hash = str(metadata.get(_META_OPERATION_HASH) or "")
-        if existing_hash and operation_hash and existing_hash != operation_hash:
-            raise ValueError(
-                "idempotency operation_hash conflict for "
-                f"{getattr(record, 'idempotency_key', '')}:"
-                f"{self._side_effect_key}"
-            )
-
     async def _check_memo(
         self,
         task_id: str,
         claim: ExecutionIdentity,
-        *,
-        operation_hash: str,
     ) -> EvidenceReceipt | None:
         """PK lookup on the deterministic claim row; memo on completion."""
         try:
             record = await self._store.get_idempotency_record(
                 claim.idempotency_key, self._side_effect_key
             )
-        except ValueError:
-            logger.warning(
-                "durable_invoker: memo probe rejected for %s; refusing"
-                " provider execution",
-                self._side_effect_key,
-                exc_info=True,
-            )
-            raise
         except Exception:
             logger.warning(
                 "durable_invoker: memo probe failed for %s; proceeding to begin",
@@ -726,7 +654,6 @@ class DurableInvoker:
             return None
         if record is None or getattr(record, "status", "") != "completed":
             return None
-        self._require_operation_hash_match(record, operation_hash)
         metadata = getattr(record, "metadata", None) or {}
         omitted = metadata.get(_META_RESULT_OMITTED)
         if omitted:

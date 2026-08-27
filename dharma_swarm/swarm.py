@@ -41,7 +41,6 @@ from dharma_swarm.models import (
     TaskStatus,
 )
 from dharma_swarm.providers import create_default_router
-from dharma_swarm.swarm_tick_effects import run_tick_effects
 
 if TYPE_CHECKING:
     from dharma_swarm.adaptive_autonomy import AdaptiveAutonomy
@@ -141,7 +140,6 @@ class SwarmManager:
 
         # v0.2.0 subsystems (CRITICAL: evolution + monitoring)
         self._engine: DarwinEngine | None = None
-        self._meta_engine: Any = None
         self._monitor: SystemMonitor | None = None
         self._trace_store: TraceStore | None = None
 
@@ -202,20 +200,6 @@ class SwarmManager:
         # Subsystem initialization tracking
         self._initialized: set[str] = set()
         self._startup_background_task: asyncio.Task[None] | None = None
-        self._startup_backfill_lock = asyncio.Lock()
-        self._startup_backfill_pending_components: set[str] = set()
-        self._startup_backfill_last_error: str | None = None
-        self._optional_startup_retry_task: asyncio.Task[None] | None = None
-        self._optional_startup_last_error: str | None = None
-        self._optional_startup_retry_not_before = 0.0
-        self._optional_startup_retry_interval_seconds = 30.0
-        self._optional_startup_retry_timeout_seconds = 30.0
-        self._effect_tick_lock = asyncio.Lock()
-        self._shutdown_started = False
-        self._shutdown_complete = False
-        self._telos_substrate_seeded = (
-            self.state_dir / "meta" / "telos_seeded"
-        ).exists()
         self._fast_boot = str(os.environ.get("DHARMA_FAST_BOOT", "")).strip().lower() in {
             "1",
             "true",
@@ -320,27 +304,6 @@ class SwarmManager:
             len(self._initialized - self._CRITICAL_SUBSYSTEMS),
         )
 
-    def _missing_optional_subsystems(self) -> list[str]:
-        """Return optional components that have not published a live object."""
-        return sorted(
-            name for name in self._OPTIONAL_SUBSYSTEMS if not self.is_ready(name)
-        )
-
-    async def _init_optional_director(self) -> None:
-        """Publish the director only after its asynchronous init succeeds."""
-        from dharma_swarm.thinkodynamic_director import ThinkodynamicDirector
-
-        director = ThinkodynamicDirector(state_dir=self.state_dir, swarm=self)
-        await director.init()
-        if self._shutdown_started:
-            stop = getattr(director, "stop", None)
-            if callable(stop):
-                stopped = stop()
-                if asyncio.iscoroutine(stopped):
-                    await stopped
-            raise asyncio.CancelledError
-        self._director = director
-
     async def _init_optional_subsystems(self) -> None:
         """Initialize noncritical subsystems after the core runtime is live."""
         # v0.2.0: Darwin Engine + System Monitor
@@ -351,36 +314,27 @@ class SwarmManager:
         evo_dir = self.state_dir / "evolution"
         traces_dir = self.state_dir / "traces"
 
-        # Build the connected evolution bundle off-object.  No caller may see
-        # a TraceStore or DarwinEngine until every awaited init succeeds, and
-        # retries must not replace an engine still referenced by MetaEngine or
-        # AutoProposer.
-        if self._trace_store is None or self._engine is None:
-            trace_store = TraceStore(base_path=traces_dir)
-            await trace_store.init()
-            engine = DarwinEngine(
-                archive_path=evo_dir / "archive.jsonl",
-                traces_path=traces_dir,
-                predictor_path=evo_dir / "predictor_data.jsonl",
-            )
-            await engine.init()
-            if self._shutdown_started:
-                raise asyncio.CancelledError
+        self._trace_store = TraceStore(base_path=traces_dir)
+        await self._trace_store.init()
 
-            # v0.9.2: Meta-evolution engine — adapts DarwinEngine parameters.
-            from dharma_swarm.meta_evolution import MetaEvolutionEngine
+        self._engine = DarwinEngine(
+            archive_path=evo_dir / "archive.jsonl",
+            traces_path=traces_dir,
+            predictor_path=evo_dir / "predictor_data.jsonl",
+        )
+        await self._engine.init()
 
-            meta_engine = MetaEvolutionEngine(
-                engine,
-                meta_archive_path=evo_dir / "meta_archive.jsonl",
-                n_object_cycles_per_meta=2,
-                auto_apply=True,
-            )
-            monitor = SystemMonitor(trace_store=trace_store)
-            self._trace_store = trace_store
-            self._engine = engine
-            self._meta_engine = meta_engine
-            self._monitor = monitor
+        # v0.9.2: Meta-evolution engine — adapts DarwinEngine hyperparameters
+        from dharma_swarm.meta_evolution import MetaEvolutionEngine
+
+        self._meta_engine = MetaEvolutionEngine(
+            self._engine,
+            meta_archive_path=evo_dir / "meta_archive.jsonl",
+            n_object_cycles_per_meta=2,
+            auto_apply=True,
+        )
+
+        self._monitor = SystemMonitor(trace_store=self._trace_store)
 
         # v0.3.0: Gödel Claw — Dharma Kernel, Corpus, Policy, Canary, Stigmergy
         from dharma_swarm.dharma_kernel import KernelGuard
@@ -391,37 +345,27 @@ class SwarmManager:
         kernel_path = self.state_dir / "kernel.json"
         corpus_path = self.state_dir / "corpus.jsonl"
 
-        if self._kernel_guard is None:
-            kernel_guard = KernelGuard(kernel_path=kernel_path)
-            try:
-                await kernel_guard.load()
-            except (FileNotFoundError, ValueError):
-                from dharma_swarm.dharma_kernel import DharmaKernel
+        self._kernel_guard = KernelGuard(kernel_path=kernel_path)
+        try:
+            await self._kernel_guard.load()
+        except (FileNotFoundError, ValueError):
+            from dharma_swarm.dharma_kernel import DharmaKernel
 
-                default = DharmaKernel.create_default()
-                await kernel_guard.save(default)
-            if self._shutdown_started:
-                raise asyncio.CancelledError
-            self._kernel_guard = kernel_guard
+            default = DharmaKernel.create_default()
+            await self._kernel_guard.save(default)
 
-        if self._corpus is None:
-            corpus = DharmaCorpus(path=corpus_path)
-            await corpus.load()
-            if self._shutdown_started:
-                raise asyncio.CancelledError
-            self._corpus = corpus
+        self._corpus = DharmaCorpus(path=corpus_path)
+        await self._corpus.load()
 
-        if self._compiler is None:
-            self._compiler = PolicyCompiler()
-        if self._canary is None:
-            self._canary = CanaryDeployer(archive=self._engine.archive)
+        self._compiler = PolicyCompiler()
+
+        self._canary = CanaryDeployer(archive=self._engine.archive)
 
         try:
             from dharma_swarm.stigmergy import StigmergyStore
 
-            if self._stigmergy is None:
-                stigmergy_path = self.state_dir / "stigmergy"
-                self._stigmergy = StigmergyStore(base_path=stigmergy_path)
+            stigmergy_path = self.state_dir / "stigmergy"
+            self._stigmergy = StigmergyStore(base_path=stigmergy_path)
         except ImportError:
             self._stigmergy = None
             logger.debug("Stigmergy module not available yet")
@@ -432,16 +376,16 @@ class SwarmManager:
         try:
             from dharma_swarm.auto_proposer import AutoProposer
 
-            if self._auto_proposer is None:
-                self._auto_proposer = AutoProposer(
-                    darwin_engine=self._engine,
-                    system_monitor=self._monitor,
-                    fitness_predictor=self._engine.predictor,
-                    stigmergy=self._stigmergy,
-                    log_dir=self.state_dir / "auto_proposer",
-                )
+            self._auto_proposer = AutoProposer(
+                darwin_engine=self._engine,
+                system_monitor=self._monitor,
+                fitness_predictor=self._engine.predictor,
+                stigmergy=self._stigmergy,
+                log_dir=self.state_dir / "auto_proposer",
+            )
             logger.info("AutoProposer initialized — autonomy loop closed")
         except Exception as exc:
+            self._auto_proposer = None
             logger.debug("AutoProposer init failed (non-fatal): %s", exc)
 
         # v0.4.0: Oz-inspired systems
@@ -482,26 +426,29 @@ class SwarmManager:
             logger.warning("v0.4.0 systems init failed (non-fatal): %s", e)
 
         # v0.5.0: Thinkodynamic Director
-        if self._director is None:
-            try:
-                await self._init_optional_director()
-                logger.info("ThinkodynamicDirector initialized")
-            except Exception as e:
-                self._director = None
-                logger.warning("ThinkodynamicDirector init failed (non-fatal): %s", e)
+        try:
+            from dharma_swarm.thinkodynamic_director import ThinkodynamicDirector
+
+            self._director = ThinkodynamicDirector(
+                state_dir=self.state_dir,
+                swarm=self,
+            )
+            await self._director.init()
+            logger.info("ThinkodynamicDirector initialized")
+        except Exception as e:
+            logger.warning("ThinkodynamicDirector init failed (non-fatal): %s", e)
 
         # v0.7.0: OrganismRuntime
-        if self._organism is None:
-            try:
-                from dharma_swarm.organism import OrganismRuntime
+        try:
+            from dharma_swarm.organism import OrganismRuntime
 
-                self._organism = OrganismRuntime(
-                    state_dir=self.state_dir,
-                    on_algedonic=self._algedonic_handler,
-                )
-                logger.info("OrganismRuntime initialized — Gnani/Samvara/Algedonic active")
-            except Exception as e:
-                logger.warning("OrganismRuntime init failed (non-fatal): %s", e)
+            self._organism = OrganismRuntime(
+                state_dir=self.state_dir,
+                on_algedonic=self._algedonic_handler,
+            )
+            logger.info("OrganismRuntime initialized — Gnani/Samvara/Algedonic active")
+        except Exception as e:
+            logger.warning("OrganismRuntime init failed (non-fatal): %s", e)
 
         # v0.8.0: Witness auditor
         try:
@@ -514,11 +461,10 @@ class SwarmManager:
                 _witness_provider = OpenRouterFreeProvider()
             except Exception:
                 _witness_provider = None
-            if self._witness is None:
-                self._witness = WitnessAuditor(
-                    cycle_seconds=3600.0,
-                    provider=_witness_provider,
-                )
+            self._witness = WitnessAuditor(
+                cycle_seconds=3600.0,
+                provider=_witness_provider,
+            )
             logger.info("WitnessAuditor initialized — S3* sporadic audit active")
         except Exception as e:
             logger.warning("WitnessAuditor init failed (non-fatal): %s", e)
@@ -527,10 +473,9 @@ class SwarmManager:
         try:
             from dharma_swarm.decision_ontology import DecisionLog
 
-            if self._decision_log is None:
-                self._decision_log = DecisionLog(
-                    path=self.state_dir / "meta" / "decisions.jsonl",
-                )
+            self._decision_log = DecisionLog(
+                path=self.state_dir / "meta" / "decisions.jsonl",
+            )
             logger.info("DecisionLog initialized — structured decision governance active")
         except Exception as e:
             logger.warning("DecisionLog init failed (non-fatal): %s", e)
@@ -539,8 +484,7 @@ class SwarmManager:
         try:
             from dharma_swarm.tool_registry import ToolRegistry
 
-            if self._tool_registry is None:
-                self._tool_registry = ToolRegistry()
+            self._tool_registry = ToolRegistry()
             logger.info("ToolRegistry initialized")
         except Exception as e:
             logger.warning("ToolRegistry init failed (non-fatal): %s", e)
@@ -548,8 +492,7 @@ class SwarmManager:
         try:
             from dharma_swarm import cron_scheduler as _cron_mod
 
-            if self._cron_scheduler is None:
-                self._cron_scheduler = _cron_mod
+            self._cron_scheduler = _cron_mod
             logger.info("CronScheduler module loaded")
         except Exception as e:
             logger.warning("CronScheduler import failed (non-fatal): %s", e)
@@ -557,8 +500,7 @@ class SwarmManager:
         try:
             from dharma_swarm.gateway import GatewayRunner
 
-            if self._gateway is None:
-                self._gateway = GatewayRunner(message_handler=None)
+            self._gateway = GatewayRunner(message_handler=None)
             logger.info("GatewayRunner initialized (call gateway.start() to activate adapters)")
         except Exception as e:
             logger.warning("GatewayRunner init failed (non-fatal): %s", e)
@@ -566,9 +508,8 @@ class SwarmManager:
         try:
             from dharma_swarm.bridge import ResearchBridge
 
-            if self._bridge_rv is None:
-                bridge_path = self.state_dir / "bridge_measurements.jsonl"
-                self._bridge_rv = ResearchBridge(data_path=bridge_path)
+            bridge_path = self.state_dir / "bridge_measurements.jsonl"
+            self._bridge_rv = ResearchBridge(data_path=bridge_path)
             logger.info("ResearchBridge initialized")
         except Exception as e:
             logger.warning("ResearchBridge init failed (non-fatal): %s", e)
@@ -585,318 +526,30 @@ class SwarmManager:
         except Exception as e:
             logger.debug("KnowledgeStore wiring failed (non-fatal): %s", e)
 
-        self._telos_substrate_seeded = (
-            self.state_dir / "meta" / "telos_seeded"
-        ).exists()
+        self._telos_substrate_seeded = False
         self._refresh_initialized_registry()
-        missing_optional = self._missing_optional_subsystems()
-        if missing_optional:
-            raise SubsystemNotReady(
-                "Optional subsystem initialization remains incomplete: "
-                + ", ".join(missing_optional)
-            )
-
-    async def _refresh_startup_graph_census(self, *, phase: str) -> bool:
-        """Earn fresh Graph authority immediately before startup effects."""
-        graph_reconciler = self._get_graph_reconciler()
-        graph_reconciler.invalidate_boot_census()
-        try:
-            await asyncio.wait_for(
-                self.reconcile_graph_runs(
-                    stale_only=graph_reconciler.boot_recovery_completed
-                ),
-                timeout=10.0,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            graph_reconciler.invalidate_boot_census()
-            self._startup_backfill_last_error = (
-                f"{phase}: {type(exc).__name__}: {exc}"
-            )
-            logger.warning(
-                "%s Graph census failed safely: %s",
-                phase,
-                self._startup_backfill_last_error,
-            )
-            return False
-        return bool(graph_reconciler.boot_census_succeeded)
 
     async def _complete_deferred_startup(self) -> None:
         """Backfill the default crew and optional subsystems after fast boot."""
         try:
-            # Critical backfill may write the TaskBoard. Serialize it with
-            # effect-bearing ticks so a tick cannot enter the Board→runtime
-            # heartbeat fence while fast-boot startup holds a Board writer.
-            # Optional initialization is deliberately scheduled only after
-            # releasing this mutex: it is noncritical and must not stall core
-            # dispatch when it is slow or permanently unavailable.
-            async with self._effect_tick_lock:
-                if self._shutdown_started:
-                    return
-                graph_ready = await self._refresh_startup_graph_census(
-                    phase="deferred_startup"
-                )
-                report = (
-                    await self._backfill_graph_held_startup()
-                    if graph_ready
-                    else {
-                        "attempted": [],
-                        "completed": [],
-                        "created": {},
-                        "pending": sorted(
-                            self._critical_startup_pending_components()
-                        ),
-                        "hold": "graph_census_not_succeeded",
-                    }
-                )
-                default_count = int(
-                    report.get("created", {}).get("default_crew", 0)
-                )
-                graph_ready = self._get_graph_reconciler().boot_census_succeeded
-            if default_count:
-                logger.info(
-                    "Deferred startup spawned %d agents from default crew",
-                    default_count,
-                )
-            optional_scheduled = self._schedule_optional_startup_retry(
-                graph_ready=graph_ready
-            )
+            from dharma_swarm.startup_crew import spawn_default_crew
+
+            crew = await spawn_default_crew(self)
+            if crew:
+                logger.info("Deferred startup spawned %d agents from default crew", len(crew))
+            await self._init_optional_subsystems()
             if self._memory is not None:
                 await self._memory.remember(
-                    "Swarm fast-boot backfill complete — "
-                    f"{default_count} default agents added; "
-                    f"critical_pending={report.get('pending', [])}; "
-                    f"optional_scheduled={optional_scheduled}",
+                    f"Swarm fast-boot backfill complete — {len(crew)} default agents added",
                     layer=MemoryLayer.SESSION,
                     source="swarm",
                 )
-            if report.get("pending"):
-                logger.warning(
-                    "Deferred startup remains safely pending: %s",
-                    report["pending"],
-                )
-            else:
-                logger.info("Deferred startup bootstrap complete")
+            logger.info("Deferred startup bootstrap complete")
         except asyncio.CancelledError:
             logger.info("Deferred startup bootstrap cancelled")
             raise
         except Exception as exc:
             logger.exception("Deferred startup bootstrap failed: %s", exc)
-
-    async def _seed_boot_telos_substrate(self) -> Any:
-        """Idempotently seed Telos after Graph authority is known green."""
-        seed_flag = self.state_dir / "meta" / "telos_seeded"
-        if seed_flag.exists():
-            self._telos_substrate_seeded = True
-            logger.info("TelosSubstrate already seeded (flag: %s)", seed_flag)
-            return {"skipped": "already_seeded"}
-
-        from dharma_swarm.telos_substrate import TelosSubstrate
-
-        substrate = TelosSubstrate(state_dir=self.state_dir)
-        seed_result = await substrate.seed_all()
-        seed_flag.parent.mkdir(parents=True, exist_ok=True)
-        seed_flag.write_text(f"seeded: {seed_result}\n", encoding="utf-8")
-        self._telos_substrate_seeded = True
-        logger.info("TelosSubstrate seeded after Graph census: %s", seed_result)
-        return seed_result
-
-    async def _seed_boot_gnani_lodestone(self) -> Any:
-        """Idempotently seed Gnani tasks after Graph authority is green."""
-        seed_flag = self.state_dir / "meta" / "gnani_seeded"
-        if seed_flag.exists():
-            logger.info("GnaniLodestone already seeded (flag: %s)", seed_flag)
-            return {"skipped": "already_seeded"}
-
-        from dharma_swarm.gnani_lodestone import GnaniLodestone
-
-        lodestone = GnaniLodestone(state_dir=self.state_dir)
-        seed_result = await lodestone.seed_all()
-        seed_flag.parent.mkdir(parents=True, exist_ok=True)
-        seed_flag.write_text(f"seeded: {seed_result}\n", encoding="utf-8")
-        logger.info("GnaniLodestone seeded after Graph census: %s", seed_result)
-        return seed_result
-
-    def _critical_startup_pending_components(self) -> set[str]:
-        """Return startup effects that must complete before core dispatch."""
-        return self._startup_backfill_pending_components - {
-            "optional_subsystems"
-        }
-
-    async def _retry_optional_startup_once(self) -> None:
-        """Run one bounded optional retry behind fresh Graph authority."""
-        if (
-            self._shutdown_started
-            or "optional_subsystems"
-            not in self._startup_backfill_pending_components
-        ):
-            return
-
-        timeout = self._optional_startup_retry_timeout_seconds
-        try:
-            # Optional initialization includes persistent stores and Director
-            # startup, so it is an effect-bearing phase.  Serialize it with
-            # ticks and earn a new census immediately before those effects.
-            async with self._effect_tick_lock:
-                if self._shutdown_started:
-                    return
-                graph_ready = await self._refresh_startup_graph_census(
-                    phase="optional_startup"
-                )
-                if not graph_ready:
-                    self._optional_startup_last_error = (
-                        "optional_subsystems: graph census not succeeded"
-                    )
-                    return
-                await asyncio.wait_for(
-                    self._init_optional_subsystems(), timeout=timeout
-                )
-                if self._shutdown_started:
-                    raise asyncio.CancelledError
-        except asyncio.CancelledError:
-            raise
-        except asyncio.TimeoutError:
-            self._optional_startup_last_error = (
-                "optional_subsystems: TimeoutError: "
-                f"exceeded {timeout:g}s"
-            )
-            logger.warning(
-                "Optional startup retry failed safely: %s",
-                self._optional_startup_last_error,
-            )
-        except Exception as exc:
-            self._optional_startup_last_error = (
-                f"optional_subsystems: {type(exc).__name__}: {exc}"
-            )
-            logger.warning(
-                "Optional startup retry failed safely: %s",
-                self._optional_startup_last_error,
-            )
-        else:
-            missing_optional = self._missing_optional_subsystems()
-            if missing_optional:
-                self._optional_startup_last_error = (
-                    "optional_subsystems: SubsystemNotReady: "
-                    + ", ".join(missing_optional)
-                )
-                logger.warning(
-                    "Optional startup retry remains pending: %s",
-                    self._optional_startup_last_error,
-                )
-            else:
-                self._startup_backfill_pending_components.discard(
-                    "optional_subsystems"
-                )
-                self._optional_startup_last_error = None
-                logger.info("Optional startup retry completed")
-        finally:
-            loop = asyncio.get_running_loop()
-            self._optional_startup_retry_not_before = (
-                loop.time() + self._optional_startup_retry_interval_seconds
-            )
-
-    def _schedule_optional_startup_retry(self, *, graph_ready: bool) -> bool:
-        """Schedule one optional retry without blocking an effect-bearing tick."""
-        if (
-            self._shutdown_started
-            or not graph_ready
-            or self._critical_startup_pending_components()
-            or "optional_subsystems"
-            not in self._startup_backfill_pending_components
-        ):
-            return False
-        current = self._optional_startup_retry_task
-        if current is not None and not current.done():
-            return False
-        if (
-            asyncio.get_running_loop().time()
-            < self._optional_startup_retry_not_before
-        ):
-            return False
-        self._optional_startup_retry_task = asyncio.create_task(
-            self._retry_optional_startup_once()
-        )
-        return True
-
-    async def _backfill_graph_held_startup(self) -> dict[str, Any]:
-        """Retry held startup effects once Graph has a fresh green census.
-
-        Each component is idempotent and removed from the pending set only
-        after it returns successfully. The lock prevents concurrent ticks from
-        duplicating work; failed or timed-out components remain pending.
-        """
-        report: dict[str, Any] = {
-            "attempted": [],
-            "completed": [],
-            "created": {},
-            "pending": sorted(self._critical_startup_pending_components()),
-        }
-        if not self._critical_startup_pending_components():
-            return report
-
-        async with self._startup_backfill_lock:
-            if not self._critical_startup_pending_components():
-                report["pending"] = []
-                return report
-
-            graph_reconciler = self._get_graph_reconciler()
-            if not graph_reconciler.boot_census_succeeded:
-                report["hold"] = "graph_census_not_succeeded"
-                return report
-
-            from dharma_swarm.startup_crew import (
-                create_seed_tasks,
-                spawn_cybernetics_crew,
-                spawn_default_crew,
-            )
-
-            components = (
-                ("telos_substrate", 120.0, self._seed_boot_telos_substrate),
-                ("gnani_lodestone", 60.0, self._seed_boot_gnani_lodestone),
-                ("cybernetics_crew", 30.0, lambda: spawn_cybernetics_crew(self)),
-                ("seed_tasks", 30.0, lambda: create_seed_tasks(self)),
-                ("default_crew", 30.0, lambda: spawn_default_crew(self)),
-            )
-            for component, timeout, operation in components:
-                if component not in self._startup_backfill_pending_components:
-                    continue
-                if not graph_reconciler.boot_census_succeeded:
-                    report["hold"] = "graph_census_not_succeeded"
-                    break
-
-                report["attempted"].append(component)
-                try:
-                    value = await asyncio.wait_for(operation(), timeout=timeout)
-                except asyncio.TimeoutError:
-                    error = (
-                        f"{component}: TimeoutError: exceeded {timeout:.0f}s"
-                    )
-                    self._startup_backfill_last_error = error
-                    report["error"] = error
-                    logger.warning("Startup backfill failed safely: %s", error)
-                    break
-                except Exception as exc:
-                    error = f"{component}: {type(exc).__name__}: {exc}"
-                    self._startup_backfill_last_error = error
-                    report["error"] = error
-                    logger.warning("Startup backfill failed safely: %s", error)
-                    break
-
-                self._startup_backfill_pending_components.discard(component)
-                self._startup_backfill_last_error = None
-                report["completed"].append(component)
-                if isinstance(value, list):
-                    report["created"][component] = len(value)
-
-            report["pending"] = sorted(
-                self._critical_startup_pending_components()
-            )
-            if not self._critical_startup_pending_components():
-                self._startup_backfill_last_error = None
-            elif "error" not in report and self._startup_backfill_last_error:
-                report["error"] = self._startup_backfill_last_error
-            return report
 
     async def init(self) -> None:
         """Initialize all subsystems."""
@@ -914,6 +567,55 @@ class SwarmManager:
                 _hold.unlink()
             except OSError:
                 pass
+
+        # ── Telos Substrate: seed ConceptGraph + TelosGraph from 10 pillars ──
+        # This MUST run early. Without it ThinkodynamicDirector operates on
+        # empty graphs and falls back to generic operational tasks.
+        # The substrate is idempotent — skips already-seeded objectives.
+        _telos_flag = self.state_dir / "meta" / "telos_seeded"
+        if not _telos_flag.exists():
+            try:
+                from dharma_swarm.telos_substrate import TelosSubstrate
+                substrate = TelosSubstrate(state_dir=self.state_dir)
+                _seed_result = await asyncio.wait_for(
+                    substrate.seed_all(), timeout=120.0
+                )
+                _telos_flag.parent.mkdir(parents=True, exist_ok=True)
+                _telos_flag.write_text(
+                    f"seeded: {_seed_result}\n", encoding="utf-8"
+                )
+                logger.info("TelosSubstrate seeded on init: %s", _seed_result)
+            except asyncio.TimeoutError:
+                logger.warning("TelosSubstrate seeding timed out (120s) — continuing")
+            except Exception as exc:
+                logger.warning("TelosSubstrate seeding failed (non-fatal): %s", exc)
+        else:
+            logger.info("TelosSubstrate already seeded (flag: %s)", _telos_flag)
+
+        # ── Gnani Lodestone: seed witness-upstream philosophy + Gnani tasks ──
+        # Runs after TelosSubstrate. Idempotent via separate flag.
+        # Seeds: stigmergy marks (gnani channel), ConceptGraph nodes,
+        # TelosGraph objectives, TaskBoard self-knowledge tasks.
+        # Non-blocking — all exceptions are caught inside GnaniLodestone.
+        _gnani_flag = self.state_dir / "meta" / "gnani_seeded"
+        if not _gnani_flag.exists():
+            try:
+                from dharma_swarm.gnani_lodestone import GnaniLodestone
+                _gnani = GnaniLodestone(state_dir=self.state_dir)
+                _gnani_result = await asyncio.wait_for(
+                    _gnani.seed_all(), timeout=60.0
+                )
+                _gnani_flag.parent.mkdir(parents=True, exist_ok=True)
+                _gnani_flag.write_text(
+                    f"seeded: {_gnani_result}\n", encoding="utf-8"
+                )
+                logger.info("GnaniLodestone seeded on init: %s", _gnani_result)
+            except asyncio.TimeoutError:
+                logger.warning("GnaniLodestone seeding timed out (60s) — continuing")
+            except Exception as exc:
+                logger.warning("GnaniLodestone seeding failed (non-fatal): %s", exc)
+        else:
+            logger.info("GnaniLodestone already seeded (flag: %s)", _gnani_flag)
 
         from dharma_swarm.agent_constitution import bootstrap_dynamic_roster
 
@@ -966,8 +668,6 @@ class SwarmManager:
             self._orchestrator._room_registry = self._room_registry
 
         self._running = True
-        self._shutdown_started = False
-        self._shutdown_complete = False
 
         if self._read_only_boot:
             logger.info(
@@ -998,7 +698,6 @@ class SwarmManager:
         # success receipt settles its board task COMPLETED here; if the reaper
         # ran first it would board-FAIL the task and the receipt completion
         # could no longer apply (FAILED -> COMPLETED is not a legal transition).
-        graph_reconciler = self._get_graph_reconciler()
         try:
             boot_report = await self.reconcile_graph_runs()
             if boot_report.total_reconciled or boot_report.recovered_claims:
@@ -1007,7 +706,6 @@ class SwarmManager:
                     boot_report.summary(),
                 )
         except Exception as exc:
-            graph_reconciler.invalidate_boot_census()
             logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
             self._last_boot_reconcile_error = f"{type(exc).__name__}: {exc}"
 
@@ -1015,118 +713,85 @@ class SwarmManager:
         # When the daemon crashes, tasks it dispatched are left in RUNNING status
         # forever. No other daemon instance will ever settle them because
         # _collect_completed only tracks in-process asyncio tasks.
-        if self._get_graph_reconciler().boot_census_succeeded:
-            try:
-                reaped = await self._reap_stale_running_tasks()
-                if reaped:
-                    logger.info(
-                        "Reaped %d stale running tasks from prior daemon", reaped
-                    )
-            except Exception as exc:
-                logger.warning("Stale task reaper failed (non-fatal): %s", exc)
-        else:
-            logger.warning(
-                "Stale task reaper held: graph boot census did not succeed"
+        try:
+            reaped = await self._reap_stale_running_tasks()
+            if reaped:
+                logger.info("Reaped %d stale running tasks from prior daemon", reaped)
+        except Exception as exc:
+            logger.warning("Stale task reaper failed (non-fatal): %s", exc)
+
+        # Spawn default crew and seed tasks if this is a fresh start
+        from dharma_swarm.startup_crew import (
+            spawn_cybernetics_crew,
+            spawn_default_crew,
+            create_seed_tasks,
+        )
+        crew: list[AgentState] | list = []
+        _CREW_TIMEOUT = 30.0  # seconds — crew spawning should not block init
+        try:
+            cyber_crew = await asyncio.wait_for(
+                spawn_cybernetics_crew(self), timeout=_CREW_TIMEOUT,
             )
-
-        # All task-producing boot effects are Graph-gated and component-wise
-        # retryable. Fast boot still defers its default crew and optional
-        # subsystems when the initial census is green.
-        startup_components = {
-            "telos_substrate",
-            "gnani_lodestone",
-            "cybernetics_crew",
-            "seed_tasks",
-        }
-        if not self._fast_boot:
-            startup_components.add("default_crew")
-        self._startup_backfill_pending_components.update(startup_components)
-
-        startup_report: dict[str, Any] = {"created": {}}
-        if graph_reconciler.boot_census_succeeded:
-            startup_report = await self._backfill_graph_held_startup()
-        else:
-            logger.warning(
-                "Startup generation held: graph boot census did not succeed"
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning("Cybernetics crew spawn timed out or failed (non-fatal): %s", exc)
+            cyber_crew = []
+        try:
+            seeds = await asyncio.wait_for(
+                create_seed_tasks(self), timeout=_CREW_TIMEOUT,
             )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning("Seed tasks creation timed out or failed (non-fatal): %s", exc)
+            seeds = []
 
-        created = startup_report.get("created", {})
-        cyber_count = int(created.get("cybernetics_crew", 0))
-        seed_count = int(created.get("seed_tasks", 0))
-        crew_count = int(created.get("default_crew", 0))
-        if cyber_count:
-            logger.info("Spawned %d agents for cybernetics crew", cyber_count)
-        if seed_count:
-            logger.info("Created %d seed tasks", seed_count)
+        if cyber_crew:
+            logger.info("Spawned %d agents for cybernetics crew", len(cyber_crew))
+        if seeds:
+            logger.info("Created %d seed tasks", len(seeds))
 
         if self._fast_boot:
-            self._startup_backfill_pending_components.update(
-                {"default_crew", "optional_subsystems"}
-            )
             await self._memory.remember(
                 f"Swarm fast-boot initialized — 0 default agents, "
-                f"{cyber_count} cybernetics agents, {seed_count} seed tasks",
+                f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
                 layer=MemoryLayer.SESSION,
                 source="swarm",
             )
+            self._telos_substrate_seeded = False
             self._refresh_initialized_registry()
-            if graph_reconciler.boot_census_succeeded:
-                self._startup_background_task = asyncio.create_task(
-                    self._complete_deferred_startup()
-                )
-                logger.info(
-                    "Fast boot enabled — deferred default crew and "
-                    "noncritical subsystems"
-                )
-            else:
-                logger.warning(
-                    "Fast boot startup backfill held: graph boot census did not succeed"
-                )
+            self._startup_background_task = asyncio.create_task(
+                self._complete_deferred_startup()
+            )
+            logger.info(
+                "Fast boot enabled — deferred default crew and noncritical subsystems"
+            )
             return
 
-        if crew_count:
-            logger.info("Spawned %d agents from default crew", crew_count)
+        try:
+            crew = await asyncio.wait_for(
+                spawn_default_crew(self), timeout=_CREW_TIMEOUT,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning("Default crew spawn timed out or failed (non-fatal): %s", exc)
+            crew = []
+        if crew:
+            logger.info("Spawned %d agents from default crew", len(crew))
 
         await self._memory.remember(
-            f"Swarm initialized — {crew_count} default agents, "
-            f"{cyber_count} cybernetics agents, {seed_count} seed tasks",
+            f"Swarm initialized — {len(crew)} default agents, "
+            f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
             layer=MemoryLayer.SESSION,
             source="swarm",
         )
 
-        if self._critical_startup_pending_components():
-            self._startup_backfill_pending_components.add("optional_subsystems")
-            logger.warning(
-                "Optional subsystem startup held until Graph-gated backfill completes"
+        try:
+            await asyncio.wait_for(
+                self._init_optional_subsystems(), timeout=120.0,
             )
-        else:
-            try:
-                await asyncio.wait_for(
-                    self._init_optional_subsystems(), timeout=120.0,
-                )
-            except asyncio.TimeoutError:
-                self._startup_backfill_pending_components.add(
-                    "optional_subsystems"
-                )
-                self._optional_startup_last_error = (
-                    "optional_subsystems: TimeoutError: exceeded 120s"
-                )
-                logger.warning(
-                    "Optional subsystem init timed out after 120s — "
-                    "queued for Graph-gated retry"
-                )
-                self._refresh_initialized_registry()
-            except Exception as exc:
-                self._startup_backfill_pending_components.add(
-                    "optional_subsystems"
-                )
-                self._optional_startup_last_error = (
-                    f"optional_subsystems: {type(exc).__name__}: {exc}"
-                )
-                logger.warning(
-                    "Optional subsystem init failed — queued for Graph-gated retry: %s",
-                    exc,
-                )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Optional subsystem init timed out after 120s — "
+                "continuing with critical subsystems only"
+            )
+            self._refresh_initialized_registry()
 
     # --- Agent Operations ---
 
@@ -1991,8 +1656,6 @@ class SwarmManager:
         if not running:
             return 0
 
-        from dharma_swarm.mission_control_executor_guard import campaign_principal
-
         now = datetime.now(timezone.utc)
         age_limit = timedelta(hours=max_age_hours)
         reaped = 0
@@ -2000,15 +1663,6 @@ class SwarmManager:
         for task in running:
             age = now - task.updated_at
             if age < age_limit:
-                continue
-            if campaign_principal(task)[0]:
-                logger.warning(
-                    "Preserved stale campaign task %s as nonterminal/indeterminate "
-                    "(age=%.1fh); generic crash recovery cannot prove provider "
-                    "cessation or authorize retry",
-                    task.id[:8],
-                    age.total_seconds() / 3600,
-                )
                 continue
             try:
                 _reap_meta = dict(task.metadata or {})
@@ -2176,8 +1830,6 @@ class SwarmManager:
         if self._task_board is None or self._agent_pool is None:
             return []
 
-        from dharma_swarm.mission_control_executor_guard import campaign_principal
-
         # Current live agent IDs
         live_agents = await self._agent_pool.list_agents()
         live_ids = {a.id for a in live_agents}
@@ -2195,14 +1847,6 @@ class SwarmManager:
                     continue
                 if task.updated_at > cutoff:
                     continue  # recently touched, give it time
-                if campaign_principal(task)[0]:
-                    logger.warning(
-                        "Preserved orphaned campaign task %s as "
-                        "nonterminal/indeterminate; generic recovery cannot "
-                        "authorize retry or claim provider cessation",
-                        task.id[:12],
-                    )
-                    continue
 
                 meta = dict(task.metadata or {})
                 meta["orphan_reaped_at"] = now.isoformat()
@@ -2248,16 +1892,7 @@ class SwarmManager:
         pending = await self._task_board.list_tasks(status=TaskStatus.PENDING, limit=500)
         propagated: list[Task] = []
 
-        from dharma_swarm.mission_control_executor_guard import campaign_principal
-
         for task in pending:
-            if campaign_principal(task)[0]:
-                logger.warning(
-                    "Dependency recovery preserving campaign task %s; generic "
-                    "recovery cannot authorize its terminal transition",
-                    task.id[:12],
-                )
-                continue
             # Check dependencies via the task_dependencies table
             try:
                 async with self._task_board._open() as db:
@@ -2355,8 +1990,6 @@ class SwarmManager:
         if not failed:
             return []
 
-        from dharma_swarm.mission_control_executor_guard import campaign_principal
-
         active_titles: set[str] = set()
         for status in (TaskStatus.PENDING, TaskStatus.ASSIGNED, TaskStatus.RUNNING):
             tasks = await self._task_board.list_tasks(status=status, limit=500)
@@ -2372,13 +2005,6 @@ class SwarmManager:
         for task in sorted(failed, key=lambda item: item.updated_at, reverse=True):
             if len(rescued) >= limit:
                 break
-            if campaign_principal(task)[0]:
-                logger.warning(
-                    "Failure rescue preserving campaign task %s; only typed "
-                    "attempt recovery may authorize another generation",
-                    task.id,
-                )
-                continue
             if now - task.updated_at > age_limit:
                 continue
 
@@ -2505,11 +2131,6 @@ class SwarmManager:
             return []
 
     async def tick(self) -> dict[str, Any]:
-        """Run one effect-bearing tick behind the census/effect mutex."""
-        async with self._effect_tick_lock:
-            return await self._tick_effects()
-
-    async def _tick_effects(self) -> dict[str, Any]:
         """Execute one full swarm lifecycle tick.
 
         This is the unified control path -- the ONLY way to advance
@@ -2519,11 +2140,394 @@ class SwarmManager:
         When the Gnani says HOLD, autonomous generation and dispatch are
         suppressed — the organism's pain signal overrides busywork.
         """
-        return await run_tick_effects(
-            self,
-            logger=logger,
-            coordination_state_factory=SwarmCoordinationState,
+        result: dict[str, Any] = {
+            "paused": False, "circuit_broken": False,
+            "dispatched": 0, "settled": 0, "rescued": 0,
+            "synthesized": 0, "director_proposals": 0,
+            "reopened": 0, "living_summary": {},
+            "organism_verdict": None, "organism_power": None,
+        }
+        import time as _time
+        _tick_t0 = _time.monotonic()
+        logger.info("tick-%d start", self._tick_count + 1)
+        overrides = self._check_human_overrides()
+        if overrides["paused"]:
+            result["paused"] = True
+            return result
+        if overrides["focus"] and self._thread_mgr:
+            self._thread_mgr._current_thread = overrides["focus"]
+            # Wire 3: .FOCUS governs routing, not just thread selection.
+            # When identity TCS is drifting, boost routing toward corrective behavior.
+            focus_text = str(overrides.get("focus_text", ""))
+            if "GPR" in focus_text and self._router:
+                # Low gate passage rate → route through reflective reroute path
+                self._router._routing_bias = min(
+                    getattr(self._router, "_routing_bias", 0.0) + 0.1, 0.5
+                )
+                logger.info(".FOCUS(GPR): routing bias increased to favor frontier models")
+            elif "RM" in focus_text and self._engine:
+                # Low research momentum → prioritize research tasks
+                logger.info(".FOCUS(RM): flagging research task priority boost")
+        if self._daemon.circuit_breaker.is_broken:
+            result["circuit_broken"] = True
+            return result
+
+        # v0.9.1: Deferred Telos Substrate seeding (once, first tick)
+        # The concept graph is ~21 MB JSON (4686 nodes, 54804 edges).
+        # Once seeded, subsequent runs create 0 new entities but still
+        # load/parse the full file, blocking the event loop for 30-60s.
+        # Persist the seeded flag so we skip on daemon restart.
+        if not self._telos_substrate_seeded:
+            seed_marker = self.state_dir / "meta" / "substrate_seeded.flag"
+            if seed_marker.exists():
+                self._telos_substrate_seeded = True
+                logger.info("TelosSubstrate already seeded (flag exists)")
+            else:
+                self._telos_substrate_seeded = True
+                try:
+                    from dharma_swarm.telos_substrate import TelosSubstrate
+
+                    substrate = TelosSubstrate(state_dir=self.state_dir)
+                    seed_result = await asyncio.wait_for(
+                        substrate.seed_all(), timeout=120.0
+                    )
+                    logger.info("TelosSubstrate seeded: %s", seed_result)
+                    # Persist the flag
+                    seed_marker.parent.mkdir(parents=True, exist_ok=True)
+                    seed_marker.write_text("seeded")
+                except asyncio.TimeoutError:
+                    logger.warning("TelosSubstrate seeding timed out (120s)")
+                except Exception as e:
+                    logger.warning("TelosSubstrate seeding failed (non-fatal): %s", e)
+
+        allow_autonomous_generation = True
+        if self._in_quiet_hours():
+            allow_autonomous_generation = False
+        if not self._contribution_allowed():
+            allow_autonomous_generation = False
+
+        # ── Organism heartbeat: Gnani / Samvara ──
+        # Runs every _organism_interval_ticks. When the Gnani says HOLD,
+        # we suppress autonomous generation — no new busywork until
+        # coherence recovers or Samvara completes its diagnostic cycle.
+        self._tick_count += 1
+        gnani_holds = False
+        if (self._organism is not None
+                and self._tick_count % self._organism_interval_ticks == 0):
+            try:
+                hb = await asyncio.wait_for(self._organism.heartbeat(), timeout=10.0)
+                result["organism_verdict"] = hb.gnani_verdict.decision if hb.gnani_verdict else None
+                result["organism_power"] = (
+                    self._organism.samvara.current_power.value
+                    if (self._organism.samvara.active
+                        and self._organism.samvara.current_power is not None)
+                    else None
+                )
+                if hb.gnani_verdict and hb.gnani_verdict.decision == "HOLD":
+                    gnani_holds = True
+                    allow_autonomous_generation = False
+                    logger.warning(
+                        "Gnani HOLD (cycle %d, power=%s): %s — suppressing dispatch",
+                        hb.cycle,
+                        result["organism_power"] or "—",
+                        hb.gnani_verdict.reason,
+                    )
+                # ── Samvara corrections → task pipeline ──
+                # When Samvara diagnoses issues, turn corrections into
+                # high-priority tasks so the TD can act on them.
+                if hb.samvara_diagnostic and hb.samvara_diagnostic.corrections:
+                    try:
+                        corrections_created = 0
+                        for corr in hb.samvara_diagnostic.corrections[:3]:
+                            await self._task_board.create(
+                                title=f"[samvara] {corr[:80]}",
+                                description=(
+                                    f"Samvara correction (power={result['organism_power'] or 'unknown'}, "
+                                    f"cycle={hb.cycle}): {corr}"
+                                ),
+                                priority=TaskPriority.HIGH,
+                                created_by="samvara",
+                            )
+                            corrections_created += 1
+                        if corrections_created:
+                            logger.info(
+                                "Samvara → %d correction tasks enqueued", corrections_created,
+                            )
+                    except Exception as corr_exc:
+                        logger.debug("Samvara correction task creation failed: %s", corr_exc)
+            except asyncio.TimeoutError:
+                logger.warning("Organism heartbeat timed out after 10s")
+            except Exception as exc:
+                logger.debug("Organism heartbeat error: %s", exc)
+
+        # ── Meta-evolution: observe organism fitness, adapt hyperparameters ──
+        if (hasattr(self, "_meta_engine") and self._meta_engine is not None
+                and result.get("organism_verdict") is not None):
+            try:
+                from dharma_swarm.evolution import CycleResult
+
+                blended = 0.0
+                if self._organism is not None:
+                    status = self._organism.status()
+                    blended = status.get("last_blended") or 0.0
+
+                # Consume live agent fitness from durable bus (if available)
+                live_best = 0.0
+                if self._message_bus is not None:
+                    try:
+                        fitness_events = await asyncio.wait_for(
+                            self._message_bus.consume_events("AGENT_FITNESS", limit=50),
+                            timeout=3.0,
+                        )
+                        for ev in fitness_events:
+                            payload = ev.get("payload") if isinstance(ev, dict) else {}
+                            if isinstance(payload, dict):
+                                score = payload.get("fitness_score")
+                                if isinstance(score, (int, float)) and score > live_best:
+                                    live_best = float(score)
+                        if live_best > 0:
+                            logger.info("Meta-evo: live agent fitness=%.3f (from %d events)",
+                                        live_best, len(fitness_events))
+                    except (asyncio.TimeoutError, Exception):
+                        pass  # Non-critical
+
+                # Use max of organism blended and live agent fitness
+                best_fitness = max(blended, live_best) if live_best > 0 else blended
+
+                meta_obs = self._meta_engine.observe_cycle_result(
+                    CycleResult(
+                        cycle_id=f"tick-{self._tick_count}",
+                        best_fitness=best_fitness,
+                    ),
+                )
+                if meta_obs is not None:
+                    result["meta_evolved"] = meta_obs.evolved_parameters
+                    result["meta_fitness"] = meta_obs.meta_fitness
+                    logger.info(
+                        "Meta-evolution tick-%d: mf=%.3f evolved=%s",
+                        self._tick_count, meta_obs.meta_fitness, meta_obs.evolved_parameters,
+                    )
+            except Exception as me_exc:
+                logger.debug("Meta-evolution observation error: %s", me_exc)
+
+        # Heartbeat live claims every tick, before any staleness-gated
+        # reconcile: claim windows can be shorter than the rescue cadence.
+        try:
+            beaten = self._get_graph_reconciler().heartbeat_live_claims()
+            result["claims_heartbeaten"] = beaten
+        except Exception as exc:
+            logger.warning("Claim heartbeat failed (non-fatal): %s", exc)
+            result["claims_heartbeat_error"] = f"{type(exc).__name__}: {exc}"
+
+        rescued: list[Task] = []
+        now = datetime.now(timezone.utc)
+        if (self._last_auto_rescue_scan is None
+            or (now - self._last_auto_rescue_scan).total_seconds()
+            >= self._auto_rescue_scan_interval_seconds):
+            try:
+                rescued = await asyncio.wait_for(
+                    self.rescue_recent_failures(), timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("rescue_recent_failures timed out after 10s")
+            self._last_auto_rescue_scan = now
+        result["rescued"] = len(rescued)
+
+        # Orphan reaper: recover tasks stuck on dead agents (runs with rescue scan)
+        if (self._last_auto_rescue_scan is not None
+                and self._last_auto_rescue_scan == now):
+            try:
+                orphans = await asyncio.wait_for(
+                    self.reap_orphaned_tasks(), timeout=10.0
+                )
+                result["orphans_reaped"] = len(orphans)
+                if orphans:
+                    logger.info("Orphan reaper recovered %d task(s)", len(orphans))
+            except asyncio.TimeoutError:
+                logger.warning("reap_orphaned_tasks timed out after 10s")
+            except Exception:
+                logger.debug("Orphan reaper error", exc_info=True)
+
+            # Graph reconciler: settle orphaned delegation_runs/task_claims
+            # (runs with rescue scan cadence; heartbeat already ran this tick).
+            try:
+                tick_report = await asyncio.wait_for(
+                    self.reconcile_graph_runs(stale_only=True), timeout=10.0
+                )
+                result["graph_reconciled"] = tick_report.total_reconciled
+            except asyncio.TimeoutError:
+                logger.warning("reconcile_graph_runs timed out after 10s")
+            except Exception as exc:
+                logger.warning("Graph tick reconcile failed (non-fatal): %s", exc)
+                result["graph_reconcile_error"] = f"{type(exc).__name__}: {exc}"
+
+        queue_snapshot: dict[str, int] = {}
+        try:
+            queue_snapshot = await asyncio.wait_for(
+                self._task_queue_snapshot(), timeout=5.0
+            )
+            result["tasks_ready"] = queue_snapshot.get("ready", 0)
+            result["tasks_blocked_pending"] = queue_snapshot.get("blocked_pending", 0)
+        except asyncio.TimeoutError:
+            logger.warning("_task_queue_snapshot timed out after 5s")
+
+        reopened: list[Any] = []
+        # Suppress synthetic task generation when operator-created tasks are pending
+        _has_real_tasks = False
+        if self._task_board is not None:
+            try:
+                _pending = await self._task_board.list_tasks(
+                    status=TaskStatus.PENDING, limit=20
+                )
+                _has_real_tasks = any(
+                    isinstance(t.metadata, dict)
+                    and t.metadata.get("created_via") in ("manual_seed", "swarm.create_task")
+                    or t.created_by == "operator"
+                    for t in _pending
+                )
+            except Exception:
+                pass
+        if allow_autonomous_generation and not _has_real_tasks:
+            import time as _t; _t0 = _t.monotonic()
+            try:
+                reopened = await asyncio.wait_for(
+                    self.spawn_latent_gold_tasks(), timeout=20.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("spawn_latent_gold_tasks timed out after 20s")
+            _dur = _t.monotonic() - _t0
+            if _dur > 2.0:
+                logger.warning("spawn_latent_gold_tasks took %.1fs", _dur)
+        result["reopened"] = len(reopened)
+
+        # When Gnani holds, skip orchestrator dispatch — no new task execution
+        activity: dict = {}
+        _orch_t0 = _time.monotonic()
+        try:
+            if not gnani_holds:
+                activity = await asyncio.wait_for(
+                    self._orchestrator.tick(), timeout=45.0
+                )
+                result["dispatched"] = activity.get("dispatched", 0)
+                result["settled"] = activity.get("settled", 0)
+            else:
+                # Still settle completed tasks, just don't dispatch new ones
+                activity = await asyncio.wait_for(
+                    self._orchestrator.tick_settle_only(), timeout=45.0
+                )
+        except asyncio.TimeoutError:
+            logger.warning("orchestrator.tick timed out after 45s")
+        _orch_dur = _time.monotonic() - _orch_t0
+        if _orch_dur > 5.0:
+            logger.warning("orchestrator.tick took %.1fs", _orch_dur)
+
+        _coord_t0 = _time.monotonic()
+        try:
+            coordination = await asyncio.wait_for(
+                self.coordination_status(refresh=False), timeout=10.0
+            )
+            # Skip coordination busywork when real tasks exist
+            if _has_real_tasks:
+                synthesized = []
+            else:
+                synthesized = await asyncio.wait_for(
+                    self.spawn_coordination_tasks(coordination=coordination),
+                    timeout=15.0,
+                )
+        except asyncio.TimeoutError:
+            coordination = SwarmCoordinationState()
+            synthesized = []
+            logger.warning("coordination timed out")
+        result["synthesized"] = len(synthesized)
+        _coord_dur = _time.monotonic() - _coord_t0
+        if _coord_dur > 5.0:
+            logger.warning("coordination took %.1fs", _coord_dur)
+
+        director_proposals: list[Task] = []
+        if (allow_autonomous_generation and self._director is not None
+            and self._tick_count % self._director_interval_ticks == 0):
+            _dir_t0 = _time.monotonic()
+            try:
+                director_proposals = await asyncio.wait_for(
+                    self._director_pulse(), timeout=20.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("director_pulse timed out after 20s")
+            except Exception:
+                logger.debug("Director pulse failed", exc_info=True)
+            _dir_dur = _time.monotonic() - _dir_t0
+            if _dir_dur > 5.0:
+                logger.warning("director_pulse took %.1fs", _dir_dur)
+        result["director_proposals"] = len(director_proposals)
+
+        living_summary: dict[str, int] = {}
+        if self._tick_count % self._living_interval_ticks == 0:
+            try:
+                living_summary = await asyncio.wait_for(
+                    self._tick_living_layers(), timeout=15.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("_tick_living_layers timed out after 15s")
+        result["living_summary"] = living_summary
+
+        # ── Witness audit (Beer S3*): sporadic random audit ──
+        if (self._witness is not None
+                and self._tick_count % self._witness_interval_ticks == 0):
+            try:
+                findings = await self._witness.run_cycle()
+                result["witness_findings"] = len(findings)
+                actionable = sum(1 for f in findings if f.is_actionable)
+                if actionable:
+                    logger.info(
+                        "Witness S3* audit: %d findings, %d actionable",
+                        len(findings), actionable,
+                    )
+            except Exception as exc:
+                logger.debug("Witness audit error: %s", exc)
+
+        # ── AutoProposer: closed-loop self-improvement ──
+        if (self._auto_proposer is not None
+                and self._tick_count % self._auto_proposer_interval_ticks == 0):
+            try:
+                ap_result = await asyncio.wait_for(
+                    self._auto_proposer.cycle(), timeout=30.0
+                )
+                result["auto_proposer_observations"] = ap_result.observations_collected
+                result["auto_proposer_proposals"] = ap_result.proposals_generated
+                result["auto_proposer_submitted"] = ap_result.proposals_submitted
+                if ap_result.proposals_generated:
+                    logger.info(
+                        "AutoProposer: %d observations -> %d proposals -> %d submitted",
+                        ap_result.observations_collected,
+                        ap_result.proposals_generated,
+                        ap_result.proposals_submitted,
+                    )
+            except asyncio.TimeoutError:
+                logger.warning("AutoProposer.cycle timed out after 30s")
+            except Exception as exc:
+                logger.debug("AutoProposer cycle error: %s", exc)
+
+        _tick_dur = _time.monotonic() - _tick_t0
+        logger.info(
+            "tick-%d done (%.1fs): dispatched=%d settled=%d rescued=%d reopened=%d "
+            "ready=%d blocked=%d organism=%s meta=%s",
+            self._tick_count, _tick_dur,
+            result.get("dispatched", 0), result.get("settled", 0),
+            len(rescued), len(reopened),
+            queue_snapshot.get("ready", -1),
+            queue_snapshot.get("blocked_pending", -1),
+            result.get("organism_verdict", "-"),
+            result.get("meta_fitness", "-"),
         )
+        did_work = (bool(reopened) or bool(rescued) or bool(synthesized)
+                    or bool(director_proposals) or self._tick_did_work(activity))
+        if did_work:
+            self._last_contribution = datetime.now()
+            self._daily_contributions += 1
+            self._daemon.circuit_breaker.record_success()
+            if self._thread_mgr:
+                self._thread_mgr.record_contribution()
+        return result
 
     async def run(self, interval: float | None = None) -> None:
         """Run the orchestration loop with Garden Daemon parameters.
@@ -3183,52 +3187,14 @@ class SwarmManager:
 
     # --- Shutdown ---
 
-    async def _join_startup_tasks_for_shutdown(self) -> None:
-        """Join canceled startup work before stopping anything it may publish."""
-        for attr, label in (
-            ("_startup_background_task", "Deferred startup"),
-            ("_optional_startup_retry_task", "Optional startup retry"),
-        ):
-            background = getattr(self, attr)
-            if background is None:
-                continue
-            try:
-                if not background.done():
-                    background.cancel()
-                await background
-            except asyncio.CancelledError:
-                pass
-            except Exception as exc:
-                logger.debug("%s shutdown failed (non-fatal): %s", label, exc)
-            finally:
-                setattr(self, attr, None)
-
     async def shutdown(self, drain_timeout: float = 30.0) -> None:
-        """Join the current effect tick, then tear the swarm down exactly once."""
-        self._running = False
-        self._shutdown_started = True
-        for background in (
-            self._startup_background_task,
-            self._optional_startup_retry_task,
-        ):
-            if background is not None and not background.done():
-                background.cancel()
-        # Join before acquiring the effect lock: a cancellation-delaying
-        # initializer may itself own or be waiting for that mutex.
-        await self._join_startup_tasks_for_shutdown()
-        async with self._effect_tick_lock:
-            if self._shutdown_complete:
-                return
-            await self._shutdown_under_effect_lock(drain_timeout)
-            self._shutdown_complete = True
-
-    async def _shutdown_under_effect_lock(self, drain_timeout: float) -> None:
         """Graceful ordered shutdown of entire swarm.
 
         Varela's autopoiesis: clean death is part of the lifecycle.
         Teardown order is reverse of init — coordination first,
         then agents, then infrastructure.
         """
+        self._running = False
         logger.info("Swarm shutdown initiated (drain_timeout=%.1fs)", drain_timeout)
 
         # Wire 5: Persist session digest as memory facts before teardown.
@@ -3242,24 +3208,10 @@ class SwarmManager:
         # 1. Stop orchestrator (cancel in-flight tasks with drain)
         if self._orchestrator:
             try:
-                stop_receipt = await self._orchestrator.graceful_stop(
-                    timeout=drain_timeout
-                )
+                await self._orchestrator.graceful_stop(timeout=drain_timeout)
             except Exception as exc:
-                raise RuntimeError(
-                    "swarm shutdown incomplete: orchestrator stop failed"
-                ) from exc
-            live = (
-                int(stop_receipt.get("live", 0) or 0)
-                if isinstance(stop_receipt, dict)
-                else 0
-            )
-            if live:
-                owners = stop_receipt.get("live_owners", {})
-                raise RuntimeError(
-                    "swarm shutdown incomplete: orchestrator retains "
-                    f"{live} live owner(s): {owners}"
-                )
+                logger.warning("Orchestrator graceful stop failed: %s", exc)
+                self._orchestrator.stop()
 
         # 2. Stop director (optional subsystem)
         if self._director:
@@ -3278,6 +3230,19 @@ class SwarmManager:
                 await self._gateway.stop()
             except Exception as exc:
                 logger.debug("Gateway stop failed (non-fatal): %s", exc)
+
+        # 2c. Cancel deferred startup work if it is still running
+        if self._startup_background_task is not None:
+            try:
+                if not self._startup_background_task.done():
+                    self._startup_background_task.cancel()
+                await self._startup_background_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                logger.debug("Deferred startup shutdown failed (non-fatal): %s", exc)
+            finally:
+                self._startup_background_task = None
 
         # 3. Shutdown agents
         if self._agent_pool:
