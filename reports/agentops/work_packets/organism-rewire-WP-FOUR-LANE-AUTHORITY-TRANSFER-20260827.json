@@ -1,9 +1,9 @@
 {
-  "id": "fleet-advancement-WP-AUTOCATALYTIC-FOUR-LANE-20260827",
+  "id": "organism-rewire-WP-FOUR-LANE-AUTHORITY-TRANSFER-20260827",
   "base_ref": "c811e8d0fa2558850a3484411b4f8546505589ac",
   "branch": "governance/four-active-mac-lanes-20260827",
   "worktree": ".",
-  "intent": "Repair the four-lane focus reset's missed typed dependency by rebinding the existing ten-node autocatalytic local-rehearsal portfolio from the ten superseded project ids to the four operator-authorized Mac programs, then keep its declared-intent documentation aligned after the contradictory three-lane PR #1445 landed first. Preserve every node role, authority, proof obligation, source adapter, edge, and local_rehearsal claim ceiling; this metadata repair grants no runtime, deployment, mutation, external-effect, or promotion authority.",
+  "intent": "Consolidate the complete pull-request event range that transfers Mac build admission from the incumbent portfolio to exactly four operator-authorized programs: Fleet advancement, the SADHANA 10-day program, RSI Lab via Meghadharma, and Sublimation Forge. Reconcile executable scoped-WIP governance, generated projections, focus and RSI witnesses, regression fixtures, and the autocatalytic local-rehearsal bindings as one reviewable authority transition. Preserve every runtime, deployment, participant, mutation, external-effect, credential, and promotion boundary.",
   "allowed_files": [
     "ACTIVE_SURFACE_MANIFEST.yaml",
     "CLAUDE.md",
@@ -18,46 +18,40 @@
     "docs/architecture/autocatalytic_nodes/operator_experience.md",
     "docs/architecture/autocatalytic_nodes/sarathi_runtime.md",
     "docs/architecture/autocatalytic_nodes/world_signal_supply.md",
+    "docs/docops/AUTO_INVENTORY.md",
     "docs/governance/ACTIVE_TRACK.yaml",
     "docs/governance/SOVEREIGN_MANIFEST.md",
-    "reports/agentops/work_packets/fleet-advancement-WP-AUTOCATALYTIC-FOUR-LANE-20260827.json"
+    "reports/agentops/work_packets/organism-rewire-WP-FOUR-LANE-AUTHORITY-TRANSFER-20260827.json",
+    "reports/governance/mac_active_programs/2026-08-27-focus-reset-ratification.json",
+    "reports/governance/mac_active_programs/2026-08-27-focus-reset.json",
+    "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json",
+    "scripts/governance/check_track_status.py",
+    "scripts/governance/render_active_track_includes.py",
+    "tests/test_active_track_governance.py",
+    "tests/test_cybernetics_codex.py",
+    "tests/test_fast_suite_isolation.py",
+    "tests/test_track_closure_rigor.py",
+    "tests/test_track_portfolio.py"
   ],
   "forbidden_files": [
     ".github/**",
-    "dharma_swarm/**",
-    "dharma_swarm/forge_lab/**",
-    "dharma_swarm/foundry/**",
+    "api/**",
     "dashboard/**",
-    "dashboard/src/app/dashboard/sadhana/**",
     "deploy/**",
-    "deploy/sadhana/**",
+    "dharma_swarm/**",
     "docs/foundry/**",
     "docs/ops/RSI_LAB_SYNC.md",
-    "scripts/**",
-    "scripts/forge_lab/**",
-    "scripts/foundry/**",
-    "scripts/runtime/sadhana_release.py",
     "terminal/**",
-    "tests/**",
-    "tests/forge_lab_v1/**",
-    "tests/test_foundry_*.py",
-    "tests/test_sadhana_release.py",
     "Makefile",
     "pyproject.toml",
     "uv.lock"
   ],
   "gates": [
     {
-      "name": "autocatalytic-four-lane-closure",
-      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py",
+      "name": "four-lane-authority-transfer",
+      "command": "python3 -m pytest -q tests/test_autocatalytic_portfolio.py tests/test_track_portfolio.py tests/test_check_track_status_lifecycle.py tests/test_active_track_governance.py tests/test_agent_onboard.py tests/test_track_closure_rigor.py tests/test_cybernetics_codex.py tests/test_fast_suite_isolation.py",
       "expected_exit": 0,
       "timeout_seconds": 600
-    },
-    {
-      "name": "four-lane-governance-regression",
-      "command": "python3 -m pytest -q tests/test_track_portfolio.py tests/test_check_track_status_lifecycle.py tests/test_active_track_governance.py tests/test_agent_onboard.py",
-      "expected_exit": 0,
-      "timeout_seconds": 300
     },
     {
       "name": "four-lane-generated-declared-intent",
@@ -82,7 +76,7 @@
   ],
   "commit": {
     "allowed": true,
-    "message": "governance: reassert four-lane authority on current main"
+    "message": "governance: consolidate four-lane authority transfer"
   },
   "approval": {
     "before_commit": false,
@@ -102,30 +96,37 @@
       "git",
       "owner_files"
     ],
-    "work_packet": "WP-AUTOCATALYTIC-FOUR-LANE-20260827",
-    "active_track": "fleet-advancement-2026-08",
-    "owner": "@dhyana",
+    "work_packet": "WP-FOUR-LANE-AUTHORITY-TRANSFER-20260827",
+    "active_track": "organism-rewire-2026-07",
+    "owner": "@AmitabhainArunachala",
     "collision": {
       "status": "clear",
       "checked_at_sha": "c811e8d0fa2558850a3484411b4f8546505589ac",
       "details": []
     },
     "interface_mismatches": [
+      "The event changes ACTIVE_SURFACE_MANIFEST.yaml, which the live merge-base portfolio assigns to organism-rewire-2026-07; therefore this transition packet binds to that incumbent endpoint rather than falsely claiming Fleet ownership.",
+      "Four historical incremental packets were valid for their local commit ranges, while pull-request CI grades the complete merge-base-to-head range and permits exactly one Session Entry packet.",
       "ACTIVE_TRACK.yaml now authorizes exactly four programs, but autocatalytic_portfolio.nodes[*].project_bindings still closes over ten superseded project ids, causing both validator errors and full-suite failures.",
-      "Project bindings are typed routing metadata only; changing them cannot honestly alter a node's proof refs, semantic adapter, authority, promotion checks, or external-effect claim."
+      "Project bindings are typed routing metadata only; changing them cannot honestly alter a node's proof refs, semantic adapter, authority, promotion checks, or external-effect claim.",
+      "The packet owner is the exact incumbent owner recorded at the live merge base; it is transition provenance and does not alter the canonical GitHub repository authority, which remains AIKAGRYA/dharma_swarm."
     ],
     "closest_existing_implementation": [
+      "scripts/governance/check_agentops_packet_scope.py:_validate_track_binding",
+      "docs/governance/ACTIVE_TRACK.yaml:track_policy.scoped_wip_limits.mac_build",
       "ACTIVE_SURFACE_MANIFEST.yaml:autocatalytic_portfolio.nodes[*].project_bindings",
       "dharma_swarm/autocatalytic_manifest_contracts.py:validate_portfolio",
       "tests/test_autocatalytic_portfolio.py:test_every_active_project_is_bound_into_the_metabolism"
     ],
     "honest_blockers": [
+      "This packet attests the committed pull-request range and its incumbent-to-successor authority boundary; it does not claim that one fresh local packet-runner closeout executed the historical range as a single atomic work session.",
       "This change proves only exact metadata closure between the active-track set and a local-rehearsal topology; it does not prove any node, program, daemon, remote host, participant journey, external effect, or promotion is live.",
       "The four programs share several metabolic membranes because assurance, evaluation, and operator projection are cross-cutting; a binding records relevance, not ownership or execution authority.",
       "PR #1445 merged a contradictory three-lane portfolio while this packet's PR was waiting on CI; this current-main integration preserves that PR's historical receipts but supersedes its active authority under the operator's explicit four-lane instruction.",
-      "PR #1444 remains unmergeable until its fresh exact-head required CI contexts pass after this repair."
+      "The exposed Anthropic and AGNI/GLM credentials observed during local cockpit recovery require owner-controlled rotation; this packet neither stores nor rotates credentials.",
+      "PR #1444 remains unmergeable until its fresh exact-head required CI contexts pass after this consolidation."
     ],
-    "rollback": "Revert this packet, the ACTIVE_SURFACE_MANIFEST.yaml binding edit, and its declared-intent mirrors together. Rollback restores the contradictory three-lane authority and stale superseded-track closure but performs no runtime, deployment, provider, participant, remote-host, or external-state mutation.",
-    "packet_digest": "0ff92d2880e6c8f0ac1a3b654502e56926b91f034ae7fe80af3cdd0bbe132a34"
+    "rollback": "Revert the consolidated event range as one authority transition. Rollback restores the contradictory three-lane authority and stale superseded-track closure but performs no runtime, deployment, provider, participant, remote-host, credential, or external-state mutation.",
+    "packet_digest": "f7c15a9c53d3577f6a80ecf8dc1fcbda5d400619c5751eb008cd44bca5b78b5d"
   }
 }
