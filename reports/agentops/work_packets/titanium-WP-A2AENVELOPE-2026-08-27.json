@@ -53,7 +53,7 @@
     }
   ],
   "session_entry": {
-    "active_track": "repository-titanium-hardening-2026-07",
+    "active_track": "fleet-advancement-2026-08",
     "authority_precedence": [
       "executable",
       "tests",
@@ -70,10 +70,12 @@
       "details": [],
       "status": "clear"
     },
-    "honest_blockers": [],
+    "honest_blockers": [
+      "packet originally bound to repository-titanium-hardening-2026-07; that track was superseded by governance PR #1444 while this branch was in review, so the binding moved to the live fleet-advancement-2026-08 track (same A2A bus substrate scope)"
+    ],
     "interface_mismatches": [],
-    "owner": "@AmitabhainArunachala",
-    "packet_digest": "da61bc61201313076e8feabc2af444a5c40549fc1cbbad3b8beeb4478992ae4a",
+    "owner": "@dhyana",
+    "packet_digest": "34e33125ed5b6d2c1b2f961ebfe0f7e8a6294293d3009d87a473417d1ee95966",
     "rollback": "git revert the WP-02 commit on branch wp02-a2a-envelope-schema; both emitters return to their inline schemas and the ack_subject dead-letter condition resurfaces",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
