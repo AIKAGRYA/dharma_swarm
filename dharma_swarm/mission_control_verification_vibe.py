@@ -111,9 +111,10 @@ def expected_vibe_halt_binding(
         "schema": SIGNED_VIBE_BINDING_SCHEMA,
         "candidate_digest": expected.candidate_digest,
         "diff_sha256": expected.diff_sha256,
-        "verifier_agent_uid": expected.verifier_agent_uid,
-        "verifier_run_id": expected.verifier_run_id,
-        "verifier_parent_run_id": expected.verifier_parent_run_id,
+        "verifier_agent_uid": expected.vibe_verifier.agent_uid,
+        "verifier_run_id": expected.vibe_verifier.run_id,
+        "verifier_parent_run_id": expected.executor_run_id,
+        "verifier_signer_public_key": expected.vibe_verifier.signer_public_key,
         "receipt_sha256": digest,
     }
 
@@ -157,13 +158,12 @@ def _evaluate_vibe_halt(
         and data.get("diff_sha256") == expected.diff_sha256
         and verifier
         == {
-            "agent_uid": expected.verifier_agent_uid,
-            "run_id": expected.verifier_run_id,
-            "parent_run_id": expected.verifier_parent_run_id,
+            "agent_uid": expected.vibe_verifier.agent_uid,
+            "run_id": expected.vibe_verifier.run_id,
+            "parent_run_id": expected.executor_run_id,
         }
-        and expected.verifier_agent_uid != expected.executor_agent_uid
-        and expected.verifier_run_id != expected.executor_run_id
-        and expected.verifier_parent_run_id == expected.executor_run_id
+        and expected.vibe_verifier.agent_uid != expected.executor_agent_uid
+        and expected.vibe_verifier.run_id != expected.executor_run_id
     )
     if not exact_identity:
         return InconclusiveCapability("candidate_or_verifier_binding_mismatch")
@@ -175,6 +175,8 @@ def _evaluate_vibe_halt(
     verifier_public_key = _signature_public_key(signature)
     if verifier_public_key is None:
         return InconclusiveCapability("malformed_verifier_signature")
+    if verifier_public_key != expected.vibe_verifier.signer_public_key:
+        return InconclusiveCapability("verifier_signer_binding_mismatch")
     if remember_capability is None or not trusted_vibe_public_keys:
         return InconclusiveCapability("trusted_verifier_signature_required")
     if verifier_public_key not in trusted_vibe_public_keys:
@@ -212,8 +214,8 @@ def _evaluate_vibe_halt(
     verified = VerifiedVibeHalt(
         candidate_digest=expected.candidate_digest,
         diff_sha256=expected.diff_sha256,
-        verifier_agent_uid=expected.verifier_agent_uid,
-        verifier_run_id=expected.verifier_run_id,
+        verifier_agent_uid=expected.vibe_verifier.agent_uid,
+        verifier_run_id=expected.vibe_verifier.run_id,
         verifier_public_key=verifier_public_key,
         receipt_sha256=receipt_sha256,
     )

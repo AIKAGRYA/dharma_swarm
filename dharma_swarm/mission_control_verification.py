@@ -12,7 +12,7 @@ import importlib
 import re
 import weakref
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
@@ -27,10 +27,11 @@ if TYPE_CHECKING:
 
 CURRENT_VIBE_SCHEMA = "dharma.vibe_halt_observer.v1"
 PATCH_VIBE_SCHEMA = "dharma.vibe_halt.patch_verification.v1"
-SIGNED_VIBE_BINDING_SCHEMA = "dharma.vibe_halt.signed_binding.v1"
-SIGNED_A2A_BINDING_SCHEMA = "dharma.forge.a2a_patch_binding.v1"
-PATCH_VERIFICATION_SCHEMA = "dharma.forge.a2a_patch_verification.v1"
-WARRANT_SCHEMA = "dharma.mission_control.patch_promotion_warrant.v1"
+FOUNDRY_PATCH_VERIFICATION_SCHEMA = "dharma.foundry.forge_patch_verification.v1"
+SIGNED_VIBE_BINDING_SCHEMA = "dharma.vibe_halt.signed_binding.v2"
+SIGNED_A2A_BINDING_SCHEMA = "dharma.forge.a2a_patch_binding.v2"
+PATCH_VERIFICATION_SCHEMA = "dharma.forge.a2a_patch_verification.v2"
+WARRANT_SCHEMA = "dharma.mission_control.patch_promotion_warrant.v2"
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _FOUNDRY_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -50,6 +51,42 @@ REQUIRED_PROMOTION_PREDICATES = _REQUIRED_EVIDENCE_PREDICATES | frozenset(
 CANONICAL_PROMOTION_SAFETY = (
     ("shadow_only", True), ("live_apply_allowed", False), ("code_diff_allowed", False)
 )
+
+
+@dataclass(frozen=True, slots=True)
+class VerifierPrincipalBinding:
+    """One exact verifier role, durable run, and signing principal."""
+
+    role: Literal["foundry", "vibe_halt"]
+    agent_uid: str
+    run_id: str
+    signer_public_key: str
+
+    def to_signed_binding(self, *, parent_run_id: str) -> dict[str, str]:
+        return {
+            "role": self.role,
+            "agent_uid": self.agent_uid,
+            "run_id": self.run_id,
+            "parent_run_id": parent_run_id,
+            "signer_public_key": self.signer_public_key,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class VerificationSeparationClaim:
+    """Distinct keys and durable roles; never OS-process or key-custody proof."""
+
+    level: Literal["distinct_signing_principals"] = field(
+        default="distinct_signing_principals",
+        init=False,
+    )
+    independent_processes_proven: Literal[False] = field(default=False, init=False)
+
+    def to_dict(self) -> dict[str, str | bool]:
+        return {
+            "level": self.level,
+            "independent_processes_proven": self.independent_processes_proven,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,9 +112,8 @@ class ExpectedPromotionBindings:
     authorized_source_files: tuple[str, ...]
     executor_agent_uid: str
     executor_run_id: str
-    verifier_agent_uid: str
-    verifier_run_id: str
-    verifier_parent_run_id: str
+    foundry_verifier: VerifierPrincipalBinding
+    vibe_verifier: VerifierPrincipalBinding
 
     def to_signed_binding(self) -> dict[str, Any]:
         """Return the exact block that must be covered by the judge signature."""
@@ -104,17 +140,18 @@ class ExpectedPromotionBindings:
                 "agent_uid": self.executor_agent_uid,
                 "run_id": self.executor_run_id,
             },
-            "verifier": {
-                "agent_uid": self.verifier_agent_uid,
-                "run_id": self.verifier_run_id,
-                "parent_run_id": self.verifier_parent_run_id,
-            },
+            "foundry_verifier": self.foundry_verifier.to_signed_binding(
+                parent_run_id=self.executor_run_id,
+            ),
+            "vibe_verifier": self.vibe_verifier.to_signed_binding(
+                parent_run_id=self.executor_run_id,
+            ),
         }
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
 class VerifiedVibeHalt:
-    """Inhabited only by a clean, diff-bound, independently run capability."""
+    """Clean, diff-bound evidence from the exact Vibe signing principal."""
 
     candidate_digest: str
     diff_sha256: str
@@ -150,7 +187,9 @@ class InconclusiveCapability:
         return False
 
 
-VibeHaltCapability: TypeAlias = VerifiedVibeHalt | RejectedCapability | InconclusiveCapability
+VibeHaltCapability: TypeAlias = (
+    VerifiedVibeHalt | RejectedCapability | InconclusiveCapability
+)
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
@@ -178,6 +217,7 @@ class PatchPromotionWarrant:
             "schema": self.schema,
             "capability_scope": "projection_only_gate",
             "repository_effect_authorized": False,
+            "verification_separation": VerificationSeparationClaim().to_dict(),
             **binding,
             "patch_verification_sha256": self.patch_verification_sha256,
             "forge_verification_sha256": self.forge_verification_sha256,
@@ -208,25 +248,29 @@ PromotionEvaluation: TypeAlias = PatchPromotionWarrant | PromotionRefusal
 def _capability_fingerprint(value: object, kind: str) -> str:
     if kind == "vibe" and type(value) is VerifiedVibeHalt:
         vibe = value
-        return canonical_sha256({
-            "kind": kind,
-            "candidate_digest": vibe.candidate_digest,
-            "diff_sha256": vibe.diff_sha256,
-            "verifier_agent_uid": vibe.verifier_agent_uid,
-            "verifier_run_id": vibe.verifier_run_id,
-            "verifier_public_key": vibe.verifier_public_key,
-            "receipt_sha256": vibe.receipt_sha256,
-        })
+        return canonical_sha256(
+            {
+                "kind": kind,
+                "candidate_digest": vibe.candidate_digest,
+                "diff_sha256": vibe.diff_sha256,
+                "verifier_agent_uid": vibe.verifier_agent_uid,
+                "verifier_run_id": vibe.verifier_run_id,
+                "verifier_public_key": vibe.verifier_public_key,
+                "receipt_sha256": vibe.receipt_sha256,
+            }
+        )
     if kind == "warrant" and type(value) is PatchPromotionWarrant:
         warrant = value
-        return canonical_sha256({
-            "kind": kind,
-            "schema": warrant.schema,
-            "bindings": warrant.bindings.to_signed_binding(),
-            "patch_verification_sha256": warrant.patch_verification_sha256,
-            "forge_verification_sha256": warrant.forge_verification_sha256,
-            "vibe_halt_receipt_sha256": warrant.vibe_halt_receipt_sha256,
-        })
+        return canonical_sha256(
+            {
+                "kind": kind,
+                "schema": warrant.schema,
+                "bindings": warrant.bindings.to_signed_binding(),
+                "patch_verification_sha256": warrant.patch_verification_sha256,
+                "forge_verification_sha256": warrant.forge_verification_sha256,
+                "vibe_halt_receipt_sha256": warrant.vibe_halt_receipt_sha256,
+            }
+        )
     return ""
 
 
@@ -287,7 +331,11 @@ _is_minted_capability, _evaluate_owned_promotion_warrant = _new_capability_regis
 
 
 def _normal_public_key_hex(public_key: str | bytes) -> str:
-    return public_key.hex() if isinstance(public_key, bytes) else str(public_key).strip().lower()
+    return (
+        public_key.hex()
+        if isinstance(public_key, bytes)
+        else str(public_key).strip().lower()
+    )
 
 
 def _normalize_trust_roots(
@@ -304,32 +352,49 @@ def _normalize_trust_roots(
 
 
 class PatchPromotionVerifier:
-    """Immutable composition-owned trust policy and projection evaluator."""
+    """Pre-pinned trust policy; constructor access is not an authority boundary."""
 
-    __slots__ = ("_judge_keys", "_vibe_keys_by_agent")
+    __slots__ = ("_foundry_keys_by_agent", "_judge_keys", "_vibe_keys_by_agent")
 
     def __init__(
         self,
         *,
         trusted_judge_public_keys: Iterable[str | bytes],
+        trusted_foundry_verifier_public_keys: Mapping[str, Iterable[str | bytes]],
         trusted_vibe_verifier_public_keys: Mapping[str, Iterable[str | bytes]],
     ) -> None:
         judge_keys = _normalize_trust_roots(
             trusted_judge_public_keys,
             name="trusted_judge_public_keys",
         )
-        vibe_keys: dict[str, frozenset[str]] = {}
-        for agent_uid, keys in trusted_vibe_verifier_public_keys.items():
-            if not isinstance(agent_uid, str) or not agent_uid or agent_uid != agent_uid.strip():
-                raise ValueError("trusted Vibe verifier identity must be non-empty")
-            vibe_keys[agent_uid] = _normalize_trust_roots(
-                keys,
-                name=f"trusted_vibe_verifier_public_keys[{agent_uid!r}]",
-            )
-        if not vibe_keys:
-            raise ValueError("trusted_vibe_verifier_public_keys must not be empty")
+        principal_maps: list[tuple[str, Mapping[str, Iterable[str | bytes]]]] = [
+            ("foundry", trusted_foundry_verifier_public_keys),
+            ("vibe", trusted_vibe_verifier_public_keys),
+        ]
+        normalized: dict[str, Mapping[str, frozenset[str]]] = {}
+        for role, supplied in principal_maps:
+            keys_by_agent: dict[str, frozenset[str]] = {}
+            for agent_uid, keys in supplied.items():
+                if (
+                    not isinstance(agent_uid, str)
+                    or not agent_uid
+                    or agent_uid != agent_uid.strip()
+                ):
+                    raise ValueError(
+                        f"trusted {role} verifier identity must be non-empty"
+                    )
+                keys_by_agent[agent_uid] = _normalize_trust_roots(
+                    keys,
+                    name=f"trusted_{role}_verifier_public_keys[{agent_uid!r}]",
+                )
+            if not keys_by_agent:
+                raise ValueError(
+                    f"trusted_{role}_verifier_public_keys must not be empty"
+                )
+            normalized[role] = MappingProxyType(keys_by_agent)
         object.__setattr__(self, "_judge_keys", judge_keys)
-        object.__setattr__(self, "_vibe_keys_by_agent", MappingProxyType(vibe_keys))
+        object.__setattr__(self, "_foundry_keys_by_agent", normalized["foundry"])
+        object.__setattr__(self, "_vibe_keys_by_agent", normalized["vibe"])
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(f"{type(self).__name__} trust policy is immutable")
@@ -408,10 +473,12 @@ def __getattr__(name: str) -> Any:
     globals()[name] = value
     return value
 
+
 __all__ = [
     "CANONICAL_PROMOTION_SAFETY",
     "CURRENT_VIBE_SCHEMA",
     "ExpectedPromotionBindings",
+    "FOUNDRY_PATCH_VERIFICATION_SCHEMA",
     "InconclusiveCapability",
     "PATCH_VERIFICATION_SCHEMA",
     "PATCH_VIBE_SCHEMA",
@@ -424,6 +491,8 @@ __all__ = [
     "SIGNED_A2A_BINDING_SCHEMA",
     "SIGNED_VIBE_BINDING_SCHEMA",
     "VerifiedVibeHalt",
+    "VerificationSeparationClaim",
+    "VerifierPrincipalBinding",
     "VibeHaltCapability",
     "WARRANT_SCHEMA",
     "evaluate_vibe_halt",

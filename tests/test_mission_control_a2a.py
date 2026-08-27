@@ -46,12 +46,14 @@ from dharma_swarm.mission_control_contract import (
     ReconciliationState,
 )
 from dharma_swarm.mission_control_verification import (
+    FOUNDRY_PATCH_VERIFICATION_SCHEMA,
     PATCH_VERIFICATION_SCHEMA,
     PATCH_VIBE_SCHEMA,
     ExpectedPromotionBindings,
     PatchPromotionVerifier,
     PatchPromotionWarrant,
     PromotionRefusal,
+    VerifierPrincipalBinding,
     expected_vibe_halt_binding,
 )
 from dharma_swarm.models import GateDecision, TaskStatus
@@ -105,10 +107,14 @@ def _sha(value: str) -> str:
 
 
 def _public_key(key: Ed25519PrivateKey) -> str:
-    return key.public_key().public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    ).hex()
+    return (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        .hex()
+    )
 
 
 def _json_bytes(value: dict) -> bytes:
@@ -168,6 +174,8 @@ class _Context:
     state_dir: Path
     processed_path: Path
     response_path: Path
+    foundry_key: Ed25519PrivateKey
+    vibe_key: Ed25519PrivateKey
 
 
 async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
@@ -425,6 +433,8 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
         command=["python", "-m", "pytest", "tests/test_dgm_loop.py"],
         output={"exit_code": 0, "stdout": "passed", "stderr": ""},
     )
+    foundry_key = Ed25519PrivateKey.generate()
+    vibe_key = Ed25519PrivateKey.generate()
     expected = ExpectedPromotionBindings(
         mission_id=mission_id,
         task_id=task.task_id,
@@ -447,9 +457,18 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
         authorized_source_files=("dharma_swarm/dgm_loop.py",),
         executor_agent_uid=agent,
         executor_run_id="executor-run-1",
-        verifier_agent_uid="forge_independent_verifier",
-        verifier_run_id="verifier-run-1",
-        verifier_parent_run_id="executor-run-1",
+        foundry_verifier=VerifierPrincipalBinding(
+            role="foundry",
+            agent_uid="forge_independent_verifier",
+            run_id=foundry_run.run_id,
+            signer_public_key=_public_key(foundry_key),
+        ),
+        vibe_verifier=VerifierPrincipalBinding(
+            role="vibe_halt",
+            agent_uid="vibe_halt_independent_verifier",
+            run_id="vibe-run-1",
+            signer_public_key=_public_key(vibe_key),
+        ),
     )
     executor = ExecutionIdentity.new(
         task_id=task.task_id,
@@ -520,20 +539,25 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
         state_dir=state_dir,
         processed_path=state_dir / "processed_deliveries.jsonl",
         response_path=response_path,
+        foundry_key=foundry_key,
+        vibe_key=vibe_key,
     )
 
 
-async def _record_verifier(ctx: _Context) -> None:
+async def _record_verifier(
+    ctx: _Context,
+    principal: VerifierPrincipalBinding,
+) -> None:
     await ctx.runtime.record_execution_identity(
         ExecutionIdentity.new(
             task_id=ctx.task_id,
-            trace_id="trace-verifier",
+            trace_id=f"trace-{principal.role}",
             correlation_id=ctx.expected.correlation_id,
             parent_run_id=ctx.expected.executor_run_id,
-            run_id=ctx.expected.verifier_run_id,
-            claim_id="claim-verifier",
-            idempotency_key="idem-verifier",
-            agent_id=ctx.expected.verifier_agent_uid,
+            run_id=principal.run_id,
+            claim_id=f"claim-{principal.role}",
+            idempotency_key=f"idem-{principal.role}",
+            agent_id=principal.agent_uid,
             session_id=f"mission:{ctx.mission_id}",
             proposal_id=ctx.expected.proposal_id,
         ),
@@ -541,9 +565,14 @@ async def _record_verifier(ctx: _Context) -> None:
     )
 
 
+async def _record_verifiers(ctx: _Context) -> None:
+    await _record_verifier(ctx, ctx.expected.foundry_verifier)
+    await _record_verifier(ctx, ctx.expected.vibe_verifier)
+
+
 def _signal(expected: ExpectedPromotionBindings) -> dict:
     return {
-        "run_id": expected.verifier_run_id,
+        "run_id": expected.foundry_verifier.run_id,
         "signal_key": f"forge-signal:{expected.candidate_digest}",
         "arm": "verify_chain",
         "taskbed": "fresh_taskbed",
@@ -638,8 +667,7 @@ def _forge_verdict(
         signed_receipts=receipts,
         operator_lease={"lease_id": expected.lease_id},
         trusted_receipt_public_keys=(_public_key(receipt_key),),
-        lease_verifier_fn=lambda lease: lease.get("lease_id")
-        == expected.lease_id,
+        lease_verifier_fn=lambda lease: lease.get("lease_id") == expected.lease_id,
         telos_gatekeeper=_AllowTelos(),
         admission_fn=admission,
     )
@@ -654,9 +682,9 @@ def _signed_vibe(
         "candidate_digest": expected.candidate_digest,
         "diff_sha256": expected.diff_sha256,
         "verifier": {
-            "agent_uid": expected.verifier_agent_uid,
-            "run_id": expected.verifier_run_id,
-            "parent_run_id": expected.verifier_parent_run_id,
+            "agent_uid": expected.vibe_verifier.agent_uid,
+            "run_id": expected.vibe_verifier.run_id,
+            "parent_run_id": expected.executor_run_id,
         },
         "ran": True,
         "reported_outcome": "clean",
@@ -691,12 +719,17 @@ def _signed_envelope(
     expected: ExpectedPromotionBindings,
     vibe: dict,
     judge_key: Ed25519PrivateKey,
+    foundry_key: Ed25519PrivateKey,
     receipt_key: Ed25519PrivateKey,
 ) -> dict:
+    foundry_verdict = _forge_verdict(expected, receipt_key)
+    foundry_verdict["schema"] = FOUNDRY_PATCH_VERIFICATION_SCHEMA
+    foundry_verdict["decision"] = "verified_evidence"
+    foundry_verdict["live_apply_allowed"] = False
     forge = sign_promotion_verification(
-        _forge_verdict(expected, receipt_key),
-        judge_key,
-        key_id="forge-judge-test",
+        foundry_verdict,
+        foundry_key,
+        key_id="foundry-verifier-test",
     )
     return sign_promotion_verification(
         {
@@ -715,11 +748,17 @@ def _signed_envelope(
 
 def _unused_authority(expected: ExpectedPromotionBindings) -> PatchPromotionVerifier:
     judge_key = Ed25519PrivateKey.generate()
-    vibe_key = Ed25519PrivateKey.generate()
     return PatchPromotionVerifier(
         trusted_judge_public_keys=(_public_key(judge_key),),
+        trusted_foundry_verifier_public_keys={
+            expected.foundry_verifier.agent_uid: (
+                expected.foundry_verifier.signer_public_key,
+            ),
+        },
         trusted_vibe_verifier_public_keys={
-            expected.verifier_agent_uid: (_public_key(vibe_key),),
+            expected.vibe_verifier.agent_uid: (
+                expected.vibe_verifier.signer_public_key,
+            ),
         },
     )
 
@@ -752,12 +791,18 @@ async def test_projection_never_calls_mission_lifecycle(tmp_path: Path) -> None:
     assert observation.proves_executor_liveness is False
     assert before == after
     assert after is not None and "a2a_projection" not in after.metadata
-    assert await ctx.runtime.list_delegation_runs(
-        session_id=f"mission:{ctx.mission_id}",
-    ) == []
-    assert await ctx.runtime.list_task_claims(
-        session_id=f"mission:{ctx.mission_id}",
-    ) == []
+    assert (
+        await ctx.runtime.list_delegation_runs(
+            session_id=f"mission:{ctx.mission_id}",
+        )
+        == []
+    )
+    assert (
+        await ctx.runtime.list_task_claims(
+            session_id=f"mission:{ctx.mission_id}",
+        )
+        == []
+    )
     snapshot = await ctx.control.get_snapshot(ctx.mission_id)
     assert snapshot is not None
     assert snapshot.reconciliation is ReconciliationState.COHERENT
@@ -1077,7 +1122,7 @@ async def test_foreign_parent_same_basename_receipt_fails_closed(
 @pytest.mark.asyncio
 async def test_pure_warrant_writes_no_gate_receipt(tmp_path: Path) -> None:
     ctx = await _context(tmp_path, proposal=True)
-    await _record_verifier(ctx)
+    await _record_verifiers(ctx)
     observation = await ctx.projection.observe(
         ctx.mission_id,
         ctx.task_id,
@@ -1085,18 +1130,21 @@ async def test_pure_warrant_writes_no_gate_receipt(tmp_path: Path) -> None:
     )
     judge_key = Ed25519PrivateKey.generate()
     receipt_key = Ed25519PrivateKey.generate()
-    vibe_key = Ed25519PrivateKey.generate()
-    vibe = _signed_vibe(ctx.expected, vibe_key)
+    vibe = _signed_vibe(ctx.expected, ctx.vibe_key)
     envelope = _signed_envelope(
         ctx.expected,
         vibe,
         judge_key,
+        ctx.foundry_key,
         receipt_key,
     )
     authority = PatchPromotionVerifier(
         trusted_judge_public_keys=(_public_key(judge_key),),
+        trusted_foundry_verifier_public_keys={
+            ctx.expected.foundry_verifier.agent_uid: (_public_key(ctx.foundry_key),),
+        },
         trusted_vibe_verifier_public_keys={
-            ctx.expected.verifier_agent_uid: (_public_key(vibe_key),),
+            ctx.expected.vibe_verifier.agent_uid: (_public_key(ctx.vibe_key),),
         },
     )
     result = await A2APatchPromotionEvaluator(
@@ -1110,15 +1158,33 @@ async def test_pure_warrant_writes_no_gate_receipt(tmp_path: Path) -> None:
     )
     assert isinstance(result, PatchPromotionWarrant)
     assert result
-    assert result.to_dict()["capability_scope"] == "projection_only_gate"
-    assert result.to_dict()["repository_effect_authorized"] is False
-    assert await ctx.runtime.list_runtime_receipts(
-        receipt_type="self_mod_gate",
-    ) == []
+    warrant = result.to_dict()
+    assert warrant["capability_scope"] == "projection_only_gate"
+    assert warrant["repository_effect_authorized"] is False
+    assert warrant["verification_separation"] == {
+        "level": "distinct_signing_principals",
+        "independent_processes_proven": False,
+    }
+    assert (
+        len(
+            {
+                warrant["foundry_verifier"]["signer_public_key"],
+                warrant["vibe_verifier"]["signer_public_key"],
+                _public_key(judge_key),
+            }
+        )
+        == 3
+    )
+    assert (
+        await ctx.runtime.list_runtime_receipts(
+            receipt_type="self_mod_gate",
+        )
+        == []
+    )
 
 
 @pytest.mark.asyncio
-async def test_missing_durable_verifier_identity_refuses_warrant(
+async def test_missing_durable_foundry_identity_refuses_warrant(
     tmp_path: Path,
 ) -> None:
     ctx = await _context(tmp_path, proposal=True)
@@ -1137,16 +1203,91 @@ async def test_missing_durable_verifier_identity_refuses_warrant(
         vibe_halt_receipt=None,
     )
     assert isinstance(result, PromotionRefusal)
-    assert result.blockers == ("missing_exact_durable_verifier_identity",)
-    assert await ctx.runtime.list_runtime_receipts(
-        receipt_type="self_mod_gate",
-    ) == []
+    assert result.blockers == ("missing_exact_durable_foundry_identity",)
+    assert (
+        await ctx.runtime.list_runtime_receipts(
+            receipt_type="self_mod_gate",
+        )
+        == []
+    )
+
+
+@pytest.mark.asyncio
+async def test_missing_durable_vibe_identity_refuses_warrant(
+    tmp_path: Path,
+) -> None:
+    ctx = await _context(tmp_path, proposal=True)
+    await _record_verifier(ctx, ctx.expected.foundry_verifier)
+    observation = await ctx.projection.observe(
+        ctx.mission_id,
+        ctx.task_id,
+        expected=ctx.expected,
+    )
+    result = await A2APatchPromotionEvaluator(
+        ctx.projection,
+        verifier=_unused_authority(ctx.expected),
+    ).issue_warrant(
+        observation,
+        expected=ctx.expected,
+        signed_patch_verification=None,
+        vibe_halt_receipt=None,
+    )
+    assert isinstance(result, PromotionRefusal)
+    assert result.blockers == ("missing_exact_durable_vibe_identity",)
+    assert (
+        await ctx.runtime.list_runtime_receipts(
+            receipt_type="self_mod_gate",
+        )
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("role", "blocker"),
+    (
+        ("foundry_verifier", "invalid_durable_foundry_identity"),
+        ("vibe_verifier", "invalid_durable_vibe_identity"),
+    ),
+)
+@pytest.mark.asyncio
+async def test_malformed_durable_verifier_identity_refuses_without_raising(
+    tmp_path: Path,
+    role: str,
+    blocker: str,
+) -> None:
+    ctx = await _context(tmp_path, proposal=True)
+    await _record_verifiers(ctx)
+    principal = getattr(ctx.expected, role)
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        db.execute(
+            "UPDATE execution_identities SET metadata_json = '{' WHERE run_id = ?",
+            (principal.run_id,),
+        )
+        db.commit()
+    observation = await ctx.projection.observe(
+        ctx.mission_id,
+        ctx.task_id,
+        expected=ctx.expected,
+    )
+
+    result = await A2APatchPromotionEvaluator(
+        ctx.projection,
+        verifier=_unused_authority(ctx.expected),
+    ).issue_warrant(
+        observation,
+        expected=ctx.expected,
+        signed_patch_verification=None,
+        vibe_halt_receipt=None,
+    )
+
+    assert isinstance(result, PromotionRefusal)
+    assert result.blockers == (blocker,)
 
 
 @pytest.mark.asyncio
 async def test_conflicting_warrant_replay_fails_closed(tmp_path: Path) -> None:
     ctx = await _context(tmp_path, proposal=True)
-    await _record_verifier(ctx)
+    await _record_verifiers(ctx)
     observed = await ctx.projection.observe(
         ctx.mission_id,
         ctx.task_id,
@@ -1176,9 +1317,12 @@ async def test_conflicting_warrant_replay_fails_closed(tmp_path: Path) -> None:
     )
     assert isinstance(result, PromotionRefusal)
     assert result.blockers == ("a2a_observation_revalidation_failed",)
-    assert await ctx.runtime.list_runtime_receipts(
-        receipt_type="self_mod_gate",
-    ) == []
+    assert (
+        await ctx.runtime.list_runtime_receipts(
+            receipt_type="self_mod_gate",
+        )
+        == []
+    )
 
 
 @pytest.mark.asyncio

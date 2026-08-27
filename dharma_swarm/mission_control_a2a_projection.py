@@ -85,8 +85,7 @@ class MissionControlA2AProjection:
         )
         with _read_only_db(self._runtime_db, "RuntimeState") as connection:
             rows = connection.execute(
-                f"SELECT {columns} FROM execution_identities "
-                "WHERE run_id = ? LIMIT 2",
+                f"SELECT {columns} FROM execution_identities WHERE run_id = ? LIMIT 2",
                 (run_id,),
             ).fetchall()
         if not rows:
@@ -186,7 +185,9 @@ class MissionControlA2AProjection:
         if task is None:
             raise MissionControlError(f"task {task_id!r} was not found")
         if task.status != TaskStatus.PENDING:
-            raise MissionControlError("A2A projection requires a PENDING TaskBoard task")
+            raise MissionControlError(
+                "A2A projection requires a PENDING TaskBoard task"
+            )
         ref = _require_binding(task, mission_id)
         delivery_path = safe_file(
             self._inbox_root,
@@ -201,11 +202,17 @@ class MissionControlA2AProjection:
         ):
             raise MissionControlError("delivery record has the wrong schema")
         content = envelope.get("content")
-        content_sha = hashlib.sha256(content.encode()).hexdigest() if isinstance(content, str) else ""
+        content_sha = (
+            hashlib.sha256(content.encode()).hexdigest()
+            if isinstance(content, str)
+            else ""
+        )
         expected_subject = a2a_inbox_subject(ref.agent_uid)
         expected_ack_subject = f"{expected_subject}.ack.{ref.packet_id}"
         expected_reply_subject = f"{expected_subject}.reply.{ref.packet_id}"
-        envelope_sha = hashlib.sha256(json.dumps(envelope, sort_keys=True).encode()).hexdigest()
+        envelope_sha = hashlib.sha256(
+            json.dumps(envelope, sort_keys=True).encode()
+        ).hexdigest()
         if (
             delivery.get("agent_uid") != ref.agent_uid
             or delivery.get("bridge_kind") != "filesystem_delivery_handler"
@@ -223,7 +230,9 @@ class MissionControlA2AProjection:
             or delivery.get("envelope_sha256") != envelope_sha
             or _delivery_id(delivery_path, delivery, envelope) != ref.delivery_id
         ):
-            raise MissionControlError("delivery content does not match the task A2A binding")
+            raise MissionControlError(
+                "delivery content does not match the task A2A binding"
+            )
         if not str(envelope.get("reply_subject") or ""):
             raise MissionControlError("delivery envelope has no reply subject")
         job = self._job(ref)
@@ -247,23 +256,47 @@ class MissionControlA2AProjection:
         if len(proposals) > _SCAN_LIMIT:
             raise MissionControlError("self-mod proposal evidence scan saturated")
         proposals = [
-            item for item in proposals if item.payload.get("proposal_id") == ref.proposal_id
+            item
+            for item in proposals
+            if item.payload.get("proposal_id") == ref.proposal_id
         ]
         proposal_id = proposal_sha = candidate_digest = diff_sha256 = ""
         base_sha = executor_run_id = ""
         authorized_source_files: tuple[str, ...] = ()
         if proposals:
-            if len(proposals) != 1 or phase != A2AEvidencePhase.EXECUTED or expected is None:
-                raise MissionControlError("conflicting or premature patch-candidate evidence")
+            if (
+                len(proposals) != 1
+                or phase != A2AEvidencePhase.EXECUTED
+                or expected is None
+            ):
+                raise MissionControlError(
+                    "conflicting or premature patch-candidate evidence"
+                )
             proposal = proposals[0]
             executor = self._execution_identity(expected.executor_run_id)
-            if executor is None or not _identity_matches_expected(executor, expected, verifier=False):
-                raise MissionControlError("patch candidate has no exact durable executor identity")
+            if executor is None or not _identity_matches_expected(
+                executor,
+                expected,
+                role="executor",
+            ):
+                raise MissionControlError(
+                    "patch candidate has no exact durable executor identity"
+                )
             payload = proposal.payload
             required_payload = {
-                "schema_version", "mission_id", "task_id", "attempt_id", "lease_id",
-                "packet_id", "correlation_id", "delivery_id", "proposal_id",
-                "candidate_digest", "diff_sha256", "base_sha", "artifact_sha256",
+                "schema_version",
+                "mission_id",
+                "task_id",
+                "attempt_id",
+                "lease_id",
+                "packet_id",
+                "correlation_id",
+                "delivery_id",
+                "proposal_id",
+                "candidate_digest",
+                "diff_sha256",
+                "base_sha",
+                "artifact_sha256",
                 "authorized_source_files",
             }
             receipt_identity = (
@@ -289,7 +322,8 @@ class MissionControlA2AProjection:
                 and payload.get("diff_sha256") == expected.diff_sha256
                 and payload.get("base_sha") == expected.base_sha
                 and payload.get("artifact_sha256") == artifact_sha
-                and payload.get("authorized_source_files") == list(expected.authorized_source_files)
+                and payload.get("authorized_source_files")
+                == list(expected.authorized_source_files)
             )
             if (
                 set(payload) != required_payload

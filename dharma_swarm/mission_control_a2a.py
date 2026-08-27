@@ -9,7 +9,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Literal, Mapping
 
 from dharma_swarm.mission_control_contract import (
     SCHEMA_VERSION as MISSION_CONTROL_SCHEMA,
@@ -106,7 +106,10 @@ class A2AExecutionObservation:
 
 def _canonical_digest(value: Mapping[str, Any]) -> str:
     encoded = json.dumps(
-        dict(value), ensure_ascii=True, sort_keys=True, separators=(",", ":"),
+        dict(value),
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
     )
     return hashlib.sha256(encoded.encode()).hexdigest()
 
@@ -133,9 +136,19 @@ def _delivery_id(
 
 def _receipt_digest(receipt: RuntimeReceipt) -> str:
     names = (
-        "receipt_id", "receipt_type", "status", "run_id", "task_id", "trace_id",
-        "correlation_id", "causation_id", "parent_run_id", "agent_id",
-        "idempotency_key", "side_effect_key", "payload",
+        "receipt_id",
+        "receipt_type",
+        "status",
+        "run_id",
+        "task_id",
+        "trace_id",
+        "correlation_id",
+        "causation_id",
+        "parent_run_id",
+        "agent_id",
+        "idempotency_key",
+        "side_effect_key",
+        "payload",
     )
     return _canonical_digest({name: getattr(receipt, name) for name in names})
 
@@ -149,7 +162,10 @@ def _require_binding(task: Task, mission_id: str) -> A2ANativeExecutionRef:
             f"task {task.id!r} is not owned by mission {mission_id!r}",
         )
     binding = task.metadata.get("a2a_binding")
-    if not isinstance(binding, dict) or binding.get("schema_version") != A2A_BINDING_SCHEMA:
+    if (
+        not isinstance(binding, dict)
+        or binding.get("schema_version") != A2A_BINDING_SCHEMA
+    ):
         raise MissionControlError("task is missing the typed A2A binding")
     agent = str(binding.get("agent_uid") or "")
     packet = str(binding.get("packet_id") or "")
@@ -190,11 +206,17 @@ def _require_expected_ref(
         expected.proposal_id,
         expected.executor_agent_uid,
         expected.executor_run_id,
-        expected.verifier_agent_uid,
-        expected.verifier_run_id,
-        expected.verifier_parent_run_id,
+        expected.foundry_verifier.agent_uid,
+        expected.foundry_verifier.run_id,
+        expected.vibe_verifier.agent_uid,
+        expected.vibe_verifier.run_id,
     )
-    bare_digests = (expected.diff_sha256, expected.artifact_sha256)
+    bare_digests = (
+        expected.diff_sha256,
+        expected.artifact_sha256,
+        expected.foundry_verifier.signer_public_key,
+        expected.vibe_verifier.signer_public_key,
+    )
     foundry_digests = (
         expected.candidate_digest,
         expected.lineage_digest,
@@ -223,17 +245,23 @@ def _require_expected_ref(
             for path in expected.authorized_source_files
         )
     ):
-        raise MissionControlError("promotion bindings do not match observed A2A execution")
+        raise MissionControlError(
+            "promotion bindings do not match observed A2A execution"
+        )
 
 
 def _identity_matches_expected(
     identity: ExecutionIdentity,
     expected: ExpectedPromotionBindings,
     *,
-    verifier: bool,
+    role: Literal["executor", "foundry", "vibe_halt"],
 ) -> bool:
-    expected_agent = expected.verifier_agent_uid if verifier else expected.executor_agent_uid
-    expected_run = expected.verifier_run_id if verifier else expected.executor_run_id
+    principal = {
+        "foundry": expected.foundry_verifier,
+        "vibe_halt": expected.vibe_verifier,
+    }.get(role)
+    expected_agent = principal.agent_uid if principal else expected.executor_agent_uid
+    expected_run = principal.run_id if principal else expected.executor_run_id
     return (
         identity.task_id == expected.task_id
         and identity.correlation_id == expected.correlation_id
@@ -241,7 +269,7 @@ def _identity_matches_expected(
         and identity.proposal_id == expected.proposal_id
         and identity.agent_id == expected_agent
         and identity.run_id == expected_run
-        and (identity.parent_run_id == expected.verifier_parent_run_id if verifier else True)
+        and (identity.parent_run_id == expected.executor_run_id if principal else True)
         and bool(identity.trace_id)
         and bool(identity.claim_id)
         and bool(identity.idempotency_key)
@@ -287,6 +315,7 @@ def __getattr__(name: str) -> Any:
     value = getattr(importlib.import_module(module_name), attribute)
     globals()[name] = value
     return value
+
 
 __all__ = [
     "A2A_BINDING_SCHEMA",

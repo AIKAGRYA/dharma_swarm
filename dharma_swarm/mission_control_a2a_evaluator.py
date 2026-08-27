@@ -64,14 +64,26 @@ class A2APatchPromotionEvaluator:
             or not _SHA256.fullmatch(current.proposal_receipt_sha256)
         ):
             return PromotionRefusal(("a2a_candidate_observation_mismatch",))
-        durable_verifier = self._projection._execution_identity(  # noqa: SLF001
-            expected.verifier_run_id,
-        )
-        if (
-            durable_verifier is None
-            or not _identity_matches_expected(durable_verifier, expected, verifier=True)
+        try:
+            durable_foundry = self._projection._execution_identity(  # noqa: SLF001
+                expected.foundry_verifier.run_id,
+            )
+        except MissionControlError:
+            return PromotionRefusal(("invalid_durable_foundry_identity",))
+        if durable_foundry is None or not _identity_matches_expected(
+            durable_foundry, expected, role="foundry"
         ):
-            return PromotionRefusal(("missing_exact_durable_verifier_identity",))
+            return PromotionRefusal(("missing_exact_durable_foundry_identity",))
+        try:
+            durable_vibe = self._projection._execution_identity(  # noqa: SLF001
+                expected.vibe_verifier.run_id,
+            )
+        except MissionControlError:
+            return PromotionRefusal(("invalid_durable_vibe_identity",))
+        if durable_vibe is None or not _identity_matches_expected(
+            durable_vibe, expected, role="vibe_halt"
+        ):
+            return PromotionRefusal(("missing_exact_durable_vibe_identity",))
         result = self._verifier.evaluate(
             signed_patch_verification,
             expected=expected,

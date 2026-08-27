@@ -11,6 +11,7 @@
     "dharma_swarm/runtime_release_entrypoint.py",
     "dharma_swarm/runtime_state.py",
     "reports/agentops/work_packets/fleet-advancement-WP-GOVERNED-PATCH-REFLEX-V1-20260828.json",
+    "reports/governance/dharmagraph_parity/seam_ledger.json",
     "scripts/runtime/dharma_swarm_release_runner.sh",
     "scripts/runtime/model_critic_runner.py",
     "tests/test_model_critic_runner.py",
@@ -29,7 +30,7 @@
   "branch": "codex/governed-patch-reflex-v1-20260827",
   "commit": {
     "allowed": true,
-    "message": "feat(runtime): admit immutable semantic responder"
+    "message": "feat(control): bind distinct verifier principals"
   },
   "forbidden_files": [
     "dharma_swarm/foundry/**",
@@ -53,7 +54,7 @@
   ],
   "gates": [
     {
-      "command": "python3 -m pytest -q tests/test_mission_control_a2a.py tests/test_mission_control_verification.py tests/test_mission_control.py tests/test_mission_control_execution.py tests/test_mission_control_mcp.py tests/test_vibe_halt_observer.py tests/test_forge_v2_promotion_door.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_model_critic_runner.py tests/test_runtime_state_self_mod_exact.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_store_inventory_census.py",
+      "command": "python3 -m pytest -q tests/test_mission_control_a2a.py tests/test_mission_control_verification.py tests/test_mission_control.py tests/test_mission_control_execution.py tests/test_mission_control_mcp.py tests/test_vibe_halt_observer.py tests/test_forge_v2_promotion_door.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_model_critic_runner.py tests/test_runtime_state_self_mod_exact.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_store_inventory_census.py tests/test_graph_seam_ledger.py",
       "expected_exit": 0,
       "name": "governed-reflex-range-contracts",
       "timeout_seconds": 300
@@ -78,10 +79,10 @@
     }
   ],
   "id": "fleet-advancement-WP-GOVERNED-PATCH-REFLEX-V1-20260828",
-  "intent": "Bind the complete governed patch-reflex PR range to one challengeable Session Entry envelope at the original fd091613 collision floor. The range implements five bounded slices: P0 adds a read-only A2A-to-Mission-Control evidence projection and typed promotion-candidate boundary; P0B splits that implementation below the quality-ratchet threshold without widening authority; P1 adds one atomic, collision-safe, exact-replay RuntimeState writer for self_mod_gate and self_mod_promote attestations; P0C renames the temporary SQLite snapshot so it preserves WAL/query-only behavior without masquerading as a durable store in the lexical census; and the immutable execution cell adds exact closed responder dispatch plus schema-bound local Ollama output. The Codex transport bridge has separately completed a clean-release cold cutover, and a worktree-only local Ollama probe returned schema-valid model-authored output; neither observation is a deployed semantic-responder or A2A proof. The range does not claim semantic-responder host cutover, an admitted end-to-end provider success, an independently admissible Vibe verdict, an authorized or applied repository effect, terminal Mission Control reconciliation, or clean-restart end-to-end completion.",
+  "intent": "Bind the complete governed patch-reflex PR range to one challengeable Session Entry envelope at the original fd091613 collision floor. The range implements bounded slices: P0 adds a read-only A2A-to-Mission-Control evidence projection and typed promotion-candidate boundary; P0B splits that implementation below the quality-ratchet threshold without widening authority; P1 adds one atomic, collision-safe, exact-replay RuntimeState writer for self_mod_gate and self_mod_promote attestations; P0C renames the temporary SQLite snapshot so it preserves WAL/query-only behavior without masquerading as a durable store in the lexical census; the immutable execution cell adds exact closed responder dispatch plus schema-bound local Ollama output; and the v2 verifier membrane requires separate outer Judge, Foundry, and Vibe signing principals plus distinct durable Foundry and Vibe identities. Foundry input is now an evidence-only schema with live_apply_allowed=false, never a retyped Forge live-effect capability. The exact writer reuses the RuntimeState async connection seam, returning the graph bypass ratchet to 230, and the committed seam ledger is regenerated at that unchanged baseline. The Codex transport bridge has separately completed a clean-release cold cutover, and a worktree-only local Ollama probe returned schema-valid model-authored output; neither observation is a deployed semantic-responder or A2A proof. The range does not claim semantic-responder host cutover, an admitted end-to-end provider success, separate OS-process or key-custody proof, an independently admissible live Vibe verdict, an authorized or applied repository effect, terminal Mission Control reconciliation, or clean-restart end-to-end completion.",
   "negative_controls": [
     {
-      "command": "python3 -m pytest -q tests/test_mission_control_a2a.py tests/test_mission_control_verification.py -k \"transport_or_heartbeat_cannot_warrant or current_vibe_calibration_is_inconclusive or self_verifier_is_rejected or mismatched_delivery_fails_closed or conflicting_warrant_replay_fails_closed or projection_never_calls_mission_lifecycle or compatibility_lane_route_never_verifies or missing_durable_verifier_identity_refuses_warrant\"",
+      "command": "python3 -m pytest -q tests/test_mission_control_a2a.py tests/test_mission_control_verification.py -k \"transport_or_heartbeat_cannot_warrant or current_vibe_calibration_is_inconclusive or self_verifier_is_rejected or foundry_and_vibe_principals_must_be_pairwise_distinct or inner_foundry_signer_is_exactly_bound or nested_live_effect_capability_cannot_be_retyped or mismatched_delivery_fails_closed or conflicting_warrant_replay_fails_closed or projection_never_calls_mission_lifecycle or compatibility_lane_route_never_verifies or missing_durable_foundry_identity_refuses_warrant or missing_durable_vibe_identity_refuses_warrant or malformed_durable_verifier_identity_refuses_without_raising\"",
       "expected_exit": 0,
       "name": "weak-or-mismatched-evidence-never-promotes",
       "timeout_seconds": 240
@@ -129,6 +130,7 @@
     "honest_blockers": [
       "The Codex transport bridge was cut over to a fresh clean accepted fd091613ce16e63a367392cc1200d4fa4b4cdbf6 release and cold-restarted as PID 49493 with a fresh IDLE heartbeat and passing provenance admission. This proves transport-bridge custody only; the semantic responder remains unloaded because its new closed command is unmerged.",
       "A live worktree probe of model_critic_runner against local Ollama mistral:latest produced a schema-valid model-authored semantic receipt with a runner-owned semr_ identifier in about four seconds. It was not an admitted deployed responder or A2A run and grants no promotion or repository-effect authority.",
+      "The v2 verifier membrane proves distinct logical agent/run identities and exact Judge, Foundry, and Vibe signing keys. It explicitly reports independent_processes_proven=false; caller-supplied ExecutionIdentity rows, constructor-supplied trust roots, process provenance, and private-key custody remain outside this proof until a composition-owned producer/effect path pins them.",
       "No deployed semantic producer currently emits the exact candidate-bound A2A patch-verification envelope from a canonical Foundry verdict and an independently produced Vibe receipt.",
       "The observed Vibe path remains calibration-only and diff_bound=false, and vh is not installed as a production trust root; that evidence is inconclusive and cannot authorize promotion.",
       "The exact RuntimeState gate/promote receipts are attestations, not bearer capabilities. No separately sealed authority or key-custody membrane yet authorizes a repository effect.",
@@ -140,13 +142,14 @@
       "A2A owns packet processing and delivery leases while Mission Control is projection-only; the projection must not fabricate or mutate the native attempt lifecycle.",
       "TaskStatus has no verifying member, so verifying and externally_promoted remain derived evidence phases rather than new TaskBoard lifecycle states.",
       "Foundry evaluation, independent Vibe observation, signed candidate evidence, RuntimeState attestation, repository-effect authority, terminal receipt, and TaskBoard projection are distinct authority layers; no earlier layer may be silently promoted into a later one.",
+      "Cryptographic role separation is weaker than hostile-process independence: agent/run labels and public keys become authoritative only under composition-owned trust roots, durable identity admission, supervised process provenance, and exclusive private-key custody.",
       "RuntimeReceipt records evidence but does not carry nominal effect authority; an effect evaluator must require a separate sealed capability and exact candidate binding.",
       "Mission Control terminal reconciliation currently requires canonical mission_attempt_terminal evidence joined to its owner run and claim; direct A2A completion would create conflicting terminal evidence.",
       "The isolated SQLite evidence snapshot is transient but the repository store inventory is lexical, so its filename must avoid a durable-store suffix while retaining SQLite WAL semantics."
     ],
     "owner": "@dhyana",
-    "packet_digest": "90b876cac07d3dec1fdabecd5d1b8b976838c6939a2e5c5ef4d2e8fc8259a505",
-    "rollback": "Revert the governed patch-reflex commits after fd091613ce16e63a367392cc1200d4fa4b4cdbf6 and this packet together as one reviewed unit. This removes the read-only evidence membrane, module split, exact gate/promote writer, and snapshot-name repair; it does not delete or reinterpret any runtime evidence outside Git.",
+    "packet_digest": "99767fbf53cf35f2832bdea2d7e92062ba1e50ab7acbebed29f641a9d9cb424d",
+    "rollback": "Revert the governed patch-reflex commits after fd091613ce16e63a367392cc1200d4fa4b4cdbf6, the regenerated seam ledger, and this packet together as one reviewed unit. This removes the read-only evidence membrane, split-principal v2 contract, module split, exact gate/promote writer, connection-seam repair, and snapshot-name repair; it does not delete or reinterpret any runtime evidence outside Git.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
       "git": "2.50.1",

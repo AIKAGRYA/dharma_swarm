@@ -1342,6 +1342,10 @@ class RuntimeStateStore:
         self.db_path = Path(db_path or DEFAULT_RUNTIME_DB)
         self.include_memory_plane = include_memory_plane
 
+    def _connect_async(self) -> aiosqlite.Connection:
+        """Return the shared async SQLite connection seam for atomic writers."""
+        return aiosqlite.connect(self.db_path)
+
     def init_db_sync(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.db_path) as db:
@@ -1352,7 +1356,7 @@ class RuntimeStateStore:
 
     async def init_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect_async() as db:
             await ensure_runtime_state_schema_async(
                 db,
                 include_memory_plane=self.include_memory_plane,
@@ -3184,7 +3188,7 @@ class RuntimeStateStore:
         # Validation above deliberately completes before schema initialization:
         # malformed inputs cannot create or alter a database.
         await self.init_db()
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect_async() as db:
             await _apply_connection_pragmas_async(db)
             db.row_factory = aiosqlite.Row
             await db.execute("BEGIN IMMEDIATE")

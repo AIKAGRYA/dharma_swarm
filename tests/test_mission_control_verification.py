@@ -30,6 +30,7 @@ from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
 )
 from dharma_swarm.mission_control_verification import (
     CURRENT_VIBE_SCHEMA,
+    FOUNDRY_PATCH_VERIFICATION_SCHEMA,
     PATCH_VERIFICATION_SCHEMA,
     PATCH_VIBE_SCHEMA,
     ExpectedPromotionBindings,
@@ -37,6 +38,7 @@ from dharma_swarm.mission_control_verification import (
     PatchPromotionVerifier,
     PatchPromotionWarrant,
     PromotionRefusal,
+    VerifierPrincipalBinding,
     VerifiedVibeHalt,
     evaluate_vibe_halt,
     expected_vibe_halt_binding,
@@ -57,7 +59,9 @@ _VERIFICATION_HELPER_ORDERS = (
 
 
 @pytest.mark.parametrize("modules", _VERIFICATION_HELPER_ORDERS)
-def test_verification_helpers_cold_import_in_any_order(modules: tuple[str, ...]) -> None:
+def test_verification_helpers_cold_import_in_any_order(
+    modules: tuple[str, ...],
+) -> None:
     code = ";".join(f"import {module}" for module in modules)
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -75,10 +79,14 @@ def _sha(label: str) -> str:
 
 
 def _public_key(key: Ed25519PrivateKey) -> str:
-    return key.public_key().public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    ).hex()
+    return (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        .hex()
+    )
 
 
 def _foundry_evidence() -> dict[str, str]:
@@ -106,7 +114,10 @@ def _foundry_evidence() -> dict[str, str]:
 
 
 @pytest.fixture
-def expected() -> ExpectedPromotionBindings:
+def expected(
+    receipt_key: Ed25519PrivateKey,
+    vibe_key: Ed25519PrivateKey,
+) -> ExpectedPromotionBindings:
     foundry = _foundry_evidence()
     return ExpectedPromotionBindings(
         mission_id="mission-reflex-1",
@@ -128,9 +139,18 @@ def expected() -> ExpectedPromotionBindings:
         authorized_source_files=("dharma_swarm/dgm_loop.py",),
         executor_agent_uid="codex_composer",
         executor_run_id="executor-run-1",
-        verifier_agent_uid="forge_independent_verifier",
-        verifier_run_id="verifier-run-1",
-        verifier_parent_run_id="executor-run-1",
+        foundry_verifier=VerifierPrincipalBinding(
+            role="foundry",
+            agent_uid="foundry_independent_verifier",
+            run_id="foundry-verifier-run-1",
+            signer_public_key=_public_key(receipt_key),
+        ),
+        vibe_verifier=VerifierPrincipalBinding(
+            role="vibe_halt",
+            agent_uid="vibe_halt_independent_verifier",
+            run_id="vibe-verifier-run-1",
+            signer_public_key=_public_key(vibe_key),
+        ),
     )
 
 
@@ -151,23 +171,41 @@ def vibe_key() -> Ed25519PrivateKey:
 
 def _signal(expected: ExpectedPromotionBindings) -> dict:
     return {
-        "run_id": expected.verifier_run_id,
+        "run_id": expected.foundry_verifier.run_id,
         "signal_key": f"forge-signal:{expected.candidate_digest}",
         "arm": "verify_chain",
         "taskbed": "fresh_taskbed",
         "mission_class": "verifier_role",
         "epoch_id": "epoch-test-1",
-        "overall_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.10, "p_le_0": 0.01},
+        "overall_ci": {
+            "n": 500,
+            "mean": 0.06,
+            "lower": 0.02,
+            "upper": 0.10,
+            "p_le_0": 0.01,
+        },
         "explore_ci": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
-        "confirm_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.10, "p_le_0": 0.01},
+        "confirm_ci": {
+            "n": 500,
+            "mean": 0.06,
+            "lower": 0.02,
+            "upper": 0.10,
+            "p_le_0": 0.01,
+        },
         "fdr_positive_significant": True,
         "contamination_state": "fresh_heldout",
         "sealed_provenance": {"contamination_state": "fresh_heldout"},
         "class_null": "self_moa",
         "null_survived": False,
         "evidence_strength": 0.9,
-        "packet_guard_review": {"deterministic_review": {"verdict": "pass_for_next_scale", "findings": []}},
-        "e4_discrimination_receipt": {"decision": "pass", "promotion_gate_satisfied": True, "blockers": []},
+        "packet_guard_review": {
+            "deterministic_review": {"verdict": "pass_for_next_scale", "findings": []}
+        },
+        "e4_discrimination_receipt": {
+            "decision": "pass",
+            "promotion_gate_satisfied": True,
+            "blockers": [],
+        },
         "promotion_blockers": [],
         "report_positive_promotion_allowed": False,
         "source_files": list(expected.authorized_source_files),
@@ -238,9 +276,9 @@ def _sign_vibe(
         "candidate_digest": expected.candidate_digest,
         "diff_sha256": expected.diff_sha256,
         "verifier": {
-            "agent_uid": expected.verifier_agent_uid,
-            "run_id": expected.verifier_run_id,
-            "parent_run_id": expected.verifier_parent_run_id,
+            "agent_uid": expected.vibe_verifier.agent_uid,
+            "run_id": expected.vibe_verifier.run_id,
+            "parent_run_id": expected.executor_run_id,
         },
         "ran": True,
         "reported_outcome": outcome,
@@ -252,7 +290,9 @@ def _sign_vibe(
         "process": {"exit_code": 0, "timed_out": False, "output_limited": False},
     }
     body["payload_sha256"] = canonical_sha256(body)
-    message = json.dumps(body, sort_keys=True, separators=(",", ":"), default=str).encode()
+    message = json.dumps(
+        body, sort_keys=True, separators=(",", ":"), default=str
+    ).encode()
     body["signature"] = {
         "scheme": "ed25519",
         "key_id": "vibe-verifier-test",
@@ -263,8 +303,14 @@ def _sign_vibe(
 
 
 def _envelope(expected, vibe, judge_key, receipt_key) -> dict:
+    foundry_verdict = _canonical_forge_verdict(expected, receipt_key)
+    foundry_verdict["schema"] = FOUNDRY_PATCH_VERIFICATION_SCHEMA
+    foundry_verdict["decision"] = "verified_evidence"
+    foundry_verdict["live_apply_allowed"] = False
     forge = sign_promotion_verification(
-        _canonical_forge_verdict(expected, receipt_key), judge_key, key_id="forge-judge-test"
+        foundry_verdict,
+        receipt_key,
+        key_id="foundry-verifier-test",
     )
     return sign_promotion_verification(
         {
@@ -278,16 +324,36 @@ def _envelope(expected, vibe, judge_key, receipt_key) -> dict:
     )
 
 
-def _authority(expected, judge_key, vibe_key) -> PatchPromotionVerifier:
+def _authority(
+    expected,
+    judge_key,
+    vibe_key,
+    *,
+    foundry_key: Ed25519PrivateKey | None = None,
+) -> PatchPromotionVerifier:
+    trusted_foundry_key = (
+        _public_key(foundry_key)
+        if foundry_key is not None
+        else expected.foundry_verifier.signer_public_key
+    )
     return PatchPromotionVerifier(
         trusted_judge_public_keys=(_public_key(judge_key),),
-        trusted_vibe_verifier_public_keys={expected.verifier_agent_uid: (_public_key(vibe_key),)},
+        trusted_foundry_verifier_public_keys={
+            expected.foundry_verifier.agent_uid: (trusted_foundry_key,)
+        },
+        trusted_vibe_verifier_public_keys={
+            expected.vibe_verifier.agent_uid: (_public_key(vibe_key),)
+        },
     )
 
 
-def _resign_inner_and_outer(envelope: dict, judge_key: Ed25519PrivateKey) -> dict:
+def _resign_inner_and_outer(
+    envelope: dict,
+    judge_key: Ed25519PrivateKey,
+    foundry_key: Ed25519PrivateKey,
+) -> dict:
     envelope["forge_verification"] = sign_promotion_verification(
-        envelope["forge_verification"], judge_key, key_id="forge-judge-test"
+        envelope["forge_verification"], foundry_key, key_id="foundry-verifier-test"
     )
     return sign_promotion_verification(envelope, judge_key, key_id="patch-judge-test")
 
@@ -296,27 +362,137 @@ def _evaluate(expected, judge_key, receipt_key, vibe_key):
     vibe = _sign_vibe(expected, vibe_key)
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     authority = _authority(expected, judge_key, vibe_key)
-    return authority, vibe, envelope, authority.evaluate(
-        envelope, expected=expected, vibe_halt_receipt=vibe
+    return (
+        authority,
+        vibe,
+        envelope,
+        authority.evaluate(envelope, expected=expected, vibe_halt_receipt=vibe),
     )
 
 
-def test_canonical_producer_core_and_two_signatures_issue_projection_only_warrant(
+def test_canonical_producer_core_and_three_signatures_issue_projection_only_warrant(
     expected, judge_key, receipt_key, vibe_key
 ) -> None:
-    authority, vibe, envelope, result = _evaluate(expected, judge_key, receipt_key, vibe_key)
+    authority, vibe, envelope, result = _evaluate(
+        expected, judge_key, receipt_key, vibe_key
+    )
 
     assert isinstance(result, PatchPromotionWarrant)
     assert bool(result)
     projected = result.to_dict()
     assert projected["capability_scope"] == "projection_only_gate"
     assert projected["repository_effect_authorized"] is False
+    assert projected["verification_separation"] == {
+        "level": "distinct_signing_principals",
+        "independent_processes_proven": False,
+    }
     assert projected["patch_verification_sha256"] == envelope["payload_sha256"]
-    assert projected["forge_verification_sha256"] == envelope["forge_verification"]["payload_sha256"]
-    assert projected["vibe_halt_receipt_sha256"] == expected_vibe_halt_binding(
-        vibe, expected=expected
-    )["receipt_sha256"]
-    assert "trusted_judge_public_keys" not in inspect.signature(authority.evaluate).parameters
+    assert (
+        projected["forge_verification_sha256"]
+        == envelope["forge_verification"]["payload_sha256"]
+    )
+    assert (
+        projected["vibe_halt_receipt_sha256"]
+        == expected_vibe_halt_binding(vibe, expected=expected)["receipt_sha256"]
+    )
+    assert (
+        "trusted_judge_public_keys"
+        not in inspect.signature(authority.evaluate).parameters
+    )
+
+
+def test_v2_signed_binding_names_both_exact_verifier_principals(expected) -> None:
+    binding = expected.to_signed_binding()
+
+    assert binding["schema"] == "dharma.forge.a2a_patch_binding.v2"
+    assert "verifier" not in binding
+    assert binding["foundry_verifier"] == expected.foundry_verifier.to_signed_binding(
+        parent_run_id=expected.executor_run_id,
+    )
+    assert binding["vibe_verifier"] == expected.vibe_verifier.to_signed_binding(
+        parent_run_id=expected.executor_run_id,
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "blocker"),
+    (
+        ("agent_uid", "verifier_agents_not_separated"),
+        ("run_id", "verifier_runs_not_separated"),
+        ("signer_public_key", "verifier_signers_not_separated"),
+    ),
+)
+def test_foundry_and_vibe_principals_must_be_pairwise_distinct(
+    expected, judge_key, receipt_key, vibe_key, field, blocker
+) -> None:
+    aliased = replace(
+        expected,
+        vibe_verifier=replace(
+            expected.vibe_verifier,
+            **{field: getattr(expected.foundry_verifier, field)},
+        ),
+    )
+    signing_key = receipt_key if field == "signer_public_key" else vibe_key
+    vibe = _sign_vibe(aliased, signing_key)
+    envelope = _envelope(aliased, vibe, judge_key, receipt_key)
+    result = _authority(aliased, judge_key, signing_key).evaluate(
+        envelope,
+        expected=aliased,
+        vibe_halt_receipt=vibe,
+    )
+
+    assert isinstance(result, PromotionRefusal)
+    assert blocker in result.blockers
+
+
+def test_verifier_role_labels_cannot_be_cross_wired(
+    expected, judge_key, receipt_key, vibe_key
+) -> None:
+    cross_wired = replace(
+        expected,
+        foundry_verifier=replace(expected.foundry_verifier, role="vibe_halt"),
+    )
+    vibe = _sign_vibe(cross_wired, vibe_key)
+    envelope = _envelope(cross_wired, vibe, judge_key, receipt_key)
+
+    result = _authority(cross_wired, judge_key, vibe_key).evaluate(
+        envelope,
+        expected=cross_wired,
+        vibe_halt_receipt=vibe,
+    )
+
+    assert isinstance(result, PromotionRefusal)
+    assert "invalid_expected:foundry_verifier_role" in result.blockers
+
+
+def test_inner_foundry_signer_is_exactly_bound_even_when_both_keys_are_trusted(
+    expected, judge_key, receipt_key, vibe_key
+) -> None:
+    foreign_foundry_key = Ed25519PrivateKey.generate()
+    vibe = _sign_vibe(expected, vibe_key)
+    envelope = _envelope(expected, vibe, judge_key, receipt_key)
+    envelope = _resign_inner_and_outer(envelope, judge_key, foreign_foundry_key)
+    authority = PatchPromotionVerifier(
+        trusted_judge_public_keys=(_public_key(judge_key),),
+        trusted_foundry_verifier_public_keys={
+            expected.foundry_verifier.agent_uid: (
+                expected.foundry_verifier.signer_public_key,
+                _public_key(foreign_foundry_key),
+            )
+        },
+        trusted_vibe_verifier_public_keys={
+            expected.vibe_verifier.agent_uid: (_public_key(vibe_key),)
+        },
+    )
+
+    result = authority.evaluate(
+        envelope,
+        expected=expected,
+        vibe_halt_receipt=vibe,
+    )
+
+    assert isinstance(result, PromotionRefusal)
+    assert "forge:signer_binding" in result.blockers
 
 
 @pytest.mark.parametrize(
@@ -354,7 +530,9 @@ def test_raw_artifact_digest_type_rejects_foundry_prefix(
     assert f"invalid_expected:{field}_shape" in result.blockers
 
 
-def test_positive_inner_verdict_is_from_canonical_verify_promotion(expected, receipt_key) -> None:
+def test_positive_inner_verdict_is_from_canonical_verify_promotion(
+    expected, receipt_key
+) -> None:
     verdict = _canonical_forge_verdict(expected, receipt_key)
 
     assert verdict["schema"] == "forge_v2.promotion_verification.v1"
@@ -382,8 +560,35 @@ def test_current_unextended_canonical_output_cannot_warrant(
     assert "untrusted_or_invalid_patch_signature" in result.blockers
 
 
-def test_default_canonical_admission_remains_blocked_and_scope_empty(expected, receipt_key) -> None:
-    verdict = _canonical_forge_verdict(expected, receipt_key, controlled_admission=False)
+def test_nested_live_effect_capability_cannot_be_retyped_as_foundry_evidence(
+    expected, judge_key, receipt_key, vibe_key
+) -> None:
+    vibe = _sign_vibe(expected, vibe_key)
+    envelope = _envelope(expected, vibe, judge_key, receipt_key)
+    forge = envelope["forge_verification"]
+    forge["schema"] = "forge_v2.promotion_verification.v1"
+    forge["decision"] = "allow"
+    forge["live_apply_allowed"] = True
+    envelope = _resign_inner_and_outer(envelope, judge_key, receipt_key)
+
+    result = _authority(expected, judge_key, vibe_key).evaluate(
+        envelope,
+        expected=expected,
+        vibe_halt_receipt=vibe,
+    )
+
+    assert isinstance(result, PromotionRefusal)
+    assert "forge:schema" in result.blockers
+    assert "forge:decision" in result.blockers
+    assert "forge:live_apply_allowed" in result.blockers
+
+
+def test_default_canonical_admission_remains_blocked_and_scope_empty(
+    expected, receipt_key
+) -> None:
+    verdict = _canonical_forge_verdict(
+        expected, receipt_key, controlled_admission=False
+    )
 
     assert verdict["decision"] == "refused"
     assert "governed_admission_review" in verdict["blockers"]
@@ -404,7 +609,9 @@ def test_current_vibe_calibration_is_inconclusive(expected) -> None:
     assert result.reason == "not_candidate_bound"
 
 
-def test_public_vibe_classifier_cannot_mint_with_fabricated_coverage(expected, vibe_key) -> None:
+def test_public_vibe_classifier_cannot_mint_with_fabricated_coverage(
+    expected, vibe_key
+) -> None:
     vibe = _sign_vibe(expected, vibe_key)
     result = evaluate_vibe_halt(
         vibe,
@@ -425,15 +632,48 @@ def test_transport_or_heartbeat_cannot_warrant(expected, judge_key, vibe_key) ->
     assert not result
 
 
-def test_vibe_key_must_be_distinct_from_every_judge_key(expected, judge_key, receipt_key) -> None:
-    vibe = _sign_vibe(expected, judge_key)
-    envelope = _envelope(expected, vibe, judge_key, receipt_key)
-    result = _authority(expected, judge_key, judge_key).evaluate(
-        envelope, expected=expected, vibe_halt_receipt=vibe
+def test_vibe_key_must_be_distinct_from_every_judge_key(
+    expected, judge_key, receipt_key
+) -> None:
+    aliased = replace(
+        expected,
+        vibe_verifier=replace(
+            expected.vibe_verifier,
+            signer_public_key=_public_key(judge_key),
+        ),
+    )
+    vibe = _sign_vibe(aliased, judge_key)
+    envelope = _envelope(aliased, vibe, judge_key, receipt_key)
+    result = _authority(aliased, judge_key, judge_key).evaluate(
+        envelope, expected=aliased, vibe_halt_receipt=vibe
     )
 
     assert isinstance(result, PromotionRefusal)
     assert "vibe_halt:verifier_key_not_independent" in result.blockers
+
+
+def test_foundry_key_must_be_distinct_from_every_judge_key(
+    expected, judge_key, receipt_key, vibe_key
+) -> None:
+    aliased = replace(
+        expected,
+        foundry_verifier=replace(
+            expected.foundry_verifier,
+            signer_public_key=_public_key(judge_key),
+        ),
+    )
+    vibe = _sign_vibe(aliased, vibe_key)
+    envelope = _envelope(aliased, vibe, judge_key, receipt_key)
+    envelope = _resign_inner_and_outer(envelope, judge_key, judge_key)
+    result = _authority(
+        aliased,
+        judge_key,
+        vibe_key,
+        foundry_key=judge_key,
+    ).evaluate(envelope, expected=aliased, vibe_halt_receipt=vibe)
+
+    assert isinstance(result, PromotionRefusal)
+    assert "foundry_verifier_signer_not_independent_from_judge" in result.blockers
 
 
 def test_vibe_key_is_bound_to_expected_verifier_identity(
@@ -449,13 +689,23 @@ def test_vibe_key_is_bound_to_expected_verifier_identity(
     assert "vibe_halt:untrusted_verifier_signature" in result.blockers
 
 
+@pytest.mark.parametrize(
+    ("field", "prefix"),
+    (("foundry_verifier", "foundry"), ("vibe_verifier", "vibe")),
+)
 def test_self_verifier_is_rejected(
-    expected, judge_key, receipt_key, vibe_key
+    expected, judge_key, receipt_key, vibe_key, field, prefix
 ) -> None:
+    principal = getattr(expected, field)
     aliased = replace(
         expected,
-        verifier_agent_uid=expected.executor_agent_uid,
-        verifier_run_id=expected.executor_run_id,
+        **{
+            field: replace(
+                principal,
+                agent_uid=expected.executor_agent_uid,
+                run_id=expected.executor_run_id,
+            )
+        },
     )
     vibe = _sign_vibe(aliased, vibe_key)
     envelope = _envelope(aliased, vibe, judge_key, receipt_key)
@@ -464,8 +714,8 @@ def test_self_verifier_is_rejected(
     )
 
     assert isinstance(result, PromotionRefusal)
-    assert "verifier_agent_not_independent" in result.blockers
-    assert "verifier_run_not_independent" in result.blockers
+    assert f"{prefix}_verifier_agent_not_independent" in result.blockers
+    assert f"{prefix}_verifier_run_not_independent" in result.blockers
 
 
 def test_direct_replace_copy_mutation_and_subclass_cannot_forge_capability(
@@ -482,8 +732,8 @@ def test_direct_replace_copy_mutation_and_subclass_cannot_forge_capability(
     direct_vibe = VerifiedVibeHalt(
         candidate_digest=expected.candidate_digest,
         diff_sha256=expected.diff_sha256,
-        verifier_agent_uid=expected.verifier_agent_uid,
-        verifier_run_id=expected.verifier_run_id,
+        verifier_agent_uid=expected.vibe_verifier.agent_uid,
+        verifier_run_id=expected.vibe_verifier.run_id,
         verifier_public_key=_sha("key"),
         receipt_sha256=_sha("receipt"),
     )
@@ -499,6 +749,7 @@ def test_direct_replace_copy_mutation_and_subclass_cannot_forge_capability(
     assert replaced.to_dict()["decision"] == "refused"
     assert copied.to_dict()["decision"] == "refused"
     with pytest.raises(TypeError):
+
         class _Forged(PatchPromotionWarrant):
             def __bool__(self) -> bool:
                 return True
@@ -520,7 +771,9 @@ def test_capability_mint_is_not_module_accessible() -> None:
     assert not hasattr(verification_module, "_CAPABILITY_SEAL")
 
 
-@pytest.mark.parametrize("strength", [float("nan"), float("inf"), float("-inf"), 0.0, -1.0])
+@pytest.mark.parametrize(
+    "strength", [float("nan"), float("inf"), float("-inf"), 0.0, -1.0]
+)
 def test_evidence_strength_must_be_finite_and_positive(
     expected, judge_key, receipt_key, vibe_key, strength
 ) -> None:
@@ -530,7 +783,7 @@ def test_evidence_strength_must_be_finite_and_positive(
     promotion["evidence_strength"] = strength
     promotion.pop("payload_sha256")
     promotion["payload_sha256"] = canonical_sha256(promotion)
-    envelope = _resign_inner_and_outer(envelope, judge_key)
+    envelope = _resign_inner_and_outer(envelope, judge_key, receipt_key)
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
@@ -547,7 +800,7 @@ def test_admission_and_telos_shapes_reject_unknown_or_revoked_fields(
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     field = "governed_admission" if target == "admission" else "telos"
     envelope["forge_verification"][field]["revoked"] = True
-    envelope = _resign_inner_and_outer(envelope, judge_key)
+    envelope = _resign_inner_and_outer(envelope, judge_key, receipt_key)
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
@@ -557,11 +810,15 @@ def test_admission_and_telos_shapes_reject_unknown_or_revoked_fields(
     assert blocker in result.blockers
 
 
-def test_nested_reduced_authority_shape_is_closed(expected, judge_key, receipt_key, vibe_key) -> None:
+def test_nested_reduced_authority_shape_is_closed(
+    expected, judge_key, receipt_key, vibe_key
+) -> None:
     vibe = _sign_vibe(expected, vibe_key)
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
-    envelope["forge_verification"]["governed_admission"]["reduced_authority"]["revoked"] = True
-    envelope = _resign_inner_and_outer(envelope, judge_key)
+    envelope["forge_verification"]["governed_admission"]["reduced_authority"][
+        "revoked"
+    ] = True
+    envelope = _resign_inner_and_outer(envelope, judge_key, receipt_key)
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
     )
@@ -570,7 +827,9 @@ def test_nested_reduced_authority_shape_is_closed(expected, judge_key, receipt_k
     assert "forge:governed_admission" in result.blockers
 
 
-def test_telos_keyword_cannot_hide_blockers(expected, judge_key, receipt_key, vibe_key) -> None:
+def test_telos_keyword_cannot_hide_blockers(
+    expected, judge_key, receipt_key, vibe_key
+) -> None:
     vibe = _sign_vibe(expected, vibe_key)
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     envelope["forge_verification"]["telos"]["keyword"] = {
@@ -579,7 +838,7 @@ def test_telos_keyword_cannot_hide_blockers(expected, judge_key, receipt_key, vi
         "reason": "pass",
         "blockers": ["hidden"],
     }
-    envelope = _resign_inner_and_outer(envelope, judge_key)
+    envelope = _resign_inner_and_outer(envelope, judge_key, receipt_key)
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
     )
@@ -598,11 +857,17 @@ def test_every_signature_shape_rejects_unknown_or_revoked_fields(
         envelope["verification_signature"]["revoked"] = True
     elif layer == "inner":
         envelope["forge_verification"]["verification_signature"]["revoked"] = True
-        envelope = sign_promotion_verification(envelope, judge_key, key_id="patch-judge-test")
+        envelope = sign_promotion_verification(
+            envelope, judge_key, key_id="patch-judge-test"
+        )
     else:
         vibe["signature"]["revoked"] = True
-        envelope["vibe_halt_binding"] = expected_vibe_halt_binding(vibe, expected=expected)
-        envelope = sign_promotion_verification(envelope, judge_key, key_id="patch-judge-test")
+        envelope["vibe_halt_binding"] = expected_vibe_halt_binding(
+            vibe, expected=expected
+        )
+        envelope = sign_promotion_verification(
+            envelope, judge_key, key_id="patch-judge-test"
+        )
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
@@ -617,8 +882,10 @@ def test_exact_a2a_binding_and_authorized_file_scope_are_required(
     vibe = _sign_vibe(expected, vibe_key)
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     envelope["a2a_binding"]["delivery_id"] = "foreign-delivery"
-    envelope["forge_verification"]["authorized_source_files"] = ["dharma_swarm/foreign.py"]
-    envelope = _resign_inner_and_outer(envelope, judge_key)
+    envelope["forge_verification"]["authorized_source_files"] = [
+        "dharma_swarm/foreign.py"
+    ]
+    envelope = _resign_inner_and_outer(envelope, judge_key, receipt_key)
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
@@ -635,7 +902,9 @@ def test_every_expected_digest_and_identity_is_signed_exactly(
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     envelope["a2a_binding"]["artifact_sha256"] = _sha("foreign-artifact")
     envelope["a2a_binding"]["executor"]["run_id"] = "foreign-run"
-    envelope = sign_promotion_verification(envelope, judge_key, key_id="patch-judge-test")
+    envelope = sign_promotion_verification(
+        envelope, judge_key, key_id="patch-judge-test"
+    )
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
@@ -651,11 +920,15 @@ def test_vibe_payload_tamper_is_refused_even_when_outer_judge_rebinds_digest(
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     vibe["process"]["exit_code"] = 1
     unsigned_vibe = {
-        key: value for key, value in vibe.items() if key not in {"payload_sha256", "signature"}
+        key: value
+        for key, value in vibe.items()
+        if key not in {"payload_sha256", "signature"}
     }
     vibe["payload_sha256"] = canonical_sha256(unsigned_vibe)
     envelope["vibe_halt_binding"] = expected_vibe_halt_binding(vibe, expected=expected)
-    envelope = sign_promotion_verification(envelope, judge_key, key_id="patch-judge-test")
+    envelope = sign_promotion_verification(
+        envelope, judge_key, key_id="patch-judge-test"
+    )
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
@@ -695,7 +968,11 @@ def test_clean_vibe_cannot_hide_negative_arrays(
 ) -> None:
     vibe = _sign_vibe(expected, vibe_key)
     vibe[field] = value
-    unsigned = {key: val for key, val in vibe.items() if key not in {"payload_sha256", "signature"}}
+    unsigned = {
+        key: val
+        for key, val in vibe.items()
+        if key not in {"payload_sha256", "signature"}
+    }
     vibe["payload_sha256"] = canonical_sha256(unsigned)
     message = json.dumps(
         {key: val for key, val in vibe.items() if key != "signature"},
@@ -714,7 +991,9 @@ def test_clean_vibe_cannot_hide_negative_arrays(
 
 
 @pytest.mark.parametrize("malformed", [None, [], "signed", 7])
-def test_malformed_input_refuses_without_raising(expected, judge_key, vibe_key, malformed) -> None:
+def test_malformed_input_refuses_without_raising(
+    expected, judge_key, vibe_key, malformed
+) -> None:
     result = _authority(expected, judge_key, vibe_key).evaluate(
         malformed,  # type: ignore[arg-type]
         expected=expected,
@@ -724,17 +1003,37 @@ def test_malformed_input_refuses_without_raising(expected, judge_key, vibe_key, 
     assert not result
 
 
-def test_trust_roots_are_required_at_composition_time(expected, judge_key, vibe_key) -> None:
+def test_trust_roots_are_required_at_composition_time(
+    expected, judge_key, vibe_key
+) -> None:
     with pytest.raises(ValueError, match="trusted_judge_public_keys"):
         PatchPromotionVerifier(
             trusted_judge_public_keys=(),
+            trusted_foundry_verifier_public_keys={
+                expected.foundry_verifier.agent_uid: (
+                    expected.foundry_verifier.signer_public_key,
+                )
+            },
             trusted_vibe_verifier_public_keys={
-                expected.verifier_agent_uid: (_public_key(vibe_key),)
+                expected.vibe_verifier.agent_uid: (_public_key(vibe_key),)
+            },
+        )
+    with pytest.raises(ValueError, match="trusted_foundry_verifier_public_keys"):
+        PatchPromotionVerifier(
+            trusted_judge_public_keys=(_public_key(judge_key),),
+            trusted_foundry_verifier_public_keys={},
+            trusted_vibe_verifier_public_keys={
+                expected.vibe_verifier.agent_uid: (_public_key(vibe_key),)
             },
         )
     with pytest.raises(ValueError, match="trusted_vibe_verifier_public_keys"):
         PatchPromotionVerifier(
             trusted_judge_public_keys=(_public_key(judge_key),),
+            trusted_foundry_verifier_public_keys={
+                expected.foundry_verifier.agent_uid: (
+                    expected.foundry_verifier.signer_public_key,
+                )
+            },
             trusted_vibe_verifier_public_keys={},
         )
 
@@ -742,7 +1041,7 @@ def test_trust_roots_are_required_at_composition_time(expected, judge_key, vibe_
     with pytest.raises(AttributeError, match="immutable"):
         authority._judge_keys = frozenset()  # type: ignore[misc]
     with pytest.raises(TypeError):
-        authority._vibe_keys_by_agent[expected.verifier_agent_uid] = frozenset()  # type: ignore[index]
+        authority._vibe_keys_by_agent[expected.vibe_verifier.agent_uid] = frozenset()  # type: ignore[index]
 
 
 def test_outer_envelope_and_nested_forge_signatures_are_both_required(
@@ -751,7 +1050,9 @@ def test_outer_envelope_and_nested_forge_signatures_are_both_required(
     vibe = _sign_vibe(expected, vibe_key)
     envelope = _envelope(expected, vibe, judge_key, receipt_key)
     envelope["forge_verification"]["verification_signature"]["signature"] = "00" * 64
-    envelope = sign_promotion_verification(envelope, judge_key, key_id="patch-judge-test")
+    envelope = sign_promotion_verification(
+        envelope, judge_key, key_id="patch-judge-test"
+    )
 
     result = _authority(expected, judge_key, vibe_key).evaluate(
         envelope, expected=expected, vibe_halt_receipt=vibe
