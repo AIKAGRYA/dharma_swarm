@@ -1,10 +1,12 @@
 """Tests for dharma_swarm.agent_runner."""
 
+import asyncio
 import builtins
 import json
 import re
-from pathlib import Path
 import sqlite3
+import time
+from pathlib import Path
 
 import pytest
 from unittest.mock import AsyncMock
@@ -822,3 +824,270 @@ async def test_post_task_lifecycle_bus_error_stays_idle(config, tmp_path: Path):
     await runner._post_task_lifecycle(task)
 
     assert runner.state.status == AgentStatus.IDLE
+
+
+def _local_tool_runner_and_task(
+    config: AgentConfig,
+    tmp_path: Path,
+) -> tuple[AgentRunner, Task]:
+    local_config = config.model_copy(
+        update={"metadata": {**config.metadata, "working_dir": str(tmp_path)}}
+    )
+    task = Task(
+        title="Exercise bounded local tools",
+        metadata={"working_dir": str(tmp_path)},
+    )
+    return AgentRunner(local_config), task
+
+
+def _slow_empty_bounded_glob(*_args, **_kwargs):
+    from dharma_swarm.bounded_fs import BoundedGlobResult
+
+    time.sleep(0.05)
+    return BoundedGlobResult((), 0, True)
+
+
+@pytest.mark.asyncio
+async def test_local_glob_stops_after_truncation_probe(
+    config,
+    tmp_path: Path,
+):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    for index in range(100):
+        (tmp_path / f"candidate-{index:03d}.txt").write_text("x\n")
+
+    output = await runner._execute_local_tool(
+        "glob_files",
+        {"pattern": "*.txt"},
+        task=task,
+    )
+
+    lines = output.splitlines()
+    assert len(lines[:-1]) == 50
+    assert lines[-1].startswith("[truncated: more than 50 paths matched")
+
+
+@pytest.mark.asyncio
+async def test_local_glob_runs_blocking_scan_off_event_loop(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    monkeypatch.setattr(
+        agent_runner_module, "bounded_glob", _slow_empty_bounded_glob
+    )
+    call = asyncio.create_task(
+        runner._execute_local_tool("glob_files", {"pattern": "*.txt"}, task=task)
+    )
+    await asyncio.sleep(0.01)
+
+    assert not call.done()
+    assert await asyncio.wait_for(call, timeout=1) == "No paths matching '*.txt'"
+
+
+@pytest.mark.asyncio
+async def test_local_read_file_streams_requested_lines(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "streamed.txt"
+    source.write_text("".join(f"line-{index}\n" for index in range(100)))
+
+    def reject_bulk_read(*_args, **_kwargs):
+        raise AssertionError("read_text must not be used by bounded local reads")
+
+    monkeypatch.setattr(Path, "read_text", reject_bulk_read)
+
+    output = await runner._execute_local_tool(
+        "read_file",
+        {"path": source.name, "offset": 90, "limit": 2},
+        task=task,
+    )
+
+    assert output.splitlines() == [
+        "   90 | line-89",
+        "   91 | line-90",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_local_read_file_rejects_oversized_file_without_opening(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    oversized = tmp_path / "oversized.txt"
+    with oversized.open("wb") as stream:
+        stream.truncate(agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1)
+    original_open = Path.open
+
+    def reject_oversized_open(path: Path, *args, **kwargs):
+        if path == oversized:
+            raise AssertionError("oversized local-tool file must not be opened")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reject_oversized_open)
+
+    output = await runner._execute_local_tool(
+        "read_file",
+        {"path": oversized.name},
+        task=task,
+    )
+
+    assert "ERROR: File exceeds the 4 MiB local-tool limit" in output
+
+
+@pytest.mark.asyncio
+async def test_local_edit_file_rejects_oversized_file_without_opening(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    oversized = tmp_path / "oversized.txt"
+    with oversized.open("wb") as stream:
+        stream.truncate(agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1)
+    original_open = Path.open
+
+    def reject_oversized_open(path: Path, *args, **kwargs):
+        if path == oversized:
+            raise AssertionError("oversized local-tool edit must not open the file")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reject_oversized_open)
+
+    output = await runner._execute_local_tool(
+        "edit_file",
+        {"path": oversized.name, "old_string": "old", "new_string": "new"},
+        task=task,
+    )
+
+    assert "ERROR: File exceeds the 4 MiB local-tool limit" in output
+
+
+@pytest.mark.asyncio
+async def test_local_edit_file_rejects_oversized_result(config, tmp_path: Path):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "editable.txt"
+    source.write_text("old")
+
+    output = await runner._execute_local_tool(
+        "edit_file",
+        {
+            "path": source.name,
+            "old_string": "old",
+            "new_string": "x" * (agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1),
+        },
+        task=task,
+    )
+
+    assert output == "ERROR: Edit would exceed the 4 MiB local-tool limit"
+    assert source.read_text() == "old"
+
+
+@pytest.mark.asyncio
+async def test_local_edit_file_replaces_one_occurrence(config, tmp_path: Path):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "editable.txt"
+    source.write_text("before old after\n")
+
+    output = await runner._execute_local_tool(
+        "edit_file",
+        {"path": source.name, "old_string": "old", "new_string": "new"},
+        task=task,
+    )
+
+    assert output == f"OK: edited {source}"
+    assert source.read_text() == "before new after\n"
+
+
+@pytest.mark.asyncio
+async def test_local_grep_streams_and_skips_oversized_files(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    source = tmp_path / "matches.txt"
+    source.write_text("needle one\nno match\nneedle two\n")
+    oversized = tmp_path / "oversized.txt"
+    with oversized.open("wb") as stream:
+        stream.truncate(agent_runner_module._LOCAL_TOOL_MAX_FILE_BYTES + 1)
+    original_open = Path.open
+
+    def guarded_open(path: Path, *args, **kwargs):
+        if path == oversized:
+            raise AssertionError("grep must not open oversized candidates")
+        return original_open(path, *args, **kwargs)
+
+    def reject_bulk_read(*_args, **_kwargs):
+        raise AssertionError("grep must stream candidates instead of using read_text")
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(Path, "read_text", reject_bulk_read)
+
+    output = await runner._execute_local_tool(
+        "grep_search",
+        {"pattern": "needle", "glob": "*.txt", "max_results": 10},
+        task=task,
+    )
+
+    lines = output.splitlines()
+    assert len([line for line in lines if line.startswith(str(source))]) == 2
+    assert "[skipped: 1 file(s) exceeded the 4 MiB local-tool limit]" in lines
+
+
+@pytest.mark.asyncio
+async def test_local_grep_caps_results_truthfully(config, tmp_path: Path):
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    (tmp_path / "matches.txt").write_text(
+        "needle one\nneedle two\nneedle three\n"
+    )
+
+    output = await runner._execute_local_tool(
+        "grep_search",
+        {"pattern": "needle", "glob": "*.txt", "max_results": 2},
+        task=task,
+    )
+
+    lines = output.splitlines()
+    assert len([line for line in lines if ":needle " in line]) == 2
+    assert "[truncated: more than 2 matches; showing the first 2]" in lines
+
+
+@pytest.mark.asyncio
+async def test_local_grep_candidate_cap_reports_bounded_no_match(
+    config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import dharma_swarm.agent_runner as agent_runner_module
+
+    runner, task = _local_tool_runner_and_task(config, tmp_path)
+    for index in range(4):
+        (tmp_path / f"candidate-{index}.txt").write_text("nothing here\n")
+
+    monkeypatch.setattr(agent_runner_module, "_LOCAL_TOOL_GREP_CANDIDATE_LIMIT", 2)
+
+    output = await runner._execute_local_tool(
+        "grep_search",
+        {"pattern": "needle", "glob": "*.txt"},
+        task=task,
+    )
+
+    assert "No matches for 'needle' within the bounded scan" in output
+    assert "more than 2 candidates matched" in output
