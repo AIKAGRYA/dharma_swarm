@@ -12,6 +12,7 @@ retry budget stays bounded (never nats-py's ``-1`` infinite sentinel).
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -53,15 +54,16 @@ async def _capture_connect_kwargs(
 ) -> dict[str, Any]:
     """Drive ``connect()`` with a mocked broker and return the connect kwargs."""
 
-    import nats as real_nats
-
     captured: dict[str, Any] = {}
 
     async def fake_connect(*_args: Any, **kwargs: Any) -> Any:
         captured.update(kwargs)
         return SimpleNamespace(jetstream=lambda: object())
 
-    monkeypatch.setattr(real_nats, "connect", fake_connect)
+    # The transport imports nats lazily inside ``connect()``; inject a stub
+    # module so the mocked path works in CI environments without nats-py
+    # (monkeypatch restores sys.modules afterwards).
+    monkeypatch.setitem(sys.modules, "nats", SimpleNamespace(connect=fake_connect))
 
     runtime = RuntimeStateStore(tmp_path / "runtime.db")
     transport = A2ANatsTransport(runtime_state=runtime, config=config)
