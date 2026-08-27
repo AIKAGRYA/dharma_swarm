@@ -88,7 +88,12 @@ def scoped_regular_file(
 
 
 def write_immutable_beneath(root: Path, relative: str, data: bytes) -> Path:
-    """Create or verify one immutable file through no-follow directory handles."""
+    """Create/verify one owner-only content-addressed file via no-follow handles.
+
+    The file is mode 0600 and therefore remains mutable by its owner. Consumers
+    requiring byte stability must carry the verified bounded snapshot forward
+    rather than reopen this path after verification.
+    """
     path = PurePosixPath(relative)
     if (
         not relative
@@ -144,11 +149,20 @@ def write_immutable_beneath(root: Path, relative: str, data: bytes) -> Path:
             try:
                 descriptor = os.open(name, read_flags, dir_fd=directory_fd)
                 with os.fdopen(descriptor, "rb") as handle:
-                    if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                    metadata = os.fstat(handle.fileno())
+                    if (
+                        not stat.S_ISREG(metadata.st_mode)
+                        or stat.S_IMODE(metadata.st_mode) != 0o600
+                        or metadata.st_uid != os.getuid()
+                    ):
                         raise PatchReplayError(
-                            f"immutable artifact is not regular: {relative}"
+                            f"immutable artifact ownership/mode is unsafe: {relative}"
                         )
-                    existing = handle.read()
+                    if metadata.st_size != len(data):
+                        raise PatchReplayError(
+                            f"content-address collision at {relative}"
+                        )
+                    existing = handle.read(len(data) + 1)
             except OSError as exc:
                 raise PatchReplayError(
                     f"immutable artifact is unsafe: {relative}"

@@ -24,12 +24,12 @@ def _cand() -> Candidate:
 
 @dataclass(frozen=True)
 class _Proof:
-    promotion_allowed: bool = True
+    promotion_allowed: bool = False
 
     def to_dict(self):
         body = {
             "isolation_level": "docker_nonet",
-            "network_disabled": self.promotion_allowed,
+            "network_disabled": True,
             "blocked": False,
             "timed_out": False,
             "exit_code": 0,
@@ -67,7 +67,7 @@ def _ring1_proof(candidate: Candidate | None = None) -> dict:
     candidate = candidate or _cand()
     return {
         "schema_version": "foundry_ring1_isolation.v1",
-        "promotion_allowed": True,
+        "promotion_allowed": False,
         "primary": _bound_payload(candidate, "ring1", 0, "ring1-primary"),
         "determinism_recheck": _bound_payload(
             candidate, "ring1", 0, "ring1-recheck"
@@ -180,7 +180,7 @@ def test_zero_in_loop_fitness_is_zero_survival():
     assert not outcome.survived
 
 
-def test_promotion_requires_ring1_and_every_heldout_isolation_proof():
+def test_public_structural_observations_cannot_authorize_promotion():
     ring1 = _ring1_proof()
     outcome = run_heldout(
         _cand(),
@@ -190,12 +190,12 @@ def test_promotion_requires_ring1_and_every_heldout_isolation_proof():
         in_loop_isolation_proof=ring1,
     )
     assert outcome.survived
-    assert outcome.promotion_allowed
+    assert outcome.promotion_allowed is False
     assert set(outcome.isolation_proofs) == {"ring1", "w1", "w2"}
     assert outcome.isolation_proofs["w1"]["schema_version"] == (
         "foundry_heldout_isolation.v1"
     )
-    assert outcome.isolation_proofs["w1"]["promotion_allowed"] is True
+    assert outcome.isolation_proofs["w1"]["promotion_allowed"] is False
 
     missing_one = run_heldout(
         _cand(),

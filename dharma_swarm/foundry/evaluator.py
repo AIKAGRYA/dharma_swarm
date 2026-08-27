@@ -90,9 +90,11 @@ def validate_isolation_proof_payload(
     *,
     expected_binding: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, bool]:
-    """Validate isolation facts and a caller-carried run integrity binding.
+    """Validate non-authorizing isolation observations and their run binding.
 
-    This does not attest the execution image or the truth of caller observations.
+    This does not attest the execution image or the truth of caller observations,
+    so a positive ``promotion_allowed`` claim is rejected. A future promotion
+    path must consume an externally attested capability, not this public shape.
     """
     base_fields = {*_ISOLATION_FACT_FIELDS, "digest", "promotion_allowed"}
     if type(payload) is not dict or set(payload) not in (
@@ -113,26 +115,10 @@ def validate_isolation_proof_payload(
     ).hexdigest()
     if payload["digest"] != digest:
         return None, False
-    derived_promotion = (
-        not payload["blocked"]
-        and not payload["timed_out"]
-        and payload["network_disabled"]
-        and payload["readonly_rootfs"]
-        and payload["cap_drop_all"]
-        and payload["no_new_privileges"]
-        and payload["pids_limited"]
-        and payload["memory_limited"]
-        and payload["memory_swap_limited"]
-        and payload["tmpfs_limited"]
-        and payload["non_root_user"]
-        and payload["workdir_readonly"]
-        and payload["exit_code"] == 0
-        and payload["isolation_level"] == "docker_nonet"
-    )
-    if payload["promotion_allowed"] is not derived_promotion:
+    if payload["promotion_allowed"] is not False:
         return None, False
     if "evaluation_binding" not in payload:
-        return dict(payload), False
+        return (dict(payload), False) if expected_binding is None else (None, False)
 
     binding = payload["evaluation_binding"]
     if type(binding) is not dict or set(binding) != {*_EVALUATION_BINDING_FIELDS, "digest"}:
@@ -157,7 +143,7 @@ def validate_isolation_proof_payload(
         binding.get(field) != value for field, value in expected_binding.items()
     ):
         return None, False
-    return dict(payload), derived_promotion
+    return dict(payload), False
 
 
 def _validated_isolation_proof(
@@ -258,7 +244,7 @@ def _evaluation_binding_context(
 
 @dataclass(frozen=True)
 class BoundIsolationProof:
-    """Isolation facts bound to one caller-identified evaluation invocation."""
+    """Non-authorizing isolation facts bound to one evaluation invocation."""
 
     proof: object
     candidate: Candidate
@@ -268,7 +254,8 @@ class BoundIsolationProof:
 
     @property
     def promotion_allowed(self) -> bool:
-        return getattr(self.proof, "promotion_allowed", None) is True
+        """Public observation envelopes never carry promotion authority."""
+        return False
 
     def to_dict(self) -> dict[str, Any]:
         to_dict = getattr(self.proof, "to_dict", None)
@@ -289,7 +276,7 @@ def bind_isolation_proof(
     proof: object, *, candidate: Candidate, evaluator_id: str, seed: int,
     run_identity: EvaluationRunIdentity,
 ) -> BoundIsolationProof:
-    """Construct the promotion-proof envelope at the evaluator/runner boundary."""
+    """Construct a bound observation envelope at the evaluator/runner boundary."""
     return BoundIsolationProof(proof, candidate, evaluator_id, seed, run_identity)
 
 

@@ -26,12 +26,12 @@ def _candidate(diff: str = "+ pass") -> Candidate:
 
 @dataclass(frozen=True)
 class _Proof:
-    promotion_allowed: bool = True
+    promotion_allowed: bool = False
 
     def to_dict(self):
         body = {
             "isolation_level": "docker_nonet",
-            "network_disabled": self.promotion_allowed,
+            "network_disabled": True,
             "blocked": False,
             "timed_out": False,
             "exit_code": 0,
@@ -90,9 +90,9 @@ def test_clean_candidate_keeps_score():
     assert receipt.isolation_proof is None
 
 
-def test_promotion_claim_requires_and_seals_isolation_proof():
+def test_public_structural_proof_is_sealed_but_never_authorizes_promotion():
     receipt = blind_evaluate(_evaluator(1.2, proof=_Proof()), _candidate(), seed=7)
-    assert receipt.promotion_allowed is True
+    assert receipt.promotion_allowed is False
     assert receipt.isolation_proof["digest"] == _Proof().to_dict()["digest"]
     binding = receipt.isolation_proof["evaluation_binding"]
     assert binding["candidate_id"] == "c1"
@@ -104,13 +104,28 @@ def test_promotion_claim_requires_and_seals_isolation_proof():
         "command_digest": binding["command_digest"],
         "output_digest": binding["output_digest"],
     }
-    denied = blind_evaluate(
-        _evaluator(1.2, proof=_Proof(promotion_allowed=False)),
+    forged_positive = blind_evaluate(
+        _evaluator(1.2, proof=_Proof(promotion_allowed=True)),
         _candidate(),
         seed=7,
     )
-    assert denied.promotion_allowed is False
-    assert denied.digest != receipt.digest
+    assert forged_positive.promotion_allowed is False
+    assert forged_positive.isolation_proof is None
+    assert forged_positive.digest != receipt.digest
+
+
+def test_bound_observation_never_echoes_caller_promotion_claim():
+    identity = EvaluationRunIdentity.from_execution(
+        run_id="run-1", command=["oracle"], output={"score": 1.2}
+    )
+    observation = bind_isolation_proof(
+        _Proof(promotion_allowed=True),
+        candidate=_candidate(),
+        evaluator_id="eval-1",
+        seed=7,
+        run_identity=identity,
+    )
+    assert observation.promotion_allowed is False
 
 
 def test_bare_isolation_proof_cannot_promote_without_run_binding():

@@ -32,12 +32,12 @@ def _score_from_diff(diff: str, scale: float = 1.0) -> EvalMetrics:
 
 @dataclass(frozen=True)
 class _Proof:
-    promotion_allowed: bool = True
+    promotion_allowed: bool = False
 
     def to_dict(self):
         body = {
             "isolation_level": "docker_nonet",
-            "network_disabled": self.promotion_allowed,
+            "network_disabled": True,
             "blocked": False,
             "timed_out": False,
             "exit_code": 0,
@@ -239,7 +239,7 @@ def test_unproven_heldout_survivor_cannot_promote():
     assert promoted == []
 
 
-def test_all_proven_rings_can_reach_survivor_callback():
+def test_public_structural_proofs_cannot_reach_survivor_callback():
     promoted = []
     loop = FoundryLoop(
         evaluator=_evaluator(proven=True),
@@ -252,12 +252,10 @@ def test_all_proven_rings_can_reach_survivor_callback():
         ),
     )
     reports = loop.run(2)
-    assert sum(report.ring2_survivors for report in reports) > 0
-    assert promoted
-    ring1 = promoted[0][1].isolation_proofs["ring1"]
-    assert ring1["schema_version"] == "foundry_ring1_isolation.v1"
-    assert ring1["primary"]
-    assert ring1["determinism_recheck"]
+    assert sum(report.ring2_checked for report in reports) > 0
+    assert sum(report.ring2_promotion_blocked for report in reports) > 0
+    assert sum(report.ring2_survivors for report in reports) == 0
+    assert promoted == []
 
 
 def test_determinism_recheck_also_requires_isolation_proof():
