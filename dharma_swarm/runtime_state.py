@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sqlite3
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import aiosqlite
@@ -394,6 +396,11 @@ SELF_MOD_RECEIPT_TYPES = frozenset(
     }
 )
 
+EXACT_SELF_MOD_RECEIPT_TYPES = frozenset({"self_mod_gate", "self_mod_promote"})
+
+_EXACT_SELF_MOD_SCHEMA_VERSION = "dharma.runtime.self_mod_exact.v1"
+_EXACT_SELF_MOD_AUTHORITY_SEMANTICS = "attestation_only"
+
 _EXECUTION_IDENTITY_CONFLICT_FIELDS = (
     "trace_id",
     "correlation_id",
@@ -414,6 +421,115 @@ _EXECUTION_IDENTITY_CONFLICT_FIELDS = (
 
 def _json_dump(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=True)
+
+
+def _canonical_finite_json_value(value: Any, *, surface: str) -> Any:
+    """Return the one JSON value accepted by exact evidence writers.
+
+    Object keys stay strings instead of being silently coerced by ``json``;
+    tuples intentionally normalize to arrays.  This keeps hashes stable and
+    makes inputs such as ``{1: "x", "1": "y"}`` fail closed rather than
+    collapsing into duplicate JSON keys.
+    """
+
+    active_containers: set[int] = set()
+
+    def normalize(inner: Any, path: str) -> Any:
+        if inner is None or type(inner) in (bool, str, int):
+            return inner
+        if type(inner) is float:
+            if not math.isfinite(inner):
+                raise ValueError(f"{surface} contains a non-finite number at {path}")
+            return inner
+        if isinstance(inner, Mapping):
+            marker = id(inner)
+            if marker in active_containers:
+                raise ValueError(f"{surface} contains a recursive object at {path}")
+            active_containers.add(marker)
+            try:
+                normalized: dict[str, Any] = {}
+                for key, child in inner.items():
+                    if type(key) is not str:
+                        raise ValueError(
+                            f"{surface} requires string object keys at {path}"
+                        )
+                    if key in normalized:
+                        raise ValueError(f"{surface} contains duplicate key {key!r} at {path}")
+                    normalized[key] = normalize(child, f"{path}.{key}")
+                return normalized
+            finally:
+                active_containers.remove(marker)
+        if isinstance(inner, (list, tuple)):
+            marker = id(inner)
+            if marker in active_containers:
+                raise ValueError(f"{surface} contains a recursive array at {path}")
+            active_containers.add(marker)
+            try:
+                return [normalize(child, f"{path}[{index}]") for index, child in enumerate(inner)]
+            finally:
+                active_containers.remove(marker)
+        raise ValueError(
+            f"{surface} contains a non-JSON value {type(inner).__name__} at {path}"
+        )
+
+    return normalize(value, "$")
+
+
+def _canonical_finite_json_dump(value: Any, *, surface: str) -> str:
+    normalized = _canonical_finite_json_value(value, surface=surface)
+    return json.dumps(
+        normalized,
+        sort_keys=True,
+        ensure_ascii=True,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+
+
+def _canonical_finite_json_load(raw: str, *, surface: str) -> Any:
+    def reject_constant(constant: str) -> None:
+        raise ValueError(f"{surface} contains non-finite JSON constant {constant}")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, child in pairs:
+            if key in value:
+                raise ValueError(f"{surface} contains duplicate JSON key {key!r}")
+            value[key] = child
+        return value
+
+    try:
+        value = json.loads(
+            raw,
+            parse_constant=reject_constant,
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{surface} is malformed JSON") from exc
+    return _canonical_finite_json_value(value, surface=surface)
+
+
+def _is_reserved_exact_self_mod_slot(
+    receipt_type: str = "", side_effect_key: str = "", receipt_id: str = "",
+) -> bool:
+    return type(receipt_type) is not str or type(side_effect_key) is not str or type(receipt_id) is not str or (
+        receipt_id.startswith("rr_self_mod_exact_")
+    ) or (
+        receipt_type in EXACT_SELF_MOD_RECEIPT_TYPES
+    ) or (
+        side_effect_key.startswith("self_mod:")
+        and side_effect_key.endswith((":gate", ":promote"))
+    )
+
+
+def _reject_reserved_exact_self_mod_slot(
+    surface: str, receipt_type: str = "", side_effect_key: str = "", receipt_id: str = "",
+) -> None:
+    if _is_reserved_exact_self_mod_slot(receipt_type, side_effect_key, receipt_id):
+        raise ValueError(
+            f"{surface} cannot write reserved self-mod gate/promote evidence; "
+            "use commit_self_mod_receipt_exact"
+        )
 
 
 def _json_load(raw: str | None, fallback: Any) -> Any:
@@ -726,6 +842,14 @@ class RuntimeReceipt:
     side_effect_key: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=_utc_now)
+
+
+def _validate_runtime_receipt_sink(receipt: RuntimeReceipt, surface: str) -> None:
+    if type(receipt) is not RuntimeReceipt:
+        raise TypeError(f"{surface} requires an exact RuntimeReceipt")
+    _reject_reserved_exact_self_mod_slot(
+        surface, receipt.receipt_type, receipt.side_effect_key, receipt.receipt_id,
+    )
 
 
 @dataclass(frozen=True)
@@ -1408,6 +1532,8 @@ class RuntimeStateStore:
             return operation(db)
 
     async def record_session_event(self, event: SessionEventRecord, receipt: RuntimeReceipt | None = None) -> SessionEventRecord:
+        if receipt is not None:
+            _validate_runtime_receipt_sink(receipt, "record_session_event")
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
@@ -2650,6 +2776,9 @@ class RuntimeStateStore:
     ) -> RuntimeReceipt:
         """Build a RuntimeReceipt that preserves the canonical identity fields."""
         identity.require_for_dispatch()
+        _reject_reserved_exact_self_mod_slot(
+            "build_runtime_receipt", receipt_type, side_effect_key, receipt_id,
+        )
         return RuntimeReceipt(
             receipt_id=receipt_id or _new_id("rr"),
             receipt_type=receipt_type,
@@ -2677,6 +2806,9 @@ class RuntimeStateStore:
         payload: dict[str, Any] | None = None,
         receipt_id: str = "",
     ) -> RuntimeReceipt:
+        _reject_reserved_exact_self_mod_slot(
+            "record_receipt_for_identity", receipt_type, side_effect_key, receipt_id,
+        )
         receipt = self.build_runtime_receipt(
             identity,
             receipt_type=receipt_type,
@@ -2697,6 +2829,9 @@ class RuntimeStateStore:
         payload: dict[str, Any] | None = None,
         receipt_id: str = "",
     ) -> RuntimeReceipt:
+        _reject_reserved_exact_self_mod_slot(
+            "record_receipt_for_identity_sync", receipt_type, side_effect_key, receipt_id,
+        )
         receipt = self.build_runtime_receipt(
             identity,
             receipt_type=receipt_type,
@@ -2887,6 +3022,10 @@ class RuntimeStateStore:
         receipt_type = f"self_mod_{stage_key}"
         if receipt_type not in SELF_MOD_RECEIPT_TYPES:
             raise ValueError(f"unknown self-mod receipt stage: {stage}")
+        _reject_reserved_exact_self_mod_slot(
+            "record_self_mod_receipt", receipt_type,
+            f"self_mod:{proposal_id or identity.proposal_id}:{stage_key}",
+        )
         return await self.record_receipt_for_identity(
             identity.with_updates(proposal_id=proposal_id or identity.proposal_id),
             receipt_type=receipt_type,
@@ -2908,6 +3047,10 @@ class RuntimeStateStore:
         receipt_type = f"self_mod_{stage_key}"
         if receipt_type not in SELF_MOD_RECEIPT_TYPES:
             raise ValueError(f"unknown self-mod receipt stage: {stage}")
+        _reject_reserved_exact_self_mod_slot(
+            "record_self_mod_receipt_sync", receipt_type,
+            f"self_mod:{proposal_id or identity.proposal_id}:{stage_key}",
+        )
         return self.record_receipt_for_identity_sync(
             identity.with_updates(proposal_id=proposal_id or identity.proposal_id),
             receipt_type=receipt_type,
@@ -2915,6 +3058,333 @@ class RuntimeStateStore:
             side_effect_key=f"self_mod:{proposal_id or identity.proposal_id}:{stage_key}",
             payload={"proposal_id": proposal_id or identity.proposal_id, **dict(payload or {})},
         )
+
+    async def commit_self_mod_receipt_exact(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        stage: Literal["gate", "promote"],
+        proposal_id: str,
+        status: str,
+        payload: Mapping[str, Any],
+    ) -> RuntimeReceipt:
+        """Atomically attest one exact self-mod gate or promotion result.
+
+        The receipt and its completed idempotency row are one indivisible
+        pair.  Existing state is replayable only when it is the single exact
+        pair this method would have written; legacy, partial, or conflicting
+        rows fail closed.  This is evidence, not bearer authorization.
+        """
+
+        if type(identity) is not ExecutionIdentity:
+            raise MissingExecutionIdentity("exact self-mod evidence requires exact ExecutionIdentity")
+        identity.require_for_dispatch()
+        identity_field_names = ("run_id", *_EXECUTION_IDENTITY_CONFLICT_FIELDS)
+        identity_fields = {
+            field_name: getattr(identity, field_name)
+            for field_name in identity_field_names
+        }
+        identity_metadata = identity.metadata
+        if type(stage) is not str or stage not in ("gate", "promote"):
+            raise ValueError("exact self-mod stage must be 'gate' or 'promote'")
+        if type(proposal_id) is not str or not proposal_id.strip():
+            raise ValueError("proposal_id is required for exact self-mod evidence")
+        if proposal_id != proposal_id.strip():
+            raise ValueError("proposal_id must not contain surrounding whitespace")
+        if identity_fields["proposal_id"] != proposal_id:
+            raise MissingExecutionIdentity(
+                "ExecutionIdentity proposal_id must exactly match self-mod proposal_id"
+            )
+        if type(status) is not str or not status.strip():
+            raise ValueError("status is required for exact self-mod evidence")
+        if not isinstance(payload, Mapping):
+            raise ValueError("exact self-mod evidence payload must be a JSON object")
+
+        for field_name, field_value in identity_fields.items():
+            if type(field_value) is not str:
+                raise MissingExecutionIdentity(
+                    f"ExecutionIdentity field {field_name} must be a string"
+                )
+        if not isinstance(identity_metadata, Mapping):
+            raise MissingExecutionIdentity(
+                "ExecutionIdentity metadata must be a JSON object"
+            )
+
+        normalized_evidence = _canonical_finite_json_value(
+            payload,
+            surface="exact self-mod evidence payload",
+        )
+        assert isinstance(normalized_evidence, dict)
+        identity_value = {**identity_fields, "metadata": identity_metadata}
+        normalized_identity = _canonical_finite_json_value(
+            identity_value,
+            surface="exact self-mod ExecutionIdentity",
+        )
+        identity_json = _canonical_finite_json_dump(
+            normalized_identity,
+            surface="exact self-mod ExecutionIdentity",
+        )
+
+        slot_json = _canonical_finite_json_dump(
+            {"proposal_id": proposal_id, "stage": stage},
+            surface="exact self-mod slot",
+        )
+        receipt_id = f"rr_self_mod_exact_{hashlib.sha256(slot_json.encode('utf-8')).hexdigest()[:32]}"
+        receipt_type = f"self_mod_{stage}"
+        side_effect_key = f"self_mod:{proposal_id}:{stage}"
+        wrapper_without_hash = {
+            "schema_version": _EXACT_SELF_MOD_SCHEMA_VERSION,
+            "authority_semantics": _EXACT_SELF_MOD_AUTHORITY_SEMANTICS,
+            "proposal_id": proposal_id,
+            "stage": stage,
+            "evidence": normalized_evidence,
+        }
+        receipt_semantics = {
+            "receipt_id": receipt_id,
+            "receipt_type": receipt_type,
+            "run_id": identity_fields["run_id"],
+            "task_id": identity_fields["task_id"],
+            "trace_id": identity_fields["trace_id"],
+            "correlation_id": identity_fields["correlation_id"],
+            "causation_id": identity_fields["causation_id"],
+            "parent_run_id": identity_fields["parent_run_id"],
+            "agent_id": identity_fields["agent_id"],
+            "idempotency_key": identity_fields["idempotency_key"],
+            "side_effect_key": side_effect_key,
+            "status": status,
+            "payload": wrapper_without_hash,
+        }
+        operation_hash = hashlib.sha256(
+            _canonical_finite_json_dump(
+                {
+                    "execution_identity": normalized_identity,
+                    "runtime_receipt": receipt_semantics,
+                },
+                surface="exact self-mod operation",
+            ).encode("utf-8")
+        ).hexdigest()
+        receipt_payload = {**wrapper_without_hash, "operation_hash": operation_hash}
+        receipt_payload_json = _canonical_finite_json_dump(
+            receipt_payload,
+            surface="exact self-mod receipt payload",
+        )
+        idempotency_metadata = {
+            "schema_version": _EXACT_SELF_MOD_SCHEMA_VERSION,
+            "authority_semantics": _EXACT_SELF_MOD_AUTHORITY_SEMANTICS,
+            "stage": stage,
+            "proposal_id": proposal_id,
+            "receipt_id": receipt_id,
+            "operation_hash": operation_hash,
+        }
+        idempotency_metadata_json = _canonical_finite_json_dump(
+            idempotency_metadata,
+            surface="exact self-mod idempotency metadata",
+        )
+
+        # Validation above deliberately completes before schema initialization:
+        # malformed inputs cannot create or alter a database.
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
+            db.row_factory = aiosqlite.Row
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                durable_row = await (
+                    await db.execute(
+                        "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
+                        " idempotency_key, causation_id, parent_run_id, agent_id,"
+                        " session_id, external_a2a_task_id, message_id, event_id,"
+                        " artifact_id, proposal_id, metadata_json"
+                        " FROM execution_identities WHERE run_id = ?",
+                        (identity_fields["run_id"],),
+                    )
+                ).fetchone()
+                if durable_row is None:
+                    raise MissingExecutionIdentity(
+                        "exact self-mod evidence requires an already-durable ExecutionIdentity"
+                    )
+                durable_metadata = _canonical_finite_json_load(
+                    str(durable_row["metadata_json"]),
+                    surface="durable ExecutionIdentity metadata",
+                )
+                if not isinstance(durable_metadata, dict):
+                    raise MissingExecutionIdentity(
+                        "durable ExecutionIdentity metadata must be a JSON object"
+                    )
+                durable_identity = {
+                    **{
+                        field_name: str(durable_row[field_name] or "")
+                        for field_name in identity_field_names
+                    },
+                    "metadata": durable_metadata,
+                }
+                durable_identity_json = _canonical_finite_json_dump(
+                    durable_identity,
+                    surface="durable ExecutionIdentity",
+                )
+                if durable_identity_json != identity_json:
+                    raise MissingExecutionIdentity(
+                        "supplied ExecutionIdentity does not exactly match durable identity"
+                    )
+
+                async def load_slot_rows() -> tuple[list[Any], list[Any]]:
+                    receipt_cursor = await db.execute(
+                        "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+                        " correlation_id, causation_id, parent_run_id, agent_id,"
+                        " idempotency_key, side_effect_key, status, payload_json, created_at"
+                        " FROM runtime_receipts"
+                        " WHERE receipt_id = ? OR side_effect_key = ?",
+                        (receipt_id, side_effect_key),
+                    )
+                    idempotency_cursor = await db.execute(
+                        "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                        " trace_id, correlation_id, status, result_receipt_id,"
+                        " metadata_json, created_at, updated_at"
+                        " FROM idempotency_records WHERE side_effect_key = ?",
+                        (side_effect_key,),
+                    )
+                    return await receipt_cursor.fetchall(), await idempotency_cursor.fetchall()
+
+                receipt_rows, idempotency_rows = await load_slot_rows()
+
+                if len(receipt_rows) > 1 or len(idempotency_rows) > 1:
+                    raise ValueError("conflicting rows occupy exact self-mod evidence slot")
+                if bool(receipt_rows) != bool(idempotency_rows):
+                    raise ValueError("partial exact self-mod evidence state")
+
+                expected_receipt_fields = {
+                    "receipt_id": receipt_id,
+                    "receipt_type": receipt_type,
+                    "run_id": identity_fields["run_id"],
+                    "task_id": identity_fields["task_id"],
+                    "trace_id": identity_fields["trace_id"],
+                    "correlation_id": identity_fields["correlation_id"],
+                    "causation_id": identity_fields["causation_id"],
+                    "parent_run_id": identity_fields["parent_run_id"],
+                    "agent_id": identity_fields["agent_id"],
+                    "idempotency_key": identity_fields["idempotency_key"],
+                    "side_effect_key": side_effect_key,
+                    "status": status,
+                    "payload_json": receipt_payload_json,
+                }
+                expected_idempotency_fields = {
+                    "idempotency_key": identity_fields["idempotency_key"],
+                    "side_effect_key": side_effect_key,
+                    "run_id": identity_fields["run_id"],
+                    "task_id": identity_fields["task_id"],
+                    "trace_id": identity_fields["trace_id"],
+                    "correlation_id": identity_fields["correlation_id"],
+                    "status": "completed",
+                    "result_receipt_id": receipt_id,
+                    "metadata_json": idempotency_metadata_json,
+                }
+
+                def exact_existing_pair() -> RuntimeReceipt:
+                    receipt_row = receipt_rows[0]
+                    idempotency_row = idempotency_rows[0]
+                    if any(
+                        str(receipt_row[field_name]) != expected_value
+                        for field_name, expected_value in expected_receipt_fields.items()
+                    ):
+                        raise ValueError("conflicting exact self-mod receipt")
+                    if any(
+                        str(idempotency_row[field_name]) != expected_value
+                        for field_name, expected_value in expected_idempotency_fields.items()
+                    ):
+                        raise ValueError("conflicting exact self-mod idempotency record")
+                    receipt_created_at = str(receipt_row["created_at"])
+                    idempotency_created_at = str(idempotency_row["created_at"])
+                    idempotency_updated_at = str(idempotency_row["updated_at"])
+                    try:
+                        parsed_created_at = datetime.fromisoformat(receipt_created_at)
+                    except ValueError as exc:
+                        raise ValueError("malformed exact self-mod receipt timestamp") from exc
+                    if parsed_created_at.tzinfo is None or not (
+                        receipt_created_at
+                        == idempotency_created_at
+                        == idempotency_updated_at
+                    ):
+                        raise ValueError("conflicting exact self-mod evidence timestamps")
+                    return _row_to_runtime_receipt(receipt_row)
+
+                if receipt_rows:
+                    existing_receipt = exact_existing_pair()
+                    await db.commit()
+                    return existing_receipt
+
+                now = _utc_now()
+                now_iso = now.isoformat()
+                receipt = RuntimeReceipt(
+                    receipt_id=receipt_id,
+                    receipt_type=receipt_type,
+                    status=status,
+                    run_id=identity_fields["run_id"],
+                    task_id=identity_fields["task_id"],
+                    trace_id=identity_fields["trace_id"],
+                    correlation_id=identity_fields["correlation_id"],
+                    causation_id=identity_fields["causation_id"],
+                    parent_run_id=identity_fields["parent_run_id"],
+                    agent_id=identity_fields["agent_id"],
+                    idempotency_key=identity_fields["idempotency_key"],
+                    side_effect_key=side_effect_key,
+                    payload=receipt_payload,
+                    created_at=now,
+                )
+                receipt_cursor = await db.execute(
+                    "INSERT INTO runtime_receipts (receipt_id, receipt_type, run_id,"
+                    " task_id, trace_id, correlation_id, causation_id, parent_run_id,"
+                    " agent_id, idempotency_key, side_effect_key, status, payload_json,"
+                    " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    " ON CONFLICT DO NOTHING",
+                    (
+                        receipt.receipt_id,
+                        receipt.receipt_type,
+                        receipt.run_id,
+                        receipt.task_id,
+                        receipt.trace_id,
+                        receipt.correlation_id,
+                        receipt.causation_id,
+                        receipt.parent_run_id,
+                        receipt.agent_id,
+                        receipt.idempotency_key,
+                        receipt.side_effect_key,
+                        receipt.status,
+                        receipt_payload_json,
+                        now_iso,
+                    ),
+                )
+                if int(receipt_cursor.rowcount or 0) != 1:
+                    raise RuntimeError("exact self-mod receipt insertion lost its slot")
+                idempotency_cursor = await db.execute(
+                    "INSERT INTO idempotency_records (idempotency_key, side_effect_key,"
+                    " run_id, task_id, trace_id, correlation_id, status,"
+                    " result_receipt_id, metadata_json, created_at, updated_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?)"
+                    " ON CONFLICT DO NOTHING",
+                    (
+                        identity_fields["idempotency_key"],
+                        side_effect_key,
+                        identity_fields["run_id"],
+                        identity_fields["task_id"],
+                        identity_fields["trace_id"],
+                        identity_fields["correlation_id"],
+                        receipt_id,
+                        idempotency_metadata_json,
+                        now_iso,
+                        now_iso,
+                    ),
+                )
+                if int(idempotency_cursor.rowcount or 0) != 1:
+                    raise RuntimeError("exact self-mod idempotency insertion lost its slot")
+                receipt_rows, idempotency_rows = await load_slot_rows()
+                if len(receipt_rows) != 1 or len(idempotency_rows) != 1:
+                    raise RuntimeError("exact self-mod pair was not durably inserted")
+                stored_receipt = exact_existing_pair()
+                await db.commit()
+                return stored_receipt
+            except BaseException:
+                await db.rollback()
+                raise
 
     @staticmethod
     def _normalize_mapping_id_kind(id_kind: str) -> str:
@@ -3185,6 +3655,7 @@ class RuntimeStateStore:
         return receipts[0].run_id if receipts else None
 
     async def record_runtime_receipt(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        _validate_runtime_receipt_sink(receipt, "record_runtime_receipt")
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -3214,6 +3685,7 @@ class RuntimeStateStore:
         return receipt
 
     def record_runtime_receipt_sync(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        _validate_runtime_receipt_sink(receipt, "record_runtime_receipt_sync")
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
@@ -3454,6 +3926,9 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
+        _reject_reserved_exact_self_mod_slot(
+            "try_begin_idempotent_side_effect_with_token", side_effect_key=side_effect_key,
+        )
         await self.init_db()
         now = _next_idempotency_token(None, ownership_time)
         async with aiosqlite.connect(self.db_path) as db:
@@ -3522,6 +3997,9 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
+        _reject_reserved_exact_self_mod_slot(
+            "try_begin_idempotent_side_effect_sync", side_effect_key=side_effect_key,
+        )
         self.init_db_sync()
         now = _utc_now_iso()
         with sqlite3.connect(self.db_path) as db:
@@ -3581,6 +4059,9 @@ class RuntimeStateStore:
         expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
+        _reject_reserved_exact_self_mod_slot(
+            "complete_idempotent_side_effect", side_effect_key=side_effect_key,
+        )
         await self.init_db()
         existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
         if existing is None:
@@ -3623,6 +4104,9 @@ class RuntimeStateStore:
         expected_updated_at: datetime | None = None,
     ) -> IdempotencyRecord:
         identity.require_for_dispatch()
+        _reject_reserved_exact_self_mod_slot(
+            "complete_idempotent_side_effect_sync", side_effect_key=side_effect_key,
+        )
         self.init_db_sync()
         existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
         if existing is None:
@@ -3667,6 +4151,9 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         if not side_effect_key:
             raise ValueError("side_effect_key is required")
+        _reject_reserved_exact_self_mod_slot(
+            "try_reclaim_idempotent_side_effect_with_token", side_effect_key=side_effect_key,
+        )
         await self.init_db()
         now = _next_idempotency_token(expected_updated_at, ownership_time)
         sql = (
@@ -4496,6 +4983,7 @@ class RuntimeStateStore:
         receipt: RuntimeReceipt,
     ) -> tuple[SessionEventRecord, RuntimeReceipt]:
         """Persist one session event and runtime receipt in one transaction."""
+        _validate_runtime_receipt_sink(receipt, "record_session_event_with_runtime_receipt")
         await self.record_session_event(event, receipt)
         return event, receipt
 
@@ -4505,6 +4993,7 @@ class RuntimeStateStore:
         receipt: RuntimeReceipt,
     ) -> tuple[SessionEventRecord, RuntimeReceipt]:
         """Synchronously persist an event and receipt in one transaction."""
+        _validate_runtime_receipt_sink(receipt, "record_session_event_with_runtime_receipt_sync")
 
         def operation(
             db: sqlite3.Connection,
@@ -4519,6 +5008,7 @@ class RuntimeStateStore:
 def _runtime_receipt_insert(
     receipt: RuntimeReceipt,
 ) -> tuple[str, tuple[Any, ...]]:
+    _validate_runtime_receipt_sink(receipt, "combined event/runtime receipt sink")
     return (
         "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
         " run_id, task_id, trace_id, correlation_id, causation_id,"
