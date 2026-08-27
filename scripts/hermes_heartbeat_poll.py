@@ -8,8 +8,12 @@ Fixes two protocol gaps identified in the 2026-05-23 morning briefing:
 This script is meant to be called from Hermes' cron heartbeat (every 30m).
 It:
   1. Writes the current timestamp to the Hermes state file
-  2. Polls queue.jsonl for unclaimed tasks matching Hermes' capabilities
-  3. Claims any matching tasks (sets claimed_by, claimed_at)
+  2. Scans the canonical task queue for unclaimed tasks matching Hermes'
+     capabilities
+  3. Claims matching tasks through the canonical lifecycle mutation
+     (``a2a_task_lifecycle.claim_task``) — this script never rewrites the
+     queue file itself, so there is exactly one mutation protocol and no
+     unsynchronized whole-file rewrite racing ``claim_task``/``close_task``
   4. Returns claimed task IDs for Hermes to execute
 
 Usage (from Hermes cron):
@@ -29,7 +33,6 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import logging
 import os
@@ -38,6 +41,23 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from dharma_swarm.operator_core.a2a_task_lifecycle import (
+        A2ATaskLifecycleError,
+        claim_task,
+        queue_path,
+    )
+except ModuleNotFoundError:  # pragma: no cover - exercised by cron layout only
+    # Direct-checkout cron invocation: ``python3 scripts/hermes_heartbeat_poll.py``
+    # from the repository root puts ``scripts/`` (not its parent) on sys.path,
+    # so the package import needs the repo root bootstrapped explicitly.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from dharma_swarm.operator_core.a2a_task_lifecycle import (
+        A2ATaskLifecycleError,
+        claim_task,
+        queue_path,
+    )
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,9 +75,6 @@ DHARMA_HOME = Path(os.environ.get("DHARMA_HOME", Path.home() / ".dharma"))
 # Hermes state file — documents Hermes' liveness
 HERMES_STATE_FILE = DHARMA_HOME / "agents" / "hermes-m5" / "state.json"
 
-# A2A bus queue — file-based task queue for inter-agent coordination
-QUEUE_FILE = DHARMA_HOME / "a2a_bus" / "queue.jsonl"
-
 # Hermes agent ID
 HERMES_AGENT_ID = "hermes-m5"
 
@@ -74,10 +91,15 @@ HERMES_CAPABILITIES = frozenset({
 })
 
 
-def queue_lock_file() -> Path:
-    """Return the advisory lock file used for queue read-modify-write cycles."""
+def _queue_root(queue_file: Path) -> Path:
+    """Return the state root that owns a canonical queue file path.
 
-    return QUEUE_FILE.with_suffix(QUEUE_FILE.suffix + ".lock")
+    ``<root>/a2a_bus/tasks/queue.jsonl`` → ``<root>``. Used so the scan and
+    the canonical ``claim_task`` mutation always target the same state root,
+    even when the queue path was supplied explicitly (tests, tooling).
+    """
+
+    return queue_file.parent.parent.parent
 
 
 # ---------------------------------------------------------------------------
@@ -144,51 +166,47 @@ def write_heartbeat_state(dry_run: bool = False) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def poll_queue(dry_run: bool = False) -> list[dict[str, Any]]:
-    """Poll queue.jsonl for unclaimed tasks matching Hermes capabilities.
+def poll_queue(
+    dry_run: bool = False,
+    *,
+    queue_file: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Scan the canonical queue for claimable tasks; claim them canonically.
 
-    Returns list of claimed tasks.
+    The scan is read-only. Matching tasks are claimed through
+    ``a2a_task_lifecycle.claim_task`` (which re-reads the queue, mutates the
+    task, rewrites the file atomically, and mirrors the task into the agent
+    inbox). This module performs no queue writes of its own.
+
+    When another agent claims or closes a matching task between the scan and
+    the claim, ``claim_task`` raises and the task is skipped — the canonical
+    writer's view wins, never a stale local snapshot.
     """
-    if not QUEUE_FILE.exists():
-        logger.info("No queue file at %s — nothing to poll", QUEUE_FILE)
+
+    resolved = Path(queue_file) if queue_file is not None else queue_path()
+    if not resolved.exists():
+        logger.info("No queue file at %s — nothing to poll", resolved)
         return []
 
-    lock_path = queue_lock_file()
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+", encoding="utf-8") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            return _poll_queue_locked(dry_run=dry_run)
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-
-def _poll_queue_locked(dry_run: bool = False) -> list[dict[str, Any]]:
-    """Poll and optionally rewrite the queue while the caller holds the lock."""
+    state_root = _queue_root(resolved)
+    claimed: list[dict[str, Any]] = []
 
     try:
-        lines = QUEUE_FILE.read_text(encoding="utf-8").splitlines()
+        lines = resolved.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
         logger.warning("Failed to read queue: %s", exc)
         return []
 
-    records: list[tuple[str, dict[str, Any] | None]] = []
-    claimed: list[dict[str, Any]] = []
-    modified = False
-    now_iso = datetime.now(timezone.utc).isoformat()
-
-    for i, raw_line in enumerate(lines):
+    for raw_line in lines:
         line = raw_line.strip()
         if not line:
-            records.append((raw_line, None))
             continue
         try:
             task = json.loads(line)
         except json.JSONDecodeError:
-            records.append((raw_line, None))
             continue
-
-        records.append(("", task))
+        if not isinstance(task, dict):
+            continue
 
         # Check if claimable
         if task.get("status") != "pending":
@@ -205,46 +223,40 @@ def _poll_queue_locked(dry_run: bool = False) -> list[dict[str, Any]]:
         if required_cap not in HERMES_CAPABILITIES:
             continue
 
-        # Claim it
-        if not dry_run:
-            task["claimed_by"] = HERMES_AGENT_ID
-            task["claimed_at"] = now_iso
-            task["status"] = "claimed"
-            modified = True
+        task_id = task.get("id")
+        if not isinstance(task_id, str) or not task_id.strip():
+            continue
+        task_id = task_id.strip()
 
-        claimed.append(task)
-        logger.info(
-            "%sClaimed task %s (capability=%s): %s",
-            "[DRY-RUN] " if dry_run else "",
-            task.get("id", f"line-{i}"),
-            required_cap,
-            task.get("description", task.get("title", "untitled"))[:80],
-        )
+        if dry_run:
+            claimed.append(dict(task))
+            logger.info(
+                "[DRY-RUN] Would claim task %s (capability=%s): %s",
+                task_id,
+                required_cap,
+                str(task.get("description", task.get("title", "untitled")))[:80],
+            )
+            continue
 
-    # Write back modified queue. A failed write must not be reported as a
-    # successful claim: callers depend on claimed IDs as dispatch evidence.
-    if modified and not dry_run:
-        new_lines = []
-        for raw_line, task in records:
-            if task is None:
-                new_lines.append(raw_line)
-            else:
-                new_lines.append(json.dumps(task, separators=(",", ":")))
-        tmp_fd, tmp_path = tempfile.mkstemp(
-            dir=str(QUEUE_FILE.parent),
-            suffix=".tmp",
-        )
         try:
-            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-                f.write("\n".join(new_lines) + "\n")
-            os.replace(tmp_path, str(QUEUE_FILE))
-        except Exception as exc:
-            logger.warning("Failed to write back queue: %s", exc)
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise
+            result = claim_task(
+                task_id,
+                agent_uid=HERMES_AGENT_ID,
+                state_root=state_root,
+            )
+        except A2ATaskLifecycleError as exc:
+            # Lost the race (already claimed/closed by a canonical writer) or
+            # the task cannot be claimed — skip without touching the queue.
+            logger.info("Skipping task %s: %s", task_id, exc)
+            continue
+
+        claimed.append(result)
+        logger.info(
+            "Claimed task %s (capability=%s): %s",
+            task_id,
+            required_cap,
+            str(result.get("description", result.get("title", "untitled")))[:80],
+        )
 
     return claimed
 
