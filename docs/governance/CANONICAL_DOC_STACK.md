@@ -84,6 +84,7 @@ is no longer a forced first-read surface.
 | Living Agent Kernel build spec (holon lane) | `spec-forge/living-agent-kernel/MASTER_SPEC.md` | Defers to `dharma_swarm/operator_core/living_agent_kernel.py` + its tests for runtime truth |
 | Terminal persistence substrate | `docs/ops/TMUX_AGENT_SUBSTRATE.md` | tmux launchers, VPS recovery plans, onboarding output, Live Ops Cockpit |
 | Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, operator-coherence report, operator travel/restart triage |
+| Sublimation Forge offline operator projection | `docs/foundry/RUNNING_NONSTOP.md` | Defers to `ACTIVE_TRACK.yaml` for intent and to code, tests, and receipts for runtime evidence; it does not prove service liveness |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
 | PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
 | Merge authority charter (Merge Master Mike) | `docs/governance/MMM_CHARTER.md` | Defers to `docs/ops/PR_REVIEW_CONTROL.md` for operations and to `examples/agents/merge_master_mike.registration.json` for capabilities |

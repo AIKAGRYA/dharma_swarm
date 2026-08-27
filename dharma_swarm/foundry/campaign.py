@@ -1,15 +1,10 @@
-"""Standing campaign — run the inner loop against one pinned target.
+"""Bounded, offline campaign orchestration for one pinned target.
 
-A campaign binds a :class:`TargetSpec` to a :class:`FoundryLoop`, runs a bounded
-number of generations, mints a lab-local seven-link receipt for every candidate
-that clears ring 2, and returns a summary that feeds the standing kill-metrics.
-Nothing here contacts an external repo or claims an external win: ring-3 links
-(a merged PR, an independent-leaderboard record) are added later by the operator
-or the live lane. Receipts stay lab-local until the guardian quorum is real.
-
-``dry_run_campaign`` runs the whole path hermetically with a synthetic proposer
-and evaluator, so CI (and this file's tests) can prove the loop composes without
-any external dependency, model key, or network.
+This layer exercises proposal, evaluation, tripwire, and held-out semantics.  It
+does not mint improvement receipts: binding a promoted candidate to an exact
+replayed artifact and pre-registered benchmark belongs to the separate digest
+layer.  In particular, a synthetic dry-run score is exploration evidence only,
+not an isolation, artifact-lineage, or improvement claim.
 """
 
 from __future__ import annotations
@@ -21,16 +16,7 @@ from pathlib import Path
 
 from dharma_swarm.foundry.army import MutationBudget
 from dharma_swarm.foundry.evaluator import Candidate, CallableEvaluator, Evaluator, EvalMetrics
-from dharma_swarm.foundry.heldout import HeldoutOutcome
 from dharma_swarm.foundry.loop import FoundryLoop, ProposeFn
-from dharma_swarm.foundry.receipts import (
-    FoundryReceipt,
-    StratifiedFields,
-    benchmark_link,
-    disclosure_link,
-    pre_registration_link,
-    write_receipt,
-)
 from dharma_swarm.foundry.targets import TargetSpec, assert_contributable
 
 
@@ -54,12 +40,16 @@ class CampaignResult:
     tripwire_trips: int = 0
     ring2_checked: int = 0
     ring2_survivors: int = 0
+    ring2_promotion_blocked: int = 0
+    provider_failures: int = 0
     best_fitness: float = 0.0
     mean_survival: float = 0.0
     spend_usd: float = 0.0
+    # Retained for API compatibility.  This offline layer never appends to it.
     receipt_ids: list[str] = field(default_factory=list)
     started_at: str = ""
     finished_at: str = ""
+    trip_reasons: dict[str, int] = field(default_factory=dict)
 
 
 def run_campaign(
@@ -72,44 +62,15 @@ def run_campaign(
     counterparty: str = "",
     state_root: Path | None = None,
 ) -> CampaignResult:
-    """Run a bounded campaign against ``spec`` and mint ring-1/2 receipts."""
+    """Run a bounded campaign without persisting promotion claims.
+
+    ``counterparty`` is retained for call compatibility with the former receipt
+    writer.  The digest layer must separately bind an exact replay artifact,
+    pinned target, benchmark, and isolation proofs before persistence.
+    """
     assert_contributable(spec)  # refuse do-not-touch / AI-banned targets
     config = config or CampaignConfig()
     result = CampaignResult(target_id=spec.id, started_at=datetime.now(timezone.utc).isoformat())
-
-    survival_by_candidate: dict[str, HeldoutOutcome] = {}
-
-    def _on_survivor(candidate: Candidate, fitness: float, outcome: HeldoutOutcome) -> None:
-        survival_by_candidate[candidate.candidate_id] = outcome
-        receipt = FoundryReceipt(
-            receipt_id=f"{spec.id}-{candidate.candidate_id}",
-            target_id=spec.id,
-            candidate_id=candidate.candidate_id,
-            stratified=StratifiedFields(
-                domain="external_code_contribution",
-                counterparty=counterparty or spec.name,
-                value_risk=f"benchmark delta {config.baseline_metric}->{fitness}",
-                independence="held-out ring-2 survived; ring-3 external confirmation pending",
-                transfer="not yet merged/recorded upstream",
-            ),
-            pre_registration=pre_registration_link(
-                target_id=spec.id, resolved_sha=spec.sha or "unpinned",
-                tree_digest="sha256:pending-ingest", baseline_metric=config.baseline_metric,
-                oracle_cmd=spec.oracle_cmd, seed=0,
-            ),
-            benchmark=benchmark_link(
-                baseline_metric=config.baseline_metric, candidate_metric=fitness,
-                runs=1 + len(outcome.workloads),
-                coefficient_of_variation=0.0, repro_cmd=spec.oracle_cmd,
-                isolation_level="docker_nonet",
-            ),
-            disclosure=disclosure_link(
-                ai_assisted=True, duplicate_checked=True,
-                test_results=f"ring-2 survival_rate={outcome.survival_rate:.3f}",
-            ),
-        )
-        write_receipt(receipt, state_root=(Path(state_root) / "receipts") if state_root else None)
-        result.receipt_ids.append(receipt.receipt_id)
 
     loop = FoundryLoop(
         evaluator=evaluator,
@@ -120,18 +81,23 @@ def run_campaign(
         per_generation=config.per_generation,
         timing_floor_s=config.timing_floor_s,
         survival_threshold=config.survival_threshold,
+        win_floor=config.baseline_metric,
         budget=MutationBudget(cap_usd=config.budget_cap_usd),
         state_root=state_root,
-        on_survivor=_on_survivor,
     )
 
     reports = loop.run(config.generations)
     result.generations_run = len(reports)
     result.proposed = sum(r.proposed for r in reports)
     result.ring1_wins = sum(r.ring1_wins for r in reports)
+    result.provider_failures = sum(r.provider_failures for r in reports)
     result.tripwire_trips = sum(r.tripwire_trips for r in reports)
+    for report in reports:
+        for reason, count in report.trip_reasons.items():
+            result.trip_reasons[reason] = result.trip_reasons.get(reason, 0) + count
     result.ring2_checked = sum(r.ring2_checked for r in reports)
     result.ring2_survivors = sum(r.ring2_survivors for r in reports)
+    result.ring2_promotion_blocked = sum(r.ring2_promotion_blocked for r in reports)
     result.spend_usd = round(sum(r.spend_usd for r in reports), 6)
     best = loop.grid.best()
     result.best_fitness = best.fitness if best else 0.0
@@ -174,7 +140,7 @@ def dry_run_campaign(
     config: CampaignConfig | None = None,
     state_root: Path | None = None,
 ) -> CampaignResult:
-    """Run a campaign end-to-end with synthetic army/evaluator (hermetic)."""
+    """Exercise the offline loop; synthetic evaluators never prove promotion."""
     return run_campaign(
         spec,
         evaluator=_dry_evaluator(),
