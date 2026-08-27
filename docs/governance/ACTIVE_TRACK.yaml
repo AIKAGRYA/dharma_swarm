@@ -71,15 +71,14 @@ spine_objectives:
 # TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
 # This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
 # (min_active..max_active concurrent tracks). Concurrency is authorized, not
-# mandated: the floor is 1, the current ceiling is 10, and opening beyond the floor is
+# mandated: the floor is 1, the current ceiling is 4, and opening beyond the floor is
 # operator discretion gated on non-overlap (owned_surfaces), not agent count.
 # ---------------------------------------------------------------------------
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 10            # hard ceiling — TAM retired and Titanium was
-                            # admitted one-for-one on 2026-07-17.
-  warn_active: 8            # soft signal — "you're spreading thin"; CI WARN above this (bumped 5->8 2026-07-07: reconcile admitted helm terminal + safety TCB with REAL behavioral gates; hyperbolic-time-chamber landed via #830)
+  max_active: 4             # hard ceiling — three durable priorities plus one bounded temporary lane
+  warn_active: 3            # soft signal — opening a fourth track requires explicit WIP justification
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
@@ -132,659 +131,6 @@ vital_signs:
 #   prerequisites / completion_criteria / non_goals / next_items  (as in v1)
 # ---------------------------------------------------------------------------
 active_tracks:
-  - id: loop-closure-2026-06
-    name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
-    status: ACTIVE
-    opened_at: "2026-06-11"
-    verified_at: "2026-07-11"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - runtime-truth-reconciliation-2026-06
-    depends_on:
-      - organism-rewire-2026-07
-    owned_surfaces:
-      - reports/loop_closure/**
-      - CYBERNETIC_LOOP_MAP.md
-      - docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md
-      - scripts/governance/loop1_consumption_check.py
-      - tests/test_loop_supervisor_tristate.py
-      - tests/test_loop1_consumption.py
-      - tests/test_loop1_consumption_check.py
-    moves_vital_signs:
-      - quality_gates
-      - eval_coverage
-    target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "CLOSED_LIVE 0/13; HARNESS_PROVEN 11/13; BLOCKED 2/13. Completion criteria only prove the claim-boundary artifact set, not production-live closure."
-
-    description: |
-      Operator-instructed campaign (2026-06-11 master prompt): wire all 13
-      cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
-      sense->interpret->constrain->act->adapt on real data with receipts to
-      its declared owner surface and an automated closure check.
-
-      Phase 0 (research dossier, no build code) ships first. Phases proceed
-      in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
-      then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
-      gated behind the One Wire external-receipt quorum (N>=5, M>=3).
-
-      Invariant that must hold throughout:
-        Internal artifacts never touch archive fitness; only countersigned
-        external acted receipts above quorum do.
-
-      Claim boundary:
-        HARNESS_PROVEN means a bounded replay/regression harness passed. It is
-        not production-live closure. CLOSED_LIVE requires one live owner-surface
-        criterion per loop; those criteria intentionally remain open until the
-        daemon branch that actually runs proves them.
-
-    ship_vetoes:
-      - id: cybernetics_codex_harness_proven_blocks_live_ship
-        kind: json_count_greater_than
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        collection: loop_statuses
-        field: verdict
-        value: HARNESS_PROVEN
-        threshold: 0
-
-    prerequisites:
-      - id: loop_map_exists
-        kind: file_exists
-        file: CYBERNETIC_LOOP_MAP.md
-      - id: loop_supervisor_exists
-        kind: file_exists
-        file: dharma_swarm/loop_supervisor.py
-
-    completion_criteria:
-      - id: phase0_dossier_exists
-        kind: file_exists
-        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
-      - id: phase0_fresh_status_table
-        kind: file_contains
-        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
-        pattern: "Fresh 13-loop status table"
-      - id: one_wire_invariant_stated
-        kind: file_contains
-        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
-        pattern: "never let internal artifacts touch archive fitness"
-      - id: loop1_closure_receipt_exists
-        kind: file_exists
-        file: reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md
-      - id: campaign_retrospective_exists
-        kind: file_exists
-        file: reports/loop_closure/RETROSPECTIVE.md
-      - id: cybernetics_codex_manifest_registered
-        kind: file_contains
-        file: ACTIVE_SURFACE_MANIFEST.yaml
-        pattern: "id: cybernetics_codex"
-      - id: cybernetics_codex_seed_exists
-        kind: file_exists
-        file: docs/agents/cybernetics_codex/agent.seed.yaml
-      - id: cybernetics_codex_soul_exists
-        kind: file_exists
-        file: docs/agents/cybernetics_codex/SOUL.md
-      - id: cybernetics_codex_context_desk_exists
-        kind: file_exists
-        file: docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md
-      - id: cybernetics_codex_audit_script_exists
-        kind: file_exists
-        file: scripts/governance/cybernetics_codex_audit.py
-      - id: cybernetics_codex_registration_script_exists
-        kind: file_exists
-        file: scripts/governance/register_cybernetics_codex.py
-      - id: cybernetics_codex_latest_audit_exists
-        kind: file_exists
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-      - id: cybernetics_codex_latest_audit_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        fresh_ttl_days: 21
-        requires_keys:
-          - bounded_replays
-          - loop_statuses
-          - one_wire
-          - verdict_tiers
-          - live_owner_surface_criteria
-      - id: cybernetics_codex_loop_verdict_map_matches_claim_boundary
-        kind: json_collection_values_match
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        collection: loop_statuses
-        key_field: number
-        value_field: verdict
-        expected:
-          "1": HARNESS_PROVEN
-          "2": HARNESS_PROVEN
-          "3": HARNESS_PROVEN
-          "4": HARNESS_PROVEN
-          "5": HARNESS_PROVEN
-          "6": HARNESS_PROVEN
-          "7": HARNESS_PROVEN
-          "8": HARNESS_PROVEN
-          "9": HARNESS_PROVEN
-          "10": HARNESS_PROVEN
-          "11": HARNESS_PROVEN
-          "12": BLOCKED
-          "13": BLOCKED
-      - id: cybernetics_codex_live_owner_criteria_declared
-        kind: json_mapping_keys_nonempty
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        mapping: live_owner_surface_criteria
-        keys:
-          - loop1
-          - loop2
-          - loop3
-          - loop4
-          - loop5
-          - loop6
-          - loop7
-          - loop8
-          - loop9
-          - loop10
-          - loop11
-          - loop12
-          - loop13
-      - id: cybernetics_codex_closed_live_count_zero
-        kind: json_count_equals
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        collection: loop_statuses
-        field: verdict
-        value: CLOSED_LIVE
-        expected: 0
-      - id: cybernetics_codex_harness_proven_count_11
-        kind: json_count_equals
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        collection: loop_statuses
-        field: verdict
-        value: HARNESS_PROVEN
-        expected: 11
-      - id: cybernetics_codex_blocked_count_2
-        kind: json_count_equals
-        file: reports/loop_closure/cybernetics_codex/latest_audit.json
-        collection: loop_statuses
-        field: verdict
-        value: BLOCKED
-        expected: 2
-      - id: cybernetics_codex_loop3_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_loop4_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_loop7_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_loop8_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_loop9_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_loop10_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_loop11_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json
-        requires_keys:
-          - loop
-          - loop_id
-          - observed_at
-          - transitions_receipted
-          - adapt_proof
-          - later_cycle_read_evidence
-      - id: cybernetics_codex_one_wire_guard_test_exists
-        kind: file_exists
-        file: tests/test_one_wire_archive_fitness_guard.py
-      - id: cybernetics_codex_one_wire_guard_test_passes
-        kind: test_passes
-        test: tests/test_one_wire_archive_fitness_guard.py
-      - id: cybernetics_codex_loop12_13_guard_receipt_exists
-        kind: file_exists
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json
-      - id: cybernetics_codex_loop12_13_guard_receipt_valid
-        kind: receipt_valid
-        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json
-        requires_keys:
-          - verdict
-          - do_not_close_loop
-          - one_wire_live_state
-          - command_to_replay
-          - tests_run
-      # WP-LC campaign criteria (spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md §7.1)
-      # — deliberately RED until their packets land.
-      - id: loop_supervisor_tristate_honest
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_loop_supervisor_tristate.py", "-q"]
-      - id: loop1_consumption_unit_proof
-        kind: command_passes
-        command: ["python3", "-m", "pytest", "tests/test_loop1_consumption.py", "-q"]
-      - id: loop1_consumption_check_replays
-        kind: command_passes
-        command: ["python3", "scripts/governance/loop1_consumption_check.py", "--check"]
-        timeout_s: 60
-
-    non_goals:
-      - Do not weaken, bypass, or hard-code any telos gate to close a loop.
-      - Do not let internal artifacts touch archive fitness (One Wire quorum stands).
-      - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
-      - Do not commit provider API keys or any credentials.
-      - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
-
-    next_items:
-      - id: 1
-        what: "TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp. [AMENDED 2026-07-11: EXECUTED 2026-07-03 on the then-daemon host (Mac, db_path /Users/dhyana/.dharma/state/runtime.db) — cutoff 2026-07-02T00:00:00Z, quarantined_now=2191, dropoff_live_after=0, dry-run/execute rowid-sha256 identical; repo witness a9d6f6a6b reports/loop_closure/2026-07-03_dispatch_dropoff_quarantine.json; host-delegation ratified by this admission merge. Residual owned by WP-LC2: verify the CURRENT daemon host's container DB — any live dropoffs there postdate the #755 spine fix and are real signal, never quarantinable.]"
-        kind: code
-        blocker: true
-      - id: 2
-        what: "Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority."
-        kind: governance
-        blocker: false
-      - id: 3
-        what: "Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs."
-        kind: governance
-        blocker: true
-      - id: 4
-        what: "WP-LC0 admission record: LOOP-1 CLOSED_LIVE campaign admitted; spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md is the detail authority (WP-LC0..LC5). Operator decision register 2026-07-11: D-LC2 consumption wire RATIFIED (bounded ModelRouter feedback extension — reorder-only, demotion cap, delegation_runs-receipts-only, fail-open to default order); D-LC3 one redeploy + one restart AUTHORIZED (date open; item 8 precondition); D-LC1 resolved by the 2026-07-03 execution; D-LC5 dharmagraph sign-off route PRE-APPROVED as fallback. Session-entry update 2026-07-17: managed projections no longer touch BUILD_SESSION_ENTRYPOINT.md and require no onboarding shared-surface exception."
-        kind: governance
-        blocker: false
-      - id: 5
-        what: "WP-LC1 — 4-state loop-health honesty (NEVER_STARTED|RUNNING|STALLED|DISABLED; never-started must not render OK — loop_supervisor.py is_stalled returns False at last_tick==0 and the CLI collapses to OK/STALLED), register the five factory-only loops (archaeology, guardian, health-api, gauntlet, world-model — record_tick silently no-ops for unregistered names), thread supervisor ticks through the named-loop factories (~20 sites). Spec §6 WP-LC1; criterion loop_supervisor_tristate_honest RED until landed."
-        kind: code
-        blocker: false
-      - id: 6
-        what: "WP-LC3 — the ratified consumption wire: receipt-grounded provider deprioritization as an extension of the shared ModelRouter's existing feedback loop (providers.py ModelRouter; feedback via agent_runner._record_router_feedback); evidence (consumed_trace_ids, decision delta, per-process boot_id) rides RoutingDecision (model_routing.py); dharma_swarm/orchestrator.py is NOT edited (dharmagraph-owned; D-LC5 sign-off fallback pre-approved). Spec §6 WP-LC3 boundedness rules are hard requirements."
-        kind: code
-        blocker: false
-      - id: 7
-        what: "WP-LC4 — disjoint read-only checker scripts/governance/loop1_consumption_check.py validating P1..P4 from runtime.db (mode=ro) + witness chain, emitting reports/loop_closure/loop1_consumption_receipt.json (two-digest pattern, observed_at + host-binding keys); CI-safe --check exits with typed needs_host gap when host stores are absent. Spec §6 WP-LC4."
-        kind: code
-        blocker: false
-      - id: 8
-        what: "needs-owner -> organism-rewire-2026-07 (docker-compose.yml owner): commit the loopback binding (127.0.0.1:7433:7433) to main BEFORE any WP-LC2 redeploy — origin/main docker-compose.yml world-binds 7433:7433 and the daemon host's closure of that exposure is an uncommitted local patch (2026-07-09 forensics), so a clean redeploy silently reopens it. Hard precondition for executing D-LC3."
-        kind: ops
-        blocker: true
-      - id: 10
-        what: "WP-LC5 — the closure claim: one atomic governance PR carrying the fresh ON-HOST cybernetics_codex audit + the §7.2 criteria transition (closed_live 0->1, harness_proven 11->10, verdict map loop 1 -> CLOSED_LIVE) + claim_boundary 'CLOSED_LIVE 1/13; HARNESS_PROVEN 10/13; BLOCKED 2/13'. Anti-gaming: host-binding requires_keys on all three receipts, audit inputs chained to the operator-executed host_session receipt, NON-AUTHOR MERGE required, bot-PR/automerge label forbidden. Ship veto (any HARNESS_PROVEN blocks live-ship) stays — Loop-1 closure is not a track live-ship claim."
-        kind: governance
-        blocker: false
-      - id: 11
-        what: "WP-A4A5 (aliveness campaign wave 0, admitted 2026-07-17): durable liveness evidence — orchestrate_live.py append_liveness_ledger_row writes digest-chained spine VerifiedMachineReceipt rows (boot_id, pid, running, restart_counts, abandoned) to ~/.dharma/ops/liveness_ledger.jsonl hourly and on abandonment change, closing the overwrite-in-place gap in _write_loop_liveness that left run claims unfalsifiable; single-mint process boot_id in dharma_swarm/spine/identity.py (P4 restart-survival prerequisite); read-only replay verifier scripts/governance/liveness_ledger_check.py (typed needs_host exit 0 when the ledger is absent, exit 1 on broken chain or failed coverage); live_ops_census.py dharma_daemon pattern extended to match the container entrypoint python -m dharma_swarm.orchestrate_live (Dockerfile.swarm CMD). REMAINING (host, WP-LC2 window): >=24 chained hourly rows under one boot_id after 24h, cross-restart different-boot_id proof, hourly census scheduling after the BR-004 cron reconciliation."
-        kind: code
-        blocker: false
-
-  - id: orchestration-arena-v1-2026-06
-    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
-    status: ACTIVE
-    opened_at: "2026-06-23"
-    # Re-verified 2026-07-16: check_track_status full run, 12/12 completion
-    # criteria pass including live pytest greens (arena_v1_controls_tests_pass
-    # 15 passed; arena_truth_surface_tests_pass 8 passed) and a fresh, digest-
-    # intact arena_truth_receipt. Blocker next-item 2 (live-lane rules) stays open.
-    verified_at: "2026-07-17"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - provider-routing-consolidation-2026-06
-      - loop-closure-2026-06
-    owned_surfaces:
-      - dharma_swarm/coordination/**
-      - dharma_swarm/council/**
-      - scripts/governance/arena_truth_report.py
-      - reports/governance/arena/**
-      - tests/test_arena_v1.py
-      - tests/test_dpi.py
-      - tests/test_orchestration_genome.py
-      - tests/test_orchestrator_v1.py
-      - tests/test_council_profiles.py
-      - tests/test_coordination_closure_checks.py
-      - tests/test_arena_truth_report.py
-    moves_vital_signs:
-      - eval_coverage
-      - quality_gates
-
-    description: |
-      Governance admission for the Arena/Orchestration substrate that LANDED on
-      main (PRs #670 and adjacent) but was not yet represented in the active-track
-      portfolio. The DGM substrate must be governance-visible: the system needs to
-      know its own fitness function exists, is frozen/hermetic/replayable, and is
-      not yet making production capability claims.
-
-      This is the keystone fitness layer for any future Dharma Forge: a frozen
-      verifiable taskpack + deterministic scorer + zero-weight heuristic
-      orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
-      that gates a decorrelated-correctness bonus on actual correctness, plus a
-      minimal Council that verifies orchestration traces.
-
-      Doctrine that must hold: capability leads, trust multiplies (not the
-      headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
-      trained weights — training is earned only after the arena produces labels.
-
-    prerequisites:
-      - id: arena_runner_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/arena/runner.py
-      - id: arena_scorer_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/arena/scorer.py
-      - id: orchestration_genome_exists
-        kind: file_exists
-        file: dharma_swarm/coordination/genome.py
-
-    completion_criteria:
-      - id: frozen_taskpack_present
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/taskpack.py
-        pattern: "TASK_PACK_ID"
-      - id: deterministic_scorer_hash
-        kind: file_contains
-        file: dharma_swarm/coordination/arena/scorer.py
-        pattern: "def scorer_hash"
-      - id: orchestration_genome_class
-        kind: file_contains
-        file: dharma_swarm/coordination/genome.py
-        pattern: "class OrchestrationGenome"
-      - id: zero_weight_orchestrator_map_elites
-        kind: file_contains
-        file: dharma_swarm/coordination/orchestrator_v1.py
-        pattern: "class MapElitesArchive"
-      - id: dpi_decorrelation_gated_on_correctness
-        kind: file_contains
-        file: dharma_swarm/coordination/dpi.py
-        pattern: "def decorrelation_bonus"
-      - id: council_trace_verification
-        kind: file_contains
-        file: dharma_swarm/council/council.py
-        pattern: "class Council"
-      - id: arena_v1_test_exists
-        kind: file_contains
-        file: tests/test_arena_v1.py
-        pattern: "def test_positive_lift_candidate_beats_best_single_at_parity"
-      - id: dpi_test_exists
-        kind: file_exists
-        file: tests/test_dpi.py
-      - id: closure_checks_test_exists
-        kind: file_exists
-        file: tests/test_coordination_closure_checks.py
-      # Rigorous criteria (2026-07-03): the onboarding TRUST CHECK capped this
-      # track at existence-only evidence. These make readiness a number a real
-      # check produced — the controls/parity/significance battery must PASS and
-      # the governance surface must replay + verify as a digest-intact receipt.
-      - id: arena_v1_controls_tests_pass
-        kind: test_passes
-        test: tests/test_arena_v1.py
-      - id: arena_truth_surface_tests_pass
-        kind: test_passes
-        test: tests/test_arena_truth_report.py
-      - id: arena_truth_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/arena/arena_truth_receipt.json
-        expect_digest: true
-        fresh_ttl_days: 21
-        requires_keys:
-          - schema
-          - generated_at
-          - hermetic
-          - capability_claim
-          - task_manifest_hash
-          - scorer_hash
-          - sealed_oracle_hash
-          - best
-          - corpus
-
-    non_goals:
-      - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
-      - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
-      - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
-      - Do not couple admission to the full world-ingestion (#662) seam.
-
-    next_items:
-      - id: 1
-        what: >-
-          DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only
-          governance surface — scripts/governance/arena_truth_report.py renders
-          reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md +
-          corpus), seeded/deterministic; --check fails if the committed surface
-          does not replay byte-for-byte. Criterion arena_truth_receipt_valid
-          verifies it.
-        kind: code
-        blocker: false
-      - id: 2
-        what: >-
-          HERMETIC CONTROLS SHIPPED (runner.run always executes
-          best_single_full_budget gate + budget-parity ledger for every arm +
-          seeded bootstrap significance; proven by arena_v1_controls_tests_pass).
-          REMAINING (the blocker's live edge): any future live-lane arena run
-          (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control
-          arms before any capability claim — the hermetic lift on the fixture
-          taskpack is a control-machinery existence proof, never a capability
-          claim (non-goal 1). C2 stays owned by real benchmark evidence.
-        kind: code
-        blocker: true
-      - id: 3
-        what: >-
-          DONE 2026-07-03: arena winners connected to the cold-start trace
-          corpus — coordination/arena/corpus.py emits labeled winner traces
-          (positive_lift_candidate only, scorer-labeled, deterministic) to
-          reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in
-          the report receipt. Labels only; zero training (v1 doctrine).
-        kind: code
-        blocker: false
-
-  - id: merge-master-mike-d4-2026-06
-    name: Merge Master Mike — D4 persistent always-on merge agent
-    status: ACTIVE
-    opened_at: "2026-06-24"
-    # Re-verified 2026-07-16: PR #982 (merge commit 145e0b7bbe) landed the
-    # cloud heartbeat + codex,copilot quorum code slice; full Mike battery
-    # green on that tree (tests/test_pr_merge_control_github_reviews.py +
-    # tests/test_pr_merge_control.py + tests/test_merge_master_mike_daemon.py:
-    # 75 passed). mike_cloud_heartbeat criterion now passes in-tree.
-    verified_at: "2026-07-16"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    graduation_profile: governance_gate
-    target_closure_kind: VERIFIED_SLICE
-    claim_boundary: >-
-      Native Codex/Copilot reviews are accepted only from trusted installed-App
-      identities; unattended human-PR merge is authorized only after every
-      existing deterministic gate is clean. Claude remains an optional
-      deep/backup lane with no new credential. This policy and its hermetic
-      behavior are landed; PRODUCTION_READY is not claimed until a live cloud
-      canary and a ship_safe Final Boss manifest are attached. The current 7/7
-      criteria prove the landed D4 slice only; they do not cover Titanium
-      WP-0F2 required-check authority convergence, so Mike remains active.
-    complements:
-      - runtime-truth-reconciliation-2026-06
-      - repository-titanium-hardening-2026-07
-    owned_surfaces:
-      - scripts/runtime/pr_merge_control.py
-      - scripts/runtime/merge_master_mike_daemon.py
-      - .github/workflows/automerge.yml
-      - .github/workflows/codex-mention-router.yml
-      - .github/workflows/merge-master-mike-backlog.yml
-      - tests/test_merge_master_mike_daemon.py
-      - tests/test_pr_merge_control.py
-      - tests/test_pr_merge_control_github_reviews.py
-    moves_vital_signs:
-      - quality_gates
-      - tool_coverage
-
-    description: |
-      Operator directive 2026-06-24: make Merge Master Mike a D4-level
-      PERSISTENT, always-on merge agent — up independently of any operator
-      machine, responsive both reactively (@mention) and proactively (every
-      PR event), with a reviewer quorum that is satisfiable in the cloud.
-
-      Diagnosis (this session): Mike-the-merger is already cloud event-driven
-      (automerge.yml on pull_request / check_suite / review + an hourly sweep,
-      and the router on @mention). Mike-the-reviewer-LANE is not: the cloud
-      router runs packet->gate->merge against an ephemeral RUNNER_TEMP state
-      dir but NEVER runs the reviewer lanes (run-agent), so the required
-      claude/copilot receipt FILES are never written in the cloud. Result: bot
-      PRs flow (the bot-pr label WAIVES receipts) but HUMAN PRs can never
-      auto-merge in the cloud — the gate always finds the receipts missing. The
-      only producer today is the Mac daemon's review cycle-mode (which defaults
-      to dry-run) or a manual `make pr-run-claude`. That machine dependency is
-      the real clean-merge bottleneck.
-
-      The fix is a reviewer-receipt SOURCE that exists in the cloud with no
-      credential: teach the gate to count the native GitHub reviews it already
-      receives (the Codex App review = codex; a requested Copilot review =
-      copilot) as receipts, and demote claude to the deep/backup lane (built
-      later as a credentialed cloud Action). Then auto-enroll every non-draft
-      PR so Mike acts proactively, and give Mike a cloud heartbeat so his
-      living-agent presence is continuous rather than Mac-bound.
-
-      Doctrine that MUST hold (the gate's safety floor is never weakened):
-        Add receipt SOURCES, never remove gate checks. CI green, no conflict,
-        no unresolved blocking threads, and reviewDecision != CHANGES_REQUESTED
-        stay hard. Mike never silent-merges, never approves, never pushes
-        source, never bypasses governance. A native GitHub review counts as a
-        receipt ONLY from a trusted installed reviewer-App login.
-
-    prerequisites:
-      - id: pr_merge_control_exists
-        kind: file_exists
-        file: scripts/runtime/pr_merge_control.py
-      - id: mike_daemon_exists
-        kind: file_exists
-        file: scripts/runtime/merge_master_mike_daemon.py
-      - id: automerge_workflow_exists
-        kind: file_exists
-        file: .github/workflows/automerge.yml
-      - id: router_workflow_exists
-        kind: file_exists
-        file: .github/workflows/codex-mention-router.yml
-
-    completion_criteria:
-      - id: github_review_receipt_bridge
-        kind: file_contains
-        file: scripts/runtime/pr_merge_control.py
-        pattern: "github_review"
-      - id: github_review_bridge_tested
-        kind: file_exists
-        file: tests/test_pr_merge_control_github_reviews.py
-      - id: automerge_enrolls_all_nondraft
-        kind: file_contains
-        file: .github/workflows/automerge.yml
-        pattern: "mike-watch"
-      - id: mike_cloud_heartbeat
-        kind: file_contains
-        file: .github/workflows/merge-master-mike-backlog.yml
-        pattern: "schedule:"
-      # Grade-up (2026-07-04 Pudgala dive Phase 0): the criteria above are all
-      # existence-only (S1 ceiling). This binds the track to the Slice 1 work
-      # that actually LANDED on main — feat(mike): bridge native GitHub reviews
-      # to Mike receipts (D4) — an honest S2, no new claim.
-      - id: github_review_bridge_landed
-        kind: commit_on_main
-        commit: "751c5ba8a802e7116827c31bcf98631b2e2a1f8f"
-      # --- REAL behavioral gate (2026-07-07 reconcile): the criteria above were
-      #     existence/landed-only. These two RAN GREEN from origin/main and prove
-      #     the shipped Slice 1 behavior (native-GitHub-review -> Mike receipt
-      #     bridge is ADDITIVE and FAILS CLOSED). No longer a landed-only false positive.
-      - id: github_review_bridge_test_passes
-        kind: test_passes
-        test: tests/test_pr_merge_control_github_reviews.py
-        oracle_source: github-rest-pulls-reviews-contract
-        # 14 tests: CHANGES_REQUESTED still blocks; untrusted login never counts;
-        # no-trusted-review keeps local blocked; a present local receipt is never
-        # overridden. Verified 2026-07-07: 14 passed.
-      - id: pr_merge_control_gate_fail_closed_test_passes
-        kind: test_passes
-        test: tests/test_pr_merge_control.py
-        # 52 tests: fail-closed dispatch/gate (missing-required-CI blocks; Mike
-        # merge authority skips when gate blocked; backup-reviewer/quorum gating).
-        # Verified 2026-07-07: 52 passed.
-
-    non_goals:
-      - Do not weaken or remove any existing gate check (CI green, conflict, unresolved threads, CHANGES_REQUESTED stay hard).
-      - Do not let Mike silent-merge, approve PRs, push source, or bypass governance.
-      - Do not commit provider/API credentials; the credentialed Claude reviewer Action is operator-provisioned.
-      - Do not accept a "review" from an untrusted login as a receipt; only trusted installed reviewer-App logins.
-      - Do not create a new merge authority or receipt store; extend pr_merge_control and the existing workflows.
-
-    # OPERATOR RATIFICATION 2026-07-16 (durable record: PR #962 comment
-    # https://github.com/AmitabhainArunachala/dharma_swarm/pull/962#issuecomment-4987647747):
-    #   D1 YES — trusted native GitHub reviews may satisfy receipts.
-    #   D2 YES — required cloud quorum is codex,copilot; claude is deep/backup.
-    #   D3 YES — unattended human-PR merge only when every existing gate is clean.
-    #   D4 DEFERRED — no new Claude CI credential; the optional backup lane stays off.
-    next_items:
-      - id: 1
-        what: "DONE 2026-07-16 (reconciled; was: Slice 1 blocker — bridge native GitHub reviews -> Mike receipts in the pr_merge_control gate, trusted-login-gated and ADDITIVE). Shipped and landed on main (commit 751c5ba8a8, criterion github_review_bridge_landed) with behavioral proof green (github_review_bridge_test_passes 15 passed; pr_merge_control_gate_fail_closed_test_passes 52 passed)."
-        kind: code
-        blocker: false
-        # Underclaim probe (2026-07-03) reconciled 2026-07-16; the linked
-        # criterion stays as the item's proof pointer.
-        evidence_criterion: github_review_bridge_tested
-      - id: 2
-        what: "DONE: Slice 2 auto-enrolls every non-draft PR into the Mike evaluate lane via mike-watch (automerge.yml, criterion automerge_enrolls_all_nondraft) without waiving reviewer receipts."
-        kind: code
-        blocker: false
-      - id: 3
-        what: "DEFERRED by operator decision D4 (2026-07-16 record): no cloud Claude credential; Claude remains an optional deep/backup reviewer and is not part of the required cloud quorum."
-        kind: code
-        blocker: false
-      - id: 4
-        what: "DONE 2026-07-16 (PR #982, merge commit 145e0b7bbe): merge-master-mike-backlog.yml carries an hourly scheduled heartbeat pinned to packet-only + merge-off on scheduled fires, with codex,copilot native-review quorum parity; the Mac daemon remains an optional mirror."
-        kind: code
-        blocker: false
-        evidence_criterion: mike_cloud_heartbeat
-      - id: 5
-        what: "DONE 2026-07-16: operator ratification of D1/D2/D3 (D4 explicitly DEFERRED) recorded durably on the PR #962 thread under the fail-closed claim boundary above; no gate check was weakened."
-        kind: governance
-        blocker: false
-      - id: titanium-wp-0f2
-        what: "Titanium WP-0F2 blocker: after WP-0F1 establishes the canonical required-check manifest, make automerge, manual Mike, and workflow-dispatch consumers use that one authority; fail closed on absent, failed, pending, cancelled, or action-required checks; preserve stale-head rejection, unresolved-thread and CHANGES_REQUESTED blocks, plus the narrow bot-PR waiver. Keep Mike active until the merged-main behavioral tests pass."
-        kind: code
-        blocker: true
-
   - id: organism-rewire-2026-07
     name: Organism Rewire — dormant organs to production, spine standing-on, external gradients
     status: ACTIVE
@@ -1390,9 +736,978 @@ active_tracks:
   # (never an existence-only rubber-stamp).
   # ==========================================================================
 
+  - id: darshan-publication-2026-07
+    name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
+    status: ACTIVE
+    opened_at: "2026-07-12"
+    verified_at: "2026-07-12"
+    ttl_days: 30
+    owner: "@AmitabhainArunachala"
+    serves: revenue-external-humans-served
+    complements:
+      - company-builder-parity-2026-07
+    owned_surfaces:
+      - docs/plans/DARSHAN_CHARTER_2026-07-12.md
+      - reports/darshan/**
+      - reports/tam/**
+    moves_vital_signs:
+      - eval_coverage
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical
+      text at ~/.dharma/agents/darshan_fable/DECREE_GOLDEN_SEAL.md). Criteria
+      prove the publication organ exists and its output is receipted — never
+      audience, revenue, or influence claims (those are TAM-board readings,
+      measured not narrated). Posting to third-party platforms (Medium,
+      Substack, Reddit, etc.) stays operator-gated per platform regardless of
+      criteria state. The Darshan-owned site itself may publish pieces that
+      have passed the editorial law (both-fires + discernment + operator read).
+
+    description: |
+      Operator-decreed publication venture (seed: 2026-05-26 lodestone,
+      wiki darshan-publication-venture-cell; decree: GOLDEN SEAL 2026-07-12).
+      Darshan is a multi-disciplinary voice of truth — deep research in one
+      hand, grounded contemplative vision in the other — that carves the
+      estate's telos into public words, gives the MI/R_V research a platform
+      independent of academic acceptance, and feeds back to the swarm: every
+      article ends its open questions as typed research/build candidates.
+      Structure: seven desks (Bridge, Instrument, Witness Ledger, Noosphere
+      Weather, Field Notes, Readings in Fire, Polity); one head-editor holon
+      (darshan_fable, seat externalized at ~/.dharma/agents/darshan_fable/);
+      two competing entrepreneurial author personas (staged; external GO
+      operator-gated); a zero-dependency static site; the VWRITE pipeline as
+      production substrate. Editorial law (both-fires, register tags
+      FACT/HYPOTHESIS/WILD, fourth option, citation-or-silence, salvage with
+      every kill) is enforced on every piece — anti-feed by charter: no
+      engagement bait, no trackers, no outrage farming.
+
+    completion_criteria:
+      - id: darshan_charter_exists
+        kind: file_contains
+        file: docs/plans/DARSHAN_CHARTER_2026-07-12.md
+        pattern: "editorial law"
+      - id: darshan_issue_one_receipt_valid
+        # RED until Issue One actually publishes to the Darshan site with a
+        # digest-sealed receipt (deliberate-RED precedent: #864/#866).
+        kind: receipt_valid
+        file: reports/darshan/issue_one_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - observed_at
+          - articles
+          - site_build_sha256
+          - editorial_law_passes
+          - content_digest
+
+    next_items:
+      - id: 1
+        what: "Issue One: ~6 articles (The Silenced No + five decreed topics: China land purchases, Chinese-model Tibet silence, frontier-model gatekeeping, Iran/Swiss-channel epistemics, Kali Yuga/AI time) through the full editorial law — both-fires pass, independent discernment pass, operator read — then site publish + digest-sealed issue receipt at reports/darshan/issue_one_receipt.json. Drafting pipeline ran 2026-07-12; law passes remain."
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Website deployment decision (operator, from phone is fine): GitHub Pages / Cloudflare Pages / agni VPS. Site scaffold built locally at ~/darshan_site (zero-dependency static, python3 scripts/build.py). Until decided, the site exists locally only."
+        kind: ops
+        blocker: true
+      - id: 3
+        what: "Two competing entrepreneurial author personas: staged under ~/.dharma/agents/darshan_fable/authors/ with voices, beats, platform strategies, monetization models, competition scoreboard. EXTERNAL POSTING GATE (blocker): no third-party platform post until operator GO per platform — one phone message suffices, logged here when given."
+        kind: governance
+        blocker: true
+      - id: 4
+        what: "VWRITE massive evolution: integration brief at ~/.dharma/darshan/INTEGRATION_BRIEF.md (recon 2026-07-12 incl. agni/dokka/NIKKI); v0.1 spec lands as its own governance amendment once operator reviews the brief."
+        kind: code
+        blocker: false
+      - id: 5
+        what: "Fleet registration: darshan_fable agent card (~/.dharma/agents/darshan_fable/identity/agent_card.json) registered via a2a agent onboarding; nurture heartbeat live (com.dharma.darshan-nurture, 07:45/19:45, phone digest at ~/.dharma/darshan/LATEST.md). Kill-switch: launchctl unload."
+        kind: ops
+        blocker: false
+      - id: 6
+        what: "Editorial queue (post-Issue-One, ~14 slots to the decreed ~20): maintained at ~/.dharma/darshan/editorial_queue.md; each published piece must emit its open questions as typed swarm work — an article that spawns no downstream work is decoration (editorial law 6)."
+        kind: governance
+        blocker: false
+      - id: 7
+        what: "OPERATOR CONTEXT (standing): operator walking Japan for peace (Soya->Hateruma) from 2026-07; ~15% interaction, phone-first. All decisions batch to ~/.dharma/darshan/DECISIONS_PENDING.md; never block on operator except items marked blocker here."
+        kind: governance
+        blocker: false
+
+    non_goals:
+      - No third-party platform posting without per-platform operator GO (the external boundary stays operator-held; this decree does not lift the outreach lease for anything but the Darshan-owned site).
+      - No engagement optimization, trackers, analytics, or feed mechanics — Darshan is anti-feed by charter; its authors compete on earnings/reach WITHOUT slop (competition rules in authors/COMPETITION.md).
+      - No revenue claims on this track — receipted dollars are TAM-board readings (honest_arr), never narrated here.
+      - No new digest/receipt primitives — stable_digest/utc_now (memory_kernel.write_receipts) and the receipt_valid contract, as everywhere.
+      - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
+
+  - id: hyperbolic-time-chamber-2026-07
+    name: Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
+    status: ACTIVE
+    # Fourth-lane WIP justification: this is the only active track whose
+    # criteria directly advance the declared research-depth objective. Keep it
+    # bounded to the existing chamber surfaces and blocked on the isolation
+    # jail before any live untrusted-solver work.
+    opened_at: "2026-07-07"
+    verified_at: "2026-07-07"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: research-depth
+    complements:
+      - organism-rewire-2026-07
+      - orchestration-arena-v1-2026-06
+      - loop-closure-2026-06
+    owned_surfaces:
+      - docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
+      - docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
+      - docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md
+      - docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md
+      - scripts/governance/inward_ascent_baseline.py
+      - scripts/governance/frontier_ledger.py
+      - scripts/governance/transcendence_ledger.py
+      - dharma_swarm/chamber/**
+      - tests/test_chamber_traces.py
+      - tests/test_chamber_gym_git_history.py
+      - tests/test_chamber_daily_delta.py
+      - tests/test_chamber_predictions.py
+      - tests/test_chamber_sandbox.py
+      - tests/test_chamber_ledger_history.py
+      - tests/test_transcendence_ledger.py
+      - reports/governance/inward_ascent/**
+      - reports/governance/chamber/**
+    moves_vital_signs:
+      - eval_coverage
+      - quality_gates
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: >-
+      Phase 0 proved the dossier + two replayable instruments; Phase 1 Slice A
+      proves a HARNESS-level G1 gym (fixture solver, deterministic scorer,
+      leak guard) plus the E1/E3/E4/E5/E6 wiring. Gym results are
+      internal-gym numbers, never benchmark or capability claims; C2 stays
+      owned by the RSI/arena lab; live solver evolution waits on operator
+      keys/compute. Archive fitness remains behind the One Wire external
+      quorum.
+
+    description: |
+      Operator-ratified chamber doctrine (vision map 2026-07-07) + elevation
+      spec (SEAL v2): seal the efferent edge, open the afferent edge wide,
+      evolve at machine speed against imported and time-lagged reality
+      (class-2 signal only) until the trust gate opens on measured numbers.
+      Phase 0 shipped the dossier + baseline scoreboard + Frontier Ledger
+      (PR #830). Phase 1 Slice A (ratified via plan approval 2026-07-07)
+      hardwires ONE environment fully alive: G1 git-history gym with the E5
+      chamber_gym_trace.v1 mandate, E1 transcendence decomposition
+      (Krogh-Vedelsby from trace rows — verified unowned gap, chamber
+      surfaces only), E4 causal daily delta chain, E3 micro-prediction lane
+      on the existing ginko_brier API, E6 velocity columns on the ledger.
+      All 12 disciplines + substrate ruling enforced.
+
+    prerequisites:
+      - id: chamber_doctrine_exists
+        kind: file_exists
+        file: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
+      - id: phase0_dossier_exists
+        kind: file_exists
+        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
+
+    completion_criteria:
+      - id: phase0_firewall_stated
+        kind: file_contains
+        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
+        pattern: "archive fitness for self-modification still requires the One Wire external quorum"
+      - id: baseline_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/inward_ascent/baseline_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema_version
+          - surfaces
+          - summary
+          - content_digest
+      - id: frontier_ledger_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/chamber/frontier_ledger_receipt.json
+        expect_digest: true
+        fresh_ttl_days: 30
+        requires_keys:
+          - schema
+          - rows
+          - door
+          - chamber_drift
+          - summary
+          - inputs
+      - id: frontier_ledger_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/frontier_ledger.py", "--check"]
+      - id: chamber_traces_tests_pass
+        kind: test_passes
+        test: tests/test_chamber_traces.py
+      # G1's pytest file (17s: fixture repos + real scoring) runs in the CI
+      # pytest job; the track criterion verifies the committed run receipt
+      # instead so check_track_status stays inside its 60s test budget.
+      - id: chamber_g1_run_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/chamber/g1_run_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - taskpack_sha
+          - scorer_hash
+          - trace_corpus
+          - per_task
+      - id: chamber_daily_delta_tests_pass
+        kind: test_passes
+        test: tests/test_chamber_daily_delta.py
+      - id: chamber_predictions_tests_pass
+        kind: test_passes
+        test: tests/test_chamber_predictions.py
+      - id: transcendence_ledger_tests_pass
+        kind: test_passes
+        test: tests/test_transcendence_ledger.py
+      - id: transcendence_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/chamber/transcendence_receipt.json
+        expect_digest: true
+        requires_keys:
+          - schema
+          - decomposition
+          - corpus_sha256
+      - id: transcendence_ledger_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/transcendence_ledger.py", "--check"]
+
+    next_items:
+      - id: 1
+        what: "DONE 2026-07-07 (Phase 1 Slice A): dharma_swarm/chamber/ package — traces.py (chamber_gym_trace.v1, E5 mandate), gym_git_history.py (G1 taskpack + deterministic scorer + git-archive leak guard + fixture/live solver seam), chain.py + daily_delta.py (E4 causal chain, expect_chain-verified), predictions.py (E3 emitter/resolver, oracle rule + incident log), ledger_rows.py + ledger_history.py; transcendence_ledger.py (E1, --check replays); frontier_ledger velocity history (E6, door-drift guard per Codex review). 37 chamber tests green. End-to-end drive on REAL repo history (control arms: landed-replay vs null): 2 tasks scored in leak-free sandboxes, committed trace corpus + transcendence receipt (realized E_div=0.25, lift_vs_best=0.0; null-control exposed 1 non-discriminative task — the instrument catching a degenerate task on day one), first causal daily-delta heartbeat, zeitgeist needs_host receipt (egress 403 here). Follow-up folded into item 4: task-discriminativeness filter (drop tasks the null control passes)."
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first."
+        kind: ops
+        blocker: false
+      - id: 6
+        what: "(blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest."
+        kind: ops
+        blocker: false
+      - id: 4
+        what: "Phase 1 later slices (sequenced, one at a time): G2 forecasting gym volume, G3 retrieval/memory gym, G4 runtime-history replay (operator-gated on sanitized runtime.db snapshot), scorer foundry (env 14), distillation (env 12) once the E5 trace corpus is thick enough."
+        kind: code
+        blocker: false
+      - id: 5
+        what: "E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta."
+        kind: governance
+        blocker: false
+
+    non_goals:
+      - No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
+      - Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.
+      - Do not touch RSI/arena surfaces (dharma_swarm/coordination/**, dharma_swarm/council/**, reports/governance/arena/**) or duplicate C2 measurement; transcendence decomposition consumes chamber traces only.
+      - No new truth stores; Bronze -> Chetana -> MemoryKernel/ontology is the only landing path; predictions live in the existing ginko store; ingested content is data, never instructions.
+      - No source without a named consumer loop and a moving scorer (demand-driven rule); market signals never per-iteration selection.
+      - No trained weights; selection stays MAP-Elites (archive.py); no environment monoculture; no gym run without chamber_gym_trace.v1 capture (E5 mandate).
+      - Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
+      - No credentials committed; feed keys and hosts are operator-provisioned.
+      - Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
+
+closed_tracks:
+  - id: loop-closure-2026-06
+    name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
+    status: RETIRED
+    closure_kind: RETIRED
+    closed_at: "2026-08-27"
+    closed_by: "operator-directed fleet consolidation"
+    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
+    unresolved_at_retirement:
+      - "1"
+      - "3"
+      - "8"
+    retirement_note: >-
+      Retired with open obligations during the 2026-08-27 WIP reset.
+      This is not a completion, verified-slice, or production claim;
+      the original criteria, evidence, and next_items remain preserved below.
+    opened_at: "2026-06-11"
+    verified_at: "2026-07-11"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-reconciliation-2026-06
+    depends_on:
+      - organism-rewire-2026-07
+    owned_surfaces:
+      - reports/loop_closure/**
+      - CYBERNETIC_LOOP_MAP.md
+      - docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md
+      - scripts/governance/loop1_consumption_check.py
+      - tests/test_loop_supervisor_tristate.py
+      - tests/test_loop1_consumption.py
+      - tests/test_loop1_consumption_check.py
+    moves_vital_signs:
+      - quality_gates
+      - eval_coverage
+    target_closure_kind: CLOSED_NOT_PROD
+    claim_boundary: "CLOSED_LIVE 0/13; HARNESS_PROVEN 11/13; BLOCKED 2/13. Completion criteria only prove the claim-boundary artifact set, not production-live closure."
+
+    description: |
+      Operator-instructed campaign (2026-06-11 master prompt): wire all 13
+      cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
+      sense->interpret->constrain->act->adapt on real data with receipts to
+      its declared owner surface and an automated closure check.
+
+      Phase 0 (research dossier, no build code) ships first. Phases proceed
+      in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
+      then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
+      gated behind the One Wire external-receipt quorum (N>=5, M>=3).
+
+      Invariant that must hold throughout:
+        Internal artifacts never touch archive fitness; only countersigned
+        external acted receipts above quorum do.
+
+      Claim boundary:
+        HARNESS_PROVEN means a bounded replay/regression harness passed. It is
+        not production-live closure. CLOSED_LIVE requires one live owner-surface
+        criterion per loop; those criteria intentionally remain open until the
+        daemon branch that actually runs proves them.
+
+    ship_vetoes:
+      - id: cybernetics_codex_harness_proven_blocks_live_ship
+        kind: json_count_greater_than
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        collection: loop_statuses
+        field: verdict
+        value: HARNESS_PROVEN
+        threshold: 0
+
+    prerequisites:
+      - id: loop_map_exists
+        kind: file_exists
+        file: CYBERNETIC_LOOP_MAP.md
+      - id: loop_supervisor_exists
+        kind: file_exists
+        file: dharma_swarm/loop_supervisor.py
+
+    completion_criteria:
+      - id: phase0_dossier_exists
+        kind: file_exists
+        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+      - id: phase0_fresh_status_table
+        kind: file_contains
+        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+        pattern: "Fresh 13-loop status table"
+      - id: one_wire_invariant_stated
+        kind: file_contains
+        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+        pattern: "never let internal artifacts touch archive fitness"
+      - id: loop1_closure_receipt_exists
+        kind: file_exists
+        file: reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md
+      - id: campaign_retrospective_exists
+        kind: file_exists
+        file: reports/loop_closure/RETROSPECTIVE.md
+      - id: cybernetics_codex_manifest_registered
+        kind: file_contains
+        file: ACTIVE_SURFACE_MANIFEST.yaml
+        pattern: "id: cybernetics_codex"
+      - id: cybernetics_codex_seed_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/agent.seed.yaml
+      - id: cybernetics_codex_soul_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/SOUL.md
+      - id: cybernetics_codex_context_desk_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md
+      - id: cybernetics_codex_audit_script_exists
+        kind: file_exists
+        file: scripts/governance/cybernetics_codex_audit.py
+      - id: cybernetics_codex_registration_script_exists
+        kind: file_exists
+        file: scripts/governance/register_cybernetics_codex.py
+      - id: cybernetics_codex_latest_audit_exists
+        kind: file_exists
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+      - id: cybernetics_codex_latest_audit_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        fresh_ttl_days: 21
+        requires_keys:
+          - bounded_replays
+          - loop_statuses
+          - one_wire
+          - verdict_tiers
+          - live_owner_surface_criteria
+      - id: cybernetics_codex_loop_verdict_map_matches_claim_boundary
+        kind: json_collection_values_match
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        collection: loop_statuses
+        key_field: number
+        value_field: verdict
+        expected:
+          "1": HARNESS_PROVEN
+          "2": HARNESS_PROVEN
+          "3": HARNESS_PROVEN
+          "4": HARNESS_PROVEN
+          "5": HARNESS_PROVEN
+          "6": HARNESS_PROVEN
+          "7": HARNESS_PROVEN
+          "8": HARNESS_PROVEN
+          "9": HARNESS_PROVEN
+          "10": HARNESS_PROVEN
+          "11": HARNESS_PROVEN
+          "12": BLOCKED
+          "13": BLOCKED
+      - id: cybernetics_codex_live_owner_criteria_declared
+        kind: json_mapping_keys_nonempty
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        mapping: live_owner_surface_criteria
+        keys:
+          - loop1
+          - loop2
+          - loop3
+          - loop4
+          - loop5
+          - loop6
+          - loop7
+          - loop8
+          - loop9
+          - loop10
+          - loop11
+          - loop12
+          - loop13
+      - id: cybernetics_codex_closed_live_count_zero
+        kind: json_count_equals
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        collection: loop_statuses
+        field: verdict
+        value: CLOSED_LIVE
+        expected: 0
+      - id: cybernetics_codex_harness_proven_count_11
+        kind: json_count_equals
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        collection: loop_statuses
+        field: verdict
+        value: HARNESS_PROVEN
+        expected: 11
+      - id: cybernetics_codex_blocked_count_2
+        kind: json_count_equals
+        file: reports/loop_closure/cybernetics_codex/latest_audit.json
+        collection: loop_statuses
+        field: verdict
+        value: BLOCKED
+        expected: 2
+      - id: cybernetics_codex_loop3_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop3_evolution_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop4_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop4_memory_context_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop7_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop8_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop8_recognition_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop9_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop10_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop10_context_agent_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_loop11_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop11_replication_monitor_closure.json
+        requires_keys:
+          - loop
+          - loop_id
+          - observed_at
+          - transitions_receipted
+          - adapt_proof
+          - later_cycle_read_evidence
+      - id: cybernetics_codex_one_wire_guard_test_exists
+        kind: file_exists
+        file: tests/test_one_wire_archive_fitness_guard.py
+      - id: cybernetics_codex_one_wire_guard_test_passes
+        kind: test_passes
+        test: tests/test_one_wire_archive_fitness_guard.py
+      - id: cybernetics_codex_loop12_13_guard_receipt_exists
+        kind: file_exists
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json
+      - id: cybernetics_codex_loop12_13_guard_receipt_valid
+        kind: receipt_valid
+        file: reports/loop_closure/cybernetics_codex/2026-07-01_loop12_13_one_wire_archive_fitness_guard.json
+        requires_keys:
+          - verdict
+          - do_not_close_loop
+          - one_wire_live_state
+          - command_to_replay
+          - tests_run
+      # WP-LC campaign criteria (spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md §7.1)
+      # — deliberately RED until their packets land.
+      - id: loop_supervisor_tristate_honest
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_loop_supervisor_tristate.py", "-q"]
+      - id: loop1_consumption_unit_proof
+        kind: command_passes
+        command: ["python3", "-m", "pytest", "tests/test_loop1_consumption.py", "-q"]
+      - id: loop1_consumption_check_replays
+        kind: command_passes
+        command: ["python3", "scripts/governance/loop1_consumption_check.py", "--check"]
+        timeout_s: 60
+
+    non_goals:
+      - Do not weaken, bypass, or hard-code any telos gate to close a loop.
+      - Do not let internal artifacts touch archive fitness (One Wire quorum stands).
+      - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+      - Do not commit provider API keys or any credentials.
+      - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
+
+    next_items:
+      - id: 1
+        what: "TOOL SHIPPED 2026-07-03 (execution on daemon host remains operator): scripts/runtime/dispatch_dropoff_quarantine.py — dry-run default, REQUIRED --before cutoff, --execute stamps quarantined_at/quarantine_reason on existing delegation_runs rows (idempotent ALTER, no new store, rows stay auditable) and writes a JSON receipt (counts + rowid-list sha256) under ~/.dharma/loop_closure/. Audit now reports dropoff_live=N / dropoff_quarantined_historical=M separately (cybernetics_codex excludes only explicitly-stamped rows and always reports the quarantined tally — never hides it). 7 fixture-DB tests green. REMAINING: operator runs it on the daemon host against the real runtime.db (~2191 historical rows), cutoff at/before the spine-dispatch fix timestamp. [AMENDED 2026-07-11: EXECUTED 2026-07-03 on the then-daemon host (Mac, db_path /Users/dhyana/.dharma/state/runtime.db) — cutoff 2026-07-02T00:00:00Z, quarantined_now=2191, dropoff_live_after=0, dry-run/execute rowid-sha256 identical; repo witness a9d6f6a6b reports/loop_closure/2026-07-03_dispatch_dropoff_quarantine.json; host-delegation ratified by this admission merge. Residual owned by WP-LC2: verify the CURRENT daemon host's container DB — any live dropoffs there postdate the #755 spine fix and are real signal, never quarantinable.]"
+        kind: code
+        blocker: true
+      - id: 2
+        what: "Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority."
+        kind: governance
+        blocker: false
+      - id: 3
+        what: "Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs."
+        kind: governance
+        blocker: true
+      - id: 4
+        what: "WP-LC0 admission record: LOOP-1 CLOSED_LIVE campaign admitted; spec docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md is the detail authority (WP-LC0..LC5). Operator decision register 2026-07-11: D-LC2 consumption wire RATIFIED (bounded ModelRouter feedback extension — reorder-only, demotion cap, delegation_runs-receipts-only, fail-open to default order); D-LC3 one redeploy + one restart AUTHORIZED (date open; item 8 precondition); D-LC1 resolved by the 2026-07-03 execution; D-LC5 dharmagraph sign-off route PRE-APPROVED as fallback. Session-entry update 2026-07-17: managed projections no longer touch BUILD_SESSION_ENTRYPOINT.md and require no onboarding shared-surface exception."
+        kind: governance
+        blocker: false
+      - id: 5
+        what: "WP-LC1 — 4-state loop-health honesty (NEVER_STARTED|RUNNING|STALLED|DISABLED; never-started must not render OK — loop_supervisor.py is_stalled returns False at last_tick==0 and the CLI collapses to OK/STALLED), register the five factory-only loops (archaeology, guardian, health-api, gauntlet, world-model — record_tick silently no-ops for unregistered names), thread supervisor ticks through the named-loop factories (~20 sites). Spec §6 WP-LC1; criterion loop_supervisor_tristate_honest RED until landed."
+        kind: code
+        blocker: false
+      - id: 6
+        what: "WP-LC3 — the ratified consumption wire: receipt-grounded provider deprioritization as an extension of the shared ModelRouter's existing feedback loop (providers.py ModelRouter; feedback via agent_runner._record_router_feedback); evidence (consumed_trace_ids, decision delta, per-process boot_id) rides RoutingDecision (model_routing.py); dharma_swarm/orchestrator.py is NOT edited (dharmagraph-owned; D-LC5 sign-off fallback pre-approved). Spec §6 WP-LC3 boundedness rules are hard requirements."
+        kind: code
+        blocker: false
+      - id: 7
+        what: "WP-LC4 — disjoint read-only checker scripts/governance/loop1_consumption_check.py validating P1..P4 from runtime.db (mode=ro) + witness chain, emitting reports/loop_closure/loop1_consumption_receipt.json (two-digest pattern, observed_at + host-binding keys); CI-safe --check exits with typed needs_host gap when host stores are absent. Spec §6 WP-LC4."
+        kind: code
+        blocker: false
+      - id: 8
+        what: "needs-owner -> organism-rewire-2026-07 (docker-compose.yml owner): commit the loopback binding (127.0.0.1:7433:7433) to main BEFORE any WP-LC2 redeploy — origin/main docker-compose.yml world-binds 7433:7433 and the daemon host's closure of that exposure is an uncommitted local patch (2026-07-09 forensics), so a clean redeploy silently reopens it. Hard precondition for executing D-LC3."
+        kind: ops
+        blocker: true
+      - id: 10
+        what: "WP-LC5 — the closure claim: one atomic governance PR carrying the fresh ON-HOST cybernetics_codex audit + the §7.2 criteria transition (closed_live 0->1, harness_proven 11->10, verdict map loop 1 -> CLOSED_LIVE) + claim_boundary 'CLOSED_LIVE 1/13; HARNESS_PROVEN 10/13; BLOCKED 2/13'. Anti-gaming: host-binding requires_keys on all three receipts, audit inputs chained to the operator-executed host_session receipt, NON-AUTHOR MERGE required, bot-PR/automerge label forbidden. Ship veto (any HARNESS_PROVEN blocks live-ship) stays — Loop-1 closure is not a track live-ship claim."
+        kind: governance
+        blocker: false
+      - id: 11
+        what: "WP-A4A5 (aliveness campaign wave 0, admitted 2026-07-17): durable liveness evidence — orchestrate_live.py append_liveness_ledger_row writes digest-chained spine VerifiedMachineReceipt rows (boot_id, pid, running, restart_counts, abandoned) to ~/.dharma/ops/liveness_ledger.jsonl hourly and on abandonment change, closing the overwrite-in-place gap in _write_loop_liveness that left run claims unfalsifiable; single-mint process boot_id in dharma_swarm/spine/identity.py (P4 restart-survival prerequisite); read-only replay verifier scripts/governance/liveness_ledger_check.py (typed needs_host exit 0 when the ledger is absent, exit 1 on broken chain or failed coverage); live_ops_census.py dharma_daemon pattern extended to match the container entrypoint python -m dharma_swarm.orchestrate_live (Dockerfile.swarm CMD). REMAINING (host, WP-LC2 window): >=24 chained hourly rows under one boot_id after 24h, cross-restart different-boot_id proof, hourly census scheduling after the BR-004 cron reconciliation."
+        kind: code
+        blocker: false
+
+  - id: orchestration-arena-v1-2026-06
+    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+    status: RETIRED
+    closure_kind: RETIRED
+    closed_at: "2026-08-27"
+    closed_by: "operator-directed fleet consolidation"
+    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
+    unresolved_at_retirement:
+      - "2"
+    retirement_note: >-
+      Retired with open obligations during the 2026-08-27 WIP reset.
+      This is not a completion, verified-slice, or production claim;
+      the original criteria, evidence, and next_items remain preserved below.
+    opened_at: "2026-06-23"
+    # Re-verified 2026-07-16: check_track_status full run, 12/12 completion
+    # criteria pass including live pytest greens (arena_v1_controls_tests_pass
+    # 15 passed; arena_truth_surface_tests_pass 8 passed) and a fresh, digest-
+    # intact arena_truth_receipt. Blocker next-item 2 (live-lane rules) stays open.
+    verified_at: "2026-07-17"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - provider-routing-consolidation-2026-06
+      - loop-closure-2026-06
+    owned_surfaces:
+      - dharma_swarm/coordination/**
+      - dharma_swarm/council/**
+      - scripts/governance/arena_truth_report.py
+      - reports/governance/arena/**
+      - tests/test_arena_v1.py
+      - tests/test_dpi.py
+      - tests/test_orchestration_genome.py
+      - tests/test_orchestrator_v1.py
+      - tests/test_council_profiles.py
+      - tests/test_coordination_closure_checks.py
+      - tests/test_arena_truth_report.py
+    moves_vital_signs:
+      - eval_coverage
+      - quality_gates
+
+    description: |
+      Governance admission for the Arena/Orchestration substrate that LANDED on
+      main (PRs #670 and adjacent) but was not yet represented in the active-track
+      portfolio. The DGM substrate must be governance-visible: the system needs to
+      know its own fitness function exists, is frozen/hermetic/replayable, and is
+      not yet making production capability claims.
+
+      This is the keystone fitness layer for any future Dharma Forge: a frozen
+      verifiable taskpack + deterministic scorer + zero-weight heuristic
+      orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
+      that gates a decorrelated-correctness bonus on actual correctness, plus a
+      minimal Council that verifies orchestration traces.
+
+      Doctrine that must hold: capability leads, trust multiplies (not the
+      headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
+      trained weights — training is earned only after the arena produces labels.
+
+    prerequisites:
+      - id: arena_runner_exists
+        kind: file_exists
+        file: dharma_swarm/coordination/arena/runner.py
+      - id: arena_scorer_exists
+        kind: file_exists
+        file: dharma_swarm/coordination/arena/scorer.py
+      - id: orchestration_genome_exists
+        kind: file_exists
+        file: dharma_swarm/coordination/genome.py
+
+    completion_criteria:
+      - id: frozen_taskpack_present
+        kind: file_contains
+        file: dharma_swarm/coordination/arena/taskpack.py
+        pattern: "TASK_PACK_ID"
+      - id: deterministic_scorer_hash
+        kind: file_contains
+        file: dharma_swarm/coordination/arena/scorer.py
+        pattern: "def scorer_hash"
+      - id: orchestration_genome_class
+        kind: file_contains
+        file: dharma_swarm/coordination/genome.py
+        pattern: "class OrchestrationGenome"
+      - id: zero_weight_orchestrator_map_elites
+        kind: file_contains
+        file: dharma_swarm/coordination/orchestrator_v1.py
+        pattern: "class MapElitesArchive"
+      - id: dpi_decorrelation_gated_on_correctness
+        kind: file_contains
+        file: dharma_swarm/coordination/dpi.py
+        pattern: "def decorrelation_bonus"
+      - id: council_trace_verification
+        kind: file_contains
+        file: dharma_swarm/council/council.py
+        pattern: "class Council"
+      - id: arena_v1_test_exists
+        kind: file_contains
+        file: tests/test_arena_v1.py
+        pattern: "def test_positive_lift_candidate_beats_best_single_at_parity"
+      - id: dpi_test_exists
+        kind: file_exists
+        file: tests/test_dpi.py
+      - id: closure_checks_test_exists
+        kind: file_exists
+        file: tests/test_coordination_closure_checks.py
+      # Rigorous criteria (2026-07-03): the onboarding TRUST CHECK capped this
+      # track at existence-only evidence. These make readiness a number a real
+      # check produced — the controls/parity/significance battery must PASS and
+      # the governance surface must replay + verify as a digest-intact receipt.
+      - id: arena_v1_controls_tests_pass
+        kind: test_passes
+        test: tests/test_arena_v1.py
+      - id: arena_truth_surface_tests_pass
+        kind: test_passes
+        test: tests/test_arena_truth_report.py
+      - id: arena_truth_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/arena/arena_truth_receipt.json
+        expect_digest: true
+        fresh_ttl_days: 21
+        requires_keys:
+          - schema
+          - generated_at
+          - hermetic
+          - capability_claim
+          - task_manifest_hash
+          - scorer_hash
+          - sealed_oracle_hash
+          - best
+          - corpus
+
+    non_goals:
+      - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
+      - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
+      - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
+      - Do not couple admission to the full world-ingestion (#662) seam.
+
+    next_items:
+      - id: 1
+        what: >-
+          DONE 2026-07-03: arena scorecard + DPI receipts wired into a read-only
+          governance surface — scripts/governance/arena_truth_report.py renders
+          reports/governance/arena/ (digest-stamped receipt + ARENA_TRUTH.md +
+          corpus), seeded/deterministic; --check fails if the committed surface
+          does not replay byte-for-byte. Criterion arena_truth_receipt_valid
+          verifies it.
+        kind: code
+        blocker: false
+      - id: 2
+        what: >-
+          HERMETIC CONTROLS SHIPPED (runner.run always executes
+          best_single_full_budget gate + budget-parity ledger for every arm +
+          seeded bootstrap significance; proven by arena_v1_controls_tests_pass).
+          REMAINING (the blocker's live edge): any future live-lane arena run
+          (DHARMA_ARENA_LIVE seam in fixtures.py) must inherit the SAME control
+          arms before any capability claim — the hermetic lift on the fixture
+          taskpack is a control-machinery existence proof, never a capability
+          claim (non-goal 1). C2 stays owned by real benchmark evidence.
+        kind: code
+        blocker: true
+      - id: 3
+        what: >-
+          DONE 2026-07-03: arena winners connected to the cold-start trace
+          corpus — coordination/arena/corpus.py emits labeled winner traces
+          (positive_lift_candidate only, scorer-labeled, deterministic) to
+          reports/governance/arena/cold_start_corpus.jsonl, sha256-pinned in
+          the report receipt. Labels only; zero training (v1 doctrine).
+        kind: code
+        blocker: false
+
+  - id: merge-master-mike-d4-2026-06
+    name: Merge Master Mike — D4 persistent always-on merge agent
+    status: RETIRED
+    closure_kind: RETIRED
+    closed_at: "2026-08-27"
+    closed_by: "operator-directed fleet consolidation"
+    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
+    unresolved_at_retirement:
+      - "titanium-wp-0f2"
+    retirement_note: >-
+      Retired with open obligations during the 2026-08-27 WIP reset.
+      This is not a completion, verified-slice, or production claim;
+      the original criteria, evidence, and next_items remain preserved below.
+    opened_at: "2026-06-24"
+    # Re-verified 2026-07-16: PR #982 (merge commit 145e0b7bbe) landed the
+    # cloud heartbeat + codex,copilot quorum code slice; full Mike battery
+    # green on that tree (tests/test_pr_merge_control_github_reviews.py +
+    # tests/test_pr_merge_control.py + tests/test_merge_master_mike_daemon.py:
+    # 75 passed). mike_cloud_heartbeat criterion now passes in-tree.
+    verified_at: "2026-07-16"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    graduation_profile: governance_gate
+    target_closure_kind: VERIFIED_SLICE
+    claim_boundary: >-
+      Native Codex/Copilot reviews are accepted only from trusted installed-App
+      identities; unattended human-PR merge is authorized only after every
+      existing deterministic gate is clean. Claude remains an optional
+      deep/backup lane with no new credential. This policy and its hermetic
+      behavior are landed; PRODUCTION_READY is not claimed until a live cloud
+      canary and a ship_safe Final Boss manifest are attached. The current 7/7
+      criteria prove the landed D4 slice only; they do not cover Titanium
+      WP-0F2 required-check authority convergence, so Mike remains active.
+    complements:
+      - runtime-truth-reconciliation-2026-06
+      - repository-titanium-hardening-2026-07
+    owned_surfaces:
+      - scripts/runtime/pr_merge_control.py
+      - scripts/runtime/merge_master_mike_daemon.py
+      - .github/workflows/automerge.yml
+      - .github/workflows/codex-mention-router.yml
+      - .github/workflows/merge-master-mike-backlog.yml
+      - tests/test_merge_master_mike_daemon.py
+      - tests/test_pr_merge_control.py
+      - tests/test_pr_merge_control_github_reviews.py
+    moves_vital_signs:
+      - quality_gates
+      - tool_coverage
+
+    description: |
+      Operator directive 2026-06-24: make Merge Master Mike a D4-level
+      PERSISTENT, always-on merge agent — up independently of any operator
+      machine, responsive both reactively (@mention) and proactively (every
+      PR event), with a reviewer quorum that is satisfiable in the cloud.
+
+      Diagnosis (this session): Mike-the-merger is already cloud event-driven
+      (automerge.yml on pull_request / check_suite / review + an hourly sweep,
+      and the router on @mention). Mike-the-reviewer-LANE is not: the cloud
+      router runs packet->gate->merge against an ephemeral RUNNER_TEMP state
+      dir but NEVER runs the reviewer lanes (run-agent), so the required
+      claude/copilot receipt FILES are never written in the cloud. Result: bot
+      PRs flow (the bot-pr label WAIVES receipts) but HUMAN PRs can never
+      auto-merge in the cloud — the gate always finds the receipts missing. The
+      only producer today is the Mac daemon's review cycle-mode (which defaults
+      to dry-run) or a manual `make pr-run-claude`. That machine dependency is
+      the real clean-merge bottleneck.
+
+      The fix is a reviewer-receipt SOURCE that exists in the cloud with no
+      credential: teach the gate to count the native GitHub reviews it already
+      receives (the Codex App review = codex; a requested Copilot review =
+      copilot) as receipts, and demote claude to the deep/backup lane (built
+      later as a credentialed cloud Action). Then auto-enroll every non-draft
+      PR so Mike acts proactively, and give Mike a cloud heartbeat so his
+      living-agent presence is continuous rather than Mac-bound.
+
+      Doctrine that MUST hold (the gate's safety floor is never weakened):
+        Add receipt SOURCES, never remove gate checks. CI green, no conflict,
+        no unresolved blocking threads, and reviewDecision != CHANGES_REQUESTED
+        stay hard. Mike never silent-merges, never approves, never pushes
+        source, never bypasses governance. A native GitHub review counts as a
+        receipt ONLY from a trusted installed reviewer-App login.
+
+    prerequisites:
+      - id: pr_merge_control_exists
+        kind: file_exists
+        file: scripts/runtime/pr_merge_control.py
+      - id: mike_daemon_exists
+        kind: file_exists
+        file: scripts/runtime/merge_master_mike_daemon.py
+      - id: automerge_workflow_exists
+        kind: file_exists
+        file: .github/workflows/automerge.yml
+      - id: router_workflow_exists
+        kind: file_exists
+        file: .github/workflows/codex-mention-router.yml
+
+    completion_criteria:
+      - id: github_review_receipt_bridge
+        kind: file_contains
+        file: scripts/runtime/pr_merge_control.py
+        pattern: "github_review"
+      - id: github_review_bridge_tested
+        kind: file_exists
+        file: tests/test_pr_merge_control_github_reviews.py
+      - id: automerge_enrolls_all_nondraft
+        kind: file_contains
+        file: .github/workflows/automerge.yml
+        pattern: "mike-watch"
+      - id: mike_cloud_heartbeat
+        kind: file_contains
+        file: .github/workflows/merge-master-mike-backlog.yml
+        pattern: "schedule:"
+      # Grade-up (2026-07-04 Pudgala dive Phase 0): the criteria above are all
+      # existence-only (S1 ceiling). This binds the track to the Slice 1 work
+      # that actually LANDED on main — feat(mike): bridge native GitHub reviews
+      # to Mike receipts (D4) — an honest S2, no new claim.
+      - id: github_review_bridge_landed
+        kind: commit_on_main
+        commit: "751c5ba8a802e7116827c31bcf98631b2e2a1f8f"
+      # --- REAL behavioral gate (2026-07-07 reconcile): the criteria above were
+      #     existence/landed-only. These two RAN GREEN from origin/main and prove
+      #     the shipped Slice 1 behavior (native-GitHub-review -> Mike receipt
+      #     bridge is ADDITIVE and FAILS CLOSED). No longer a landed-only false positive.
+      - id: github_review_bridge_test_passes
+        kind: test_passes
+        test: tests/test_pr_merge_control_github_reviews.py
+        oracle_source: github-rest-pulls-reviews-contract
+        # 14 tests: CHANGES_REQUESTED still blocks; untrusted login never counts;
+        # no-trusted-review keeps local blocked; a present local receipt is never
+        # overridden. Verified 2026-07-07: 14 passed.
+      - id: pr_merge_control_gate_fail_closed_test_passes
+        kind: test_passes
+        test: tests/test_pr_merge_control.py
+        # 52 tests: fail-closed dispatch/gate (missing-required-CI blocks; Mike
+        # merge authority skips when gate blocked; backup-reviewer/quorum gating).
+        # Verified 2026-07-07: 52 passed.
+
+    non_goals:
+      - Do not weaken or remove any existing gate check (CI green, conflict, unresolved threads, CHANGES_REQUESTED stay hard).
+      - Do not let Mike silent-merge, approve PRs, push source, or bypass governance.
+      - Do not commit provider/API credentials; the credentialed Claude reviewer Action is operator-provisioned.
+      - Do not accept a "review" from an untrusted login as a receipt; only trusted installed reviewer-App logins.
+      - Do not create a new merge authority or receipt store; extend pr_merge_control and the existing workflows.
+
+    # OPERATOR RATIFICATION 2026-07-16 (durable record: PR #962 comment
+    # https://github.com/AmitabhainArunachala/dharma_swarm/pull/962#issuecomment-4987647747):
+    #   D1 YES — trusted native GitHub reviews may satisfy receipts.
+    #   D2 YES — required cloud quorum is codex,copilot; claude is deep/backup.
+    #   D3 YES — unattended human-PR merge only when every existing gate is clean.
+    #   D4 DEFERRED — no new Claude CI credential; the optional backup lane stays off.
+    next_items:
+      - id: 1
+        what: "DONE 2026-07-16 (reconciled; was: Slice 1 blocker — bridge native GitHub reviews -> Mike receipts in the pr_merge_control gate, trusted-login-gated and ADDITIVE). Shipped and landed on main (commit 751c5ba8a8, criterion github_review_bridge_landed) with behavioral proof green (github_review_bridge_test_passes 15 passed; pr_merge_control_gate_fail_closed_test_passes 52 passed)."
+        kind: code
+        blocker: false
+        # Underclaim probe (2026-07-03) reconciled 2026-07-16; the linked
+        # criterion stays as the item's proof pointer.
+        evidence_criterion: github_review_bridge_tested
+      - id: 2
+        what: "DONE: Slice 2 auto-enrolls every non-draft PR into the Mike evaluate lane via mike-watch (automerge.yml, criterion automerge_enrolls_all_nondraft) without waiving reviewer receipts."
+        kind: code
+        blocker: false
+      - id: 3
+        what: "DEFERRED by operator decision D4 (2026-07-16 record): no cloud Claude credential; Claude remains an optional deep/backup reviewer and is not part of the required cloud quorum."
+        kind: code
+        blocker: false
+      - id: 4
+        what: "DONE 2026-07-16 (PR #982, merge commit 145e0b7bbe): merge-master-mike-backlog.yml carries an hourly scheduled heartbeat pinned to packet-only + merge-off on scheduled fires, with codex,copilot native-review quorum parity; the Mac daemon remains an optional mirror."
+        kind: code
+        blocker: false
+        evidence_criterion: mike_cloud_heartbeat
+      - id: 5
+        what: "DONE 2026-07-16: operator ratification of D1/D2/D3 (D4 explicitly DEFERRED) recorded durably on the PR #962 thread under the fail-closed claim boundary above; no gate check was weakened."
+        kind: governance
+        blocker: false
+      - id: titanium-wp-0f2
+        what: "Titanium WP-0F2 blocker: after WP-0F1 establishes the canonical required-check manifest, make automerge, manual Mike, and workflow-dispatch consumers use that one authority; fail closed on absent, failed, pending, cancelled, or action-required checks; preserve stale-head rejection, unresolved-thread and CHANGES_REQUESTED blocks, plus the narrow bot-PR waiver. Keep Mike active until the merged-main behavioral tests pass."
+        kind: code
+        blocker: true
+
   - id: helm-worldclass-terminal-2026-06
     name: Helm — world-class operator terminal (Bun+Ink TUI)
-    status: ACTIVE
+    status: RETIRED
+    closure_kind: RETIRED
+    closed_at: "2026-08-27"
+    closed_by: "operator-directed fleet consolidation"
+    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
+    unresolved_at_retirement:
+      - "1"
+    retirement_note: >-
+      Retired with open obligations during the 2026-08-27 WIP reset.
+      This is not a completion, verified-slice, or production claim;
+      the original criteria, evidence, and next_items remain preserved below.
     opened_at: "2026-06-15"
     verified_at: "2026-07-07"
     ttl_days: 21
@@ -1463,7 +1778,17 @@ active_tracks:
 
   - id: sovereign-safety-tcb-2026-07
     name: Sovereign Safety TCB — fail-closed evolution, graded anti-slop, verified kernel, self-gating portfolio
-    status: ACTIVE
+    status: RETIRED
+    closure_kind: RETIRED
+    closed_at: "2026-08-27"
+    closed_by: "operator-directed fleet consolidation"
+    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
+    unresolved_at_retirement:
+      - "2"
+    retirement_note: >-
+      Retired with open obligations during the 2026-08-27 WIP reset.
+      This is not a completion, verified-slice, or production claim;
+      the original criteria, evidence, and next_items remain preserved below.
     opened_at: "2026-07-07"
     verified_at: "2026-07-07"
     ttl_days: 21
@@ -1661,177 +1986,23 @@ active_tracks:
   #     completion would be a false positive.
   # ==========================================================================
 
-  - id: hyperbolic-time-chamber-2026-07
-    name: Hyperbolic Time Chamber — afferent ingest, gym battery, Frontier Ledger
-    status: ACTIVE
-    opened_at: "2026-07-07"
-    verified_at: "2026-07-07"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: research-depth
-    complements:
-      - organism-rewire-2026-07
-      - orchestration-arena-v1-2026-06
-      - loop-closure-2026-06
-    owned_surfaces:
-      - docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
-      - docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
-      - docs/plans/HYPERBOLIC_CHAMBER_ELEVATION_SPEC_2026-07-07.md
-      - docs/plans/INWARD_ASCENT_PHASE0_DOSSIER_2026-07-07.md
-      - scripts/governance/inward_ascent_baseline.py
-      - scripts/governance/frontier_ledger.py
-      - scripts/governance/transcendence_ledger.py
-      - dharma_swarm/chamber/**
-      - tests/test_chamber_traces.py
-      - tests/test_chamber_gym_git_history.py
-      - tests/test_chamber_daily_delta.py
-      - tests/test_chamber_predictions.py
-      - tests/test_chamber_sandbox.py
-      - tests/test_chamber_ledger_history.py
-      - tests/test_transcendence_ledger.py
-      - reports/governance/inward_ascent/**
-      - reports/governance/chamber/**
-    moves_vital_signs:
-      - eval_coverage
-      - quality_gates
-    target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: >-
-      Phase 0 proved the dossier + two replayable instruments; Phase 1 Slice A
-      proves a HARNESS-level G1 gym (fixture solver, deterministic scorer,
-      leak guard) plus the E1/E3/E4/E5/E6 wiring. Gym results are
-      internal-gym numbers, never benchmark or capability claims; C2 stays
-      owned by the RSI/arena lab; live solver evolution waits on operator
-      keys/compute. Archive fitness remains behind the One Wire external
-      quorum.
-
-    description: |
-      Operator-ratified chamber doctrine (vision map 2026-07-07) + elevation
-      spec (SEAL v2): seal the efferent edge, open the afferent edge wide,
-      evolve at machine speed against imported and time-lagged reality
-      (class-2 signal only) until the trust gate opens on measured numbers.
-      Phase 0 shipped the dossier + baseline scoreboard + Frontier Ledger
-      (PR #830). Phase 1 Slice A (ratified via plan approval 2026-07-07)
-      hardwires ONE environment fully alive: G1 git-history gym with the E5
-      chamber_gym_trace.v1 mandate, E1 transcendence decomposition
-      (Krogh-Vedelsby from trace rows — verified unowned gap, chamber
-      surfaces only), E4 causal daily delta chain, E3 micro-prediction lane
-      on the existing ginko_brier API, E6 velocity columns on the ledger.
-      All 12 disciplines + substrate ruling enforced.
-
-    prerequisites:
-      - id: chamber_doctrine_exists
-        kind: file_exists
-        file: docs/vision_maps/MASTER_2026-07-07_hyperbolic_time_chamber.md
-      - id: phase0_dossier_exists
-        kind: file_exists
-        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
-
-    completion_criteria:
-      - id: phase0_firewall_stated
-        kind: file_contains
-        file: docs/plans/HYPERBOLIC_CHAMBER_PHASE0_DOSSIER_2026-07-07.md
-        pattern: "archive fitness for self-modification still requires the One Wire external quorum"
-      - id: baseline_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/inward_ascent/baseline_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema_version
-          - surfaces
-          - summary
-          - content_digest
-      - id: frontier_ledger_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/chamber/frontier_ledger_receipt.json
-        expect_digest: true
-        fresh_ttl_days: 30
-        requires_keys:
-          - schema
-          - rows
-          - door
-          - chamber_drift
-          - summary
-          - inputs
-      - id: frontier_ledger_replays
-        kind: command_passes
-        command: ["python3", "scripts/governance/frontier_ledger.py", "--check"]
-      - id: chamber_traces_tests_pass
-        kind: test_passes
-        test: tests/test_chamber_traces.py
-      # G1's pytest file (17s: fixture repos + real scoring) runs in the CI
-      # pytest job; the track criterion verifies the committed run receipt
-      # instead so check_track_status stays inside its 60s test budget.
-      - id: chamber_g1_run_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/chamber/g1_run_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema
-          - taskpack_sha
-          - scorer_hash
-          - trace_corpus
-          - per_task
-      - id: chamber_daily_delta_tests_pass
-        kind: test_passes
-        test: tests/test_chamber_daily_delta.py
-      - id: chamber_predictions_tests_pass
-        kind: test_passes
-        test: tests/test_chamber_predictions.py
-      - id: transcendence_ledger_tests_pass
-        kind: test_passes
-        test: tests/test_transcendence_ledger.py
-      - id: transcendence_receipt_valid
-        kind: receipt_valid
-        file: reports/governance/chamber/transcendence_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema
-          - decomposition
-          - corpus_sha256
-      - id: transcendence_ledger_replays
-        kind: command_passes
-        command: ["python3", "scripts/governance/transcendence_ledger.py", "--check"]
-
-    next_items:
-      - id: 1
-        what: "DONE 2026-07-07 (Phase 1 Slice A): dharma_swarm/chamber/ package — traces.py (chamber_gym_trace.v1, E5 mandate), gym_git_history.py (G1 taskpack + deterministic scorer + git-archive leak guard + fixture/live solver seam), chain.py + daily_delta.py (E4 causal chain, expect_chain-verified), predictions.py (E3 emitter/resolver, oracle rule + incident log), ledger_rows.py + ledger_history.py; transcendence_ledger.py (E1, --check replays); frontier_ledger velocity history (E6, door-drift guard per Codex review). 37 chamber tests green. End-to-end drive on REAL repo history (control arms: landed-replay vs null): 2 tasks scored in leak-free sandboxes, committed trace corpus + transcendence receipt (realized E_div=0.25, lift_vs_best=0.0; null-control exposed 1 non-discriminative task — the instrument catching a degenerate task on day one), first causal daily-delta heartbeat, zeitgeist needs_host receipt (egress 403 here). Follow-up folded into item 4: task-discriminativeness filter (drop tasks the null control passes)."
-        kind: code
-        blocker: false
-      - id: 2
-        what: "Live solver seats for G1 (needs provider keys on the running host via key_oracle.dispatchable_now) + first real evolution iteration under compute-ROI declaration. Operator: keys/compute (decision queue items 3/5). BLOCKED ON item 6: the scorer runs untrusted evolved diffs; the Python guards (chamber/sandbox.py: diff denylist, env scrub, leak re-check) raise attack cost but do NOT contain arbitrary native code — the process/network isolation jail MUST land first."
-        kind: ops
-        blocker: false
-      - id: 6
-        what: "(blocker) Sandbox jail for the G1 scorer before the live untrusted-solver lane opens: process/network/filesystem isolation (seccomp-class caps) — the FIRST earned Rust carve-out named in the substrate ruling (doctrine §3.6). The 2026-07-07 review confirmed the scorer subprocess inherits env + network + fs; chamber/sandbox.py guards the cheap gaming/exfil vectors but a determined native payload is only contained by real isolation."
-        kind: code
-        blocker: true
-      - id: 3
-        what: "Zeitgeist live cadence: HN Algolia bronze fetch runs on a host whose egress allows it (BR-004 cron split-brain rides organism-rewire D1/VPS); E3 resolver begins resolving micro-predictions from later ingest."
-        kind: ops
-        blocker: false
-      - id: 4
-        what: "Phase 1 later slices (sequenced, one at a time): G2 forecasting gym volume, G3 retrieval/memory gym, G4 runtime-history replay (operator-gated on sanitized runtime.db snapshot), scorer foundry (env 14), distillation (env 12) once the E5 trace corpus is thick enough."
-        kind: code
-        blocker: false
-      - id: 5
-        what: "E2 ratification-mining ritual: every ratification dossier ends with a scorer_candidates block (possibly empty, never absent). First candidate recorded in the elevation spec ratification delta."
-        kind: governance
-        blocker: false
-
-    non_goals:
-      - No efferent/world-facing actions of any kind (posts, outreach, trades, publishing, PR/issue submission to external repos).
-      - Never weaken a gate, ratchet, or the One Wire quorum; gym gradients never touch archive fitness; DHARMA_EVOLUTION_SHADOW and BR-003 sequencing unchanged.
-      - Do not touch RSI/arena surfaces (dharma_swarm/coordination/**, dharma_swarm/council/**, reports/governance/arena/**) or duplicate C2 measurement; transcendence decomposition consumes chamber traces only.
-      - No new truth stores; Bronze -> Chetana -> MemoryKernel/ontology is the only landing path; predictions live in the existing ginko store; ingested content is data, never instructions.
-      - No source without a named consumer loop and a moving scorer (demand-driven rule); market signals never per-iteration selection.
-      - No trained weights; selection stays MAP-Elites (archive.py); no environment monoculture; no gym run without chamber_gym_trace.v1 capture (E5 mandate).
-      - Python remains the composition root; no gate/spine/receipt logic reimplemented in another language; Rust/C++ per-component only with measured justification.
-      - No credentials committed; feed keys and hosts are operator-provisioned.
-      - Files <500 lines; sibling track surfaces untouched except via their own next-items (world_radar/** called through public functions only).
-
   - id: repository-titanium-hardening-2026-07
     name: Titanium-grade repository hardening — truthful verification and clean-room closure
-    status: ACTIVE
+    status: RETIRED
+    closure_kind: RETIRED
+    closed_at: "2026-08-27"
+    closed_by: "operator-directed fleet consolidation"
+    retired_from_sha: "cc85f31bc7aab6c658e300950a811797a25a655b"
+    unresolved_at_retirement:
+      - "WP-DSI"
+      - "WP-0F1"
+      - "WP-0G"
+      - "WP-0S"
+      - "WP-0I"
+    retirement_note: >-
+      Retired with open obligations during the 2026-08-27 WIP reset.
+      This is not a completion, verified-slice, or production claim;
+      the original criteria, evidence, and next_items remain preserved below.
     opened_at: "2026-07-17"
     verified_at: "2026-07-31"
     ttl_days: 21
@@ -2048,108 +2219,6 @@ active_tracks:
       - No missing tool, skipped required test, stale receipt, NEEDS_HOST, or BLOCKED_OPERATOR result may be promoted to PASS.
       - No operator credential, live branch-protection decision, deployment change, reviewer nomination, or external action is silently assumed.
 
-  - id: darshan-publication-2026-07
-    name: Darshan — publication venture cell (multi-disciplinary voice of clear seeing)
-    status: ACTIVE
-    opened_at: "2026-07-12"
-    verified_at: "2026-07-12"
-    ttl_days: 30
-    owner: "@AmitabhainArunachala"
-    serves: revenue-external-humans-served
-    complements:
-      - company-builder-parity-2026-07
-    owned_surfaces:
-      - docs/plans/DARSHAN_CHARTER_2026-07-12.md
-      - reports/darshan/**
-      - reports/tam/**
-    moves_vital_signs:
-      - eval_coverage
-    target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: >-
-      Admitted by operator DECREE (GOLDEN SEAL, 2026-07-12 00:36 JST; canonical
-      text at ~/.dharma/agents/darshan_fable/DECREE_GOLDEN_SEAL.md). Criteria
-      prove the publication organ exists and its output is receipted — never
-      audience, revenue, or influence claims (those are TAM-board readings,
-      measured not narrated). Posting to third-party platforms (Medium,
-      Substack, Reddit, etc.) stays operator-gated per platform regardless of
-      criteria state. The Darshan-owned site itself may publish pieces that
-      have passed the editorial law (both-fires + discernment + operator read).
-
-    description: |
-      Operator-decreed publication venture (seed: 2026-05-26 lodestone,
-      wiki darshan-publication-venture-cell; decree: GOLDEN SEAL 2026-07-12).
-      Darshan is a multi-disciplinary voice of truth — deep research in one
-      hand, grounded contemplative vision in the other — that carves the
-      estate's telos into public words, gives the MI/R_V research a platform
-      independent of academic acceptance, and feeds back to the swarm: every
-      article ends its open questions as typed research/build candidates.
-      Structure: seven desks (Bridge, Instrument, Witness Ledger, Noosphere
-      Weather, Field Notes, Readings in Fire, Polity); one head-editor holon
-      (darshan_fable, seat externalized at ~/.dharma/agents/darshan_fable/);
-      two competing entrepreneurial author personas (staged; external GO
-      operator-gated); a zero-dependency static site; the VWRITE pipeline as
-      production substrate. Editorial law (both-fires, register tags
-      FACT/HYPOTHESIS/WILD, fourth option, citation-or-silence, salvage with
-      every kill) is enforced on every piece — anti-feed by charter: no
-      engagement bait, no trackers, no outrage farming.
-
-    completion_criteria:
-      - id: darshan_charter_exists
-        kind: file_contains
-        file: docs/plans/DARSHAN_CHARTER_2026-07-12.md
-        pattern: "editorial law"
-      - id: darshan_issue_one_receipt_valid
-        # RED until Issue One actually publishes to the Darshan site with a
-        # digest-sealed receipt (deliberate-RED precedent: #864/#866).
-        kind: receipt_valid
-        file: reports/darshan/issue_one_receipt.json
-        expect_digest: true
-        requires_keys:
-          - schema
-          - observed_at
-          - articles
-          - site_build_sha256
-          - editorial_law_passes
-          - content_digest
-
-    next_items:
-      - id: 1
-        what: "Issue One: ~6 articles (The Silenced No + five decreed topics: China land purchases, Chinese-model Tibet silence, frontier-model gatekeeping, Iran/Swiss-channel epistemics, Kali Yuga/AI time) through the full editorial law — both-fires pass, independent discernment pass, operator read — then site publish + digest-sealed issue receipt at reports/darshan/issue_one_receipt.json. Drafting pipeline ran 2026-07-12; law passes remain."
-        kind: code
-        blocker: false
-      - id: 2
-        what: "Website deployment decision (operator, from phone is fine): GitHub Pages / Cloudflare Pages / agni VPS. Site scaffold built locally at ~/darshan_site (zero-dependency static, python3 scripts/build.py). Until decided, the site exists locally only."
-        kind: ops
-        blocker: true
-      - id: 3
-        what: "Two competing entrepreneurial author personas: staged under ~/.dharma/agents/darshan_fable/authors/ with voices, beats, platform strategies, monetization models, competition scoreboard. EXTERNAL POSTING GATE (blocker): no third-party platform post until operator GO per platform — one phone message suffices, logged here when given."
-        kind: governance
-        blocker: true
-      - id: 4
-        what: "VWRITE massive evolution: integration brief at ~/.dharma/darshan/INTEGRATION_BRIEF.md (recon 2026-07-12 incl. agni/dokka/NIKKI); v0.1 spec lands as its own governance amendment once operator reviews the brief."
-        kind: code
-        blocker: false
-      - id: 5
-        what: "Fleet registration: darshan_fable agent card (~/.dharma/agents/darshan_fable/identity/agent_card.json) registered via a2a agent onboarding; nurture heartbeat live (com.dharma.darshan-nurture, 07:45/19:45, phone digest at ~/.dharma/darshan/LATEST.md). Kill-switch: launchctl unload."
-        kind: ops
-        blocker: false
-      - id: 6
-        what: "Editorial queue (post-Issue-One, ~14 slots to the decreed ~20): maintained at ~/.dharma/darshan/editorial_queue.md; each published piece must emit its open questions as typed swarm work — an article that spawns no downstream work is decoration (editorial law 6)."
-        kind: governance
-        blocker: false
-      - id: 7
-        what: "OPERATOR CONTEXT (standing): operator walking Japan for peace (Soya->Hateruma) from 2026-07; ~15% interaction, phone-first. All decisions batch to ~/.dharma/darshan/DECISIONS_PENDING.md; never block on operator except items marked blocker here."
-        kind: governance
-        blocker: false
-
-    non_goals:
-      - No third-party platform posting without per-platform operator GO (the external boundary stays operator-held; this decree does not lift the outreach lease for anything but the Darshan-owned site).
-      - No engagement optimization, trackers, analytics, or feed mechanics — Darshan is anti-feed by charter; its authors compete on earnings/reach WITHOUT slop (competition rules in authors/COMPETITION.md).
-      - No revenue claims on this track — receipted dollars are TAM-board readings (honest_arr), never narrated here.
-      - No new digest/receipt primitives — stable_digest/utc_now (memory_kernel.write_receipts) and the receipt_valid contract, as everywhere.
-      - No geopolitical piece publishes without register tags and a steelman of the criticized parties — citation-or-silence applies doubly to charged topics.
-
-closed_tracks:
   - id: company-builder-parity-2026-07
     name: TAM (Transdimensional Abundance Machine) — Company-Builder Parity board
     status: RETIRED

@@ -231,9 +231,14 @@ class TestTrackCriterionTimeoutBudgets:
         mutated = copy.deepcopy(portfolio)
         titanium = next(
             track
-            for track in mutated["active_tracks"]
+            for track in mutated["closed_tracks"]
             if track["id"] == "repository-titanium-hardening-2026-07"
         )
+        # The Titanium lane is retired, so re-admit its preserved contract only
+        # inside this mutation fixture. The production register remains focused
+        # on its three active tracks while this guard still exercises a real
+        # under-budget pytest contract.
+        mutated["active_tracks"] = [titanium]
         verifier = next(
             criterion
             for criterion in titanium["completion_criteria"]

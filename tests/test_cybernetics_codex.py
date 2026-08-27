@@ -622,12 +622,15 @@ def test_manifest_registers_cybernetics_codex():
     assert "test_file_exists" in agents[AGENT_ID]["health_check_ids"]
 
 
-def test_loop_closure_track_requires_steward_packet():
+def test_retired_loop_closure_track_preserves_steward_packet():
     data = yaml.safe_load(open("docs/governance/ACTIVE_TRACK.yaml", encoding="utf-8"))
-    tracks = {track["id"]: track for track in data["active_tracks"]}
+    tracks = {track["id"]: track for track in data["closed_tracks"]}
+    loop_closure = tracks["loop-closure-2026-06"]
+    assert loop_closure["status"] == "RETIRED"
+    assert loop_closure["closure_kind"] == "RETIRED"
     criteria = {
         criterion["id"]
-        for criterion in tracks["loop-closure-2026-06"]["completion_criteria"]
+        for criterion in loop_closure["completion_criteria"]
     }
 
     assert "cybernetics_codex_manifest_registered" in criteria

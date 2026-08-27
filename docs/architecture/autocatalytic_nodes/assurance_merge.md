@@ -6,7 +6,7 @@ authority: local_evidence
 
 # Assurance and Merge Membrane
 
-Producer: claim-evidence binding, Titanium CI truth, and Merge Master Mike form one fail-closed integration membrane. It binds `sovereign-safety-tcb-2026-07`, `repository-titanium-hardening-2026-07`, and `merge-master-mike-d4-2026-06`.
+Producer: claim-evidence binding, CI truth, and merge control form one fail-closed integration membrane. It binds the active `organism-rewire-2026-07` substrate lane and `dharmagraph-engine-2026-07` execution lane; retired assurance tracks remain historical evidence rather than active authority.
 
 Contract: consume `proposed_change`; apply `assure_and_integrate`; emit `verified_release` to [Operator Experience](operator_experience.md).
 
