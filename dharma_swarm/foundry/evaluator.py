@@ -1,16 +1,7 @@
-"""Evaluator Protocol and the blind ring-1 fitness gate.
+"""Evaluator protocol and blind ring-1 fitness gate.
 
-An :class:`Evaluator` turns a :class:`Candidate` (a proposed code change to an
-external target) into :class:`EvalMetrics`. The Foundry never lets the mutation
-army read the evaluator: the army only ever receives the scalar fitness on the
-returned :class:`EvalReceipt`. That is the "blind" property — the scoring logic
-is a separate object (and, for command evaluators, a separate process via
-:mod:`dharma_swarm.foundry.runner_isolation`), so the search cannot learn to
-address the grader instead of the code.
-
-:func:`blind_evaluate` is the ring-1 gate: it runs the tripwires first and
-zeroes fitness on any trip or correctness failure, so a reward-hacked or
-scope-violating candidate can never enter the elite grid with a positive score.
+The mutation army sees only a gated scalar receipt, never evaluator internals.
+Tripwire or correctness failure zeroes fitness before archival or promotion.
 """
 
 from __future__ import annotations
@@ -56,6 +47,11 @@ _ISOLATION_FACT_FIELDS = (
     "non_root_user",
     "workdir_readonly",
 )
+_EVALUATION_BINDING_FIELDS = (
+    "schema_version", "candidate_id", "target_id", "candidate_digest",
+    "evaluator_id", "seed", "run_id", "command_digest", "output_digest",
+    "isolation_digest",
+)
 
 
 def _utc_now_iso() -> str:
@@ -63,11 +59,7 @@ def _utc_now_iso() -> str:
 
 
 def canonical_digest(payload: Any) -> str:
-    """Deterministic sha256 over a JSON-canonicalized payload.
-
-    Used to seal receipts so a third party can recompute the hash from the
-    published artifact alone.
-    """
+    """Deterministic sha256 over a JSON-canonicalized payload."""
     blob = json.dumps(
         payload,
         sort_keys=True,
@@ -78,12 +70,29 @@ def canonical_digest(payload: Any) -> str:
     return "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def _is_sha256_digest(value: object) -> bool:
+    return (
+        type(value) is str
+        and len(value) == 71
+        and value.startswith("sha256:")
+        and all(character in "0123456789abcdef" for character in value[7:])
+    )
+
+
 def validate_isolation_proof_payload(
     payload: object,
+    *,
+    expected_binding: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, bool]:
-    """Validate serialized sibling IsolationProof facts, digest, and predicate."""
-    expected = {*_ISOLATION_FACT_FIELDS, "digest", "promotion_allowed"}
-    if type(payload) is not dict or set(payload) != expected:
+    """Validate isolation facts and a caller-carried run integrity binding.
+
+    This does not attest the execution image or the truth of caller observations.
+    """
+    base_fields = {*_ISOLATION_FACT_FIELDS, "digest", "promotion_allowed"}
+    if type(payload) is not dict or set(payload) not in (
+        base_fields,
+        base_fields | {"evaluation_binding"},
+    ):
         return None, False
     if type(payload["isolation_level"]) is not str or type(payload["digest"]) is not str:
         return None, False
@@ -116,10 +125,40 @@ def validate_isolation_proof_payload(
     )
     if payload["promotion_allowed"] is not derived_promotion:
         return None, False
+    if "evaluation_binding" not in payload:
+        return dict(payload), False
+
+    binding = payload["evaluation_binding"]
+    if type(binding) is not dict or set(binding) != {*_EVALUATION_BINDING_FIELDS, "digest"}:
+        return None, False
+    string_fields = set(_EVALUATION_BINDING_FIELDS) - {"seed"}
+    if (
+        any(type(binding[field]) is not str for field in string_fields)
+        or type(binding["seed"]) is not int
+        or binding["schema_version"] != "foundry_evaluation_binding.v1"
+    ):
+        return None, False
+    for field_name in ("candidate_digest", "command_digest", "output_digest",
+                       "isolation_digest", "digest"):
+        if not _is_sha256_digest(binding[field_name]):
+            return None, False
+    if binding["isolation_digest"] != payload["digest"]:
+        return None, False
+    binding_body = {field: binding[field] for field in _EVALUATION_BINDING_FIELDS}
+    if binding["digest"] != canonical_digest(binding_body):
+        return None, False
+    if expected_binding is not None and any(
+        binding.get(field) != value for field, value in expected_binding.items()
+    ):
+        return None, False
     return dict(payload), derived_promotion
 
 
-def _validated_isolation_proof(proof: object) -> tuple[dict[str, Any] | None, bool]:
+def _validated_isolation_proof(
+    proof: object,
+    *,
+    expected_binding: dict[str, Any],
+) -> tuple[dict[str, Any] | None, bool]:
     """Recompute the sibling IsolationProof digest and promotion predicate."""
     to_dict = getattr(proof, "to_dict", None)
     if not callable(to_dict):
@@ -128,7 +167,10 @@ def _validated_isolation_proof(proof: object) -> tuple[dict[str, Any] | None, bo
         payload = to_dict()
     except (TypeError, ValueError):
         return None, False
-    validated, derived_promotion = validate_isolation_proof_payload(payload)
+    validated, derived_promotion = validate_isolation_proof_payload(
+        payload,
+        expected_binding=expected_binding,
+    )
     if validated is None:
         return None, False
     if getattr(proof, "promotion_allowed", None) is not derived_promotion:
@@ -148,6 +190,103 @@ class Candidate:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+def candidate_digest(candidate: Candidate) -> str:
+    """Bind every declared candidate field, including the exact proposed diff."""
+    return canonical_digest(asdict(candidate))
+
+
+@dataclass(frozen=True)
+class EvaluationRunIdentity:
+    """Caller-carried identity of the command invocation and its exact output."""
+
+    run_id: str
+    command_digest: str
+    output_digest: str
+
+    @classmethod
+    def from_execution(
+        cls, *, run_id: str, command: Any, output: Any
+    ) -> EvaluationRunIdentity:
+        if type(run_id) is not str or not run_id or len(run_id) > 256:
+            raise ValueError("run_id must be a non-empty bounded string")
+        return cls(run_id, canonical_digest(command), canonical_digest(output))
+
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+def _run_identity_payload(identity: object) -> dict[str, str] | None:
+    if type(identity) is not EvaluationRunIdentity:
+        return None
+    payload = identity.to_dict()
+    if not (type(payload["run_id"]) is str and 0 < len(payload["run_id"]) <= 256):
+        return None
+    if not all(_is_sha256_digest(payload[field]) for field in
+               ("command_digest", "output_digest")):
+        return None
+    return payload
+
+
+def _evaluation_binding_context(
+    candidate: Candidate, evaluator_id: str, seed: int,
+    run_identity: EvaluationRunIdentity,
+) -> dict[str, Any]:
+    identity = _run_identity_payload(run_identity)
+    if (
+        identity is None
+        or not all(type(value) is str for value in
+                   (candidate.candidate_id, candidate.target_id, evaluator_id))
+        or type(seed) is not int
+    ):
+        raise ValueError("evaluation binding identity is malformed")
+    return {
+        "schema_version": "foundry_evaluation_binding.v1",
+        "candidate_id": candidate.candidate_id,
+        "target_id": candidate.target_id,
+        "candidate_digest": candidate_digest(candidate),
+        "evaluator_id": evaluator_id,
+        "seed": seed,
+        **identity,
+    }
+
+
+@dataclass(frozen=True)
+class BoundIsolationProof:
+    """Isolation facts bound to one caller-identified evaluation invocation."""
+
+    proof: object
+    candidate: Candidate
+    evaluator_id: str
+    seed: int
+    run_identity: EvaluationRunIdentity
+
+    @property
+    def promotion_allowed(self) -> bool:
+        return getattr(self.proof, "promotion_allowed", None) is True
+
+    def to_dict(self) -> dict[str, Any]:
+        to_dict = getattr(self.proof, "to_dict", None)
+        if not callable(to_dict):
+            raise TypeError("bound isolation proof must expose to_dict()")
+        payload = to_dict()
+        if type(payload) is not dict:
+            raise TypeError("bound isolation proof payload must be a plain dict")
+        context = _evaluation_binding_context(
+            self.candidate, self.evaluator_id, self.seed, self.run_identity
+        )
+        binding = {**context, "isolation_digest": payload.get("digest")}
+        sealed_binding = {**binding, "digest": canonical_digest(binding)}
+        return {**payload, "evaluation_binding": sealed_binding}
+
+
+def bind_isolation_proof(
+    proof: object, *, candidate: Candidate, evaluator_id: str, seed: int,
+    run_identity: EvaluationRunIdentity,
+) -> BoundIsolationProof:
+    """Construct the promotion-proof envelope at the evaluator/runner boundary."""
+    return BoundIsolationProof(proof, candidate, evaluator_id, seed, run_identity)
+
+
 @dataclass(frozen=True)
 class EvalMetrics:
     """The raw output of one evaluation — before tripwire/correctness gating.
@@ -162,16 +301,13 @@ class EvalMetrics:
     metrics: dict[str, float] = field(default_factory=dict)
     wall_clock_s: float = 0.0
     notes: str = ""
-    isolation_proof: "IsolationProof | None" = None
+    isolation_proof: "IsolationProof | BoundIsolationProof | None" = None
+    run_identity: EvaluationRunIdentity | None = None
 
 
 @dataclass(frozen=True)
 class EvalReceipt:
-    """The blind, gated result the army is allowed to see: a scalar and flags.
-
-    ``fitness`` is zero whenever a tripwire fired or correctness failed, so the
-    only thing the search can optimize is real, tripwire-clean improvement.
-    """
+    """Blind result; fitness is zero on any tripwire or correctness failure."""
 
     candidate_id: str
     target_id: str
@@ -184,6 +320,7 @@ class EvalReceipt:
     wall_clock_s: float
     promotion_allowed: bool
     isolation_proof: dict[str, Any] | None
+    run_identity: dict[str, str] | None
     sealed_at: str
     digest: str
 
@@ -212,13 +349,7 @@ class Evaluator(Protocol):
 
 @dataclass
 class CallableEvaluator:
-    """Adapter that wraps a plain scoring function as an :class:`Evaluator`.
-
-    The scoring function receives ``(candidate, seed)`` and returns
-    :class:`EvalMetrics`. Used for hermetic tests and for in-process evaluators;
-    command-line/Docker evaluators live in
-    :mod:`dharma_swarm.foundry.runner_isolation`.
-    """
+    """Wrap ``(candidate, seed) -> EvalMetrics`` as an evaluator."""
 
     evaluator_id: str
     score_fn: Any
@@ -306,8 +437,23 @@ def blind_evaluate(
     proof = metrics.isolation_proof
     proof_payload = None
     proof_allows_promotion = False
-    if proof is not None:
-        proof_payload, proof_allows_promotion = _validated_isolation_proof(proof)
+    run_identity_payload = _run_identity_payload(metrics.run_identity)
+    expected_binding = None
+    if run_identity_payload is not None:
+        try:
+            expected_binding = _evaluation_binding_context(
+                candidate,
+                evaluator.evaluator_id,
+                seed,
+                metrics.run_identity,
+            )
+        except (TypeError, ValueError):
+            expected_binding = None
+    if proof is not None and expected_binding is not None:
+        proof_payload, proof_allows_promotion = _validated_isolation_proof(
+            proof,
+            expected_binding=expected_binding,
+        )
     promotion = bool(fitness > 0 and proof_allows_promotion)
     body = {
         "candidate_id": candidate.candidate_id,
@@ -321,6 +467,7 @@ def blind_evaluate(
         "wall_clock_s": wall_clock_s,
         "promotion_allowed": promotion,
         "isolation_proof": proof_payload,
+        "run_identity": run_identity_payload,
     }
     return EvalReceipt(
         candidate_id=candidate.candidate_id,
@@ -334,6 +481,7 @@ def blind_evaluate(
         wall_clock_s=wall_clock_s,
         promotion_allowed=promotion,
         isolation_proof=proof_payload,
+        run_identity=run_identity_payload,
         sealed_at=_utc_now_iso(),
         digest=canonical_digest(body),
     )

@@ -8,7 +8,13 @@ from dataclasses import dataclass
 
 import pytest
 
-from dharma_swarm.foundry.evaluator import Candidate, CallableEvaluator, EvalMetrics
+from dharma_swarm.foundry.evaluator import (
+    Candidate,
+    CallableEvaluator,
+    EvalMetrics,
+    EvaluationRunIdentity,
+    bind_isolation_proof,
+)
 from dharma_swarm.foundry.heldout import run_heldout
 
 
@@ -43,24 +49,62 @@ class _Proof:
         return {**body, "digest": digest, "promotion_allowed": self.promotion_allowed}
 
 
-def _ring1_proof() -> dict:
-    proof = _Proof().to_dict()
+def _bound_payload(
+    candidate: Candidate, evaluator_id: str, seed: int, run_id: str,
+) -> dict:
+    identity = EvaluationRunIdentity.from_execution(
+        run_id=run_id,
+        command=["oracle", evaluator_id, str(seed)],
+        output={"score": 1.0},
+    )
+    return bind_isolation_proof(
+        _Proof(), candidate=candidate, evaluator_id=evaluator_id, seed=seed,
+        run_identity=identity,
+    ).to_dict()
+
+
+def _ring1_proof(candidate: Candidate | None = None) -> dict:
+    candidate = candidate or _cand()
     return {
         "schema_version": "foundry_ring1_isolation.v1",
         "promotion_allowed": True,
-        "primary": proof,
-        "determinism_recheck": proof,
+        "primary": _bound_payload(candidate, "ring1", 0, "ring1-primary"),
+        "determinism_recheck": _bound_payload(
+            candidate, "ring1", 0, "ring1-recheck"
+        ),
     }
 
 
 def _evaluator(score: float, *, proven: bool = False) -> CallableEvaluator:
-    return CallableEvaluator(
-        evaluator_id=f"held-{score}",
-        score_fn=lambda c, s: EvalMetrics(
+    evaluator_id = f"held-{score}"
+    calls = 0
+
+    def score_fn(candidate, seed):
+        nonlocal calls
+        calls += 1
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"{evaluator_id}:{candidate.candidate_id}:{seed}:{calls}",
+            command=["oracle", evaluator_id, str(seed)],
+            output={"score": score},
+        )
+        proof = (
+            bind_isolation_proof(
+                _Proof(), candidate=candidate, evaluator_id=evaluator_id, seed=seed,
+                run_identity=identity,
+            )
+            if proven
+            else None
+        )
+        return EvalMetrics(
             primary_score=score,
             correctness_passed=True,
-            isolation_proof=_Proof() if proven else None,
-        ),
+            isolation_proof=proof,
+            run_identity=identity,
+        )
+
+    return CallableEvaluator(
+        evaluator_id=evaluator_id,
+        score_fn=score_fn,
     )
 
 
@@ -164,6 +208,61 @@ def test_promotion_requires_ring1_and_every_heldout_isolation_proof():
     assert missing_one.promotion_allowed is False
 
 
+def test_ring1_workload_name_is_reserved_before_evaluation():
+    evaluator = CallableEvaluator(
+        evaluator_id="must-not-run",
+        score_fn=lambda candidate, seed: pytest.fail("reserved workload was evaluated"),
+    )
+    with pytest.raises(ValueError, match="reserved key 'ring1'"):
+        run_heldout(
+            _cand(), {"ring1": evaluator}, in_loop_fitness=1.0,
+            in_loop_promotion_allowed=True, in_loop_isolation_proof=_ring1_proof(),
+        )
+
+
+def test_ring1_proof_bound_to_another_candidate_fails_closed():
+    other = Candidate(candidate_id="c2", target_id="t1", diff="+ x=2")
+    outcome = run_heldout(
+        _cand(),
+        {"w1": _evaluator(1.0, proven=True)},
+        in_loop_fitness=1.0,
+        in_loop_promotion_allowed=True,
+        in_loop_isolation_proof=_ring1_proof(other),
+    )
+    assert outcome.survived
+    assert outcome.promotion_allowed is False
+
+
+def test_reused_heldout_run_identity_cannot_satisfy_recheck():
+    candidate = _cand()
+    identity = EvaluationRunIdentity.from_execution(
+        run_id="one-run", command=["oracle"], output={"score": 1.0}
+    )
+    proof = bind_isolation_proof(
+        _Proof(), candidate=candidate, evaluator_id="reused", seed=0,
+        run_identity=identity,
+    )
+    evaluator = CallableEvaluator(
+        evaluator_id="reused",
+        score_fn=lambda current, seed: EvalMetrics(
+            primary_score=1.0,
+            correctness_passed=True,
+            isolation_proof=proof,
+            run_identity=identity,
+        ),
+    )
+    outcome = run_heldout(
+        candidate,
+        {"w1": evaluator},
+        in_loop_fitness=1.0,
+        in_loop_promotion_allowed=True,
+        in_loop_isolation_proof=_ring1_proof(),
+    )
+    assert outcome.survived
+    assert outcome.promotion_allowed is False
+    assert outcome.isolation_proofs["w1"]["promotion_allowed"] is False
+
+
 def test_promotion_boolean_without_ring1_proof_fails_closed():
     outcome = run_heldout(
         _cand(),
@@ -265,10 +364,20 @@ def test_flaky_heldout_score_cannot_cross_promotion_boundary():
     def alternating_score(candidate, seed):
         nonlocal calls
         calls += 1
+        score = 10.0 if calls % 2 else 0.0
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"alternating:{calls}",
+            command=["oracle", "alternating-heldout", str(seed)],
+            output={"score": score},
+        )
         return EvalMetrics(
-            primary_score=10.0 if calls % 2 else 0.0,
+            primary_score=score,
             correctness_passed=True,
-            isolation_proof=_Proof(),
+            isolation_proof=bind_isolation_proof(
+                _Proof(), candidate=candidate, evaluator_id="alternating-heldout",
+                seed=seed, run_identity=identity,
+            ),
+            run_identity=identity,
         )
 
     evaluator = CallableEvaluator(

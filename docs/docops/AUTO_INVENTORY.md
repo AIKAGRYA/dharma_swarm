@@ -8,9 +8,9 @@ Do not hand-edit the generated block.
 |---|---:|
 | Dharma Python modules | 1,129 |
 | Top-level Dharma Python modules | 491 |
-| Dharma Python LOC | 398,411 |
+| Dharma Python LOC | 398,582 |
 | Test files | 1,020 |
-| Test function occurrences | 15,568 |
+| Test function occurrences | 15,573 |
 | Markdown files | 1,534 |
 | Markdown total lines | 320,594 |
 | Bridge files | 37 |

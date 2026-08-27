@@ -17,6 +17,7 @@ from dharma_swarm.foundry.evaluator import (
     Candidate,
     Evaluator,
     blind_evaluate,
+    candidate_digest,
     validate_isolation_proof_payload,
 )
 from dharma_swarm.foundry.tripwires import check_determinism
@@ -35,7 +36,7 @@ class HeldoutOutcome:
     isolation_proofs: dict[str, dict] = field(default_factory=dict)
 
 
-def _valid_ring1_proof(proof: dict | None) -> bool:
+def _valid_ring1_proof(proof: dict | None, candidate: Candidate) -> bool:
     expected = {
         "schema_version",
         "promotion_allowed",
@@ -49,11 +50,24 @@ def _valid_ring1_proof(proof: dict | None) -> bool:
         or proof.get("promotion_allowed") is not True
     ):
         return False
+    bindings = []
     for key in ("primary", "determinism_recheck"):
-        _, allows = validate_isolation_proof_payload(proof.get(key))
-        if not allows:
+        validated, allows = validate_isolation_proof_payload(proof.get(key))
+        if not allows or validated is None:
             return False
-    return True
+        binding = validated["evaluation_binding"]
+        if (
+            binding["candidate_id"] != candidate.candidate_id
+            or binding["target_id"] != candidate.target_id
+            or binding["candidate_digest"] != candidate_digest(candidate)
+        ):
+            return False
+        bindings.append(binding)
+    return (
+        bindings[0]["evaluator_id"] == bindings[1]["evaluator_id"]
+        and bindings[0]["seed"] == bindings[1]["seed"]
+        and bindings[0]["run_id"] != bindings[1]["run_id"]
+    )
 
 
 def run_heldout(
@@ -74,6 +88,9 @@ def run_heldout(
     ``survived`` is True when that rate meets
     ``survival_threshold`` (default: at least half the claimed gain holds).
     """
+    if any(type(name) is not str or not name or name == "ring1"
+           for name in heldout_evaluators):
+        raise ValueError("held-out workload names cannot use reserved key 'ring1'")
     if not math.isfinite(survival_threshold) or not 0.0 <= survival_threshold <= 1.0:
         raise ValueError("survival_threshold must be finite and within [0, 1]")
     if not math.isfinite(baseline_fitness):
@@ -97,6 +114,9 @@ def run_heldout(
                 deterministic
                 and primary.promotion_allowed
                 and recheck.promotion_allowed
+                and primary.run_identity is not None
+                and recheck.run_identity is not None
+                and primary.run_identity["run_id"] != recheck.run_identity["run_id"]
             ),
             "primary": primary.isolation_proof,
             "determinism_recheck": recheck.isolation_proof,
@@ -152,7 +172,7 @@ def run_heldout(
         promotion_allowed=(
             survived
             and in_loop_promotion_allowed is True
-            and _valid_ring1_proof(in_loop_isolation_proof)
+            and _valid_ring1_proof(in_loop_isolation_proof, candidate)
             and bool(workload_promotion)
             and all(workload_promotion)
         ),

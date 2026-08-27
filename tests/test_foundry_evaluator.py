@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pytest
 
@@ -13,6 +13,8 @@ from dharma_swarm.foundry.evaluator import (
     Candidate,
     CallableEvaluator,
     EvalMetrics,
+    EvaluationRunIdentity,
+    bind_isolation_proof,
     blind_evaluate,
     canonical_digest,
 )
@@ -54,10 +56,26 @@ def _evaluator(
     correct: bool = True,
     proof: _Proof | None = None,
 ) -> CallableEvaluator:
-    def score_fn(candidate, seed):  # noqa: ARG001
+    def score_fn(candidate, seed):
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"eval-1:{candidate.candidate_id}:{seed}",
+            command=["oracle", "eval-1", str(seed)],
+            output={"score": score, "correct": correct},
+        )
+        bound = (
+            bind_isolation_proof(
+                proof,
+                candidate=candidate,
+                evaluator_id="eval-1",
+                seed=seed,
+                run_identity=identity,
+            )
+            if proof is not None
+            else None
+        )
         return EvalMetrics(primary_score=score, correctness_passed=correct,
                            metrics={"speedup": score}, wall_clock_s=0.5,
-                           isolation_proof=proof)
+                           isolation_proof=bound, run_identity=identity)
 
     return CallableEvaluator(evaluator_id="eval-1", score_fn=score_fn)
 
@@ -75,23 +93,16 @@ def test_clean_candidate_keeps_score():
 def test_promotion_claim_requires_and_seals_isolation_proof():
     receipt = blind_evaluate(_evaluator(1.2, proof=_Proof()), _candidate(), seed=7)
     assert receipt.promotion_allowed is True
-    assert receipt.isolation_proof == {
-        "isolation_level": "docker_nonet",
-        "network_disabled": True,
-        "blocked": False,
-        "timed_out": False,
-        "exit_code": 0,
-        "readonly_rootfs": True,
-        "cap_drop_all": True,
-        "no_new_privileges": True,
-        "pids_limited": True,
-        "memory_limited": True,
-        "memory_swap_limited": True,
-        "tmpfs_limited": True,
-        "non_root_user": True,
-        "workdir_readonly": True,
-        "promotion_allowed": True,
-        "digest": _Proof().to_dict()["digest"],
+    assert receipt.isolation_proof["digest"] == _Proof().to_dict()["digest"]
+    binding = receipt.isolation_proof["evaluation_binding"]
+    assert binding["candidate_id"] == "c1"
+    assert binding["evaluator_id"] == "eval-1"
+    assert binding["seed"] == 7
+    assert binding["run_id"] == "eval-1:c1:7"
+    assert receipt.run_identity == {
+        "run_id": binding["run_id"],
+        "command_digest": binding["command_digest"],
+        "output_digest": binding["output_digest"],
     }
     denied = blind_evaluate(
         _evaluator(1.2, proof=_Proof(promotion_allowed=False)),
@@ -100,6 +111,79 @@ def test_promotion_claim_requires_and_seals_isolation_proof():
     )
     assert denied.promotion_allowed is False
     assert denied.digest != receipt.digest
+
+
+def test_bare_isolation_proof_cannot_promote_without_run_binding():
+    identity = EvaluationRunIdentity.from_execution(
+        run_id="run-1", command=["oracle"], output={"score": 1.2}
+    )
+    evaluator = CallableEvaluator(
+        evaluator_id="eval-1",
+        score_fn=lambda candidate, seed: EvalMetrics(
+            primary_score=1.2,
+            correctness_passed=True,
+            isolation_proof=_Proof(),
+            run_identity=identity,
+        ),
+    )
+    receipt = blind_evaluate(evaluator, _candidate(), seed=7)
+    assert receipt.fitness == 1.2
+    assert receipt.promotion_allowed is False
+    assert receipt.isolation_proof is None
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ["candidate", "target", "evaluator", "seed", "run", "command", "output"],
+)
+def test_bound_proof_cannot_be_reused_for_another_receipt_identity(mismatch):
+    candidate = _candidate()
+    evaluator_id = "eval-1"
+    seed = 7
+    identity = EvaluationRunIdentity.from_execution(
+        run_id="run-1", command=["oracle", "--seed", "7"], output={"score": 1.2}
+    )
+    bound = bind_isolation_proof(
+        _Proof(), candidate=candidate, evaluator_id=evaluator_id, seed=seed,
+        run_identity=identity,
+    )
+    current_candidate = candidate
+    current_evaluator_id = evaluator_id
+    current_seed = seed
+    current_identity = identity
+    if mismatch == "candidate":
+        current_candidate = replace(candidate, diff="+ different")
+    elif mismatch == "target":
+        current_candidate = replace(candidate, target_id="t2")
+    elif mismatch == "evaluator":
+        current_evaluator_id = "eval-2"
+    elif mismatch == "seed":
+        current_seed = 8
+    elif mismatch == "run":
+        current_identity = replace(identity, run_id="run-2")
+    elif mismatch == "command":
+        current_identity = EvaluationRunIdentity.from_execution(
+            run_id="run-1", command=["other-oracle"], output={"score": 1.2}
+        )
+    else:
+        current_identity = EvaluationRunIdentity.from_execution(
+            run_id="run-1", command=["oracle", "--seed", "7"],
+            output={"score": 9.9},
+        )
+
+    evaluator = CallableEvaluator(
+        evaluator_id=current_evaluator_id,
+        score_fn=lambda current, current_seed_value: EvalMetrics(
+            primary_score=1.2,
+            correctness_passed=True,
+            isolation_proof=bound,
+            run_identity=current_identity,
+        ),
+    )
+    receipt = blind_evaluate(evaluator, current_candidate, seed=current_seed)
+    assert receipt.fitness == 1.2
+    assert receipt.promotion_allowed is False
+    assert receipt.isolation_proof is None
 
 
 def test_forged_isolation_proof_digest_cannot_promote():

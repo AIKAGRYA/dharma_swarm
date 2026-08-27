@@ -148,6 +148,9 @@ class FoundryLoop:
                 promotion
                 and first.promotion_allowed
                 and second.promotion_allowed
+                and first.run_identity is not None
+                and second.run_identity is not None
+                and first.run_identity["run_id"] != second.run_identity["run_id"]
             )
             isolation_proof = (
                 {

@@ -11,7 +11,13 @@ import pytest
 
 from dharma_swarm.foundry.army import ROLE_HARD, ROLE_MASS, ArmyModel, MutationBudget
 from dharma_swarm.foundry.elite_grid import EliteGrid
-from dharma_swarm.foundry.evaluator import Candidate, CallableEvaluator, EvalMetrics
+from dharma_swarm.foundry.evaluator import (
+    Candidate,
+    CallableEvaluator,
+    EvalMetrics,
+    EvaluationRunIdentity,
+    bind_isolation_proof,
+)
 from dharma_swarm.foundry.loop import FoundryLoop
 
 _SPEED = re.compile(r"SPEED=([0-9.]+)")
@@ -57,14 +63,31 @@ def _evaluator(
     *,
     proven: bool = False,
 ) -> CallableEvaluator:
+    calls = 0
+
     def score(candidate, seed):
+        nonlocal calls
+        calls += 1
         metrics = _score_from_diff(candidate.diff, scale)
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"{eid}:{candidate.candidate_id}:{seed}:{calls}",
+            command=["oracle", eid, str(seed)],
+            output={"score": metrics.primary_score},
+        )
         return EvalMetrics(
             primary_score=metrics.primary_score,
             correctness_passed=metrics.correctness_passed,
             metrics=metrics.metrics,
             wall_clock_s=metrics.wall_clock_s,
-            isolation_proof=_Proof() if proven else None,
+            isolation_proof=(
+                bind_isolation_proof(
+                    _Proof(), candidate=candidate, evaluator_id=eid, seed=seed,
+                    run_identity=identity,
+                )
+                if proven
+                else None
+            ),
+            run_identity=identity,
         )
 
     return CallableEvaluator(evaluator_id=eid, score_fn=score)
@@ -244,12 +267,25 @@ def test_determinism_recheck_also_requires_isolation_proof():
         nonlocal calls
         calls += 1
         metrics = _score_from_diff(candidate.diff)
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"alternating-proof:{candidate.candidate_id}:{seed}:{calls}",
+            command=["oracle", "alternating-proof", str(seed)],
+            output={"score": metrics.primary_score},
+        )
         return EvalMetrics(
             primary_score=metrics.primary_score,
             correctness_passed=True,
             metrics=metrics.metrics,
             wall_clock_s=metrics.wall_clock_s,
-            isolation_proof=_Proof() if calls % 2 else None,
+            isolation_proof=(
+                bind_isolation_proof(
+                    _Proof(), candidate=candidate, evaluator_id="alternating-proof",
+                    seed=seed, run_identity=identity,
+                )
+                if calls % 2
+                else None
+            ),
+            run_identity=identity,
         )
 
     promoted = []
