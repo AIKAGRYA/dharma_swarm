@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -145,3 +146,37 @@ def test_evidence_quarantine_stops_until_operator_review(tmp_path, name):
     marker.write_text("quarantined", encoding="utf-8")
     assert killswitch.is_stopped(state_root=tmp_path)
     assert str(marker) in killswitch.stop_reason(state_root=tmp_path)
+
+
+@pytest.mark.parametrize("name", ["QUARANTINE.json", "QUARANTINE"])
+def test_dangling_quarantine_marker_still_stops(tmp_path, name):
+    marker = tmp_path / name
+    marker.symlink_to(tmp_path / "missing-quarantine-evidence")
+    assert not marker.exists()
+    assert killswitch.is_stopped(state_root=tmp_path)
+    assert str(marker) in killswitch.stop_reason(state_root=tmp_path)
+    with pytest.raises(killswitch.FoundryStopped):
+        killswitch.check(state_root=tmp_path)
+
+
+def test_non_regular_quarantine_marker_still_stops(tmp_path):
+    marker = tmp_path / "QUARANTINE.json"
+    marker.mkdir()
+    assert killswitch.is_stopped(state_root=tmp_path)
+    assert str(marker) in killswitch.stop_reason(state_root=tmp_path)
+
+
+def test_uninspectable_quarantine_marker_fails_closed(tmp_path, monkeypatch):
+    marker = tmp_path / "QUARANTINE.json"
+    original_lstat = Path.lstat
+
+    def guarded_lstat(path):
+        if path == marker:
+            raise PermissionError("simulated unreadable quarantine marker")
+        return original_lstat(path)
+
+    monkeypatch.setattr(Path, "lstat", guarded_lstat)
+    assert killswitch.is_stopped(state_root=tmp_path)
+    assert str(marker) in killswitch.stop_reason(state_root=tmp_path)
+    with pytest.raises(killswitch.FoundryStopped):
+        killswitch.check(state_root=tmp_path)

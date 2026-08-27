@@ -130,8 +130,13 @@ def persist_terminal_kill(
 
 
 def has_terminal_kill(state_root: Path | None = None) -> bool:
+    return _directory_entry_exists(terminal_kill_file(state_root))
+
+
+def _directory_entry_exists(path: Path) -> bool:
+    """Fail closed on any directory entry, including dangling symlinks."""
     try:
-        terminal_kill_file(state_root).lstat()
+        path.lstat()
     except FileNotFoundError:
         return False
     except OSError:
@@ -147,7 +152,7 @@ def _quarantine_files(state_root: Path | None = None) -> tuple[Path, Path]:
 def is_stopped(*, agents_root: Path | None = None, state_root: Path | None = None) -> bool:
     return (
         has_terminal_kill(state_root)
-        or any(path.exists() for path in _quarantine_files(state_root))
+        or any(_directory_entry_exists(path) for path in _quarantine_files(state_root))
         or is_kill_requested(FOUNDRY_HOLON, agents_root)
         or _stop_file(state_root).exists()
     )
@@ -161,7 +166,8 @@ def stop_reason(*, agents_root: Path | None = None, state_root: Path | None = No
             f"{terminal.get('reason') or '(no reason given)'}"
         )
     quarantine = next(
-        (path for path in _quarantine_files(state_root) if path.exists()),
+        (path for path in _quarantine_files(state_root)
+         if _directory_entry_exists(path)),
         None,
     )
     if quarantine is not None:

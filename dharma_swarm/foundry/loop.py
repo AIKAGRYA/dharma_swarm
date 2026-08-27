@@ -151,6 +151,10 @@ class FoundryLoop:
                 and first.run_identity is not None
                 and second.run_identity is not None
                 and first.run_identity["run_id"] != second.run_identity["run_id"]
+                and first.run_identity["command_digest"]
+                == second.run_identity["command_digest"]
+                and first.run_identity["output_digest"]
+                == second.run_identity["output_digest"]
             )
             isolation_proof = (
                 {

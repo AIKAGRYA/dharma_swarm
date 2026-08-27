@@ -15,7 +15,7 @@ from dharma_swarm.foundry.evaluator import (
     EvaluationRunIdentity,
     bind_isolation_proof,
 )
-from dharma_swarm.foundry.heldout import run_heldout
+from dharma_swarm.foundry.heldout import _matching_recheck_identity, run_heldout
 
 
 def _cand() -> Candidate:
@@ -261,6 +261,76 @@ def test_reused_heldout_run_identity_cannot_satisfy_recheck():
     assert outcome.survived
     assert outcome.promotion_allowed is False
     assert outcome.isolation_proofs["w1"]["promotion_allowed"] is False
+
+
+@pytest.mark.parametrize("varying_digest", ["command", "output"])
+def test_heldout_recheck_requires_matching_command_and_output(varying_digest):
+    calls = 0
+
+    def score(candidate, seed):
+        nonlocal calls
+        calls += 1
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"heldout-digest:{calls}",
+            command=["oracle", calls if varying_digest == "command" else "stable"],
+            output={"score": 1.0, "nonce": calls if varying_digest == "output" else "stable"},
+        )
+        return EvalMetrics(
+            primary_score=1.0,
+            correctness_passed=True,
+            isolation_proof=bind_isolation_proof(
+                _Proof(), candidate=candidate, evaluator_id="heldout-digest",
+                seed=seed, run_identity=identity,
+            ),
+            run_identity=identity,
+        )
+
+    outcome = run_heldout(
+        _cand(),
+        {"w1": CallableEvaluator(evaluator_id="heldout-digest", score_fn=score)},
+        in_loop_fitness=1.0,
+        in_loop_promotion_allowed=True,
+        in_loop_isolation_proof=_ring1_proof(),
+    )
+    assert outcome.survived
+    assert outcome.promotion_allowed is False
+    assert outcome.isolation_proofs["w1"]["promotion_allowed"] is False
+
+
+def test_ring1_bundle_recheck_identity_digests_must_match():
+    candidate = _cand()
+    proof = _ring1_proof(candidate)
+    identity = EvaluationRunIdentity.from_execution(
+        run_id="ring1-recheck", command=["different-command"], output={"score": 1.0}
+    )
+    proof["determinism_recheck"] = bind_isolation_proof(
+        _Proof(), candidate=candidate, evaluator_id="ring1", seed=0,
+        run_identity=identity,
+    ).to_dict()
+    outcome = run_heldout(
+        candidate, {"w1": _evaluator(1.0, proven=True)}, in_loop_fitness=1.0,
+        in_loop_promotion_allowed=True, in_loop_isolation_proof=proof,
+    )
+    assert outcome.survived
+    assert outcome.promotion_allowed is False
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ({"run_id": "a"}, {"run_id": "b"}),
+        (
+            {"run_id": "a", "command_digest": "same", "output_digest": "same"},
+            {"run_id": "b", "command_digest": "same", "output_digest": "same"},
+        ),
+        ({"run_id": "", "command_digest": "sha256:" + "0" * 64,
+          "output_digest": "sha256:" + "0" * 64},
+         {"run_id": "b", "command_digest": "sha256:" + "0" * 64,
+          "output_digest": "sha256:" + "0" * 64}),
+    ],
+)
+def test_recheck_identity_helper_rejects_missing_or_malformed_digests(first, second):
+    assert _matching_recheck_identity(first, second) is False
 
 
 def test_promotion_boolean_without_ring1_proof_fails_closed():

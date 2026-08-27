@@ -36,6 +36,33 @@ class HeldoutOutcome:
     isolation_proofs: dict[str, dict] = field(default_factory=dict)
 
 
+def _matching_recheck_identity(first: dict | None, second: dict | None) -> bool:
+    def valid_digest(value: object) -> bool:
+        return (
+            type(value) is str
+            and len(value) == 71
+            and value.startswith("sha256:")
+            and all(character in "0123456789abcdef" for character in value[7:])
+        )
+
+    if type(first) is not dict or type(second) is not dict:
+        return False
+    first_id, second_id = first.get("run_id"), second.get("run_id")
+    return bool(
+        type(first_id) is str
+        and type(second_id) is str
+        and 0 < len(first_id) <= 256
+        and 0 < len(second_id) <= 256
+        and first_id != second_id
+        and valid_digest(first.get("command_digest"))
+        and valid_digest(first.get("output_digest"))
+        and valid_digest(second.get("command_digest"))
+        and valid_digest(second.get("output_digest"))
+        and first.get("command_digest") == second.get("command_digest")
+        and first.get("output_digest") == second.get("output_digest")
+    )
+
+
 def _valid_ring1_proof(proof: dict | None, candidate: Candidate) -> bool:
     expected = {
         "schema_version",
@@ -66,7 +93,7 @@ def _valid_ring1_proof(proof: dict | None, candidate: Candidate) -> bool:
     return (
         bindings[0]["evaluator_id"] == bindings[1]["evaluator_id"]
         and bindings[0]["seed"] == bindings[1]["seed"]
-        and bindings[0]["run_id"] != bindings[1]["run_id"]
+        and _matching_recheck_identity(bindings[0], bindings[1])
     )
 
 
@@ -114,9 +141,9 @@ def run_heldout(
                 deterministic
                 and primary.promotion_allowed
                 and recheck.promotion_allowed
-                and primary.run_identity is not None
-                and recheck.run_identity is not None
-                and primary.run_identity["run_id"] != recheck.run_identity["run_id"]
+                and _matching_recheck_identity(
+                    primary.run_identity, recheck.run_identity
+                )
             ),
             "primary": primary.isolation_proof,
             "determinism_recheck": recheck.isolation_proof,

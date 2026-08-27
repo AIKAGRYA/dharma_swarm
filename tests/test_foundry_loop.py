@@ -303,6 +303,47 @@ def test_determinism_recheck_also_requires_isolation_proof():
     assert promoted == []
 
 
+@pytest.mark.parametrize("varying_digest", ["command", "output"])
+def test_ring1_recheck_requires_matching_command_and_output(varying_digest):
+    calls = 0
+
+    def score(candidate, seed):
+        nonlocal calls
+        calls += 1
+        metrics = _score_from_diff(candidate.diff)
+        identity = EvaluationRunIdentity.from_execution(
+            run_id=f"digest-recheck:{calls}",
+            command=["oracle", calls if varying_digest == "command" else "stable"],
+            output={
+                "score": metrics.primary_score,
+                "nonce": calls if varying_digest == "output" else "stable",
+            },
+        )
+        return EvalMetrics(
+            primary_score=metrics.primary_score,
+            correctness_passed=True,
+            isolation_proof=bind_isolation_proof(
+                _Proof(), candidate=candidate, evaluator_id="digest-recheck",
+                seed=seed, run_identity=identity,
+            ),
+            run_identity=identity,
+        )
+
+    loop = FoundryLoop(
+        evaluator=CallableEvaluator(evaluator_id="digest-recheck", score_fn=score),
+        propose_fn=_honest_proposer,
+        allowed_paths=["kernels/*.py"],
+    )
+    candidate = Candidate(
+        candidate_id="digest-candidate", target_id="t",
+        diff="+++ b/kernels/k.py\n+SPEED=1.0\n",
+    )
+    fitness, _, _, promotion, proof = loop._ring1(candidate, seed=0)
+    assert fitness == 1.0
+    assert promotion is False
+    assert proof is None
+
+
 def test_win_floor_rejects_baseline_reproduction():
     loop = FoundryLoop(
         evaluator=_evaluator(),
