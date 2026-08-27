@@ -2686,9 +2686,7 @@
       "weight": 4
     },
     {
-      "caveats": [
-        "unproven facets: append_message, replace_by_id, remove_message, remove_all, invalid_remove, openai_format, ui_message_helpers"
-      ],
+      "caveats": [],
       "class": "core",
       "facets": {
         "append_message": {
@@ -2700,11 +2698,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:append_message and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:add_messages and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'append_message'",
-                "path": "dharma_swarm.graph:append_message"
+                "available": true,
+                "kind": "function",
+                "path": "dharma_swarm.graph:add_messages"
               },
               "id": "surface-lg11-append_message",
               "kind": "public_surface_probe",
@@ -2713,10 +2711,102 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "appended": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210",
+                    "id": "h1",
+                    "type": "human"
+                  },
+                  {
+                    "content": "ack-210",
+                    "id": "a1",
+                    "type": "ai"
+                  }
+                ],
+                "graph_messages": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ],
+                "ids_minted": {
+                  "all_present": true,
+                  "contents": [
+                    "hello-210",
+                    "ack-210"
+                  ],
+                  "count": 2,
+                  "unique": true
+                }
+              },
+              "id": "seeded_message_reducers:append_message",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "appended": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210",
+                    "id": "h1",
+                    "type": "human"
+                  },
+                  {
+                    "content": "ack-210",
+                    "id": "a1",
+                    "type": "ai"
+                  }
+                ],
+                "graph_messages": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ],
+                "ids_minted": {
+                  "all_present": true,
+                  "contents": [
+                    "hello-210",
+                    "ack-210"
+                  ],
+                  "count": 2,
+                  "unique": true
+                }
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "invalid_remove": {
           "evidence": [
@@ -2727,11 +2817,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:invalid_remove and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:RemoveMessage and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'invalid_remove'",
-                "path": "dharma_swarm.graph:invalid_remove"
+                "available": true,
+                "kind": "type",
+                "path": "dharma_swarm.graph:RemoveMessage"
               },
               "id": "surface-lg11-invalid_remove",
               "kind": "public_surface_probe",
@@ -2740,10 +2830,30 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "invalid_remove_error": "Attempting to delete a message with an ID that doesn't exist ('missing-210')",
+                "invalid_remove_rejected": true
+              },
+              "id": "seeded_message_reducers:invalid_remove",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "invalid_remove_error": "Attempting to delete a message with an ID that doesn't exist ('missing-210')",
+                "invalid_remove_rejected": true
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "openai_format": {
           "evidence": [
@@ -2754,11 +2864,12 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:openai_format and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:add_messages#format and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'openai_format'",
-                "path": "dharma_swarm.graph:openai_format"
+                "available": true,
+                "kind": "function",
+                "parameter": "format",
+                "path": "dharma_swarm.graph:add_messages#format"
               },
               "id": "surface-lg11-openai_format",
               "kind": "public_surface_probe",
@@ -2767,10 +2878,88 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "invalid_format_rejected": true,
+                "openai_format": [
+                  {
+                    "content": [
+                      {
+                        "text": "look-210",
+                        "type": "text"
+                      },
+                      {
+                        "image_url": {
+                          "url": "data:image/jpeg;base64,210"
+                        },
+                        "type": "image_url"
+                      }
+                    ],
+                    "type": "human"
+                  },
+                  {
+                    "content": "A210\nB210",
+                    "type": "human"
+                  },
+                  {
+                    "content": "ack-210",
+                    "type": "ai"
+                  },
+                  {
+                    "content": "system-210",
+                    "type": "system"
+                  }
+                ],
+                "openai_ids_dropped": true
+              },
+              "id": "seeded_message_reducers:openai_format",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "invalid_format_rejected": true,
+                "openai_format": [
+                  {
+                    "content": [
+                      {
+                        "text": "look-210",
+                        "type": "text"
+                      },
+                      {
+                        "image_url": {
+                          "url": "data:image/jpeg;base64,210"
+                        },
+                        "type": "image_url"
+                      }
+                    ],
+                    "type": "human"
+                  },
+                  {
+                    "content": "A210\nB210",
+                    "type": "human"
+                  },
+                  {
+                    "content": "ack-210",
+                    "type": "ai"
+                  },
+                  {
+                    "content": "system-210",
+                    "type": "system"
+                  }
+                ],
+                "openai_ids_dropped": true
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "remove_all": {
           "evidence": [
@@ -2781,11 +2970,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:remove_all and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:add_messages and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'remove_all'",
-                "path": "dharma_swarm.graph:remove_all"
+                "available": true,
+                "kind": "function",
+                "path": "dharma_swarm.graph:add_messages"
               },
               "id": "surface-lg11-remove_all",
               "kind": "public_surface_probe",
@@ -2794,10 +2983,40 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "after_remove_all": [
+                  {
+                    "content": "fresh-210",
+                    "id": "f1",
+                    "type": "ai"
+                  }
+                ]
+              },
+              "id": "seeded_message_reducers:remove_all",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "after_remove_all": [
+                  {
+                    "content": "fresh-210",
+                    "id": "f1",
+                    "type": "ai"
+                  }
+                ]
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "remove_message": {
           "evidence": [
@@ -2808,11 +3027,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:remove_message and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:add_messages and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'remove_message'",
-                "path": "dharma_swarm.graph:remove_message"
+                "available": true,
+                "kind": "function",
+                "path": "dharma_swarm.graph:add_messages"
               },
               "id": "surface-lg11-remove_message",
               "kind": "public_surface_probe",
@@ -2821,10 +3040,74 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "graph_messages": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ],
+                "removed": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "ack-210",
+                    "id": "a1",
+                    "type": "ai"
+                  }
+                ]
+              },
+              "id": "seeded_message_reducers:remove_message",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "graph_messages": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ],
+                "removed": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "ack-210",
+                    "id": "a1",
+                    "type": "ai"
+                  }
+                ]
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "replace_by_id": {
           "evidence": [
@@ -2835,11 +3118,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:replace_by_id and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:add_messages and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'replace_by_id'",
-                "path": "dharma_swarm.graph:replace_by_id"
+                "available": true,
+                "kind": "function",
+                "path": "dharma_swarm.graph:add_messages"
               },
               "id": "surface-lg11-replace_by_id",
               "kind": "public_surface_probe",
@@ -2848,10 +3131,74 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "graph_messages": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ],
+                "replaced": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ]
+              },
+              "id": "seeded_message_reducers:replace_by_id",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "graph_messages": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ],
+                "replaced": [
+                  {
+                    "content": "system-210",
+                    "id": "s1",
+                    "type": "system"
+                  },
+                  {
+                    "content": "hello-210-edited",
+                    "id": "h1",
+                    "type": "human"
+                  }
+                ]
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         },
         "ui_message_helpers": {
           "evidence": [
@@ -2862,11 +3209,11 @@
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
                 "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
               ],
-              "command_or_probe": "resolve dharma_swarm.graph:ui_message_helpers and langgraph.graph:StateGraph",
+              "command_or_probe": "resolve dharma_swarm.graph:ui_message_reducer and langgraph.graph:StateGraph",
               "dharma": {
-                "available": false,
-                "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'ui_message_helpers'",
-                "path": "dharma_swarm.graph:ui_message_helpers"
+                "available": true,
+                "kind": "function",
+                "path": "dharma_swarm.graph:ui_message_reducer"
               },
               "id": "surface-lg11-ui_message_helpers",
               "kind": "public_surface_probe",
@@ -2875,17 +3222,103 @@
                 "kind": "type",
                 "path": "langgraph.graph:StateGraph"
               },
-              "outcome": "dharma_public_surface_missing"
+              "outcome": "related_public_surfaces_present_behavior_unproven"
+            },
+            {
+              "citations": [
+                "site-packages/langgraph/graph/message.py:29",
+                "dharma_swarm/langgraph_parity/state.py:114",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V2.json",
+                "docs/langgraph_parity/DHARMAGRAPH_PARITY_GAUNTLET_RUBRIC_V1.json"
+              ],
+              "command_or_probe": "drive message append / replace-by-id / removal / remove-all / invalid-remove / openai formatting / UI reduction through a message channel and the reducer on both installed runtimes",
+              "dharma": {
+                "ui_after_reduce": [
+                  {
+                    "id": "u1",
+                    "metadata": {
+                      "merge": true
+                    },
+                    "name": "Chat",
+                    "props": {
+                      "content": "hello-210",
+                      "tone": "warm-210"
+                    },
+                    "type": "ui"
+                  },
+                  {
+                    "id": "u2",
+                    "metadata": {},
+                    "name": "Side",
+                    "props": {
+                      "n": 210
+                    },
+                    "type": "ui"
+                  }
+                ],
+                "ui_after_remove": [
+                  {
+                    "id": "u2",
+                    "metadata": {},
+                    "name": "Side",
+                    "props": {
+                      "n": 210
+                    },
+                    "type": "ui"
+                  }
+                ],
+                "ui_invalid_remove_rejected": true
+              },
+              "id": "seeded_message_reducers:ui_message_helpers",
+              "kind": "two_arm_differential",
+              "langgraph": {
+                "ui_after_reduce": [
+                  {
+                    "id": "u1",
+                    "metadata": {
+                      "merge": true
+                    },
+                    "name": "Chat",
+                    "props": {
+                      "content": "hello-210",
+                      "tone": "warm-210"
+                    },
+                    "type": "ui"
+                  },
+                  {
+                    "id": "u2",
+                    "metadata": {},
+                    "name": "Side",
+                    "props": {
+                      "n": 210
+                    },
+                    "type": "ui"
+                  }
+                ],
+                "ui_after_remove": [
+                  {
+                    "id": "u2",
+                    "metadata": {},
+                    "name": "Side",
+                    "props": {
+                      "n": 210
+                    },
+                    "type": "ui"
+                  }
+                ],
+                "ui_invalid_remove_rejected": true
+              },
+              "outcome": "parity"
             }
           ],
-          "status": "missing"
+          "status": "pass"
         }
       },
       "gap_card": "parity-gap-lg11-messages",
       "id": "LG11",
       "name": "Message accumulation, replacement, removal, and formatting",
-      "points": 0,
-      "verdict": "NOT_PROVEN",
+      "points": 2,
+      "verdict": "FULLY_PROVEN",
       "weight": 2
     },
     {
@@ -10339,25 +10772,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.009724875002575573,
+                "median_seconds": 0.00931420805864036,
                 "samples_seconds": [
-                  0.009280250000301749,
-                  0.010218625000561588,
-                  0.009724875002575573,
-                  0.009905250000883825,
-                  0.008982833001937252
+                  0.010233999928459525,
+                  0.00931420805864036,
+                  0.009213707991875708,
+                  0.009318375028669834,
+                  0.008510874933563173
                 ]
               },
               "id": "performance:seeded_checkpoint_resume_fork",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.002594666999357287,
+                "median_seconds": 0.0029165829764679074,
                 "samples_seconds": [
-                  0.0024299159995280206,
-                  0.0024758340005064383,
-                  0.0026500000021769665,
-                  0.0027134589981869794,
-                  0.002594666999357287
+                  0.0032944579143077135,
+                  0.002594792051240802,
+                  0.002988334046676755,
+                  0.0025991250295192003,
+                  0.0029165829764679074
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10399,17 +10832,17 @@
               "command_or_probe": "record interpreter, platform, and installed LangGraph version",
               "dharma": {
                 "langgraph_version": "1.2.4",
-                "platform": "macOS-26.5.1-arm64-arm-64bit",
-                "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
-                "python_version": "3.11.15"
+                "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+                "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
+                "python_version": "3.13.12"
               },
               "id": "performance:environment-metadata",
               "kind": "runtime_environment",
               "langgraph": {
                 "langgraph_version": "1.2.4",
-                "platform": "macOS-26.5.1-arm64-arm-64bit",
-                "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
-                "python_version": "3.11.15"
+                "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+                "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
+                "python_version": "3.13.12"
               },
               "outcome": "recorded"
             }
@@ -10449,25 +10882,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.0006677499986835755,
+                "median_seconds": 0.0007200830150395632,
                 "samples_seconds": [
-                  0.0008809169994492549,
-                  0.0006677499986835755,
-                  0.000549374999536667,
-                  0.000691374996677041,
-                  0.0005924170000071172
+                  0.0010538749629631639,
+                  0.0007552909664809704,
+                  0.0006402910221368074,
+                  0.0007200830150395632,
+                  0.0006423330632969737
                 ]
               },
               "id": "performance:seeded_linear_reducer_chain",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.0014109580006334,
+                "median_seconds": 0.0018085419433191419,
                 "samples_seconds": [
-                  0.0016522080004506279,
-                  0.0013357909992919303,
-                  0.0014109580006334,
-                  0.00146708300235332,
-                  0.0013819589985359926
+                  0.00202233309391886,
+                  0.001815292052924633,
+                  0.001665416988544166,
+                  0.0018085419433191419,
+                  0.0016576669877395034
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -10508,9 +10941,9 @@
               ],
               "command_or_probe": "compute Dharma median / LangGraph median",
               "dharma": {
-                "seeded_checkpoint_resume_fork": 3.7480243148675636,
-                "seeded_linear_reducer_chain": 0.47326001084639846,
-                "seeded_send_map_reduce": 0.34925960003047374
+                "seeded_checkpoint_resume_fork": 3.193534397543601,
+                "seeded_linear_reducer_chain": 0.3981566574663039,
+                "seeded_send_map_reduce": 0.34497974953656746
               },
               "id": "performance:overhead-ratios",
               "kind": "wall_clock_performance",
@@ -10555,25 +10988,25 @@
               ],
               "command_or_probe": "time both arms for 5 iterations",
               "dharma": {
-                "median_seconds": 0.00036791599995922297,
+                "median_seconds": 0.00041141698602586985,
                 "samples_seconds": [
-                  0.00035754200143855996,
-                  0.0003888339997502044,
-                  0.00033858299866551533,
-                  0.00041487500129733235,
-                  0.00036791599995922297
+                  0.00041141698602586985,
+                  0.0004402500344440341,
+                  0.0003850000211969018,
+                  0.00045362499076873064,
+                  0.00040604197420179844
                 ]
               },
               "id": "performance:seeded_send_map_reduce",
               "kind": "wall_clock_performance",
               "langgraph": {
-                "median_seconds": 0.001053416999639012,
+                "median_seconds": 0.001192583004012704,
                 "samples_seconds": [
-                  0.001146874998084968,
-                  0.001053416999639012,
-                  0.000949542001762893,
-                  0.0008580419998907018,
-                  0.001057375000527827
+                  0.0012412091018632054,
+                  0.001192583004012704,
+                  0.0011486660223454237,
+                  0.0011019579833373427,
+                  0.0013329170178622007
                 ]
               },
               "outcome": "measured_semantics_parity"
@@ -11553,14 +11986,14 @@
       "supply_eta_risk"
     ]
   },
-  "digest": "778c3ac03f48e2296307f5235b1a7a1d85750f898ce816bb1b876bed69205373",
+  "digest": "19d9bdd0f16202c23820d3c168c8f898afacc87a4ba81edbf2ad7315ad12c73d",
   "environment": {
     "langgraph_checkpoint_sqlite_version": "3.1.0",
     "langgraph_checkpoint_version": "4.1.1",
     "langgraph_version": "1.2.4",
-    "platform": "macOS-26.5.1-arm64-arm-64bit",
-    "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
-    "python_version": "3.11.15"
+    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
+    "python_version": "3.13.12"
   },
   "gaps": [
     {
@@ -11586,14 +12019,6 @@
       "name": "Reducer and channel semantics with concurrent-write conflicts",
       "points": 1,
       "weight": 4
-    },
-    {
-      "capability_id": "LG11",
-      "closure_condition": "All frozen facets prove 2/2 in an independent judge rerun.",
-      "gap_card": "parity-gap-lg11-messages",
-      "name": "Message accumulation, replacement, removal, and formatting",
-      "points": 0,
-      "weight": 2
     },
     {
       "capability_id": "LG12",
@@ -11790,12 +12215,12 @@
   ],
   "judge": {
     "attestation": "I independently re-ran the committed gauntlet and compared the mechanical grade to the builder receipt.",
-    "builder_receipt_digest": "5c799bb09027956797d8881111aea07d844fb7d889de46f393b3c2fc1a62180f",
-    "builder_stable_digest": "ffc91d098bf2047ecf56b443cb5404194bfe4116f2fc87a88d71154b4709effd",
+    "builder_receipt_digest": "11c3ac8c4b96071cd209a3f265e81c15d4326847e66e2274cfd181fea6d8a718",
+    "builder_stable_digest": "d902c4b1c56d8adce9edc39000356a3e81157b2088b3aba6d483bade55a12c5a",
     "discrepancy_is_finding": false,
-    "judge_id": "codex-independent-oraclepin-20260809-4c836606",
+    "judge_id": "codex-independent-no-effect-fleet-reseal-20260828",
     "reconciliation": "MATCH",
-    "signature": "3e6f03bf4c771ce7838f8c0b3b95373ecc515df233650d3e9fff90e78944218e"
+    "signature": "f210d6e056cc4b41065eaa25b09a47728b3f6bbd87641e6b846d72b70f638445"
   },
   "non_gating_drift_check": {
     "behavioral_execution_against_latest": false,
@@ -11812,14 +12237,14 @@
       "version": "1.2.8"
     }
   },
-  "observed_at": "2026-08-08T16:18:47Z",
+  "observed_at": "2026-08-27T22:54:41Z",
   "performance": {
     "clock": "time.perf_counter",
     "environment_metadata": {
       "langgraph_version": "1.2.4",
-      "platform": "macOS-26.5.1-arm64-arm-64bit",
-      "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
-      "python_version": "3.11.15"
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python",
+      "python_version": "3.13.12"
     },
     "iterations": 5,
     "timing_decides_semantic_parity": false,
@@ -11827,83 +12252,83 @@
     "workloads": {
       "seeded_checkpoint_resume_fork": {
         "dharma": {
-          "median_seconds": 0.009724875002575573,
+          "median_seconds": 0.00931420805864036,
           "samples_seconds": [
-            0.009280250000301749,
-            0.010218625000561588,
-            0.009724875002575573,
-            0.009905250000883825,
-            0.008982833001937252
+            0.010233999928459525,
+            0.00931420805864036,
+            0.009213707991875708,
+            0.009318375028669834,
+            0.008510874933563173
           ]
         },
-        "dharma_median_seconds": 0.009724875002575573,
+        "dharma_median_seconds": 0.00931420805864036,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.002594666999357287,
+          "median_seconds": 0.0029165829764679074,
           "samples_seconds": [
-            0.0024299159995280206,
-            0.0024758340005064383,
-            0.0026500000021769665,
-            0.0027134589981869794,
-            0.002594666999357287
+            0.0032944579143077135,
+            0.002594792051240802,
+            0.002988334046676755,
+            0.0025991250295192003,
+            0.0029165829764679074
           ]
         },
-        "langgraph_median_seconds": 0.002594666999357287,
-        "overhead_ratio_dharma_to_langgraph": 3.7480243148675636,
+        "langgraph_median_seconds": 0.0029165829764679074,
+        "overhead_ratio_dharma_to_langgraph": 3.193534397543601,
         "semantic_parity_all_iterations": true
       },
       "seeded_linear_reducer_chain": {
         "dharma": {
-          "median_seconds": 0.0006677499986835755,
+          "median_seconds": 0.0007200830150395632,
           "samples_seconds": [
-            0.0008809169994492549,
-            0.0006677499986835755,
-            0.000549374999536667,
-            0.000691374996677041,
-            0.0005924170000071172
+            0.0010538749629631639,
+            0.0007552909664809704,
+            0.0006402910221368074,
+            0.0007200830150395632,
+            0.0006423330632969737
           ]
         },
-        "dharma_median_seconds": 0.0006677499986835755,
+        "dharma_median_seconds": 0.0007200830150395632,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.0014109580006334,
+          "median_seconds": 0.0018085419433191419,
           "samples_seconds": [
-            0.0016522080004506279,
-            0.0013357909992919303,
-            0.0014109580006334,
-            0.00146708300235332,
-            0.0013819589985359926
+            0.00202233309391886,
+            0.001815292052924633,
+            0.001665416988544166,
+            0.0018085419433191419,
+            0.0016576669877395034
           ]
         },
-        "langgraph_median_seconds": 0.0014109580006334,
-        "overhead_ratio_dharma_to_langgraph": 0.47326001084639846,
+        "langgraph_median_seconds": 0.0018085419433191419,
+        "overhead_ratio_dharma_to_langgraph": 0.3981566574663039,
         "semantic_parity_all_iterations": true
       },
       "seeded_send_map_reduce": {
         "dharma": {
-          "median_seconds": 0.00036791599995922297,
+          "median_seconds": 0.00041141698602586985,
           "samples_seconds": [
-            0.00035754200143855996,
-            0.0003888339997502044,
-            0.00033858299866551533,
-            0.00041487500129733235,
-            0.00036791599995922297
+            0.00041141698602586985,
+            0.0004402500344440341,
+            0.0003850000211969018,
+            0.00045362499076873064,
+            0.00040604197420179844
           ]
         },
-        "dharma_median_seconds": 0.00036791599995922297,
+        "dharma_median_seconds": 0.00041141698602586985,
         "iterations": 5,
         "langgraph": {
-          "median_seconds": 0.001053416999639012,
+          "median_seconds": 0.001192583004012704,
           "samples_seconds": [
-            0.001146874998084968,
-            0.001053416999639012,
-            0.000949542001762893,
-            0.0008580419998907018,
-            0.001057375000527827
+            0.0012412091018632054,
+            0.001192583004012704,
+            0.0011486660223454237,
+            0.0011019579833373427,
+            0.0013329170178622007
           ]
         },
-        "langgraph_median_seconds": 0.001053416999639012,
-        "overhead_ratio_dharma_to_langgraph": 0.34925960003047374,
+        "langgraph_median_seconds": 0.001192583004012704,
+        "overhead_ratio_dharma_to_langgraph": 0.34497974953656746,
         "semantic_parity_all_iterations": true
       }
     }
@@ -14066,11 +14491,11 @@
         }
       },
       "surface-lg11-append_message": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'append_message'",
-          "path": "dharma_swarm.graph:append_message"
+          "available": true,
+          "kind": "function",
+          "path": "dharma_swarm.graph:add_messages"
         },
         "id": "surface-lg11-append_message",
         "langgraph": {
@@ -14080,11 +14505,11 @@
         }
       },
       "surface-lg11-invalid_remove": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'invalid_remove'",
-          "path": "dharma_swarm.graph:invalid_remove"
+          "available": true,
+          "kind": "type",
+          "path": "dharma_swarm.graph:RemoveMessage"
         },
         "id": "surface-lg11-invalid_remove",
         "langgraph": {
@@ -14094,11 +14519,12 @@
         }
       },
       "surface-lg11-openai_format": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'openai_format'",
-          "path": "dharma_swarm.graph:openai_format"
+          "available": true,
+          "kind": "function",
+          "parameter": "format",
+          "path": "dharma_swarm.graph:add_messages#format"
         },
         "id": "surface-lg11-openai_format",
         "langgraph": {
@@ -14108,11 +14534,11 @@
         }
       },
       "surface-lg11-remove_all": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'remove_all'",
-          "path": "dharma_swarm.graph:remove_all"
+          "available": true,
+          "kind": "function",
+          "path": "dharma_swarm.graph:add_messages"
         },
         "id": "surface-lg11-remove_all",
         "langgraph": {
@@ -14122,11 +14548,11 @@
         }
       },
       "surface-lg11-remove_message": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'remove_message'",
-          "path": "dharma_swarm.graph:remove_message"
+          "available": true,
+          "kind": "function",
+          "path": "dharma_swarm.graph:add_messages"
         },
         "id": "surface-lg11-remove_message",
         "langgraph": {
@@ -14136,11 +14562,11 @@
         }
       },
       "surface-lg11-replace_by_id": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'replace_by_id'",
-          "path": "dharma_swarm.graph:replace_by_id"
+          "available": true,
+          "kind": "function",
+          "path": "dharma_swarm.graph:add_messages"
         },
         "id": "surface-lg11-replace_by_id",
         "langgraph": {
@@ -14150,11 +14576,11 @@
         }
       },
       "surface-lg11-ui_message_helpers": {
-        "comparison_verdict": "dharma_public_surface_missing",
+        "comparison_verdict": "related_public_surfaces_present_behavior_unproven",
         "dharma": {
-          "available": false,
-          "error": "AttributeError: module 'dharma_swarm.graph' has no attribute 'ui_message_helpers'",
-          "path": "dharma_swarm.graph:ui_message_helpers"
+          "available": true,
+          "kind": "function",
+          "path": "dharma_swarm.graph:ui_message_reducer"
         },
         "id": "surface-lg11-ui_message_helpers",
         "langgraph": {
@@ -16717,6 +17143,289 @@
         },
         "semantic_comparison_verdict": "parity"
       },
+      "seeded_message_reducers": {
+        "comparison_verdict": "parity",
+        "dharma": {
+          "after_remove_all": [
+            {
+              "content": "fresh-210",
+              "id": "f1",
+              "type": "ai"
+            }
+          ],
+          "appended": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "hello-210",
+              "id": "h1",
+              "type": "human"
+            },
+            {
+              "content": "ack-210",
+              "id": "a1",
+              "type": "ai"
+            }
+          ],
+          "graph_messages": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "hello-210-edited",
+              "id": "h1",
+              "type": "human"
+            }
+          ],
+          "ids_minted": {
+            "all_present": true,
+            "contents": [
+              "hello-210",
+              "ack-210"
+            ],
+            "count": 2,
+            "unique": true
+          },
+          "invalid_format_rejected": true,
+          "invalid_remove_error": "Attempting to delete a message with an ID that doesn't exist ('missing-210')",
+          "invalid_remove_rejected": true,
+          "openai_format": [
+            {
+              "content": [
+                {
+                  "text": "look-210",
+                  "type": "text"
+                },
+                {
+                  "image_url": {
+                    "url": "data:image/jpeg;base64,210"
+                  },
+                  "type": "image_url"
+                }
+              ],
+              "type": "human"
+            },
+            {
+              "content": "A210\nB210",
+              "type": "human"
+            },
+            {
+              "content": "ack-210",
+              "type": "ai"
+            },
+            {
+              "content": "system-210",
+              "type": "system"
+            }
+          ],
+          "openai_ids_dropped": true,
+          "removed": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "ack-210",
+              "id": "a1",
+              "type": "ai"
+            }
+          ],
+          "replaced": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "hello-210-edited",
+              "id": "h1",
+              "type": "human"
+            }
+          ],
+          "ui_after_reduce": [
+            {
+              "id": "u1",
+              "metadata": {
+                "merge": true
+              },
+              "name": "Chat",
+              "props": {
+                "content": "hello-210",
+                "tone": "warm-210"
+              },
+              "type": "ui"
+            },
+            {
+              "id": "u2",
+              "metadata": {},
+              "name": "Side",
+              "props": {
+                "n": 210
+              },
+              "type": "ui"
+            }
+          ],
+          "ui_after_remove": [
+            {
+              "id": "u2",
+              "metadata": {},
+              "name": "Side",
+              "props": {
+                "n": 210
+              },
+              "type": "ui"
+            }
+          ],
+          "ui_invalid_remove_rejected": true
+        },
+        "id": "seeded_message_reducers",
+        "langgraph": {
+          "after_remove_all": [
+            {
+              "content": "fresh-210",
+              "id": "f1",
+              "type": "ai"
+            }
+          ],
+          "appended": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "hello-210",
+              "id": "h1",
+              "type": "human"
+            },
+            {
+              "content": "ack-210",
+              "id": "a1",
+              "type": "ai"
+            }
+          ],
+          "graph_messages": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "hello-210-edited",
+              "id": "h1",
+              "type": "human"
+            }
+          ],
+          "ids_minted": {
+            "all_present": true,
+            "contents": [
+              "hello-210",
+              "ack-210"
+            ],
+            "count": 2,
+            "unique": true
+          },
+          "invalid_format_rejected": true,
+          "invalid_remove_error": "Attempting to delete a message with an ID that doesn't exist ('missing-210')",
+          "invalid_remove_rejected": true,
+          "openai_format": [
+            {
+              "content": [
+                {
+                  "text": "look-210",
+                  "type": "text"
+                },
+                {
+                  "image_url": {
+                    "url": "data:image/jpeg;base64,210"
+                  },
+                  "type": "image_url"
+                }
+              ],
+              "type": "human"
+            },
+            {
+              "content": "A210\nB210",
+              "type": "human"
+            },
+            {
+              "content": "ack-210",
+              "type": "ai"
+            },
+            {
+              "content": "system-210",
+              "type": "system"
+            }
+          ],
+          "openai_ids_dropped": true,
+          "removed": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "ack-210",
+              "id": "a1",
+              "type": "ai"
+            }
+          ],
+          "replaced": [
+            {
+              "content": "system-210",
+              "id": "s1",
+              "type": "system"
+            },
+            {
+              "content": "hello-210-edited",
+              "id": "h1",
+              "type": "human"
+            }
+          ],
+          "ui_after_reduce": [
+            {
+              "id": "u1",
+              "metadata": {
+                "merge": true
+              },
+              "name": "Chat",
+              "props": {
+                "content": "hello-210",
+                "tone": "warm-210"
+              },
+              "type": "ui"
+            },
+            {
+              "id": "u2",
+              "metadata": {},
+              "name": "Side",
+              "props": {
+                "n": 210
+              },
+              "type": "ui"
+            }
+          ],
+          "ui_after_remove": [
+            {
+              "id": "u2",
+              "metadata": {},
+              "name": "Side",
+              "props": {
+                "n": 210
+              },
+              "type": "ui"
+            }
+          ],
+          "ui_invalid_remove_rejected": true
+        },
+        "semantic_comparison_verdict": "parity"
+      },
       "seeded_remaining_steps": {
         "comparison_verdict": "parity",
         "dharma": {
@@ -16869,7 +17578,7 @@
   "role": "judge",
   "rubric": {
     "base_rubric_commit_sha": "6965d38dc8df4bc487e97465ed2f08ffa8274e31",
-    "head_sha": "4c83660632e88802c5e3c6536c71c0dc4b64e6ea",
+    "head_sha": "fd01db5c28b1d0ffce0f1c5829803ff8cac12ca7",
     "rubric_blob_digest": "44ba1f42550563b3f2b5e167b80440250228e4b3d045a2654c9e8b62c87d2338",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_predates_head": true,
@@ -16877,12 +17586,12 @@
   },
   "schema": "dharma_swarm.dharmagraph_parity_receipt.v1",
   "score": {
-    "display": "58.00/100",
-    "earned": "58.00",
+    "display": "60.00/100",
+    "earned": "60.00",
     "possible": "100.00"
   },
   "shas": {
-    "dharma_git_sha": "4c83660632e88802c5e3c6536c71c0dc4b64e6ea",
+    "dharma_git_sha": "fd01db5c28b1d0ffce0f1c5829803ff8cac12ca7",
     "langgraph_git_sha": "054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690",
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc"
   },
@@ -16893,7 +17602,7 @@
     },
     {
       "path": "dharma_swarm/graph/__init__.py",
-      "sha256": "6a4878d7273b24d99278944376325bbc7a74abf71f9f8c43536186e5c77f14a1"
+      "sha256": "8380a60e287bc5fbde293844d3cb552cf02b802e3bb04bd2272664c6bb0761fd"
     },
     {
       "path": "dharma_swarm/graph/_persistence_io.py",
@@ -16938,6 +17647,10 @@
     {
       "path": "dharma_swarm/graph/interrupts.py",
       "sha256": "b5042c04d88e23df06c4b90c99be9a34ec421926eb5ad4c785b4a8e2e1101bfa"
+    },
+    {
+      "path": "dharma_swarm/graph/messages.py",
+      "sha256": "980285c58ca5b97c548bbb1f23d3d30f951cdb6262ead884d9ebe55791ce4da8"
     },
     {
       "path": "dharma_swarm/graph/persistence.py",
@@ -17065,7 +17778,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "f48caca9134135a9b9f74b887cfefa27e358be0847f77d9b5b529e202797ac29"
+      "sha256": "5d5b0286e39eddebd44360a10781d8611e0065addd11d0844608aae67750fd8c"
     },
     {
       "path": "scripts/governance/dharmagraph_parity_gauntlet.py",
@@ -17077,7 +17790,7 @@
     },
     {
       "path": "tests/oracle_support/dharmagraph_gauntlet.py",
-      "sha256": "4818be500d8ed5a0c39d9f6e6e086e1e6458b2904c67e3e2901e7552db9673a8"
+      "sha256": "fb40c8ec33b152744ccfebd9f57d54154d127f41c05f99bd0ed2787c29d6560d"
     },
     {
       "path": "tests/oracle_support/langgraph_arm.py",
@@ -17105,10 +17818,10 @@
     },
     {
       "path": "uv.lock",
-      "sha256": "1aaf7c313f5fde5816445c63476ffa95edb624a2ca09a16c1138543043adb399"
+      "sha256": "abbbd2e6546002d1fbc6fb5683f858447f9849f5d7e35a1e3bbd6a523aefe0bd"
     }
   ],
-  "source_tree_digest": "9e93c0d95db80ce81189ca50aef836acf1ae464b9af1651f8a5444392a165865",
+  "source_tree_digest": "69483434f8f1530e71a1739ebd3c9a579902c69df6dc5abfc3b373083eda1e83",
   "stable_core": {
     "capabilities": [
       {
@@ -17262,21 +17975,19 @@
         "weight": 4
       },
       {
-        "caveats": [
-          "unproven facets: append_message, replace_by_id, remove_message, remove_all, invalid_remove, openai_format, ui_message_helpers"
-        ],
+        "caveats": [],
         "facet_statuses": {
-          "append_message": "missing",
-          "invalid_remove": "missing",
-          "openai_format": "missing",
-          "remove_all": "missing",
-          "remove_message": "missing",
-          "replace_by_id": "missing",
-          "ui_message_helpers": "missing"
+          "append_message": "pass",
+          "invalid_remove": "pass",
+          "openai_format": "pass",
+          "remove_all": "pass",
+          "remove_message": "pass",
+          "replace_by_id": "pass",
+          "ui_message_helpers": "pass"
         },
         "id": "LG11",
-        "points": 0,
-        "verdict": "NOT_PROVEN",
+        "points": 2,
+        "verdict": "FULLY_PROVEN",
         "weight": 2
       },
       {
@@ -17804,7 +18515,6 @@
       "LG02",
       "LG03",
       "LG10",
-      "LG11",
       "LG12",
       "LG13",
       "LG19",
@@ -17834,9 +18544,9 @@
     "rubric_commit_sha": "9fe56ce57deba94c2f0bdee03028145a2ae7b2cc",
     "rubric_schema": "dharma_swarm.dharmagraph_parity_gauntlet.rubric.v2",
     "schema": "dharma_swarm.dharmagraph_parity_receipt.stable.v1",
-    "score": "58.00",
+    "score": "60.00",
     "seed": 20260711,
-    "source_tree_digest": "9e93c0d95db80ce81189ca50aef836acf1ae464b9af1651f8a5444392a165865",
+    "source_tree_digest": "69483434f8f1530e71a1739ebd3c9a579902c69df6dc5abfc3b373083eda1e83",
     "target": {
       "checkpoint_distribution": "langgraph-checkpoint==4.1.1",
       "distribution": "langgraph",
@@ -17853,6 +18563,6 @@
     },
     "weight_denominator": 100
   },
-  "stable_digest": "ffc91d098bf2047ecf56b443cb5404194bfe4116f2fc87a88d71154b4709effd",
+  "stable_digest": "d902c4b1c56d8adce9edc39000356a3e81157b2088b3aba6d483bade55a12c5a",
   "verdict": "NOT_FINISHED"
 }

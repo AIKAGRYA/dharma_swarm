@@ -64,7 +64,7 @@ from dharma_swarm.operator_core.semantic_receipt import (
     SCHEMA_VERSION as SEMANTIC_SCHEMA,
     validate_semantic_receipt,
 )
-from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore
+from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
 from scripts.runtime.a2a_domain_reply_artifact import (
@@ -483,39 +483,29 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
     )
     await runtime.record_execution_identity(executor, source="test")
     if proposal:
-        await runtime.record_runtime_receipt(
-            RuntimeReceipt(
-                receipt_id="proposal-receipt-1",
-                receipt_type="self_mod_proposal",
-                status="proposed",
-                run_id=executor.run_id,
-                task_id=task.task_id,
-                trace_id=executor.trace_id,
-                correlation_id=executor.correlation_id,
-                causation_id=executor.causation_id,
-                parent_run_id=executor.parent_run_id,
-                agent_id=executor.agent_id,
-                idempotency_key=executor.idempotency_key,
-                side_effect_key=f"self_mod:{proposal_id}:proposal",
-                payload={
-                    "schema_version": "dharma.a2a.patch_candidate.v1",
-                    "mission_id": mission_id,
-                    "task_id": task.task_id,
-                    "attempt_id": packet_id,
-                    "lease_id": delivery_id,
-                    "packet_id": packet_id,
-                    "correlation_id": correlation,
-                    "delivery_id": delivery_id,
-                    "proposal_id": proposal_id,
-                    "candidate_digest": expected.candidate_digest,
-                    "diff_sha256": expected.diff_sha256,
-                    "base_sha": expected.base_sha,
-                    "artifact_sha256": artifact_sha,
-                    "authorized_source_files": list(
-                        expected.authorized_source_files,
-                    ),
-                },
-            ),
+        await runtime.commit_self_mod_receipt_exact(
+            executor,
+            stage="proposal",
+            proposal_id=proposal_id,
+            status="proposed",
+            payload={
+                "schema_version": "dharma.a2a.patch_candidate.v1",
+                "mission_id": mission_id,
+                "task_id": task.task_id,
+                "attempt_id": packet_id,
+                "lease_id": delivery_id,
+                "packet_id": packet_id,
+                "correlation_id": correlation,
+                "delivery_id": delivery_id,
+                "proposal_id": proposal_id,
+                "candidate_digest": expected.candidate_digest,
+                "diff_sha256": expected.diff_sha256,
+                "base_sha": expected.base_sha,
+                "artifact_sha256": artifact_sha,
+                "authorized_source_files": list(
+                    expected.authorized_source_files,
+                ),
+            },
         )
     projection = MissionControlA2AProjection(
         board,
@@ -956,7 +946,7 @@ async def test_rejected_or_foreign_proposal_never_verifies(tmp_path: Path) -> No
     with sqlite3.connect(ctx.runtime.db_path) as connection:
         connection.execute(
             "UPDATE runtime_receipts SET status = 'rejected' "
-            "WHERE receipt_id = 'proposal-receipt-1'",
+            "WHERE side_effect_key = 'self_mod:proposal-1:proposal'",
         )
     with pytest.raises(MissionControlError, match="patch candidate"):
         await ctx.projection.observe(
@@ -968,9 +958,51 @@ async def test_rejected_or_foreign_proposal_never_verifies(tmp_path: Path) -> No
     with sqlite3.connect(ctx.runtime.db_path) as connection:
         connection.execute(
             "UPDATE runtime_receipts SET status = 'proposed', trace_id = 'foreign' "
-            "WHERE receipt_id = 'proposal-receipt-1'",
+            "WHERE side_effect_key = 'self_mod:proposal-1:proposal'",
         )
     with pytest.raises(MissionControlError, match="patch candidate"):
+        await ctx.projection.observe(
+            ctx.mission_id,
+            ctx.task_id,
+            expected=ctx.expected,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tamper", ["flat_payload", "missing_idempotency"])
+async def test_flat_or_partial_proposal_evidence_never_verifies(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    ctx = await _context(tmp_path, proposal=True)
+    side_effect_key = "self_mod:proposal-1:proposal"
+    with sqlite3.connect(ctx.runtime.db_path) as connection:
+        if tamper == "flat_payload":
+            raw = connection.execute(
+                "SELECT payload_json FROM runtime_receipts WHERE side_effect_key = ?",
+                (side_effect_key,),
+            ).fetchone()[0]
+            flat_payload = json.loads(raw)["evidence"]
+            connection.execute(
+                "UPDATE runtime_receipts SET payload_json = ? WHERE side_effect_key = ?",
+                (
+                    json.dumps(
+                        flat_payload,
+                        sort_keys=True,
+                        ensure_ascii=True,
+                        allow_nan=False,
+                        separators=(",", ":"),
+                    ),
+                    side_effect_key,
+                ),
+            )
+        else:
+            connection.execute(
+                "DELETE FROM idempotency_records WHERE side_effect_key = ?",
+                (side_effect_key,),
+            )
+
+    with pytest.raises(MissionControlError, match="exact atomic proposal"):
         await ctx.projection.observe(
             ctx.mission_id,
             ctx.task_id,
@@ -1297,14 +1329,22 @@ async def test_conflicting_warrant_replay_fails_closed(tmp_path: Path) -> None:
         payload = json.loads(
             connection.execute(
                 "SELECT payload_json FROM runtime_receipts "
-                "WHERE receipt_id = 'proposal-receipt-1'",
+                "WHERE side_effect_key = 'self_mod:proposal-1:proposal'",
             ).fetchone()[0],
         )
-        payload["diff_sha256"] = _sha("foreign-diff")
+        payload["evidence"]["diff_sha256"] = _sha("foreign-diff")
         connection.execute(
             "UPDATE runtime_receipts SET payload_json = ? "
-            "WHERE receipt_id = 'proposal-receipt-1'",
-            (json.dumps(payload, sort_keys=True),),
+            "WHERE side_effect_key = 'self_mod:proposal-1:proposal'",
+            (
+                json.dumps(
+                    payload,
+                    sort_keys=True,
+                    ensure_ascii=True,
+                    allow_nan=False,
+                    separators=(",", ":"),
+                ),
+            ),
         )
     result = await A2APatchPromotionEvaluator(
         ctx.projection,

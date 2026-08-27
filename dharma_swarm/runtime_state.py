@@ -396,10 +396,13 @@ SELF_MOD_RECEIPT_TYPES = frozenset(
     }
 )
 
-EXACT_SELF_MOD_RECEIPT_TYPES = frozenset({"self_mod_gate", "self_mod_promote"})
+EXACT_SELF_MOD_RECEIPT_TYPES = frozenset(
+    {"self_mod_proposal", "self_mod_gate", "self_mod_promote"}
+)
 
 _EXACT_SELF_MOD_SCHEMA_VERSION = "dharma.runtime.self_mod_exact.v1"
 _EXACT_SELF_MOD_AUTHORITY_SEMANTICS = "attestation_only"
+_EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX = "exact:"
 
 _EXECUTION_IDENTITY_CONFLICT_FIELDS = (
     "trace_id",
@@ -518,7 +521,7 @@ def _is_reserved_exact_self_mod_slot(
         receipt_type in EXACT_SELF_MOD_RECEIPT_TYPES
     ) or (
         side_effect_key.startswith("self_mod:")
-        and side_effect_key.endswith((":gate", ":promote"))
+        and side_effect_key.endswith((":proposal", ":gate", ":promote"))
     )
 
 
@@ -527,7 +530,7 @@ def _reject_reserved_exact_self_mod_slot(
 ) -> None:
     if _is_reserved_exact_self_mod_slot(receipt_type, side_effect_key, receipt_id):
         raise ValueError(
-            f"{surface} cannot write reserved self-mod gate/promote evidence; "
+            f"{surface} cannot write reserved self-mod proposal/gate/promote evidence; "
             "use commit_self_mod_receipt_exact"
         )
 
@@ -1342,13 +1345,17 @@ class RuntimeStateStore:
         self.db_path = Path(db_path or DEFAULT_RUNTIME_DB)
         self.include_memory_plane = include_memory_plane
 
+    def _connect_sync(self, *, timeout: float = 5.0) -> sqlite3.Connection:
+        """Return the shared sync SQLite connection seam for atomic writers."""
+        return sqlite3.connect(self.db_path, timeout=timeout)
+
     def _connect_async(self) -> aiosqlite.Connection:
         """Return the shared async SQLite connection seam for atomic writers."""
         return aiosqlite.connect(self.db_path)
 
     def init_db_sync(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.db_path) as db:
+        with self._connect_sync() as db:
             ensure_runtime_state_schema_sync(
                 db,
                 include_memory_plane=self.include_memory_plane,
@@ -2670,6 +2677,7 @@ class RuntimeStateStore:
             " source = excluded.source,"
             " metadata_json = excluded.metadata_json,"
             " updated_at = excluded.updated_at"
+            " WHERE execution_identities.source NOT LIKE 'exact:%'"
         )
 
     async def record_execution_identity(
@@ -2680,16 +2688,22 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
+        if source.startswith(_EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX):
+            raise ValueError("generic execution identity source uses a reserved marker")
         await self.init_db()
         existing = await self.get_execution_identity(identity.run_id)
         _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
-            await db.execute(
+            cursor = await db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(identity, source=source, now=now, metadata=metadata),
             )
+            if int(cursor.rowcount or 0) != 1:
+                raise ValueError(
+                    "execution identity is reserved by the exact writer"
+                )
             await db.commit()
         loaded = await self.get_execution_identity(identity.run_id)
         assert loaded is not None
@@ -2703,18 +2717,161 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
+        if source.startswith(_EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX):
+            raise ValueError("generic execution identity source uses a reserved marker")
         self.init_db_sync()
         existing = self.get_execution_identity_sync(identity.run_id)
         _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
+            cursor = db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(identity, source=source, now=now, metadata=metadata),
             )
+            if int(cursor.rowcount or 0) != 1:
+                raise ValueError(
+                    "execution identity is reserved by the exact writer"
+                )
             db.commit()
         return self.get_execution_identity_sync(identity.run_id) or identity
+
+    def record_execution_identity_exact_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        source: str,
+    ) -> ExecutionIdentity:
+        """Insert or exactly replay one immutable execution-identity assertion.
+
+        Unlike the compatibility upsert above, this path never merges or
+        overwrites a durable row.  A reused ``run_id`` is replayable only when
+        every identity field, canonical metadata value, and ``source`` match.
+        The immediate transaction serializes competing verifier processes.
+        """
+
+        if type(identity) is not ExecutionIdentity:
+            raise MissingExecutionIdentity(
+                "exact execution identity requires exact ExecutionIdentity"
+            )
+        if type(source) is not str or not source.strip():
+            raise ValueError("source is required for exact execution identity")
+        if source != source.strip():
+            raise ValueError(
+                "exact execution identity source must not contain surrounding whitespace"
+            )
+        if source.startswith(_EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX):
+            raise ValueError("exact execution identity source must not use its marker")
+        durable_source = _EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX + source
+        identity.require_for_dispatch()
+        field_names = ("run_id", *_EXECUTION_IDENTITY_CONFLICT_FIELDS)
+        fields = {name: getattr(identity, name) for name in field_names}
+        for name, value in fields.items():
+            if type(value) is not str:
+                raise MissingExecutionIdentity(
+                    f"ExecutionIdentity field {name} must be a string"
+                )
+            if value != value.strip():
+                raise MissingExecutionIdentity(
+                    f"ExecutionIdentity field {name} must not contain surrounding whitespace"
+                )
+        if type(identity.metadata) is not dict:
+            raise MissingExecutionIdentity(
+                "ExecutionIdentity metadata must be an exact JSON object"
+            )
+        normalized_metadata = _canonical_finite_json_value(
+            identity.metadata,
+            surface="exact ExecutionIdentity metadata",
+        )
+        assert isinstance(normalized_metadata, dict)
+        normalized_identity = {**fields, "metadata": normalized_metadata}
+        identity_json = _canonical_finite_json_dump(
+            normalized_identity,
+            surface="exact ExecutionIdentity",
+        )
+        metadata_json = _canonical_finite_json_dump(
+            normalized_metadata,
+            surface="exact ExecutionIdentity metadata",
+        )
+        # Input validation deliberately completes before schema initialization.
+        self.init_db_sync()
+        columns = (
+            "run_id, trace_id, correlation_id, task_id, claim_id,"
+            " idempotency_key, causation_id, parent_run_id, agent_id,"
+            " session_id, external_a2a_task_id, message_id, event_id,"
+            " artifact_id, proposal_id, source, metadata_json"
+        )
+        with self._connect_sync(
+            timeout=_BUSY_TIMEOUT_MS / 1000,
+        ) as db:
+            _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                def load_row() -> sqlite3.Row | None:
+                    return db.execute(
+                        f"SELECT {columns} FROM execution_identities WHERE run_id = ?",
+                        (fields["run_id"],),
+                    ).fetchone()
+
+                def require_exact(row: sqlite3.Row) -> ExecutionIdentity:
+                    try:
+                        durable_metadata = _canonical_finite_json_load(
+                            str(row["metadata_json"]),
+                            surface="durable exact ExecutionIdentity metadata",
+                        )
+                    except ValueError as exc:
+                        raise ValueError(
+                            "conflicting exact execution identity metadata"
+                        ) from exc
+                    durable_identity = {
+                        **{name: str(row[name] or "") for name in field_names},
+                        "metadata": durable_metadata,
+                    }
+                    durable_json = _canonical_finite_json_dump(
+                        durable_identity,
+                        surface="durable exact ExecutionIdentity",
+                    )
+                    if (
+                        durable_json != identity_json
+                        or str(row["source"]) != durable_source
+                    ):
+                        raise ValueError("conflicting exact execution identity")
+                    return _row_to_execution_identity(row)
+
+                existing = load_row()
+                if existing is not None:
+                    replay = require_exact(existing)
+                    db.commit()
+                    return replay
+
+                now = _utc_now().isoformat()
+                cursor = db.execute(
+                    "INSERT INTO execution_identities (run_id, trace_id, correlation_id,"
+                    " task_id, claim_id, idempotency_key, causation_id, parent_run_id,"
+                    " agent_id, session_id, external_a2a_task_id, message_id, event_id,"
+                    " artifact_id, proposal_id, source, metadata_json, created_at, updated_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    " ON CONFLICT(run_id) DO NOTHING",
+                    (
+                        *(fields[name] for name in field_names),
+                        durable_source,
+                        metadata_json,
+                        now,
+                        now,
+                    ),
+                )
+                if int(cursor.rowcount or 0) != 1:
+                    raise RuntimeError("exact execution identity insertion lost its slot")
+                inserted = load_row()
+                if inserted is None:
+                    raise RuntimeError("exact execution identity was not durably inserted")
+                stored = require_exact(inserted)
+                db.commit()
+                return stored
+            except BaseException:
+                db.rollback()
+                raise
 
     async def get_execution_identity(self, run_id: str) -> ExecutionIdentity | None:
         await self.init_db()
@@ -3067,12 +3224,12 @@ class RuntimeStateStore:
         self,
         identity: ExecutionIdentity,
         *,
-        stage: Literal["gate", "promote"],
+        stage: Literal["proposal", "gate", "promote"],
         proposal_id: str,
         status: str,
         payload: Mapping[str, Any],
     ) -> RuntimeReceipt:
-        """Atomically attest one exact self-mod gate or promotion result.
+        """Atomically attest one exact self-mod proposal, gate, or promotion.
 
         The receipt and its completed idempotency row are one indivisible
         pair.  Existing state is replayable only when it is the single exact
@@ -3089,8 +3246,10 @@ class RuntimeStateStore:
             for field_name in identity_field_names
         }
         identity_metadata = identity.metadata
-        if type(stage) is not str or stage not in ("gate", "promote"):
-            raise ValueError("exact self-mod stage must be 'gate' or 'promote'")
+        if type(stage) is not str or stage not in ("proposal", "gate", "promote"):
+            raise ValueError(
+                "exact self-mod stage must be 'proposal', 'gate', or 'promote'"
+            )
         if type(proposal_id) is not str or not proposal_id.strip():
             raise ValueError("proposal_id is required for exact self-mod evidence")
         if proposal_id != proposal_id.strip():

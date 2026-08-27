@@ -177,6 +177,13 @@ def _evaluate_vibe_halt(
         return InconclusiveCapability("malformed_verifier_signature")
     if verifier_public_key != expected.vibe_verifier.signer_public_key:
         return InconclusiveCapability("verifier_signer_binding_mismatch")
+    if data.get("diff_bound") is not True or data.get("calibration_only") is not False:
+        return InconclusiveCapability("not_candidate_bound")
+    # A candidate-bound declaration that the capability did not run can never
+    # mint authority. Classify it before trust-root verification so unavailable
+    # evidence has the exact epistemic type ``unchecked`` even for public callers.
+    if data.get("ran") is not True:
+        return InconclusiveCapability("unchecked")
     if remember_capability is None or not trusted_vibe_public_keys:
         return InconclusiveCapability("trusted_verifier_signature_required")
     if verifier_public_key not in trusted_vibe_public_keys:
@@ -185,10 +192,6 @@ def _evaluate_vibe_halt(
         return InconclusiveCapability("verifier_key_not_independent")
     if not _signed_payload_valid(data, signature_field="signature"):
         return InconclusiveCapability("invalid_verifier_signature")
-    if data.get("diff_bound") is not True or data.get("calibration_only") is not False:
-        return InconclusiveCapability("not_candidate_bound")
-    if data.get("ran") is not True:
-        return InconclusiveCapability("unchecked")
     exit_code = process.get("exit_code")
     if (
         type(exit_code) is not int

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -97,6 +98,41 @@ def test_entrypoint_forwards_only_semantic_responder_arguments(monkeypatch) -> N
 
     assert result == 9
     assert called == [["loop", "--interval-s", "60", "--limit", "1"]]
+
+
+@pytest.mark.parametrize(
+    ("command", "module_name"),
+    (
+        (
+            "governed-patch-foundry-verifier",
+            "scripts.runtime.governed_patch_foundry_verifier",
+        ),
+        (
+            "governed-patch-vibe-verifier",
+            "scripts.runtime.governed_patch_vibe_verifier",
+        ),
+    ),
+)
+def test_entrypoint_forwards_only_governed_verifier_arguments(
+    monkeypatch,
+    command: str,
+    module_name: str,
+) -> None:
+    called: list[list[str]] = []
+    module = types.ModuleType(module_name)
+    module.main = lambda args: called.append(args) or 11  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, module_name, module)
+    monkeypatch.setenv("DHARMA_RELEASE_ROOT", str(REPO_ROOT))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["runtime-release", command, "--once", "bundle.json"],
+    )
+
+    result = runtime_release_entrypoint.main()
+
+    assert result == 11
+    assert called == [["--once", "bundle.json"]]
 
 
 def test_entrypoint_leaves_responder_argument_validation_to_responder(
