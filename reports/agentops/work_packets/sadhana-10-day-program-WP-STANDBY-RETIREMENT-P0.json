@@ -1,7 +1,7 @@
 {
   "id": "sadhana-10-day-program-WP-STANDBY-RETIREMENT-P0",
   "base_ref": "3498b3e0fb6f608ce55149143e10b076c148e94b",
-  "branch": "agent/sadhana-10day-retirement-clean-20260827",
+  "branch": "agent/sadhana-10day-retirement-runtime-main-20260827",
   "worktree": ".",
   "intent": "Consolidate one collision-free SADHANA ten-day source dossier without widening campaign authority: deterministic release and snapshot contracts, inert deployment templates, and a root-only single-writer retirement transaction with a hard ten-day stop. Bind the separately Fleet-owned campaign runtime and its complete module closure as an asserted, digest-bound NoEffectAuthority interface locator that fails closed while its manifest or exact tracked bytes are absent; do not import or own that Fleet implementation during prerequisite validation. This source contract does not claim sealability, participant completion, provider dispatch, campaign activation, or live deployment.",
   "allowed_files": [
@@ -140,6 +140,6 @@
       "Production confidence would still require a separately authorized inert host rehearsal against exact systemd and filesystem behavior, a fresh sole-parent release candidate and sealed envelope after Fleet integration, and independent review of the resulting receipts."
     ],
     "rollback": "Revert only the SADHANA release and snapshot source contracts, guarded external Fleet locator, inert deployment templates, standby lifecycle retirement transaction, focused regressions, exact DocOps registration and generated updates, and this packet. Never recover by copying the Fleet campaign implementation into this lane, dynamically loading an unmanifested module, deleting singleton receipts manually, relaxing receipt custody, bypassing the pending guard, transferring writer authority, or treating source artifacts as participant-completion or deployment proof.",
-    "packet_digest": "7c0aca03d8571564642a1900466666fbb7a4ef84bbc8bf5ac949cd3268e135ad"
+    "packet_digest": "f0b5feaec1beba2e9329c55f215304a38470777e765c0484272bdff660f43476"
   }
 }

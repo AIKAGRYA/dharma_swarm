@@ -863,6 +863,10 @@ INPUT_SOURCE_OVERRIDES = {
 }
 _SHA_RE = re.compile(r"[0-9a-f]{64}")
 _COMMIT_RE = re.compile(r"[0-9a-f]{40}")
+_TAILSCALE_HOST_PORT_RE = re.compile(
+    rf"{re.escape(WRITER_NODE)}\."
+    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.ts\.net:443"
+)
 _PACKET_PATH_RE = re.compile(
     r"reports/agentops/work_packets/[A-Za-z0-9][A-Za-z0-9._-]{1,199}\.json"
 )
@@ -3572,7 +3576,7 @@ def _verify_installed_input_set(
         not stat.S_ISDIR(root_identity.st_mode)
         or root_identity.st_uid != root_uid
         or root_identity.st_gid != account.pw_gid
-        or stat.S_IMODE(root_identity.st_mode) != 0o750
+        or stat.S_IMODE(root_identity.st_mode) != 0o710
     ):
         raise ReleaseContractError("installed input-set root lacks exact custody")
     for directory, names, files in os.walk(target_root, followlinks=False):
@@ -3583,7 +3587,7 @@ def _verify_installed_input_set(
             or not stat.S_ISDIR(directory_identity.st_mode)
             or directory_identity.st_uid != root_uid
             or directory_identity.st_gid != account.pw_gid
-            or stat.S_IMODE(directory_identity.st_mode) != 0o750
+            or stat.S_IMODE(directory_identity.st_mode) != 0o710
         ):
             raise ReleaseContractError("installed input-set directory custody differs")
         for name in names:
@@ -3786,7 +3790,7 @@ def install_input_set(
                 target = staging.joinpath(
                     *PurePosixPath(entry["target_relative_path"]).parts
                 )
-                target.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+                target.parent.mkdir(parents=True, exist_ok=True, mode=0o710)
                 descriptor = os.open(
                     target,
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
@@ -3813,9 +3817,9 @@ def install_input_set(
                 for name in names:
                     child = Path(directory) / name
                     os.chown(child, expected_root_uid, account.pw_gid)
-                    os.chmod(child, 0o750)
+                    os.chmod(child, 0o710)
             os.chown(staging, expected_root_uid, account.pw_gid)
-            os.chmod(staging, 0o750)
+            os.chmod(staging, 0o710)
             os.replace(staging, target_root)
             directory_descriptor = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
             try:
@@ -4320,6 +4324,7 @@ def _validate_pinned_uv_tree(
     execution_uid: int | None,
     execution_gid: int | None,
     execute_version: bool,
+    custody_gid: int,
     allow_legacy_private_modes: bool = False,
 ) -> Path:
     marker = root / "INSTALL.json"
@@ -4334,13 +4339,15 @@ def _validate_pinned_uv_tree(
         bin_entries = {entry.name for entry in bin_root.iterdir()}
     except OSError as exc:
         raise ReleaseContractError("pinned uv tree is unavailable") from exc
-    directory_modes = {0o755}
-    executable_modes = {0o755}
-    marker_modes = {0o644}
+    directory_modes = {0o710}
+    executable_modes = {0o510}
+    marker_modes = {0o600}
+    admitted_gids = {custody_gid}
     if allow_legacy_private_modes:
-        directory_modes.add(0o700)
-        executable_modes.add(0o700)
-        marker_modes.add(0o600)
+        directory_modes.update({0o700, 0o755})
+        executable_modes.update({0o700, 0o755})
+        marker_modes.add(0o644)
+        admitted_gids.add(os.getegid())
     if (
         root.is_symlink()
         or not stat.S_ISDIR(root_identity.st_mode)
@@ -4357,7 +4364,6 @@ def _validate_pinned_uv_tree(
     ):
         raise ReleaseContractError("pinned uv root is not a regular directory")
     expected_uid = os.geteuid()
-    expected_gid = os.getegid()
     custody = (
         (root_identity, directory_modes),
         (bin_identity, directory_modes),
@@ -4366,7 +4372,7 @@ def _validate_pinned_uv_tree(
     )
     if any(
         identity.st_uid != expected_uid
-        or identity.st_gid != expected_gid
+        or identity.st_gid not in admitted_gids
         or stat.S_IMODE(identity.st_mode) not in allowed_modes
         for identity, allowed_modes in custody
     ):
@@ -4406,16 +4412,16 @@ def _validate_pinned_uv_tree(
     return binary
 
 
-def _normalize_pinned_uv_tree_modes(root: Path) -> None:
+def _normalize_pinned_uv_tree_modes(root: Path, *, custody_gid: int) -> None:
     """Converge only the admitted legacy-private uv tree to executable custody."""
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     if not nofollow:
         raise ReleaseContractError("platform lacks no-follow pinned uv custody")
     targets = (
-        (root / "INSTALL.json", 0o644, {0o600, 0o644}, False),
-        (root / "bin" / "uv", 0o755, {0o700, 0o755}, False),
-        (root / "bin", 0o755, {0o700, 0o755}, True),
-        (root, 0o755, {0o700, 0o755}, True),
+        (root / "INSTALL.json", 0o600, {0o600, 0o644}, False),
+        (root / "bin" / "uv", 0o510, {0o510, 0o700, 0o755}, False),
+        (root / "bin", 0o710, {0o700, 0o710, 0o755}, True),
+        (root, 0o710, {0o700, 0o710, 0o755}, True),
     )
     for path, final_mode, admitted_modes, is_directory in targets:
         before = path.lstat()
@@ -4432,11 +4438,12 @@ def _normalize_pinned_uv_tree_modes(root: Path) -> None:
                 or (opened.st_dev, opened.st_ino)
                 != (before.st_dev, before.st_ino)
                 or opened.st_uid != os.geteuid()
-                or opened.st_gid != os.getegid()
+                or opened.st_gid not in {os.getegid(), custody_gid}
                 or stat.S_IMODE(opened.st_mode) not in admitted_modes
                 or (not is_directory and opened.st_nlink != 1)
             ):
                 raise ReleaseContractError("pinned uv mode transition lacks custody")
+            os.fchown(descriptor, -1, custody_gid)
             os.fchmod(descriptor, final_mode)
             os.fsync(descriptor)
             normalized = os.fstat(descriptor)
@@ -4444,7 +4451,7 @@ def _normalize_pinned_uv_tree_modes(root: Path) -> None:
                 (normalized.st_dev, normalized.st_ino)
                 != (opened.st_dev, opened.st_ino)
                 or normalized.st_uid != opened.st_uid
-                or normalized.st_gid != opened.st_gid
+                or normalized.st_gid != custody_gid
                 or stat.S_IMODE(normalized.st_mode) != final_mode
                 or (not is_directory and normalized.st_nlink != 1)
             ):
@@ -4466,6 +4473,9 @@ def provision_pinned_uv(
 ) -> Path:
     """Install the hash-pinned x86_64 uv artifact without pip or PATH trust."""
     execute = runner or _run
+    custody_gid = execution_gid if execution_gid is not None else os.getegid()
+    if custody_gid < 0:
+        raise ReleaseContractError("pinned uv custody group differs")
     observed_system = system_name or platform.system()
     observed_machine = (machine or platform.machine()).lower()
     if observed_system != "Linux" or observed_machine not in {"x86_64", "amd64"}:
@@ -4475,8 +4485,8 @@ def provision_pinned_uv(
     tooling_root.mkdir(parents=True, exist_ok=True)
     if tooling_root.is_symlink():
         raise ReleaseContractError("pinned uv tooling root cannot be a symlink")
-    os.chown(tooling_root, os.geteuid(), os.getegid())
-    os.chmod(tooling_root, 0o755)
+    os.chown(tooling_root, os.geteuid(), custody_gid)
+    os.chmod(tooling_root, 0o710)
     target = tooling_root / f"uv-{UV_VERSION}"
     if target.exists() or target.is_symlink():
         _validate_pinned_uv_tree(
@@ -4485,15 +4495,17 @@ def provision_pinned_uv(
             execution_uid=None,
             execution_gid=None,
             execute_version=False,
+            custody_gid=custody_gid,
             allow_legacy_private_modes=True,
         )
-        _normalize_pinned_uv_tree_modes(target)
+        _normalize_pinned_uv_tree_modes(target, custody_gid=custody_gid)
         return _validate_pinned_uv_tree(
             target,
             runner=execute,
             execution_uid=execution_uid,
             execution_gid=execution_gid,
             execute_version=execute_version,
+            custody_gid=custody_gid,
         )
     staging = Path(tempfile.mkdtemp(prefix=".uv-staging-", dir=tooling_root))
     try:
@@ -4519,10 +4531,10 @@ def provision_pinned_uv(
         if binary_bytes[:4] != b"\x7fELF" or binary_bytes[18:20] != b">\x00":
             raise ReleaseContractError("pinned uv executable is not x86_64 ELF")
         bin_root = staging / "bin"
-        bin_root.mkdir(mode=0o755)
+        bin_root.mkdir(mode=0o700)
         os.chmod(bin_root, 0o700)
         binary = bin_root / "uv"
-        descriptor = os.open(binary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o755)
+        descriptor = os.open(binary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, "wb") as executable:
             executable.write(binary_bytes)
             executable.flush()
@@ -4543,15 +4555,17 @@ def provision_pinned_uv(
             execution_uid=None,
             execution_gid=None,
             execute_version=False,
+            custody_gid=custody_gid,
             allow_legacy_private_modes=True,
         )
-        _normalize_pinned_uv_tree_modes(staging)
+        _normalize_pinned_uv_tree_modes(staging, custody_gid=custody_gid)
         _validate_pinned_uv_tree(
             staging,
             runner=execute,
             execution_uid=None,
             execution_gid=None,
             execute_version=False,
+            custody_gid=custody_gid,
         )
         if target.exists() or target.is_symlink():
             raise ReleaseContractError("pinned uv target appeared during installation")
@@ -4565,6 +4579,7 @@ def provision_pinned_uv(
         execution_uid=execution_uid,
         execution_gid=execution_gid,
         execute_version=execute_version,
+        custody_gid=custody_gid,
     )
 
 
@@ -7535,7 +7550,7 @@ def render_units(repo_root: Path, release_sha: str, output_root: Path) -> list[P
         validate_unit_text(destination_name, rendered, rendered=True)
         destination = output_root / destination_name
         destination.write_text(rendered, encoding="utf-8")
-        os.chmod(destination, 0o644)
+        os.chmod(destination, 0o600)
         rendered_paths.append(destination)
     return rendered_paths
 
@@ -11681,7 +11696,13 @@ def _publish_predispatch_account_ui_gate(
         uid=expected_root_uid,
         gid=control.pw_gid,
     )
-    os.chmod(PREDISPATCH_ACCOUNT_UI_GATE, 0o640, follow_symlinks=False)
+    # Root ownership is the authority boundary; the exact control group needs
+    # read-only access to consume this non-secret NoDispatch projection.
+    os.chmod(  # lgtm[py/overly-permissive-file]
+        PREDISPATCH_ACCOUNT_UI_GATE,
+        0o640,
+        follow_symlinks=False,
+    )
     admitted, admitted_raw, _identity = _read_exact_custodied_json(
         PREDISPATCH_ACCOUNT_UI_GATE,
         expected_uid=expected_root_uid,
@@ -16651,8 +16672,7 @@ def _validate_owned_tailscale_config(config: Mapping[str, Any]) -> dict[str, Any
     host_port, web_config = next(iter(web.items()))
     if (
         not isinstance(host_port, str)
-        or not host_port.startswith(f"{WRITER_NODE}.")
-        or not host_port.endswith(".ts.net:443")
+        or _TAILSCALE_HOST_PORT_RE.fullmatch(host_port) is None
         or host_port != host_port.lower()
         or any(character.isspace() for character in host_port)
         or web_config != {"Handlers": {"/": {"Proxy": TAILSCALE_ROUTE}}}
@@ -18202,6 +18222,8 @@ def _ensure_host_directory(path: Path, *, uid: int, gid: int, mode: int) -> None
     """Create one campaign-owned directory without following an existing link."""
     if not path.is_absolute():
         raise ReleaseContractError("host directory must be absolute")
+    if mode not in {0o700, 0o710, 0o711, 0o750, 0o755, 0o770}:
+        raise ReleaseContractError("host directory mode is not admitted")
     parent = path.parent.lstat()
     if (
         not stat.S_ISDIR(parent.st_mode)
@@ -18222,7 +18244,9 @@ def _ensure_host_directory(path: Path, *, uid: int, gid: int, mode: int) -> None
             f"host directory is not a real directory: {path.name}"
         )
     os.chown(path, uid, gid)
-    os.chmod(path, mode)
+    # These are directories, not secret-bearing files. Some exact service-group
+    # paths require traversal, listing, or inbox writes; world write is never admitted.
+    os.chmod(path, mode)  # lgtm[py/overly-permissive-file]
     final = path.lstat()
     if (
         final.st_uid != uid
@@ -21375,6 +21399,7 @@ def execute_isolated_build_plan(
 def _install_exact_build_driver(
     *,
     release_sha: str,
+    build_gid: int,
     source: Path | None = None,
 ) -> Path:
     """Install the already-authorized deploy executable without invoking Git.
@@ -21384,6 +21409,8 @@ def _install_exact_build_driver(
     metadata.  The isolated build later proves that these bytes equal the
     tracked driver at ``release_sha`` before its receipt can pass.
     """
+    if build_gid <= 0:
+        raise ReleaseContractError("exact build driver group differs")
     destination = UV_TOOLING_ROOT / f"{BUILD_DRIVER_PREFIX}{release_sha}.py"
     admitted_source = (source or Path(__file__)).resolve(strict=True)
     source_identity = admitted_source.lstat()
@@ -21436,15 +21463,17 @@ def _install_exact_build_driver(
             destination.is_symlink()
             or not stat.S_ISREG(identity.st_mode)
             or identity.st_uid != 0
-            or identity.st_gid != 0
-            or stat.S_IMODE(identity.st_mode) != 0o555
+            or identity.st_gid != build_gid
+            or stat.S_IMODE(identity.st_mode) != 0o440
             or identity.st_nlink != 1
             or destination.read_bytes() != raw
         ):
             raise ReleaseContractError("existing exact build driver conflicts")
         return destination
-    _atomic_private_bytes(destination, raw, uid=0, gid=0)
-    os.chmod(destination, 0o555)
+    _atomic_private_bytes(destination, raw, uid=0, gid=build_gid)
+    # The unprivileged build interpreter must read the trusted driver, while
+    # root ownership and no write bit preserve the authority boundary.
+    os.chmod(destination, 0o440)  # lgtm[py/overly-permissive-file]
     return destination
 
 
@@ -21486,8 +21515,8 @@ def _invoke_isolated_build_plan(
         build_driver.is_symlink()
         or not stat.S_ISREG(driver_identity.st_mode)
         or driver_identity.st_uid != 0
-        or driver_identity.st_gid != 0
-        or stat.S_IMODE(driver_identity.st_mode) != 0o555
+        or driver_identity.st_gid != build_account.pw_gid
+        or stat.S_IMODE(driver_identity.st_mode) != 0o440
         or driver_identity.st_nlink != 1
     ):
         raise ReleaseContractError("isolated build driver custody differs")
@@ -22337,7 +22366,7 @@ def _install_rendered_release_units(
             destination = unit_root / source.name
             temporary = unit_root / f".{source.name}.new"
             shutil.copyfile(source, temporary)
-            os.chmod(temporary, 0o644)
+            os.chmod(temporary, 0o600)
             os.replace(temporary, destination)
     finally:
         shutil.rmtree(rendered_root)
@@ -22648,6 +22677,7 @@ def stage_candidate(
     )
     build_driver = _install_exact_build_driver(
         release_sha=manifest["release_sha"],
+        build_gid=build_account.pw_gid,
     )
     build_manifest_raw = _canonical_bytes(dict(manifest)) + b"\n"
     expected_manifest_sha256 = hashlib.sha256(build_manifest_raw).hexdigest()

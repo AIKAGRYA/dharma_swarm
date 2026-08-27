@@ -2411,6 +2411,54 @@ def _validate_snapshot_outbox(
     return snapshot
 
 
+def _retire_snapshot_outbox(
+    path: Path,
+    *,
+    outbox_root: Path,
+    expected_root_uid: int,
+    expected_root_gid: int,
+) -> None:
+    """Durably remove one exact retry intent after standby confirmation."""
+    if path.parent != outbox_root or _OUTBOX_ENTRY_RE.fullmatch(path.name) is None:
+        raise SnapshotError("snapshot outbox retirement target differs")
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if not nofollow:
+        raise SnapshotError("platform lacks no-follow snapshot outbox retirement")
+    root_identity = outbox_root.lstat()
+    if (
+        outbox_root.is_symlink()
+        or not stat.S_ISDIR(root_identity.st_mode)
+        or root_identity.st_uid != expected_root_uid
+        or root_identity.st_gid != expected_root_gid
+        or stat.S_IMODE(root_identity.st_mode) != 0o700
+    ):
+        raise SnapshotError("snapshot outbox root custody differs")
+    directory_descriptor = os.open(
+        outbox_root,
+        os.O_RDONLY | os.O_DIRECTORY | nofollow,
+    )
+    try:
+        identity = os.stat(
+            path.name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(identity.st_mode)
+            or identity.st_uid != expected_root_uid
+            or identity.st_gid != expected_root_gid
+            or stat.S_IMODE(identity.st_mode) != 0o400
+            or identity.st_nlink != 1
+        ):
+            raise SnapshotError("snapshot outbox retirement custody differs")
+        os.unlink(path.name, dir_fd=directory_descriptor)
+        os.fsync(directory_descriptor)
+    except FileNotFoundError as exc:
+        raise SnapshotError("snapshot outbox retirement target disappeared") from exc
+    finally:
+        os.close(directory_descriptor)
+
+
 def replicate_pending_outbox(
     *,
     ssh_key: Path,
@@ -2457,6 +2505,12 @@ def replicate_pending_outbox(
                 expected_root_uid=expected_root_uid,
                 expected_root_gid=expected_root_gid,
                 runner=runner,
+            )
+            _retire_snapshot_outbox(
+                outbox,
+                outbox_root=outbox_root,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
             )
         except SnapshotError:
             failures.append(snapshot_id)

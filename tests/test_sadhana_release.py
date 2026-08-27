@@ -32,6 +32,109 @@ def _stable_private_tmp_group(tmp_path: Path) -> None:
     os.chown(tmp_path, -1, os.getegid())
 
 
+def _snapshot_outbox_fixture(root: Path) -> Path:
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    entry = root / "20260823T013000Z-aaaaaaaaaaaa.outbox.v1.json"
+    entry.write_bytes(b"durable retry intent\n")
+    entry.chmod(0o400)
+    return entry
+
+
+def test_confirmed_snapshot_outbox_entry_is_durably_retired(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.runtime import sadhana_snapshot
+
+    outbox_root = tmp_path / "outbox"
+    entry = _snapshot_outbox_fixture(outbox_root)
+    snapshot = tmp_path / "confirmed-snapshot"
+    receipt = tmp_path / "confirmed-receipt.json"
+    monkeypatch.setattr(
+        sadhana_snapshot,
+        "_validate_snapshot_outbox",
+        lambda *_args, **_kwargs: snapshot,
+    )
+    monkeypatch.setattr(
+        sadhana_snapshot,
+        "replicate_snapshot",
+        lambda *_args, **_kwargs: receipt,
+    )
+
+    results = sadhana_snapshot.replicate_pending_outbox(
+        ssh_key=tmp_path / "replication-key",
+        known_hosts=tmp_path / "known-hosts",
+        outbox_root=outbox_root,
+        snapshot_root=tmp_path / "snapshots",
+        receipt_root=tmp_path / "receipts",
+        expected_release_sha="a" * 40,
+        expected_root_uid=os.geteuid(),
+        expected_root_gid=os.getegid(),
+    )
+
+    assert results == [(snapshot, receipt)]
+    assert not entry.exists()
+    assert list(outbox_root.iterdir()) == []
+
+
+def test_unconfirmed_snapshot_outbox_entry_remains_retryable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.runtime import sadhana_snapshot
+
+    outbox_root = tmp_path / "outbox"
+    entry = _snapshot_outbox_fixture(outbox_root)
+    monkeypatch.setattr(
+        sadhana_snapshot,
+        "_validate_snapshot_outbox",
+        lambda *_args, **_kwargs: tmp_path / "snapshot",
+    )
+
+    def fail_confirmation(*_args, **_kwargs):  # noqa: ANN202
+        raise sadhana_snapshot.SnapshotError("confirmation absent")
+
+    monkeypatch.setattr(sadhana_snapshot, "replicate_snapshot", fail_confirmation)
+
+    with pytest.raises(sadhana_snapshot.SnapshotError, match="retry incomplete"):
+        sadhana_snapshot.replicate_pending_outbox(
+            ssh_key=tmp_path / "replication-key",
+            known_hosts=tmp_path / "known-hosts",
+            outbox_root=outbox_root,
+            snapshot_root=tmp_path / "snapshots",
+            receipt_root=tmp_path / "receipts",
+            expected_release_sha="a" * 40,
+            expected_root_uid=os.geteuid(),
+            expected_root_gid=os.getegid(),
+        )
+
+    assert entry.exists()
+    assert stat.S_IMODE(entry.stat().st_mode) == 0o400
+
+
+def test_snapshot_outbox_retirement_rejects_dangling_symlink(
+    tmp_path: Path,
+) -> None:
+    from scripts.runtime import sadhana_snapshot
+
+    outbox_root = tmp_path / "outbox"
+    outbox_root.mkdir(mode=0o700)
+    outbox_root.chmod(0o700)
+    entry = outbox_root / "20260823T013000Z-aaaaaaaaaaaa.outbox.v1.json"
+    entry.symlink_to(tmp_path / "missing")
+
+    with pytest.raises(sadhana_snapshot.SnapshotError, match="custody differs"):
+        sadhana_snapshot._retire_snapshot_outbox(
+            entry,
+            outbox_root=outbox_root,
+            expected_root_uid=os.geteuid(),
+            expected_root_gid=os.getegid(),
+        )
+
+    assert entry.is_symlink()
+
+
 def _payload() -> dict[str, object]:
     return release._manifest_payload(
         release_sha="1" * 40,
@@ -8906,6 +9009,15 @@ def test_tailscale_stop_preserves_drifted_or_public_config(tmp_path: Path) -> No
     with pytest.raises(release.ReleaseContractError, match="pinned proxy"):
         release._validate_owned_tailscale_config(foreign_host)
 
+    deceptive_suffix = _owned_tailscale_config()
+    deceptive_suffix["Web"] = {
+        "meghadharma-cloud.attacker.example.ts.net:443": {
+            "Handlers": {"/": {"Proxy": release.TAILSCALE_ROUTE}}
+        }
+    }
+    with pytest.raises(release.ReleaseContractError, match="pinned proxy"):
+        release._validate_owned_tailscale_config(deceptive_suffix)
+
 
 def _standby_serve_runner() -> tuple[
     dict[str, object],
@@ -11128,10 +11240,10 @@ def test_hash_pinned_uv_is_copied_from_wheel_without_path_or_pip(
     assert not binary.is_symlink()
     assert binary.read_bytes().startswith(b"\x7fELF")
     assert "uv-0.11.2" in str(binary)
-    assert stat.S_IMODE(binary.parent.parent.stat().st_mode) == 0o755
-    assert stat.S_IMODE(binary.parent.stat().st_mode) == 0o755
-    assert stat.S_IMODE(binary.stat().st_mode) == 0o755
-    assert stat.S_IMODE((binary.parent.parent / "INSTALL.json").stat().st_mode) == 0o644
+    assert stat.S_IMODE(binary.parent.parent.stat().st_mode) == 0o710
+    assert stat.S_IMODE(binary.parent.stat().st_mode) == 0o710
+    assert stat.S_IMODE(binary.stat().st_mode) == 0o510
+    assert stat.S_IMODE((binary.parent.parent / "INSTALL.json").stat().st_mode) == 0o600
     assert list((tmp_path / "tooling").glob(".uv-staging-*")) == []
 
 
@@ -11189,10 +11301,10 @@ def test_pinned_uv_reuse_normalizes_legacy_private_modes_without_replacement(
         path: (path.stat().st_dev, path.stat().st_ino)
         for path in (version_root, binary.parent, binary, marker)
     } == identities
-    assert stat.S_IMODE(version_root.stat().st_mode) == 0o755
-    assert stat.S_IMODE(binary.parent.stat().st_mode) == 0o755
-    assert stat.S_IMODE(binary.stat().st_mode) == 0o755
-    assert stat.S_IMODE(marker.stat().st_mode) == 0o644
+    assert stat.S_IMODE(version_root.stat().st_mode) == 0o710
+    assert stat.S_IMODE(binary.parent.stat().st_mode) == 0o710
+    assert stat.S_IMODE(binary.stat().st_mode) == 0o510
+    assert stat.S_IMODE(marker.stat().st_mode) == 0o600
     assert observed["run_uid"] == os.geteuid()
     assert observed["run_gid"] == os.getegid()
     assert observed["no_new_privileges"] is True
@@ -11387,9 +11499,24 @@ def test_isolated_build_binds_precomputed_manifest_without_root_path_read(
     actual_lstat = Path.lstat
 
     def root_tool_lstat(path: Path) -> os.stat_result:
-        if path in {systemd_run, build_driver}:
+        if path == systemd_run:
             return os.stat_result(
                 (stat.S_IFREG | 0o555, 1, 1, 1, 0, 0, 1, 0, 0, 0)
+            )
+        if path == build_driver:
+            return os.stat_result(
+                (
+                    stat.S_IFREG | 0o440,
+                    1,
+                    1,
+                    1,
+                    0,
+                    build_account.pw_gid,
+                    1,
+                    0,
+                    0,
+                    0,
+                )
             )
         return actual_lstat(path)
 
