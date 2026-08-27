@@ -16,6 +16,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
+from dharma_swarm.bounded_fs import (
+    bounded_glob,
+    bounded_grep,
+    bounded_read_lines,
+    bounded_replace_text,
+)
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
     AgentConfig,
@@ -63,8 +70,6 @@ from dharma_swarm.spine.receipt import EvidenceReceipt  # noqa: F401  (spine-ado
 from dharma_swarm.spine.routing import RoutingDecision  # noqa: F401  (spine-adoption declaration)
 
 logger = logging.getLogger(__name__)
-
-from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 
 _HEARTBEAT_THRESHOLD = timedelta(seconds=_SWARM_CFG.agent.heartbeat_threshold_seconds)
 _ERROR_PREFIXES = (
@@ -271,6 +276,13 @@ _LOCAL_TOOL_RUNTIME_DIRECTIVE = (
     "3. When a task says 'write to <path>', you MUST call write_file(path=<path>, content=<your output>).\n"
     "4. Do not roleplay or describe tool use. Call tools directly."
 )
+_LOCAL_TOOL_MAX_FILE_BYTES = 4 * 1024 * 1024
+_LOCAL_TOOL_GLOB_RESULT_LIMIT = 50
+_LOCAL_TOOL_GREP_CANDIDATE_LIMIT = 2_000
+_LOCAL_TOOL_SCAN_ENTRY_LIMIT = 10_000
+_LOCAL_TOOL_SCAN_SECONDS = 3.0
+_LOCAL_TOOL_GREP_TOTAL_BYTES = 16 * 1024 * 1024
+_LOCAL_TOOL_GREP_LINE_CHARS = 512
 _LOCAL_OPENAI_TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
@@ -1620,7 +1632,6 @@ def _local_tool_workdir(task: Task, config: AgentConfig) -> Path:
 def _resolve_local_tool_path(raw_path: str, *, workdir: Path) -> Path:
     # Normalize ~ and ~/ to the actual home directory
     raw = raw_path.strip()
-    home = str(Path.home())
     if raw.startswith("~/"):
         candidate = Path.home() / raw[2:]
     elif raw.startswith("~"):
@@ -1845,7 +1856,7 @@ class AgentRunner:
         async def remember(key: str, content: str, scope: str = "working", ttl: int | None = None) -> str:
             """Store a memory. Scope: working, short_term, long_term, shared."""
             s = MemoryScope(scope)
-            mem = await mgr.remember(key, content, scope=s, ttl=ttl)
+            await mgr.remember(key, content, scope=s, ttl=ttl)
             return f"Remembered '{key}' in {scope}"
 
         async def recall(query: str, scope: str | None = None, limit: int = 5) -> str:
@@ -1935,9 +1946,24 @@ class AgentRunner:
             except (TypeError, ValueError):
                 offset = 1
                 limit = 200
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-            selected = lines[offset - 1 : offset - 1 + limit]
-            numbered = [f"{offset + idx:>5} | {line}" for idx, line in enumerate(selected)]
+            try:
+                file_size, selected = await asyncio.to_thread(
+                    bounded_read_lines,
+                    path,
+                    offset=offset,
+                    limit=limit,
+                    max_file_bytes=_LOCAL_TOOL_MAX_FILE_BYTES,
+                )
+            except OSError as exc:
+                return f"ERROR: Could not read {path}: {exc}"
+            if file_size > _LOCAL_TOOL_MAX_FILE_BYTES:
+                return (
+                    "ERROR: File exceeds the 4 MiB local-tool limit: "
+                    f"{path} ({file_size} bytes)"
+                )
+            numbered = [
+                f"{offset + idx:>5} | {line}" for idx, line in enumerate(selected)
+            ]
             return "\n".join(numbered) if numbered else ""
 
         if tool_name == "write_file":
@@ -1953,13 +1979,27 @@ class AgentRunner:
                 return f"ERROR: File not found: {path}"
             old = str(parameters.get("old_string", ""))
             new = str(parameters.get("new_string", ""))
-            content = path.read_text(encoding="utf-8", errors="replace")
-            count = content.count(old)
-            if count == 0:
+            try:
+                edit = await asyncio.to_thread(
+                    bounded_replace_text,
+                    path,
+                    old,
+                    new,
+                    max_file_bytes=_LOCAL_TOOL_MAX_FILE_BYTES,
+                )
+            except OSError as exc:
+                return f"ERROR: Could not edit {path}: {exc}"
+            if edit.source_bytes > _LOCAL_TOOL_MAX_FILE_BYTES:
+                return (
+                    "ERROR: File exceeds the 4 MiB local-tool limit: "
+                    f"{path} ({edit.source_bytes} bytes)"
+                )
+            if edit.occurrences == 0:
                 return f"ERROR: old_string not found in {path}"
-            if count > 1:
-                return f"ERROR: old_string found {count} times in {path}"
-            path.write_text(content.replace(old, new, 1), encoding="utf-8")
+            if edit.occurrences > 1:
+                return f"ERROR: old_string found {edit.occurrences} times in {path}"
+            if not edit.wrote:
+                return "ERROR: Edit would exceed the 4 MiB local-tool limit"
             return f"OK: edited {path}"
 
         if tool_name in {"shell_exec", "bash"}:
@@ -1976,10 +2016,41 @@ class AgentRunner:
         if tool_name in {"glob_files", "search_files"}:
             pattern = str(parameters.get("pattern", "")).strip()
             base = _resolve_local_tool_path(str(parameters.get("path", "") or parameters.get("directory", "") or "."), workdir=workdir)
-            matches = sorted(base.glob(pattern))[:50]
-            if not matches:
-                return f"No files matching {pattern!r}"
-            return "\n".join(str(match) for match in matches)
+            try:
+                scan = await asyncio.to_thread(
+                    bounded_glob,
+                    base,
+                    pattern,
+                    max_entries=_LOCAL_TOOL_SCAN_ENTRY_LIMIT,
+                    max_matches=_LOCAL_TOOL_GLOB_RESULT_LIMIT + 1,
+                    max_seconds=_LOCAL_TOOL_SCAN_SECONDS,
+                )
+            except ValueError as exc:
+                return f"ERROR: Invalid glob pattern: {exc}"
+            matches = sorted(scan.paths[:_LOCAL_TOOL_GLOB_RESULT_LIMIT])
+            output = [str(match) for match in matches] or [
+                f"No paths matching {pattern!r}"
+                + (" within the bounded scan" if not scan.complete else "")
+            ]
+            if len(scan.paths) > _LOCAL_TOOL_GLOB_RESULT_LIMIT:
+                output.append(
+                    "[truncated: more than 50 paths matched; showing 50 from "
+                    "the bounded enumeration]"
+                )
+            if scan.stop_reason == "entry_limit":
+                output.append(f"[truncated: scan stopped after {scan.entries_seen} entries]")
+            elif scan.stop_reason == "deadline":
+                output.append(
+                    f"[truncated: scan reached the {_LOCAL_TOOL_SCAN_SECONDS:g} "
+                    "second deadline]"
+                )
+            if scan.skipped_directories:
+                output.append(f"[skipped: {scan.skipped_directories} bulk directory path(s)]")
+            if scan.skipped_symlinks:
+                output.append(f"[skipped: {scan.skipped_symlinks} symbolic link path(s)]")
+            if scan.errors:
+                output.append(f"[skipped: {scan.errors} unreadable path(s)]")
+            return "\n".join(output)
 
         if tool_name in {"grep_search", "search_content"}:
             pattern = str(parameters.get("pattern", "")).strip()
@@ -1995,22 +2066,78 @@ class AgentRunner:
                 max_results = max(1, min(50, int(parameters.get("max_results", 30) or 30)))
             except (TypeError, ValueError):
                 max_results = 30
-            results: list[str] = []
-            for candidate in base.glob(file_glob):
-                if not candidate.is_file():
-                    continue
-                try:
-                    for line_no, line in enumerate(
-                        candidate.read_text(encoding="utf-8", errors="replace").splitlines(),
-                        start=1,
-                    ):
-                        if compiled.search(line):
-                            results.append(f"{candidate}:{line_no}:{line}")
-                            if len(results) >= max_results:
-                                return "\n".join(results)
-                except Exception:
-                    continue
-            return "\n".join(results) if results else f"No matches for {pattern!r}"
+            try:
+                grep = await asyncio.to_thread(
+                    bounded_grep,
+                    base,
+                    file_glob,
+                    compiled,
+                    max_entries=_LOCAL_TOOL_SCAN_ENTRY_LIMIT,
+                    max_candidates=_LOCAL_TOOL_GREP_CANDIDATE_LIMIT,
+                    max_file_bytes=_LOCAL_TOOL_MAX_FILE_BYTES,
+                    max_total_bytes=_LOCAL_TOOL_GREP_TOTAL_BYTES,
+                    max_matches=max_results,
+                    max_line_chars=_LOCAL_TOOL_GREP_LINE_CHARS,
+                    max_seconds=_LOCAL_TOOL_SCAN_SECONDS,
+                )
+            except ValueError as exc:
+                return f"ERROR: Invalid file glob: {exc}"
+            incomplete = not grep.discovery.complete or grep.stop_reason is not None
+            output = [
+                f"{match.path}:{match.line_number}:{match.line}"
+                for match in grep.matches
+            ] or [
+                f"No matches for {pattern!r}"
+                + (" within the bounded scan" if incomplete else "")
+            ]
+            if grep.stop_reason == "match_limit":
+                output.append(
+                    f"[truncated: more than {max_results} matches; "
+                    f"showing the first {max_results}]"
+                )
+            if len(grep.discovery.paths) > _LOCAL_TOOL_GREP_CANDIDATE_LIMIT:
+                output.append(
+                    "[truncated: more than "
+                    f"{_LOCAL_TOOL_GREP_CANDIDATE_LIMIT} candidates matched "
+                    "the file glob; remaining candidates were not searched]"
+                )
+            if grep.stop_reason == "byte_limit":
+                output.append(
+                    "[truncated: grep reached the "
+                    f"{_LOCAL_TOOL_GREP_TOTAL_BYTES // (1024 * 1024)} MiB "
+                    "total byte budget]"
+                )
+            if grep.stop_reason == "deadline" or grep.discovery.stop_reason == "deadline":
+                output.append(
+                    f"[truncated: grep reached the {_LOCAL_TOOL_SCAN_SECONDS:g} "
+                    "second deadline]"
+                )
+            if grep.discovery.stop_reason == "entry_limit":
+                output.append(
+                    f"[truncated: discovery stopped after {grep.discovery.entries_seen} entries]"
+                )
+            if grep.oversized_skipped:
+                output.append(
+                    f"[skipped: {grep.oversized_skipped} file(s) exceeded the "
+                    "4 MiB local-tool limit]"
+                )
+            if grep.discovery.skipped_directories:
+                output.append(
+                    f"[skipped: {grep.discovery.skipped_directories} bulk directory path(s)]"
+                )
+            if grep.discovery.skipped_symlinks:
+                output.append(
+                    f"[skipped: {grep.discovery.skipped_symlinks} symbolic link path(s)]"
+                )
+            error_count = grep.discovery.errors + grep.errors
+            if error_count:
+                output.append(f"[skipped: {error_count} unreadable path(s)]")
+            if grep.clipped_lines:
+                output.append(
+                    f"[clipped: {grep.clipped_lines} matching line(s) exceeded "
+                    f"{_LOCAL_TOOL_GREP_LINE_CHARS} characters]"
+                )
+            return "\n".join(output)
 
         if tool_name == "web_search":
             query = str(parameters.get("query", "")).strip()

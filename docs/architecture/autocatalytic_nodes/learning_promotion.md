@@ -6,7 +6,7 @@ authority: projection_only
 
 # Learning and Promotion Membrane
 
-Producer: Arena corpus and routing-feedback primitives exist, but the corpus explicitly does not promote itself into routing. This candidate node binds `orchestration-arena-v1-2026-06` and `organism-rewire-2026-07`.
+Producer: Arena corpus and routing-feedback primitives exist, but the corpus explicitly does not promote itself into routing. This candidate node binds `sadhana-10-day-program-2026-08`, `rsi-lab-meghadharma-2026-08`, and `sublimation-forge-2026-08`; the superseded Arena track remains historical evidence.
 
 Contract: consume `external_outcome`; apply `promote_verified_learning`; emit `promoted_feedback` to [World-Signal Supply](world_signal_supply.md), closing the ring.
 

@@ -1,0 +1,71 @@
+{
+  "schema": "dharma.rsi_lab.exact_code_witness.v1",
+  "observed_at": "2026-08-27T03:55:26Z",
+  "authority": {
+    "kind": "bounded_cross_host_observation",
+    "request_id": "codex-20260827-rsi-sync-b148f55e",
+    "source_orchestration_receipt": {
+      "path": "/Users/dhyana/.dharma/rsi-lab/receipts/20260826T151805Z__codex-20260827-rsi-sync-b148f55e__orchestrate-apply__d40a3058.json",
+      "sha256": "d80f73a055f6314b0d77f2e4dfdca405343ddf51637a8b6e98c98d6227c23b54"
+    }
+  },
+  "claim": {
+    "modality": "observed",
+    "scope": "exact committed code identity only",
+    "target_commit": "b148f55e00f668fa84774f299610eaae4d8283e4",
+    "target_tree": "9d24a2a2b32e7a16e070d4126d2dde1938728475",
+    "plan_digest": "sha256:38410a2e9b3caaae29f37b9492d01261560865f452210c7c3ef582b6e6da3db7"
+  },
+  "host_observations": [
+    {
+      "node": "mac",
+      "observed_at": "2026-08-26T15:18:03Z",
+      "commit": "b148f55e00f668fa84774f299610eaae4d8283e4",
+      "tree": "9d24a2a2b32e7a16e070d4126d2dde1938728475",
+      "uv_lock_sha256": "7c5a84fce68c1aee7a23124d286c60abb460516822861b97924bd42402e2c369",
+      "repo_clean": true,
+      "provider_calls": false,
+      "synced_mutable_state": false,
+      "source_receipt": {
+        "path": "/Users/dhyana/.dharma/rsi-lab/receipts/20260826T151803Z__codex-20260827-rsi-sync-b148f55e__apply__0f6ee23f.json",
+        "sha256": "b9e9048f5ec38575c5c9db4de380b901dc97de7fbbd5bcb47605dcf2912a318f"
+      }
+    },
+    {
+      "node": "meghadharma",
+      "observed_at": "2026-08-26T15:18:01Z",
+      "commit": "b148f55e00f668fa84774f299610eaae4d8283e4",
+      "tree": "9d24a2a2b32e7a16e070d4126d2dde1938728475",
+      "uv_lock_sha256": "7c5a84fce68c1aee7a23124d286c60abb460516822861b97924bd42402e2c369",
+      "repo_clean": true,
+      "provider_calls": false,
+      "synced_mutable_state": false,
+      "source_receipt": {
+        "path": "/root/rsi-lab/receipts/20260826T151801Z__codex-20260827-rsi-sync-b148f55e__apply__9f74ae71.json",
+        "sha256": "f986cabbce1e23aee6c4ee608c5abbfbd5220f8fc47974536d82db24ae850d1d"
+      }
+    }
+  ],
+  "comparison": {
+    "post_apply_in_sync": true,
+    "equal_fields": [
+      "commit",
+      "tree",
+      "uv_lock_sha256"
+    ],
+    "node_ids": [
+      "mac",
+      "meghadharma"
+    ]
+  },
+  "replay": {
+    "local_receipt_sha256": "shasum -a 256 /Users/dhyana/.dharma/rsi-lab/receipts/20260826T151803Z__codex-20260827-rsi-sync-b148f55e__apply__0f6ee23f.json",
+    "remote_receipt_sha256": "ssh -o BatchMode=yes meghadharma sha256sum /root/rsi-lab/receipts/20260826T151801Z__codex-20260827-rsi-sync-b148f55e__apply__9f74ae71.json"
+  },
+  "exclusions": [
+    "This witness does not copy mutable state, secrets, OAuth material, or provider credentials into Git.",
+    "Exact commit and tree identity do not prove research quality, campaign execution, executor liveness, production readiness, or promotion authority.",
+    "The external source receipts remain the runtime owners; this committed witness is a normalized, digest-sealed observation of selected non-secret fields."
+  ],
+  "digest": "09b5d8ee64801d8ad7342bcffd67a47a8691389a5ade98b64c777fb659bd811e"
+}

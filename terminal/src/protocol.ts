@@ -3746,7 +3746,9 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     ];
   }
   if (type === "tool_result") {
-    const line = makeLine("tool", `✓ ${String(event.tool_name ?? "tool")}: ${String(event.content ?? "").trim()}`);
+    // This event is executor-owned completion, not independent verification.
+    // Reserve ✓ for projections backed by a verifier-owned verdict.
+    const line = makeLine("tool", `■ ${String(event.tool_name ?? "tool")}: ${String(event.content ?? "").trim()}`);
     return [
       {
         tabId: "tools",

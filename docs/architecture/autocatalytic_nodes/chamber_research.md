@@ -6,7 +6,7 @@ authority: local_evidence
 
 # Chamber Research and Evolution
 
-Producer: Chamber trace and prediction machinery turns bounded experiments into falsifiable proposals and Frontier Ledger evidence. It is bound to `hyperbolic-time-chamber-2026-07`.
+Producer: Chamber trace and prediction machinery turns bounded experiments into falsifiable proposals and Frontier Ledger evidence. It is bound to `rsi-lab-meghadharma-2026-08` and `sublimation-forge-2026-08` as the two active research lanes.
 
 Contract: consume `selected_experiment`; apply `research_falsifiable_change`; emit `proposed_change` to [Assurance & Merge](assurance_merge.md).
 

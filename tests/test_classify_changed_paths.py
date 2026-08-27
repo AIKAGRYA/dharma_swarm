@@ -84,6 +84,7 @@ def test_each_class_is_recognised() -> None:
     assert ccp.classify(["tools/world_scout_go/main.go"])["go"]
     assert ccp.classify(["go.mod"])["go"]
     assert ccp.classify(["dashboard/src/app/page.tsx"])["dashboard"]
+    assert ccp.classify(["desktop-shell/src-tauri/Cargo.lock"])["desktop"]
     assert ccp.classify(["terminal/src/index.ts"])["terminal"]
     assert ccp.classify(["dharma_swarm/organism.py"])["python"]
     assert ccp.classify(["uv.lock"])["python"], "a pin change changes the runtime"
@@ -98,7 +99,14 @@ def test_a_docs_only_change_touches_nothing() -> None:
 
 def test_a_dashboard_change_does_not_drag_in_go() -> None:
     classes = ccp.classify(["dashboard/src/lib/operatorCoherence.ts"])
-    assert classes["dashboard"] and not classes["go"] and not classes["terminal"]
+    assert classes["dashboard"]
+    assert not classes["desktop"] and not classes["go"] and not classes["terminal"]
+
+
+def test_a_desktop_change_runs_only_the_desktop_lane() -> None:
+    classes = ccp.classify(["desktop-shell/src-tauri/Cargo.toml"])
+    assert classes["desktop"]
+    assert not classes["dashboard"] and not classes["go"] and not classes["terminal"]
 
 
 def test_a_non_utf8_path_does_not_crash_the_classifier() -> None:

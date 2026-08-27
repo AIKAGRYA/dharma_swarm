@@ -110,6 +110,19 @@ def test_check_track_status_runs(tmp_path: Path) -> None:
     assert "active_track_id" in payload
     assert "criteria" in payload
     assert isinstance(payload["criteria"], list)
+    mac_scope = payload["portfolio_summary"]["scoped_wip"]["mac_build"]
+    assert mac_scope == {
+        "active": 4,
+        "max_active": 4,
+        "warn_active": 4,
+        "scope": "Mac build admission only",
+    }
+    for track in payload["active_tracks"]:
+        assert track["admission_scopes"] == ["mac_build"]
+        assert len(track["completion_criteria"]) == track["completion_progress"]["total"]
+        assert len(track["criteria"]) == (
+            len(track["prerequisites"]) + len(track["completion_criteria"])
+        )
     assert _report_snapshot(SOURCE_REPORTS_DIR) == source_before
 
 

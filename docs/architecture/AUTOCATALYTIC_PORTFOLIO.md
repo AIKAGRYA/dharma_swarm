@@ -3,7 +3,7 @@ title: Ten-Node Autocatalytic Portfolio
 doc_type: architecture
 status: active_reference
 authority: declared_intent
-owner: organism-rewire-2026-07
+owner: fleet-advancement-2026-08
 ---
 
 # Ten-Node Autocatalytic Portfolio
@@ -16,16 +16,16 @@ This portfolio is the metabolism of the currently active governance tracks, not 
 
 | # | Node | Typed handoff | Authority | Bound projects |
 |---:|---|---|---|---|
-| 1 | [World-Signal Supply](autocatalytic_nodes/world_signal_supply.md) | `promoted_feedback -> grounded_signal` | `local_evidence` | Organism Rewire |
-| 2 | [Persistent Agent / Sarathi](autocatalytic_nodes/sarathi_runtime.md) | `grounded_signal -> prioritized_work` | `local_evidence` | Organism Rewire, Loop Closure |
-| 3 | [DharmaGraph Execution](autocatalytic_nodes/dharmagraph_execution.md) | `prioritized_work -> execution_receipt` | `local_evidence` | DharmaGraph |
-| 4 | [Cybernetic Supervision](autocatalytic_nodes/cybernetic_supervision.md) | `execution_receipt -> closure_gap` | `local_evidence` | Loop Closure |
-| 5 | [Arena Selection](autocatalytic_nodes/arena_selection.md) | `closure_gap -> selected_experiment` | `local_evidence` | Orchestration Arena |
-| 6 | [Chamber Research](autocatalytic_nodes/chamber_research.md) | `selected_experiment -> proposed_change` | `local_evidence` | Hyperbolic Time Chamber |
-| 7 | [Assurance & Merge](autocatalytic_nodes/assurance_merge.md) | `proposed_change -> verified_release` | `local_evidence` | Safety TCB, Titanium, Merge Master Mike |
-| 8 | [Operator Experience](autocatalytic_nodes/operator_experience.md) | `verified_release -> authorized_action` | `projection_only` | Helm |
-| 9 | [External Value Delivery](autocatalytic_nodes/external_value_delivery.md) | `authorized_action -> external_outcome` | `external_gated` | Darshan |
-| 10 | [Learning & Promotion](autocatalytic_nodes/learning_promotion.md) | `external_outcome -> promoted_feedback` | `projection_only` | Arena, Organism Rewire |
+| 1 | [World-Signal Supply](autocatalytic_nodes/world_signal_supply.md) | `promoted_feedback -> grounded_signal` | `local_evidence` | RSI Lab / Meghadharma, Sublimation Forge |
+| 2 | [Persistent Agent / Sarathi](autocatalytic_nodes/sarathi_runtime.md) | `grounded_signal -> prioritized_work` | `local_evidence` | Fleet advancement |
+| 3 | [DharmaGraph Execution](autocatalytic_nodes/dharmagraph_execution.md) | `prioritized_work -> execution_receipt` | `local_evidence` | Fleet advancement |
+| 4 | [Cybernetic Supervision](autocatalytic_nodes/cybernetic_supervision.md) | `execution_receipt -> closure_gap` | `local_evidence` | Fleet advancement |
+| 5 | [Arena Selection](autocatalytic_nodes/arena_selection.md) | `closure_gap -> selected_experiment` | `local_evidence` | RSI Lab / Meghadharma, Sublimation Forge |
+| 6 | [Chamber Research](autocatalytic_nodes/chamber_research.md) | `selected_experiment -> proposed_change` | `local_evidence` | RSI Lab / Meghadharma, Sublimation Forge |
+| 7 | [Assurance & Merge](autocatalytic_nodes/assurance_merge.md) | `proposed_change -> verified_release` | `local_evidence` | Fleet advancement, SADHANA 10-day, RSI Lab / Meghadharma, Sublimation Forge |
+| 8 | [Operator Experience](autocatalytic_nodes/operator_experience.md) | `verified_release -> authorized_action` | `projection_only` | Fleet advancement, SADHANA 10-day |
+| 9 | [External Value Delivery](autocatalytic_nodes/external_value_delivery.md) | `authorized_action -> external_outcome` | `external_gated` | SADHANA 10-day |
+| 10 | [Learning & Promotion](autocatalytic_nodes/learning_promotion.md) | `external_outcome -> promoted_feedback` | `projection_only` | SADHANA 10-day, RSI Lab / Meghadharma, Sublimation Forge |
 
 The last output is the first input. Cross-edges additionally bind World Radar evidence to Chamber oracles, assurance contracts back to DharmaGraph, and operator intent back to Sarathi.
 

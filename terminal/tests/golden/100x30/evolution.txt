@@ -1,5 +1,5 @@
- ◆ DHARMA HELM  /  ACTIVITY  ·  ds_nihonga_helm_frontier_20260814                 100×30 · standard
- ○ offline  ·  claude:claude-opus-4.8 [unverified]  ·  projection only · owner truth preserved
+ ◆ DHARMA HELM  /  ACTIVITY  ·  dharma_swarm                                      100×30 · standard
+ ○ offline  ·  claude:claude-opus-4.8 [? UNVERIFIED]  ·  PROJECTION · owner truth preserved
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  · Home   · Conversation   ◆ Activity   · Evidence   · System
  HELM ◌ UNKNOWN ?/7  ·  Python verdict
@@ -10,8 +10,8 @@
 │  Type a message below · F2 unfolds     ││ Forward-loop, swarm evolution, and shell continuation  │
 │  the Whole Helm                        ││ surface.                                               │
 │                                        ││                                                        │
-│                                        ││ Cascade and self-improvement surface loading...        │
-│                                        ││                                                        │
+│                                        ││ ?[?] UNKNOWN · evolution owner projection not          │
+│                                        ││ observed.                                              │
 │                                        ││                                                        │
 │                                        ││                                                        │
 │                                        ││                                                        │

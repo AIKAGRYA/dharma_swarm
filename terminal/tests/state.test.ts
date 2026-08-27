@@ -245,6 +245,47 @@ describe("reduceApp UI state", () => {
     expect(reduceApp(closed, {type: "ui.focus.set", focus: "composer"}).uiMode.keyboardFocus).toBe("composer");
   });
 
+  test("owner-truth reset retains inspectable selection but revokes armed session resume", () => {
+    const continuity = {
+      ...initialState.sessionContinuity,
+      activeSessionId: "session-a",
+      resumeSessionId: "provider-session-a",
+      activeRouteId: "claude:claude-opus-4-8",
+      continuityMode: "resume" as const,
+      boundedHistory: [{role: "user" as const, content: "retained", source: "session_detail" as const}],
+      compactedSummary: "retained summary",
+    };
+    const armed = reduce(initialState, [
+      {type: "session.catalog.set", catalog: sessionCatalog({id: "session-a"})},
+      {type: "session.detail.requested", requestId: "detail-before-reset", sessionId: "session-a"},
+      {
+        type: "session.detail.received",
+        requestId: "detail-before-reset",
+        sessionId: "session-a",
+        detail: sessionDetail("session-a"),
+      },
+      {type: "session.detail.requested", requestId: "pending-before-reset", sessionId: "session-a"},
+      {type: "surface.truth.mark", surface: "sessions"},
+      {type: "session.continuity.set", continuity},
+      {type: "tab.activate", tabId: "sessions"},
+      {type: "paneSwitcher.open"},
+    ]);
+
+    const reset = reduceApp(armed, {type: "surface.truth.reset"});
+
+    expect(reset.sessionPane.catalog).toBe(armed.sessionPane.catalog);
+    expect(reset.sessionPane.selectedSessionId).toBe(armed.sessionPane.selectedSessionId);
+    expect(reset.sessionPane.detailsBySessionId).toEqual({});
+    expect(reset.sessionPane.pendingDetailRequestsBySessionId).toEqual({});
+    expect(reset.uiMode.activeTabId).toBe("sessions");
+    expect(reset.uiMode.activeOverlay).toEqual(armed.uiMode.activeOverlay);
+    expect(reset.authoritativeSurfaces.sessions).toBe(false);
+    expect(reset.sessionContinuity.continuityMode).toBe("fresh");
+    expect(reset.sessionContinuity.activeSessionId).toBeUndefined();
+    expect(reset.sessionContinuity.resumeSessionId).toBeUndefined();
+    expect(reset.sessionContinuity.boundedHistory).toEqual([]);
+  });
+
   test("opens and closes the route picker without changing the active tab", () => {
     const state = reduce(initialState, [
       {type: "tab.activate", tabId: "tools"},

@@ -1,5 +1,6 @@
 import React from "react";
 import {Box, Text} from "ink";
+import {routeStatePresentation} from "../routePresentation.ts";
 import {THEME} from "../theme";
 import type {RouteTarget} from "../types";
 
@@ -27,13 +28,7 @@ export function ModelPicker({choices, selectedIndex, title = "Model Picker", com
         visible.map((choice, index) => {
           const actualIndex = start + index;
           const active = actualIndex === selectedIndex;
-          const routeState = choice.routeState;
-          const stateColor =
-            routeState === "ready"
-              ? THEME.moss
-              : routeState === "unverified" || routeState === "degraded" || routeState === "slow"
-                ? THEME.parchment
-                : THEME.vermilion;
+          const route = routeStatePresentation(choice.routeState);
           return (
             <Box key={`${choice.provider}:${choice.model}`} flexDirection="column" marginBottom={compact ? 0 : 1}>
               <Text color={active ? THEME.wave : THEME.foam} bold={active}>
@@ -41,7 +36,7 @@ export function ModelPicker({choices, selectedIndex, title = "Model Picker", com
               </Text>
               <Text color={THEME.stone}>
                 {"  "}{compact ? choice.provider : `${choice.provider}:${choice.model}`} {"| "}
-                <Text color={stateColor}>{routeState}</Text>
+                <Text color={route.color}>{route.glyph} {route.word}</Text>
               </Text>
               {!compact && choice.availabilityReason ? <Text color={THEME.stone}>  {choice.availabilityReason}</Text> : null}
             </Box>
