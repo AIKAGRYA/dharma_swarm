@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,7 @@ from scripts.runtime.a2a_send import resolve_agent_uid  # noqa: E402
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
 
 DEFAULT_ARTIFACT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "domain_reply_artifacts"
+PACKET_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -39,12 +42,28 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    flags = os.O_CREAT | os.O_TRUNC | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    path.chmod(0o600)
 
 
 def _safe_token(value: object, *, fallback: str = "unknown") -> str:
     chars = [char if char.isalnum() or char in ("_", "-") else "_" for char in str(value or "")]
     return ("".join(chars).strip("_-") or fallback)[:96]
+
+
+def validate_packet_id(packet_id: object) -> str:
+    """Return one path-safe packet id without lossy aliasing."""
+
+    value = str(packet_id or "")
+    if PACKET_ID_PATTERN.fullmatch(value) is None:
+        raise ValueError(
+            "packet_id must be 1-96 ASCII letters, digits, underscores, or hyphens"
+        )
+    return value
 
 
 def _delivery_envelope(delivery_record: dict[str, Any]) -> dict[str, Any]:
@@ -72,10 +91,8 @@ def build_domain_reply_artifact(
     target_uid = resolve_agent_uid(agent_uid or str(delivery_record.get("agent_uid") or envelope.get("target_uid") or ""))
     if target_uid != resolve_agent_uid(str(delivery_record.get("agent_uid") or target_uid)):
         raise ValueError("agent_uid does not match delivery record agent_uid")
-    packet_id = str(envelope.get("packet_id") or "")
+    packet_id = validate_packet_id(envelope.get("packet_id"))
     reply_subject = str(envelope.get("reply_subject") or "")
-    if not packet_id:
-        raise ValueError("delivery envelope is missing packet_id")
     if not reply_subject:
         raise ValueError("delivery envelope is missing reply_subject")
     if not summary.strip():
@@ -114,7 +131,41 @@ def artifact_path_for(
     agent_uid: str,
     packet_id: str,
 ) -> Path:
-    return default_outbox_dir(agent_uid, outbox_root=outbox_root) / f"{packet_id}-domain-reply.json"
+    safe_packet_id = validate_packet_id(packet_id)
+    outbox_base = outbox_root.expanduser().resolve()
+    owner_root = default_outbox_dir(
+        agent_uid,
+        outbox_root=outbox_base,
+    ).expanduser().resolve()
+    try:
+        owner_relative = owner_root.relative_to(outbox_base)
+    except ValueError as exc:
+        raise ValueError("target-owned outbox escapes configured outbox root") from exc
+    if owner_relative.parent != Path("."):
+        raise ValueError("target-owned outbox must be a direct outbox-root child")
+    candidate = (owner_root / f"{safe_packet_id}-domain-reply.json").resolve(
+        strict=False
+    )
+    try:
+        relative = candidate.relative_to(owner_root)
+    except ValueError as exc:
+        raise ValueError("domain reply artifact path escapes target-owned outbox") from exc
+    if relative.parent != Path("."):
+        raise ValueError("domain reply artifact must be a direct outbox child")
+    return candidate
+
+
+def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> bool:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    path.chmod(0o600)
+    return True
 
 
 def write_artifact_author_receipt(
@@ -140,11 +191,16 @@ def write_artifact_author_receipt(
         ),
     }
     receipt_dir.mkdir(parents=True, exist_ok=True)
-    path = receipt_dir / (
-        f"{stamp()}-{_safe_token(receipt['agent_uid'])}-{_safe_token(receipt['packet_id'])}.json"
+    stem = (
+        f"{stamp()}-{_safe_token(receipt['agent_uid'])}-"
+        f"{_safe_token(receipt['packet_id'])}"
     )
-    _write_json(path, receipt)
-    return path
+    for suffix in range(10_000):
+        discriminator = "" if suffix == 0 else f"-{suffix}"
+        path = receipt_dir / f"{stem}{discriminator}.json"
+        if _write_json_exclusive(path, receipt):
+            return path
+    raise RuntimeError("could not allocate a unique artifact-author receipt path")
 
 
 def main(argv: list[str] | None = None) -> int:
