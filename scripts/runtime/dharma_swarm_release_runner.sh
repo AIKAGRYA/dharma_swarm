@@ -136,4 +136,4 @@ exec env \
     DHARMA_RUNTIME_EXPECTED_COMMIT="${expected_commit}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONNOUSERSITE=1 \
-    "${runtime_python}" -B -I -m dharma_swarm.dgc_cli orchestrate-live
+    "${runtime_python}" -B -I -m dharma_swarm.runtime_release_entrypoint orchestrate-live

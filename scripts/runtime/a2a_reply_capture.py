@@ -14,6 +14,7 @@ import asyncio
 import hashlib
 import json
 import os
+import stat
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -33,9 +34,19 @@ from scripts.runtime.a2a_topology import (  # noqa: E402
     REPLY_CONSUMER_PREFIX,
 )
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 
-DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
-DEFAULT_REPLY_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "reply_receipts"
+DEFAULT_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
+DEFAULT_REPLY_RECEIPT_ROOT = runtime_report_dir("a2a", "reply_receipts")
+# Read-only compatibility root for receipts created before the state-root
+# migration. This same-checkout fallback does not prove that an older immutable
+# checkout was drained; name that checkout explicitly with the environment or
+# CLI authority below. Remove after the legacy queue has a certified drain
+# receipt.
+LEGACY_REPO_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
+LEGACY_SEND_RECEIPT_ROOT_ENV = "DHARMA_LEGACY_SEND_RECEIPT_ROOT"
+SEND_RECEIPT_SCHEMA_VERSION = "dharma.a2a.send_receipt.v1"
+MAX_SEND_RECEIPT_BYTES = 1024 * 1024
 
 STATUS_NO_REPLY = "NO_REPLY"
 STATUS_REPLY_CAPTURED = "REPLY_CAPTURED"
@@ -71,6 +82,273 @@ class ReplyCaptureTarget:
     reply_subject: str
     packet_id: str
     target: str
+
+
+@dataclass(frozen=True)
+class ValidatedSendReceipt:
+    path: Path
+    receipt: dict[str, Any]
+    packet_id: str
+    reply_subject: str
+    target: str
+    mtime_ns: int
+    root_rank: int
+    causal_fields: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class RejectedSendReceipt:
+    path: Path
+    root_rank: int
+    apparent_identity: tuple[str, str] | None
+
+
+class SendReceiptCollisionError(RuntimeError):
+    """Two receipts claim one causal identity with incompatible fields."""
+
+
+def _legacy_root_from_authority(configured: Path | str | None) -> Path:
+    """Resolve the one read-only legacy root authorized for this invocation."""
+
+    explicit = configured is not None
+    raw = (
+        str(configured).strip()
+        if explicit
+        else os.environ.get(LEGACY_SEND_RECEIPT_ROOT_ENV, "").strip()
+    )
+    if not raw:
+        if explicit:
+            raise ValueError("legacy send receipt root cannot be empty")
+        # Compatibility only: this is the current checkout, not proof that a
+        # previous immutable release checkout has been searched or drained.
+        return LEGACY_REPO_SEND_RECEIPT_ROOT.resolve()
+
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        raise ValueError(
+            f"{LEGACY_SEND_RECEIPT_ROOT_ENV} must name an absolute directory"
+        )
+    root = candidate.resolve()
+    if not root.is_dir():
+        raise ValueError(
+            f"{LEGACY_SEND_RECEIPT_ROOT_ENV} must name an existing directory"
+        )
+    return root
+
+
+def _send_receipt_roots(
+    send_receipt_root: Path | str,
+    *,
+    legacy_send_receipt_root: Path | str | None,
+    use_legacy_fallback: bool | None,
+) -> list[Path]:
+    root = Path(send_receipt_root).expanduser().resolve()
+    default_selected = (
+        root == DEFAULT_SEND_RECEIPT_ROOT.expanduser().resolve()
+        if use_legacy_fallback is None
+        else bool(use_legacy_fallback)
+    )
+    if not default_selected:
+        return [root]
+    legacy_root = _legacy_root_from_authority(legacy_send_receipt_root)
+    return [root] if legacy_root == root else [root, legacy_root]
+
+
+def _read_bounded_regular_json(path: Path) -> tuple[dict[str, Any], int] | None:
+    """Read one regular non-symlink JSON file without following replacements."""
+
+    try:
+        before = path.lstat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_SEND_RECEIPT_BYTES:
+        return None
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        with os.fdopen(fd, "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_size > MAX_SEND_RECEIPT_BYTES
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+            ):
+                return None
+            raw = handle.read(MAX_SEND_RECEIPT_BYTES + 1)
+    except OSError:
+        return None
+    if len(raw) > MAX_SEND_RECEIPT_BYTES:
+        return None
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload, opened.st_mtime_ns
+
+
+def _required_receipt_text(receipt: dict[str, Any], field: str) -> str:
+    value = receipt.get(field)
+    if not isinstance(value, str) or not value or value != value.strip():
+        return ""
+    return value
+
+
+def _validated_send_receipt(
+    path: Path,
+    *,
+    root_rank: int,
+) -> tuple[ValidatedSendReceipt | None, RejectedSendReceipt | None]:
+    loaded = _read_bounded_regular_json(path)
+    if loaded is None:
+        return None, RejectedSendReceipt(path, root_rank, None)
+    receipt, mtime_ns = loaded
+    apparent_packet_id = _required_receipt_text(receipt, "packet_id")
+    apparent_reply_subject = _required_receipt_text(receipt, "reply_subject")
+    apparent_identity = (
+        (apparent_packet_id, apparent_reply_subject)
+        if apparent_packet_id and apparent_reply_subject
+        else None
+    )
+    if receipt.get("schema_version") != SEND_RECEIPT_SCHEMA_VERSION:
+        return None, RejectedSendReceipt(path, root_rank, apparent_identity)
+
+    packet_id = apparent_packet_id
+    reply_subject = apparent_reply_subject
+    target = _required_receipt_text(receipt, "target_uid") or _required_receipt_text(
+        receipt, "to"
+    )
+    if not packet_id or not reply_subject or not target:
+        return None, RejectedSendReceipt(path, root_rank, apparent_identity)
+    subject_tokens = reply_subject.split(".")
+    if (
+        len(subject_tokens) < 2
+        or any(
+            not token or any(char.isspace() or char in "*>/\\" for char in token)
+            for token in subject_tokens
+        )
+        or not reply_subject.endswith(f".{packet_id}")
+    ):
+        return None, RejectedSendReceipt(path, root_rank, apparent_identity)
+
+    causal_fields = tuple(
+        sorted(
+            {
+                "schema_version": SEND_RECEIPT_SCHEMA_VERSION,
+                "packet_id": packet_id,
+                "reply_subject": reply_subject,
+                "target": target,
+                "to": str(receipt.get("to") or ""),
+                "target_uid": str(receipt.get("target_uid") or ""),
+                "route": str(receipt.get("route") or ""),
+                "subject": str(receipt.get("subject") or ""),
+                "ack_subject": str(receipt.get("ack_subject") or ""),
+                "file": str(receipt.get("file") or ""),
+                "sha256": str(receipt.get("sha256") or ""),
+            }.items()
+        )
+    )
+    return (
+        ValidatedSendReceipt(
+            path=path,
+            receipt=receipt,
+            packet_id=packet_id,
+            reply_subject=reply_subject,
+            target=target,
+            mtime_ns=mtime_ns,
+            root_rank=root_rank,
+            causal_fields=causal_fields,
+        ),
+        None,
+    )
+
+
+def validated_send_receipts(
+    send_receipt_root: Path | str,
+    *,
+    legacy_send_receipt_root: Path | str | None = None,
+    use_legacy_fallback: bool | None = None,
+    packet_id: str = "",
+    reply_subject: str = "",
+) -> list[ValidatedSendReceipt]:
+    """Load bounded receipt candidates and fail closed on causal collisions."""
+
+    roots = _send_receipt_roots(
+        send_receipt_root,
+        legacy_send_receipt_root=legacy_send_receipt_root,
+        use_legacy_fallback=use_legacy_fallback,
+    )
+    candidates: list[ValidatedSendReceipt] = []
+    rejected_primary: list[RejectedSendReceipt] = []
+    for root_rank, root in enumerate(roots):
+        if not root.is_dir():
+            continue
+        try:
+            paths = sorted(root.iterdir(), key=lambda item: item.name)
+        except OSError:
+            continue
+        for path in paths:
+            if path.suffix != ".json":
+                continue
+            candidate, rejected = _validated_send_receipt(path, root_rank=root_rank)
+            if rejected is not None and root_rank == 0:
+                rejected_primary.append(rejected)
+            if candidate is None:
+                continue
+            if packet_id and candidate.packet_id != packet_id:
+                continue
+            if reply_subject and candidate.reply_subject != reply_subject:
+                continue
+            candidates.append(candidate)
+
+    # Primary root wins for equivalent migration copies; newest wins within
+    # one root. Causally incompatible copies are never auto-selected.
+    candidates.sort(key=lambda item: (item.root_rank, -item.mtime_ns, item.path.name))
+    selected: dict[tuple[str, str], ValidatedSendReceipt] = {}
+    for candidate in candidates:
+        identity = (candidate.packet_id, candidate.reply_subject)
+        prior = selected.get(identity)
+        if prior is None:
+            selected[identity] = candidate
+            continue
+        if prior.causal_fields != candidate.causal_fields:
+            raise SendReceiptCollisionError(
+                "conflicting A2A send receipts for "
+                f"packet_id={candidate.packet_id!r} "
+                f"reply_subject={candidate.reply_subject!r}: "
+                f"{prior.path} != {candidate.path}"
+            )
+
+    # Never use a selected legacy copy to bypass a malformed or unsafe primary
+    # copy of the same apparent receipt. For unreadable files, the bounded
+    # filename comparison is the only available identity signal; content is
+    # not read by following a symlink or exceeding the size cap.
+    for identity, candidate in selected.items():
+        if candidate.root_rank == 0:
+            continue
+        for rejected in rejected_primary:
+            apparent_same = rejected.apparent_identity == identity
+            opaque_same = rejected.apparent_identity is None and (
+                rejected.path.name == candidate.path.name
+                or candidate.packet_id in rejected.path.stem
+            )
+            if apparent_same or opaque_same:
+                raise SendReceiptCollisionError(
+                    "invalid primary A2A send receipt shadows legacy candidate "
+                    f"packet_id={candidate.packet_id!r} "
+                    f"reply_subject={candidate.reply_subject!r}: "
+                    f"{rejected.path} != {candidate.path}"
+                )
+
+    return sorted(
+        selected.values(),
+        key=lambda item: (-item.mtime_ns, item.root_rank, item.path.name),
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -182,39 +460,36 @@ def pending_reply_targets(
     *,
     target: str = "",
     limit: int = 0,
+    legacy_send_receipt_root: Path | str | None = None,
+    use_legacy_fallback: bool | None = None,
 ) -> list[ReplyCaptureTarget]:
-    root = Path(send_receipt_root).expanduser().resolve()
-    if not root.exists():
-        return []
-    paths = sorted(
-        (path for path in root.glob("*.json") if path.is_file()),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
     targets: list[ReplyCaptureTarget] = []
-    for path in paths:
-        receipt = _read_json(path)
+    for candidate in validated_send_receipts(
+        send_receipt_root,
+        legacy_send_receipt_root=legacy_send_receipt_root,
+        use_legacy_fallback=use_legacy_fallback,
+    ):
+        receipt = candidate.receipt
         if receipt.get("replied") is True:
             continue
-        reply_subject = str(receipt.get("reply_subject") or "")
-        if not reply_subject:
-            continue
-        receipt_target = str(receipt.get("to") or receipt.get("target_uid") or "")
-        target_uid = str(receipt.get("target_uid") or "")
-        if target and target not in path.stem and target not in {receipt_target, target_uid}:
+        target_uid = _required_receipt_text(receipt, "target_uid")
+        to = _required_receipt_text(receipt, "to")
+        if target and target not in candidate.path.stem and target not in {
+            candidate.target,
+            target_uid,
+            to,
+        }:
             continue
         targets.append(
             ReplyCaptureTarget(
-                send_receipt_path=path,
+                send_receipt_path=candidate.path,
                 send_receipt=receipt,
-                reply_subject=reply_subject,
-                packet_id=str(receipt.get("packet_id") or path.stem),
-                target=receipt_target or target_uid or "unknown",
+                reply_subject=candidate.reply_subject,
+                packet_id=candidate.packet_id,
+                target=candidate.target,
             )
         )
-        if limit > 0 and len(targets) >= limit:
-            break
-    return targets
+    return targets[:limit] if limit > 0 else targets
 
 
 def no_reply_receipt(target: ReplyCaptureTarget, *, stream: str, endpoint: str) -> dict[str, Any]:
@@ -445,7 +720,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reply-subject", default="", help="reply subject when no send receipt is used")
     parser.add_argument("--packet-id", default="")
     parser.add_argument("--target", default="")
-    parser.add_argument("--send-receipt-root", default=str(DEFAULT_SEND_RECEIPT_ROOT))
+    parser.add_argument(
+        "--send-receipt-root",
+        default=None,
+        help="explicit primary root; setting it disables all legacy fallback",
+    )
+    parser.add_argument(
+        "--legacy-send-receipt-root",
+        default=None,
+        help=(
+            "absolute former-release send-receipt directory used only with the "
+            f"default primary root; defaults to ${LEGACY_SEND_RECEIPT_ROOT_ENV}; "
+            "if unset, only the current-checkout compatibility root is scanned"
+        ),
+    )
     parser.add_argument("--receipt-root", default=str(DEFAULT_REPLY_RECEIPT_ROOT))
     parser.add_argument("--endpoint", default="nats://127.0.0.1:4222")
     parser.add_argument("--stream", default=DEFAULT_COMPATIBILITY_STREAM)
@@ -453,15 +741,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=1)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    default_send_receipt_root_selected = args.send_receipt_root is None
+    send_receipt_root = args.send_receipt_root or str(DEFAULT_SEND_RECEIPT_ROOT)
+    if args.legacy_send_receipt_root is not None and not default_send_receipt_root_selected:
+        parser.error(
+            "--legacy-send-receipt-root cannot be combined with --send-receipt-root"
+        )
 
     try:
         if args.send_receipt or args.reply_subject:
             targets = [_target_from_args(args)]
         else:
             targets = pending_reply_targets(
-                args.send_receipt_root,
+                send_receipt_root,
                 target=args.target,
                 limit=max(args.limit, 1),
+                legacy_send_receipt_root=args.legacy_send_receipt_root,
+                use_legacy_fallback=default_send_receipt_root_selected,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

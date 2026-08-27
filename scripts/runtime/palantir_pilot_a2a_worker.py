@@ -36,6 +36,7 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
     NATS_SUBJECT,
     build_answer_packet,
 )
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 from scripts.runtime.a2a_send import ACK_TIER_HANDLER_ACKED, ACK_TIER_NO_CONTACT  # noqa: E402
 from scripts.runtime.pr_merge_control import (  # noqa: E402
     NATSConfig,
@@ -49,7 +50,7 @@ from scripts.runtime.pr_merge_control import (  # noqa: E402
 DEFAULT_A2A_BUS = Path.home() / ".dharma" / "a2a_bus"
 DEFAULT_OUTBOX_DIR = DEFAULT_A2A_BUS / "outboxes" / CALLSIGN
 DEFAULT_HEARTBEAT_FILE = DEFAULT_A2A_BUS / "worker_heartbeats" / f"{CALLSIGN}.json"
-DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "palantir_pilot_worker_receipts"
+DEFAULT_RECEIPT_DIR = runtime_report_dir("a2a", "palantir_pilot_worker_receipts")
 
 SEMANTIC_REPLY_SCHEMA = "dharma.a2a.semantic_reply.v1"
 HANDLER_ACK_SCHEMA = "dharma.a2a.palantir_pilot.handler_ack.v1"

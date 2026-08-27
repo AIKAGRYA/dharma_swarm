@@ -25,7 +25,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir, runtime_report_dir  # noqa: E402
+from scripts.runtime.a2a_reply_capture import (  # noqa: E402
+    LEGACY_SEND_RECEIPT_ROOT_ENV,
+    validated_send_receipts,
+)
 from scripts.runtime.a2a_domain_reply_worker import (  # noqa: E402
     DEFAULT_OUTBOX_ROOT,
     DEFAULT_RECEIPT_DIR as DEFAULT_DOMAIN_REPLY_RECEIPT_DIR,
@@ -43,7 +47,7 @@ from scripts.runtime.pr_merge_control import _nats_config, stamp, utc_now  # noq
 DEFAULT_AGENT_UID = "codex_composer"
 DEFAULT_DHARMA_HOME = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 DEFAULT_INBOX_DIR = DEFAULT_DHARMA_HOME / "a2a_bus" / "inboxes" / DEFAULT_AGENT_UID
-DEFAULT_SEND_RECEIPT_ROOT = REPO_ROOT / "reports" / "a2a" / "send_receipts"
+DEFAULT_SEND_RECEIPT_ROOT = runtime_report_dir("a2a", "send_receipts")
 DEFAULT_STATE_DIR = (
     DEFAULT_DHARMA_HOME
     / "external_agents"
@@ -482,24 +486,18 @@ def find_send_receipt(
     agent_uid: str,
     packet_id: str,
     reply_subject: str,
+    legacy_send_receipt_root: Path | str | None = None,
+    use_legacy_fallback: bool | None = None,
 ) -> Path | None:
-    root = Path(send_receipt_root).expanduser().resolve()
-    if not root.exists():
-        return None
-    candidates = sorted(root.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
-    for path in candidates:
-        try:
-            receipt = _read_json(path)
-        except (OSError, ValueError, json.JSONDecodeError):
-            continue
-        if str(receipt.get("packet_id") or "") != packet_id:
-            continue
-        if str(receipt.get("reply_subject") or "") != reply_subject:
-            continue
-        target = str(receipt.get("target_uid") or receipt.get("to") or "")
-        if target and target != agent_uid:
-            continue
-        return path
+    for candidate in validated_send_receipts(
+        send_receipt_root,
+        legacy_send_receipt_root=legacy_send_receipt_root,
+        use_legacy_fallback=use_legacy_fallback,
+        packet_id=packet_id,
+        reply_subject=reply_subject,
+    ):
+        if candidate.target == agent_uid:
+            return candidate.path
     return None
 
 
@@ -845,6 +843,8 @@ def process_delivery(
     max_publish_attempts: int = DEFAULT_MAX_PUBLISH_ATTEMPTS,
     drain_func: DrainFunc = drain_semantic_inbox,
     publish_func: PublishFunc = publish_domain_reply_sync,
+    legacy_send_receipt_root: Path | str | None = None,
+    use_legacy_send_receipts: bool | None = None,
 ) -> dict[str, Any]:
     max_publish_attempts = max(1, int(max_publish_attempts))
     existing_dead_letter = load_dead_letter(state_dir, delivery.delivery_id)
@@ -895,6 +895,8 @@ def process_delivery(
         agent_uid=agent_uid,
         packet_id=delivery.packet_id,
         reply_subject=delivery.reply_subject,
+        legacy_send_receipt_root=legacy_send_receipt_root,
+        use_legacy_fallback=use_legacy_send_receipts,
     )
     # Idempotency guard (fugu-verify flag, Phase A work item in
     # A2A_MASTER_SPEC_v1.md): if a prior tick already produced a model-authored
@@ -1196,6 +1198,8 @@ def run_once(
     canonical_projector: CanonicalProjector = project_canonical_responder_state,
     drain_func: DrainFunc = drain_semantic_inbox,
     publish_func: PublishFunc = publish_domain_reply_sync,
+    legacy_send_receipt_root: Path | str | None = None,
+    use_legacy_send_receipts: bool | None = None,
 ) -> list[dict[str, Any]]:
     seen = processed_delivery_ids(state_dir)
     deliveries = pending_deliveries(
@@ -1232,6 +1236,8 @@ def run_once(
                 max_publish_attempts=max_publish_attempts,
                 drain_func=drain_func,
                 publish_func=publish_func,
+                legacy_send_receipt_root=legacy_send_receipt_root,
+                use_legacy_send_receipts=use_legacy_send_receipts,
             )
             receipts.append(receipt)
             status = str(receipt.get("status") or "unknown")
@@ -1283,7 +1289,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--agent-uid", default=DEFAULT_AGENT_UID)
     parser.add_argument("--inbox-dir", default=str(DEFAULT_INBOX_DIR))
     parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR))
-    parser.add_argument("--send-receipt-root", default=str(DEFAULT_SEND_RECEIPT_ROOT))
+    parser.add_argument(
+        "--send-receipt-root",
+        default=None,
+        help="explicit primary root; setting it disables all legacy fallback",
+    )
+    parser.add_argument(
+        "--legacy-send-receipt-root",
+        default=None,
+        help=(
+            "absolute former-release send-receipt directory used only with the "
+            f"default primary root; defaults to ${LEGACY_SEND_RECEIPT_ROOT_ENV}; "
+            "if unset, only the current-checkout compatibility root is scanned"
+        ),
+    )
     parser.add_argument("--outbox-root", default=str(DEFAULT_OUTBOX_ROOT))
     parser.add_argument("--semantic-receipt-dir", default=str(DEFAULT_SEMANTIC_RECEIPT_DIR))
     parser.add_argument("--artifact-receipt-dir", default=str(DEFAULT_ARTIFACT_RECEIPT_DIR))
@@ -1321,6 +1340,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-publish", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    default_send_receipt_root_selected = args.send_receipt_root is None
+    send_receipt_root = args.send_receipt_root or str(DEFAULT_SEND_RECEIPT_ROOT)
+    if args.legacy_send_receipt_root is not None and not default_send_receipt_root_selected:
+        parser.error(
+            "--legacy-send-receipt-root cannot be combined with --send-receipt-root"
+        )
     canonical_state_path = (
         _path(args.canonical_state_path)
         if args.canonical_state_path
@@ -1330,7 +1355,7 @@ def main(argv: list[str] | None = None) -> int:
     common = {
         "inbox_dir": _path(args.inbox_dir),
         "state_dir": _path(args.state_dir),
-        "send_receipt_root": _path(args.send_receipt_root),
+        "send_receipt_root": _path(send_receipt_root),
         "outbox_root": _path(args.outbox_root),
         "semantic_receipt_dir": _path(args.semantic_receipt_dir),
         "artifact_receipt_dir": _path(args.artifact_receipt_dir),
@@ -1349,6 +1374,8 @@ def main(argv: list[str] | None = None) -> int:
         "packet_id": args.packet_id,
         "canonical_state_path": canonical_state_path,
         "project_canonical_state": not args.no_canonical_state,
+        "legacy_send_receipt_root": args.legacy_send_receipt_root,
+        "use_legacy_send_receipts": default_send_receipt_root_selected,
     }
 
     if args.mode == "quarantine":

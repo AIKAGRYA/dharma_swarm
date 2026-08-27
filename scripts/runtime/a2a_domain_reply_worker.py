@@ -33,9 +33,10 @@ from scripts.runtime.pr_merge_control import (  # noqa: E402
     stamp,
     utc_now,
 )
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 
 DEFAULT_OUTBOX_ROOT = Path.home() / ".dharma" / "a2a_bus" / "outboxes"
-DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "domain_reply_receipts"
+DEFAULT_RECEIPT_DIR = runtime_report_dir("a2a", "domain_reply_receipts")
 
 DOMAIN_REPLY_ARTIFACT_SCHEMA = "dharma.a2a.domain_reply_artifact.v1"
 DOMAIN_RECEIPT_SCHEMA = "dharma.a2a.domain_receipt.v1"

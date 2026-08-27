@@ -26,7 +26,7 @@ Three independent checks, all of which must pass:
 2. orchestrate-live process — a live process matching ANY of the organism's
    real launch spellings (``ORCHESTRATE_COMMAND_FORMS``: the plist's console
    script ``dgc orchestrate-live``, the release runner's module form
-   ``dharma_swarm.dgc_cli orchestrate-live``, the container entrypoint
+   ``dharma_swarm.runtime_release_entrypoint orchestrate-live``, the container entrypoint
    ``dharma_swarm.orchestrate_live``) must exist AND answer ``kill -0``.
    A PID read from any file is never trusted on its own.
    Deliberately NOT symmetric with check 1: if the ``ps`` probe fails, that
@@ -102,7 +102,7 @@ SERVICE_LABEL = "com.dharma.swarm"
 
 # Every spelling the organism is actually launched under. Sources:
 #   com.dharma.swarm.plist            -> exec env ... dgc orchestrate-live
-#   dharma_swarm_release_runner.sh    -> python -B -I -m dharma_swarm.dgc_cli orchestrate-live
+#   dharma_swarm_release_runner.sh    -> python -B -I -m dharma_swarm.runtime_release_entrypoint orchestrate-live
 #   Dockerfile.swarm / container CMD  -> python -m dharma_swarm.orchestrate_live
 # Matching only the module form made a plist-started (i.e. the normal) host
 # scan as dead, which would have made this sentinel a liar on the very
@@ -115,6 +115,7 @@ SERVICE_LABEL = "com.dharma.swarm"
 # dharma_swarm/runtime_process_identity.py is kept honest by that test.
 ORCHESTRATE_COMMAND_FORMS: tuple[str, ...] = (
     "dgc orchestrate-live",
+    "dharma_swarm.runtime_release_entrypoint orchestrate-live",
     "dharma_swarm.dgc_cli orchestrate-live",
     "dharma_swarm.orchestrate_live",
 )

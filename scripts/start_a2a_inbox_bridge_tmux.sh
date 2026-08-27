@@ -22,7 +22,7 @@ if tmux has-session -t "${SESSION}" 2>/dev/null; then
   exit 0
 fi
 
-tmux_cmd="cd '${ROOT}' && uv run --with nats-py python scripts/runtime/a2a_inbox_bridge.py --agent-uid '${AGENT_UID}' --consumer '${CONSUMER}' --stream '${STREAM}' --fetch-timeout '${FETCH_TIMEOUT}' --poll-interval '${POLL_INTERVAL}' --max-messages '${MAX_MESSAGES}' --heartbeat-file '${HEARTBEAT_FILE}' --loop --suppress-no-messages"
+tmux_cmd="cd '${ROOT}' && PYTHONDONTWRITEBYTECODE=1 uv run --with nats-py python -B scripts/runtime/a2a_inbox_bridge.py --agent-uid '${AGENT_UID}' --consumer '${CONSUMER}' --stream '${STREAM}' --fetch-timeout '${FETCH_TIMEOUT}' --poll-interval '${POLL_INTERVAL}' --max-messages '${MAX_MESSAGES}' --heartbeat-file '${HEARTBEAT_FILE}' --loop --suppress-no-messages"
 
 tmux new-session -d -s "${SESSION}" "${tmux_cmd}"
 tmux pipe-pane -o -t "${SESSION}" "cat >> '${LOG_FILE}'"

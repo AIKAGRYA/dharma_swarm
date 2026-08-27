@@ -7,7 +7,7 @@ Usage:
     python3 scripts/runtime/a2a_send.py --to hermes-m5 --route agent-inbox --file packet.md
 
 Publishes the file as a ``dharma.a2a.send.v1`` envelope to ``dharma.a2a.<agent>``,
-writes an ack receipt under ``reports/a2a/send_receipts/``, and reports a single
+writes an ack receipt under ``~/.dharma/reports/a2a/send_receipts/``, and reports a single
 terminal status:
 
     NATS_SECRETS_MISSING  no usable NATS credentials in the environment
@@ -63,13 +63,14 @@ from dharma_swarm.a2a.agent_card import (  # noqa: E402
     resolve_agent_uid,
 )
 from dharma_swarm.a2a.envelope_schema import build_send_envelope  # noqa: E402
+from dharma_swarm.daemon_config import runtime_report_dir  # noqa: E402
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash  # noqa: E402
 from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore  # noqa: E402
 from dharma_swarm.spine.identity import ExecutionIdentity  # noqa: E402
 from dharma_swarm.spine.receipt import EvidenceReceipt  # noqa: E402
 from dharma_swarm.spine.warrant import RuntimeWarrantDenied, issue_runtime_warrant  # noqa: E402
 
-DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "send_receipts"
+DEFAULT_RECEIPT_DIR = runtime_report_dir("a2a", "send_receipts")
 
 STATUS_SECRETS_MISSING = "NATS_SECRETS_MISSING"
 STATUS_NATS_CLIENT_MISSING = "NATS_CLIENT_MISSING"

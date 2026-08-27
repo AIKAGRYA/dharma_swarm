@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE_ROOT="${DHARMA_STATE_DIR:-${DHARMA_HOME:-${HOME}/.dharma}}"
+case "${STATE_ROOT}" in
+  "~") STATE_ROOT="${HOME}" ;;
+  "~/"*) STATE_ROOT="${HOME}/${STATE_ROOT#\~/}" ;;
+esac
+RECEIPT_DIR="${STATE_ROOT}/reports/a2a/inbox_bridge_receipts"
 SESSION="${SESSION_NAME:-dharma_a2a_inbox_bridge_hermes_m5}"
 AGENT_UID="${AGENT_UID:-hermes-m5}"
 CONSUMER="${CONSUMER:-hermes_inbox}"
@@ -31,9 +36,9 @@ if command -v nats >/dev/null 2>&1; then
   nats --no-context --server nats://127.0.0.1:4222 consumer info "${STREAM}" "${CONSUMER}" --json || true
 fi
 
-if [[ -d "${ROOT}/reports/a2a/inbox_bridge_receipts" ]]; then
+if [[ -d "${RECEIPT_DIR}" ]]; then
   echo "--- latest bridge receipts ---"
-  find "${ROOT}/reports/a2a/inbox_bridge_receipts" -maxdepth 1 -type f -name '*.json' -print \
+  find "${RECEIPT_DIR}" -maxdepth 1 -type f -name '*.json' -print \
     | sort -r \
     | head -5
 fi
