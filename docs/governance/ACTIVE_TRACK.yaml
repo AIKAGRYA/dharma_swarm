@@ -71,15 +71,22 @@ spine_objectives:
 # TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
 # This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
 # (min_active..max_active concurrent tracks). Concurrency is authorized, not
-# mandated: the floor is 1 and the operator reset the Mac ceiling to exactly
-# four program lanes on 2026-08-27. Opening a fifth requires closing or
-# superseding one of those slots first.
+# mandated. The repository-wide portfolio keeps its existing global ceiling;
+# the operator's 2026-08-27 directive is narrower and is enforced separately
+# by scoped_wip_limits.mac_build. Opening a fifth Mac build lane requires
+# closing or superseding one of those scoped slots first. A non-Mac track does
+# not consume that scoped capacity merely because it is represented here.
 # ---------------------------------------------------------------------------
 track_policy:
   model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
   min_active: 1             # floor — single-track default holds until a 2nd is opened
-  max_active: 4             # hard operator ceiling for Mac build programs
-  warn_active: 4            # all four slots are intentional; a fifth is an error
+  max_active: 10            # repository-wide ceiling; independent of host-scoped admission
+  warn_active: 5            # repository-wide focus warning
+  scoped_wip_limits:
+    mac_build:
+      scope: "Mac build admission only"
+      max_active: 4         # hard operator ceiling for programs building on the Mac
+      warn_active: 4        # all four Mac slots are intentional; a fifth is an error
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
@@ -124,6 +131,7 @@ vital_signs:
 #   depends_on:       [<track id>, ...]         (hard ordering; must form a DAG)
 #   conflicts_with:   [<track id>, ...]         (shared surface; not both ACTIVE)
 #   owned_surfaces:   [<glob>, ...]             (coordination plane; overlap => WARN)
+#   admission_scopes: [<scoped WIP id>, ...]    (host/context-specific capacity)
 #   moves_vital_signs:[<vital_sign id>, ...]    (which live-status dims it improves)
 #   graduation_profile: <profile id>            (profile-aware final-boss gate)
 #   target_closure_kind / closure_kind:
@@ -146,8 +154,10 @@ active_tracks:
       - sublimation-forge-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - dharma_swarm/mission_control*.py
+      - tests/test_mission_control.py
       - dashboard/src/app/dashboard/cockpit/**
       - dashboard/src/components/cockpit/**
       - dashboard/src/components/operator-coherence/v2/**
@@ -168,13 +178,13 @@ active_tracks:
       projection; HELM remains the terminal operator surface. Their prototype
       packages may complete independently, but they do not consume extra
       standing portfolio slots.
-    prerequisites: []
-    completion_criteria:
+    prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
       - id: mission_control_contract_tests_pass
         kind: test_passes
         test: tests/test_mission_control.py
@@ -211,6 +221,7 @@ active_tracks:
       - rsi-lab-meghadharma-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - deploy/sadhana/**
       - scripts/runtime/sadhana_release.py
@@ -221,25 +232,25 @@ active_tracks:
       - eval_coverage
       - security_guardrails
     target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "The active truth-fix release worktree is durable at /Users/dhyana/ds_sadhana_10day_active_20260826. Custody and code volume do not prove a live participant journey, release, or program outcome."
+    claim_boundary: "The provisional release package is preserved at /Users/dhyana/ds_sadhana_10day_release_final_20260827 and on draft PR #1453. Custody, tests in that worktree, and code volume do not prove the package is landed or a participant journey, release, or program outcome is live."
     description: |
       Finish the explicitly bounded ten-day SADHANA program through its
       existing release contract, writer sentinel, mobile surface, and hard
       stop. Preserve the single-writer boundary and distinguish participant
       evidence from fixture or deployment evidence.
-    prerequisites: []
-    completion_criteria:
+    prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
       - id: sadhana_release_contract_landed
         kind: file_exists
         file: scripts/runtime/sadhana_release.py
       - id: sadhana_release_tests_landed
-        kind: file_exists
-        file: tests/test_sadhana_release.py
+        kind: test_passes
+        test: tests/test_sadhana_release.py
     non_goals:
       - Do not extend the ten-day program silently or weaken its hard stop.
       - Do not treat a release bundle as participant completion evidence.
@@ -268,6 +279,7 @@ active_tracks:
       - sublimation-forge-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - dharma_swarm/forge_lab/**
       - scripts/forge_lab/**
@@ -285,13 +297,37 @@ active_tracks:
       Meghadharma, then run bounded research campaigns through the governed
       lab controls. Release verification stays cross-host and fail-closed;
       spend and promotion retain their own gates.
-    prerequisites: []
-    completion_criteria:
-      - id: exact_sync_observation_receipt_valid
+    prerequisites:
+      - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
+      - id: exact_sync_observation_receipt_valid
+        kind: receipt_valid
+        file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
+        fresh_ttl_days: 30
+        expect_digest: true
+        requires_keys: [schema, observed_at, authority, claim, host_observations, comparison, exclusions, digest]
+      - id: exact_sync_host_commits_match
+        kind: json_collection_values_match
+        file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
+        collection: host_observations
+        key_field: node
+        value_field: commit
+        expected:
+          mac: b148f55e00f668fa84774f299610eaae4d8283e4
+          meghadharma: b148f55e00f668fa84774f299610eaae4d8283e4
+      - id: exact_sync_host_trees_match
+        kind: json_collection_values_match
+        file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
+        collection: host_observations
+        key_field: node
+        value_field: tree
+        expected:
+          mac: 9d24a2a2b32e7a16e070d4126d2dde1938728475
+          meghadharma: 9d24a2a2b32e7a16e070d4126d2dde1938728475
     non_goals:
       - Do not synchronize mutable state, secrets, OAuth material, or provider credentials as code.
       - Do not equate exact code identity with research validity or production readiness.
@@ -315,6 +351,7 @@ active_tracks:
       - rsi-lab-meghadharma-2026-08
     depends_on: []
     conflicts_with: []
+    admission_scopes: [mac_build]
     owned_surfaces:
       - dharma_swarm/foundry/**
       - scripts/foundry/**
@@ -330,13 +367,13 @@ active_tracks:
       Consolidate the existing foundry into the Sublimation Forge: an
       offline-first, held-out, receipted improvement loop whose candidate
       promotion remains independent and fail-closed.
-    prerequisites: []
-    completion_criteria:
+    prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
         file: reports/governance/mac_active_programs/2026-08-27-focus-reset.json
         fresh_ttl_days: 30
         requires_keys: [schema, observed_at, authority, claim, observations, exclusions]
+    completion_criteria:
       - id: foundry_loop_tests_pass
         kind: test_passes
         test: tests/test_foundry_loop.py

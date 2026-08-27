@@ -10,7 +10,7 @@
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
-**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The governing principle: the operator may run between `min_active` and `max_active` concurrent tracks (default floor 1, ceiling 4) as declared by `track_policy` in `ACTIVE_TRACK.yaml`. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. A portfolio of one is fine — concurrency is authorized, not mandated — and equally, opening a second co-equal track when the operator proposes new work is the expected response, never a violation of an existing track. **To open a track** (e.g. when the operator proposes a new project — treat that as a new track, never a violation): add an entry under `active_tracks:` in `ACTIVE_TRACK.yaml` with `serves:` a spine objective, `owned_surfaces:`, and acceptance criteria, then run `scripts/governance/render_active_track_includes.py`; `check_track_status.py` enforces WIP limit, spine binding, surface non-overlap, and edge/cycle validity. Rationale: the four-lane ceiling reserves three durable priorities plus one bounded temporary lane; any fourth lane requires explicit WIP justification. Concurrency is gated on non-overlap, not on agent count.
+**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The repository-wide portfolio uses `track_policy.min_active..max_active` (current floor 1, ceiling 10); narrower authority is represented independently by `track_policy.scoped_wip_limits`. The operator's 2026-08-27 directive caps the `mac_build` admission scope at four lanes without freezing non-Mac work or claiming that a declared track is actually running on a host. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. A portfolio of one is fine — concurrency is authorized, not mandated — and equally, opening a second co-equal track when the operator proposes new work is the expected response, never a violation of an existing track. **To open a track** (e.g. when the operator proposes a new project — treat that as a new track, never a violation): add an entry under `active_tracks:` in `ACTIVE_TRACK.yaml` with `serves:` a spine objective, `owned_surfaces:`, acceptance criteria, and any applicable `admission_scopes`, then run `scripts/governance/render_active_track_includes.py`; `check_track_status.py` enforces global and scoped WIP limits, spine binding, surface non-overlap, and edge/cycle validity. Concurrency is gated on non-overlap and declared admission scope, not on agent count.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -22,18 +22,22 @@
                  tests/test_active_track_governance.py
      newest track verified_at in source: 2026-08-27 -->
 
-**Active portfolio — declared intent only:** 4 co-equal track(s) (WIP warn 4, max 4; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy.
+**Active portfolio — declared intent only:** 4 co-equal track(s) (WIP warn 5, max 10; scoped WIP: `mac_build` 4 active / max 4; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy. Admission scopes constrain declared build authority; they do not prove where a process is running.
 
 **Spine objectives:** `substrate-nativeness`, `revenue-external-humans-served`, `research-depth` (each covered by at least one active track)
 
 - **`fleet-advancement-2026-08`** — Fleet advancement — Fleet Hub, Mission Control, and HELM operator surfaces (ACTIVE, serves `substrate-nativeness`, verified 2026-08-27, open blocker items: 2)
-  - owns: dharma_swarm/mission_control*.py, dashboard/src/app/dashboard/cockpit/**, dashboard/src/components/cockpit/**, dashboard/src/components/operator-coherence/v2/**, terminal/**, docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md, specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
+  - owns: dharma_swarm/mission_control*.py, tests/test_mission_control.py, dashboard/src/app/dashboard/cockpit/**, dashboard/src/components/cockpit/**, dashboard/src/components/operator-coherence/v2/**, terminal/**, docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md, specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
+  - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`sadhana-10-day-program-2026-08`** — SADHANA — governed 10-day program (ACTIVE, serves `revenue-external-humans-served`, verified 2026-08-27, open blocker items: 2)
   - owns: deploy/sadhana/**, scripts/runtime/sadhana_release.py, tests/test_sadhana_release.py, dashboard/src/app/dashboard/sadhana/**
+  - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`rsi-lab-meghadharma-2026-08`** — RSI Lab — exact-code Mac and Meghadharma campaign lane (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 1)
   - owns: dharma_swarm/forge_lab/**, scripts/forge_lab/**, tests/forge_lab_v1/**, docs/ops/RSI_LAB_SYNC.md
+  - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`sublimation-forge-2026-08`** — Sublimation Forge — offline-first governed foundry (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 1)
   - owns: dharma_swarm/foundry/**, scripts/foundry/**, tests/test_foundry_*.py, docs/foundry/**
+  - admission scopes: mac_build (declared build authority; not runtime evidence)
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
 
@@ -158,11 +162,11 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 | Top-level (flat) modules | **490 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
 | Total Python LOC | **396,573** | wc -l across dharma_swarm Python modules |
 | Test files | **1015** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **15,448 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **15,453 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,534** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **320,585** | wc -l across all tracked .md |
+| Markdown total lines | **320,593** | wc -l across all tracked .md |
 | Bridge files | **37** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **50** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **23** | find dharma_swarm -type f \| rg -i "rout" |

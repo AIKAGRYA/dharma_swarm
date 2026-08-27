@@ -288,6 +288,38 @@ def test_existence_only_criteria_are_not_shippable():
     assert any("existence-only" in b for b in r["ship_blocks"])
 
 
+def test_prerequisite_receipt_does_not_count_as_completion_or_rigorous_evidence(
+    tmp_path,
+):
+    """Admission authority can be a prerequisite without inflating product progress."""
+    receipt = tmp_path / "authority.json"
+    receipt.write_text('{"schema":"authority.v1"}', encoding="utf-8")
+    t = {
+        "id": "t",
+        "status": "ACTIVE",
+        "prerequisites": [
+            {
+                "id": "authority",
+                "kind": "receipt_valid",
+                "file": str(receipt),
+                "requires_keys": ["schema"],
+            }
+        ],
+        "completion_criteria": [
+            {"id": "surface", "kind": "file_exists", "file": "CLAUDE.md"}
+        ],
+        "next_items": [],
+    }
+
+    result = evaluate_track(t)
+
+    assert result["prereqs_ok"] is True
+    assert result["passed"] == 1
+    assert result["total"] == 1
+    assert result["has_rigorous_evidence"] is False
+    assert result["shippable"] is False
+
+
 def _root_commit() -> str:
     import subprocess
 

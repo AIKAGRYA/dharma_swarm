@@ -94,6 +94,100 @@ def test_wip_high_is_warn_not_error() -> None:
     assert not any(f.check == "wip-exceeded" for f in findings)
 
 
+def test_scoped_wip_allows_fifth_unscoped_track_without_weakening_global_cap() -> None:
+    tracks = [
+        _track(f"mac-{i}", admission_scopes=["mac_build"])
+        for i in range(4)
+    ] + [_track("remote-only")]
+    policy = {
+        "max_active": 10,
+        "warn_active": 5,
+        "scoped_wip_limits": {
+            "mac_build": {"max_active": 4, "warn_active": 4}
+        },
+    }
+    findings: list[Finding] = []
+    validate_portfolio_graph(_portfolio(tracks, policy=policy), findings)
+    assert not any(f.check.startswith("scoped-wip-exceeded") for f in findings)
+    assert not any(f.check == "wip-exceeded" for f in findings)
+
+
+def test_scoped_wip_rejects_fifth_mac_build_track() -> None:
+    tracks = [
+        _track(f"mac-{i}", admission_scopes=["mac_build"])
+        for i in range(5)
+    ]
+    policy = {
+        "max_active": 10,
+        "warn_active": 5,
+        "scoped_wip_limits": {
+            "mac_build": {"max_active": 4, "warn_active": 4}
+        },
+    }
+    findings: list[Finding] = []
+    validate_portfolio_graph(_portfolio(tracks, policy=policy), findings)
+    assert any(f.check == "scoped-wip-exceeded:mac_build" for f in findings)
+    assert not any(f.check == "wip-exceeded" for f in findings)
+
+
+def test_scoped_wip_counts_shippable_but_not_paused_tracks() -> None:
+    tracks = [
+        _track(f"mac-{i}", admission_scopes=["mac_build"])
+        for i in range(4)
+    ]
+    tracks.append(_track("paused", status="PAUSED", admission_scopes=["mac_build"]))
+    policy = {
+        "max_active": 10,
+        "warn_active": 5,
+        "scoped_wip_limits": {
+            "mac_build": {"max_active": 4, "warn_active": 4}
+        },
+    }
+    paused_findings: list[Finding] = []
+    validate_portfolio_graph(_portfolio(tracks, policy=policy), paused_findings)
+    assert not any(
+        f.check == "scoped-wip-exceeded:mac_build" for f in paused_findings
+    )
+
+    tracks[-1]["status"] = "SHIPPABLE"
+    shippable_findings: list[Finding] = []
+    validate_portfolio_graph(_portfolio(tracks, policy=policy), shippable_findings)
+    assert any(
+        f.check == "scoped-wip-exceeded:mac_build" for f in shippable_findings
+    )
+
+
+def test_scoped_wip_rejects_unknown_and_malformed_scopes_fail_closed() -> None:
+    typo_tracks = [_track("typo", admission_scopes=["mac_buid"])]
+    policy = {
+        "scoped_wip_limits": {
+            "mac_build": {"max_active": 4, "warn_active": 4}
+        }
+    }
+    typo_findings: list[Finding] = []
+    validate_portfolio_graph(_portfolio(typo_tracks, policy=policy), typo_findings)
+    assert any(
+        f.check == "admission-scope-unresolved:typo" for f in typo_findings
+    )
+
+    malformed_policy = {
+        "scoped_wip_limits": {
+            "mac_build": {"max_active": "4", "warn_active": 5}
+        }
+    }
+    malformed_findings: list[Finding] = []
+    validate_portfolio_graph(
+        _portfolio([_track("mac", admission_scopes=["mac_build"])], policy=malformed_policy),
+        malformed_findings,
+    )
+    assert any(
+        f.check == "scoped-wip-malformed:mac_build" for f in malformed_findings
+    )
+    assert any(
+        f.check == "admission-scope-unresolved:mac" for f in malformed_findings
+    )
+
+
 def test_empty_portfolio_warns() -> None:
     p = _portfolio([])
     findings: list[Finding] = []
@@ -228,7 +322,13 @@ def test_stdlib_parser_matches_pyyaml_on_real_file() -> None:
     assert p_ref["track_policy"] == p_mini["track_policy"]
     for a, b in zip(p_ref["active_tracks"], p_mini["active_tracks"]):
         assert a.get("serves") == b.get("serves")
-        for kind in ("complements", "depends_on", "conflicts_with", "owned_surfaces"):
+        for kind in (
+            "complements",
+            "depends_on",
+            "conflicts_with",
+            "admission_scopes",
+            "owned_surfaces",
+        ):
             assert (a.get(kind) or []) == (b.get(kind) or []), f"{a['id']}.{kind} parser mismatch"
         assert len(a.get("completion_criteria") or []) == len(b.get("completion_criteria") or [])
 
