@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch fenced AGNI incoming snapshots
+PartOf=dharma-sadhana-standby.target
+ConditionPathExists=!/etc/dharma-sadhana/receipts/standby/deadline-stopped.v1.json
+
+[Path]
+PathExistsGlob=/var/lib/dharma-sadhana/snapshot-incoming/uploads/????????T??????Z-????????????.upload-*/.ready.json
+Unit=dharma-sadhana-standby-snapshot-receiver.service
+
+[Install]
+WantedBy=dharma-sadhana-standby.target

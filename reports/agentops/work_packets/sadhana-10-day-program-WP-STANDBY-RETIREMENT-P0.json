@@ -1,0 +1,145 @@
+{
+  "id": "sadhana-10-day-program-WP-STANDBY-RETIREMENT-P0",
+  "base_ref": "3498b3e0fb6f608ce55149143e10b076c148e94b",
+  "branch": "agent/sadhana-10day-retirement-clean-20260827",
+  "worktree": ".",
+  "intent": "Consolidate one collision-free SADHANA ten-day source dossier without widening campaign authority: deterministic release and snapshot contracts, inert deployment templates, and a root-only single-writer retirement transaction with a hard ten-day stop. Bind the separately Fleet-owned campaign runtime and its complete module closure as an asserted, digest-bound NoEffectAuthority interface locator that fails closed while its manifest or exact tracked bytes are absent; do not import or own that Fleet implementation during prerequisite validation. This source contract does not claim sealability, participant completion, provider dispatch, campaign activation, or live deployment.",
+  "allowed_files": [
+    "deploy/sadhana/**",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/docops/assertions.yaml",
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/sadhana-10-day-program-WP-STANDBY-RETIREMENT-P0.json",
+    "scripts/runtime/sadhana_release.py",
+    "scripts/runtime/sadhana_snapshot.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dashboard/src/app/dashboard/cockpit/**",
+    "dashboard/src/components/cockpit/**",
+    "dashboard/src/components/operator-coherence/v2/**",
+    "dharma_swarm/**",
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/mission_control*.py",
+    "docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md",
+    "docs/foundry/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "docs/plans/**",
+    "packages/**",
+    "pyproject.toml",
+    "scripts/forge_lab/**",
+    "scripts/foundry/**",
+    "scripts/governance/**",
+    "specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md",
+    "terminal/**",
+    "tests/forge_lab_v1/**",
+    "tests/test_foundry_*.py",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "sadhana-release-contracts",
+      "command": "python -m pytest -q tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "sadhana-release-ruff",
+      "command": "python -m ruff check scripts/runtime/sadhana_release.py scripts/runtime/sadhana_snapshot.py tests/test_sadhana_release.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "docops-integrity",
+      "command": "python scripts/docops/check_docops_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "scope-diff-check",
+      "command": "git diff --check 3498b3e0fb6f608ce55149143e10b076c148e94b HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "standby-retirement-fail-closed-contract",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k 'retirement or clock_proof or standby_activation or failed_predispatch'",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    },
+    {
+      "name": "fleet-prerequisite-fail-closed-contract",
+      "command": "python -m pytest -q tests/test_sadhana_release.py -k fleet_campaign_prerequisite_is_digest_bound_and_has_no_effect_authority",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): make standby retirement crash-safe"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-STANDBY-RETIREMENT-P0",
+    "active_track": "sadhana-10-day-program-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "3498b3e0fb6f608ce55149143e10b076c148e94b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Current main does not contain the Fleet-owned campaign implementation, runner, interface manifest, or the twelve-module runtime closure named by this source contract. SADHANA therefore validates an exact external interface assertion without importing it and refuses checkout verification or sealing until Fleet lands the complete tracked closure.",
+      "The interface manifest has claim_modality asserted_interface_locator and effect_authority NoEffectAuthority. Exact hashes establish byte identity and track authority, not independent semantic proof or permission to execute those bytes; only separately admitted runtime call sites may use the guarded locator after validation.",
+      "The activation contract intentionally leaves immutable lifecycle evidence after a compensated failure. A distinct retirement transaction binds the failed-attempt chain, proves an authority-quiet host, archives exact bytes, survives interruption, and only then frees singleton paths for a separately admitted replacement release."
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/sadhana_release.py",
+      "scripts/runtime/sadhana_snapshot.py",
+      "tests/test_sadhana_release.py",
+      "deploy/sadhana/README.md"
+    ],
+    "honest_blockers": [
+      "Current main and this packet do not contain docs/governance/FLEET_SADHANA_CAMPAIGN_INTERFACE.json, dharma_swarm/mission_control_campaign.py, scripts/runtime/mission_control_campaign.py, or the exact twelve-module runtime closure enumerated in scripts/runtime/sadhana_release.py. Checkout verification and sealing therefore fail closed until the separately governed Fleet track lands the complete accepted interface; this PR cannot itself be sealed, deployed, or activated.",
+      "This packet proves only local source and deterministic fixture contracts. It does not prove a participant completed any SADHANA day, that a campaign is active, that a release is deployed, that a provider was contacted, or that a Fleet locator's asserted exports and commands are semantically correct.",
+      "No deployment, host mutation, external contact, credential access, participant-data access, account confirmation, provider dispatch, supervisor start, campaign activation, or writer failover is authorized by this packet.",
+      "Production confidence would still require a separately authorized inert host rehearsal against exact systemd and filesystem behavior, a fresh sole-parent release candidate and sealed envelope after Fleet integration, and independent review of the resulting receipts."
+    ],
+    "rollback": "Revert only the SADHANA release and snapshot source contracts, guarded external Fleet locator, inert deployment templates, standby lifecycle retirement transaction, focused regressions, exact DocOps registration and generated updates, and this packet. Never recover by copying the Fleet campaign implementation into this lane, dynamically loading an unmanifested module, deleting singleton receipts manually, relaxing receipt custody, bypassing the pending guard, transferring writer authority, or treating source artifacts as participant-completion or deployment proof.",
+    "packet_digest": "7c0aca03d8571564642a1900466666fbb7a4ef84bbc8bf5ac949cd3268e135ad"
+  }
+}

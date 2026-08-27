@@ -1,0 +1,44 @@
+[Unit]
+Description=Stage a service-owned SADHANA online backup for root finalization
+After=dharma-sadhana-supervisor.service network-online.target
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=oneshot
+User=dharma-sadhana
+Group=dharma-sadhana
+EnvironmentFile=/etc/dharma-sadhana/supervisor.env
+WorkingDirectory=/var/lib/dharma-sadhana/workspace
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_snapshot.py stage --mission-id sadhana-10-20260823 --role writer --release-sha @RELEASE_SHA@ --state-root /var/lib/dharma-sadhana/state --projection ${SADHANA_PROJECTION_PATH} --snapshot-root /var/lib/dharma-sadhana/snapshots --staging-root /var/lib/dharma-sadhana/snapshot-staging
+TimeoutStartSec=240s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana /var/lib/dharma-sadhana/state /var/lib/dharma-sadhana/projection-source /var/lib/dharma-sadhana/snapshots
+ReadWritePaths=/var/lib/dharma-sadhana/snapshot-staging
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+IPAddressDeny=any
+UMask=0077

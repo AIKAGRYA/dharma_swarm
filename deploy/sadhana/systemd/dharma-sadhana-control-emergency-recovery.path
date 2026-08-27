@@ -1,0 +1,10 @@
+[Unit]
+Description=Resume durable SADHANA emergency-stop claims after service or host failure
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+
+[Path]
+DirectoryNotEmpty=/var/lib/dharma-sadhana/emergency-inflight
+Unit=dharma-sadhana-control-emergency-recovery.service
+
+[Install]
+WantedBy=multi-user.target

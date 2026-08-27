@@ -1,0 +1,8 @@
+[Unit]
+Description=SADHANA fenced append-only standby receiver
+ConditionPathExists=!/etc/dharma-sadhana/receipts/standby/deadline-stopped.v1.json
+Requires=dharma-sadhana-standby-replication-serve.service dharma-sadhana-standby-snapshot-receiver.path dharma-sadhana-standby-snapshot-receiver.timer
+After=network-online.target tailscaled.service dharma-sadhana-standby-replication-serve.service
+
+[Install]
+WantedBy=multi-user.target
