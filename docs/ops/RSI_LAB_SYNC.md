@@ -469,14 +469,24 @@ systemctl status rsi-lab-explore.timer --no-pager
 
 The service is `Type=oneshot`, drops its capability and ambient-capability
 sets, makes home and the immutable release read-only, writes only
-`/root/rsi-lab/state`, forbids namespace creation, and applies systemd process
+`/root/rsi-lab/state` plus the two public Hugging Face cache roots needed for
+offline file locks, forbids namespace creation, and applies systemd process
 hardening plus an external timeout. Docker remains a daemon-mediated Unix
-socket client; candidate containers never receive that socket. Verify both the
-unit syntax and Docker reachability through `rsi doctor --json` before enabling
-the timer. The provider refresh is independent and runs hourly at minute `:17`.
+socket client; candidate containers never receive that socket. The launcher
+pins SWE-bench 4.1 from the root-owned, non-writable dedicated host runtime and
+refuses a missing, escaped, modified, or API-incompatible evaluator. Verify
+unit syntax and the complete grader runtime
+through `rsi doctor --json` before enabling the timer. The provider refresh is
+independent and runs hourly at minute `:17`.
 The persistent EXPLORE timer fires once per UTC day at `03:35` plus no more than
 `25m` randomized delay; the runner's daily/monthly reservation ledger remains
 the authoritative admission fuse.
+
+The daily launcher also pins the local Docker socket, clears inherited Docker
+TLS/API overrides after credential bootstrap, and requires both CLI and Python
+SDK daemon probes. Its task context and grader use only the release-attested
+cached image ID: no mutable image pull is permitted after admission, and the
+task/image/context binding is rechecked in the child process.
 Create the following file to stop new runs without editing code or units:
 
 ```bash

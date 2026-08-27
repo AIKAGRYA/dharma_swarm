@@ -23,6 +23,11 @@ Restart=no
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/root/rsi-lab/state
+# The public SWE-bench dataset is cached outside lab state. Datasets takes
+# short-lived file locks even in offline/cache-only mode, so admit only its two
+# cache roots while the rest of /root remains read-only.
+ReadWritePaths=/root/.cache/huggingface/datasets
+ReadWritePaths=/root/.cache/huggingface/hub
 ReadOnlyPaths=/root/rsi-lab/current
 PrivateTmp=true
 PrivateDevices=true

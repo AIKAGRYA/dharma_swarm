@@ -61,6 +61,11 @@ from dharma_swarm.forge_lab.unattended_ledger import (
     read_chain as _ledger_read_chain,
     reserve_budget as _ledger_reserve_budget,
 )
+from dharma_swarm.forge_lab.unattended_context import (
+    UnattendedContextError,
+    load_admitted_task_context,
+    sanitize_unattended_docker_env,
+)
 from dharma_swarm.forge_lab.unattended_model_evidence import (
     ModelEvidenceError,
     selected_model_evidence,
@@ -311,7 +316,9 @@ def admission_status(state_root: Path) -> dict[str, Any]:
             "model_profile_digest": None,
             "provider_receipt_digest": None,
             "task_id": None,
+            "task_context_binding": None,
         }
+    sanitize_unattended_docker_env()
     halt = state_root / ".dharma" / "forge_lab" / "HALT"
     if halt.exists():
         reasons.append(f"HALT_present:{halt}")
@@ -369,6 +376,15 @@ def admission_status(state_root: Path) -> dict[str, Any]:
     task_id = str(taskbed.get("next_explore_task_id") or "").strip()
     if not taskbed.get("ready") or not task_id:
         reasons.append("state_anchored_isolated_task_unavailable")
+    task_context_binding: dict[str, Any] | None = None
+    if task_id:
+        try:
+            _task, _context, task_context_binding = load_admitted_task_context(
+                task_id,
+                state_root=state_root,
+            )
+        except UnattendedContextError as exc:
+            reasons.append(f"{exc.code}:{exc}")
     return {
         "ready": not reasons and set(role_bindings) == set(MODEL_ROLES) and len(routes) >= 2,
         "reasons": reasons,
@@ -381,6 +397,7 @@ def admission_status(state_root: Path) -> dict[str, Any]:
         "model_profile_digest": model_evidence.get("model_profile_digest"),
         "provider_receipt_digest": model_evidence.get("provider_receipt_digest"),
         "task_id": task_id or None,
+        "task_context_binding": task_context_binding,
     }
 
 
@@ -542,6 +559,9 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             "model_profile_digest": admission["model_profile_digest"],
             "provider_receipt_digest": admission["provider_receipt_digest"],
             "task_id": admission["task_id"],
+            "task_context_binding_digest": admission["task_context_binding"][
+                "binding_digest"
+            ],
             "shape": {"generations": GENERATIONS, "children": CHILDREN, "tasks": TASKS},
             "limits": {
                 "logical_provider_call_slots": LOGICAL_PROVIDER_CALL_SLOTS,
@@ -567,6 +587,9 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                 "model_profile_digest": spec["model_profile_digest"],
                 "role_bindings": role_bindings,
                 "task_id": spec["task_id"],
+                "task_context_binding_digest": spec[
+                    "task_context_binding_digest"
+                ],
                 "shape": spec["shape"],
                 "limits": spec["limits"],
                 "spec": str(spec_path),

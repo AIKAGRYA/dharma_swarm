@@ -448,8 +448,10 @@ when all of the following are simultaneously true:
 - `rsi doctor` is ready, including retirement of legacy provider controls;
 - a valid live provider receipt, no older than one hour, attests two distinct
   callable provider entitlements for this exact release; and
-- the official SWE-bench Docker daemon is reachable. Candidate grading still
-  must emit a complete `rsi_lab.grader_isolation_proof.v1` to become comparable.
+- the source-pinned SWE-bench 4.1 evaluator APIs and Docker daemon are
+  reachable. Linux launchers pin the local `default` context and Unix socket;
+  macOS pins `colima-forge-swebench`. Candidate grading still must emit a
+  complete `rsi_lab.grader_isolation_proof.v1` to become comparable.
 
 The child shape is permanently `generations=1`, `children=1`, `tasks=1`. The
 seed/control candidate uses `freeform_single`; the one child uses a bounded
@@ -464,7 +466,21 @@ the child process group when it appears, recording
 `InconclusiveOperatorHalt`. The parent also applies a 2,700-second subprocess
 timeout; systemd adds a second 2,800-second fuse. Scratch code is a standalone
 exact-commit clone under state, so execution never writes the immutable release
-Git dir.
+Git dir. Before reserving spend, the runner binds the selected task row to a
+release-owned fixture containing its task SHA, cached image ID, platform, and
+source paths. Context is read from that exact image ID with `--pull=never`, no
+network, and no gold patch. The public benchmark dataset is cache-only during
+official grading. The SWE-bench spec shim skips its otherwise unnecessary
+remote environment-file lookup because the exact prebuilt image is already
+attested. The evaluator script is redirected from the read-only container root
+into its bounded `/tmp` tmpfs, and RSI-created anonymous testbed volumes are
+removed at container closeout.
+
+The unattended task/image fixture is deliberately a release authority, not a
+mutable tag trust decision. Adding a new unattended task therefore requires a
+reviewed release update with the governed task SHA, exact cached image ID and
+platform, and bounded context paths. A missing or changed fixture refuses
+before the reservation ledger is touched.
 
 Reservations are conservative: `$1.25`/five logical call slots per run,
 `$3`/12 slots per UTC day, and `$40`/120 slots per UTC month. They are never

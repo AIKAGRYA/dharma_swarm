@@ -10,6 +10,21 @@ from dharma_swarm.forge_lab import unattended_explore as unattended
 from dharma_swarm.forge_lab import unattended_ledger
 from dharma_swarm.forge_lab import provider_selftest
 
+_CONTEXT_DIGEST = "sha256:" + "d" * 64
+
+
+@pytest.fixture(autouse=True)
+def _admitted_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        unattended,
+        "load_admitted_task_context",
+        lambda task_id, *, state_root: (
+            {"task_id": task_id},
+            {"fixture.py": "fixture\n"},
+            {"task_id": task_id, "binding_digest": _CONTEXT_DIGEST},
+        ),
+    )
+
 
 def test_hash_chain_is_append_only_and_tamper_evident(tmp_path: Path) -> None:
     path = tmp_path / "receipts.jsonl"
@@ -376,6 +391,7 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
         "model_profile_digest": "sha256:" + "a" * 64,
         "provider_receipt_digest": "sha256:" + "b" * 64,
         "task_id": "task-fixture",
+        "task_context_binding_digest": _CONTEXT_DIGEST,
         "shape": {"generations": 1, "children": 1, "tasks": 1},
         "limits": {
             "logical_provider_call_slots": unattended.LOGICAL_PROVIDER_CALL_SLOTS,
@@ -406,6 +422,10 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
             "model_profile_digest": spec["model_profile_digest"],
             "provider_receipt_digest": spec["provider_receipt_digest"],
             "task_id": spec["task_id"],
+            "task_context_binding": {
+                "task_id": spec["task_id"],
+                "binding_digest": _CONTEXT_DIGEST,
+            },
         },
     )
     def fake_seams(_spec, counter):
@@ -488,6 +508,10 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
             "model_profile_digest": "sha256:" + "a" * 64,
             "provider_receipt_digest": "sha256:" + "b" * 64,
             "task_id": "task-fixture",
+            "task_context_binding": {
+                "task_id": "task-fixture",
+                "binding_digest": _CONTEXT_DIGEST,
+            },
             "halt_path": str(state / ".dharma" / "forge_lab" / "HALT"),
         },
     )
@@ -649,10 +673,25 @@ def test_unattended_wrapper_and_systemd_timer_are_bounded() -> None:
     assert "RSI_LAB_DEV_SOURCE is forbidden" in wrapper
     assert 'state="$(cd -- "${state}" && pwd -P)"' in wrapper
     assert 'export RSI_LAB_PYDEPS="${pydeps}"' in wrapper
+    assert 'export RSI_LAB_SWEBENCH_PYDEPS="${swebench_pydeps}"' in wrapper
+    assert 'export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="1"' in wrapper
+    assert 'docker_context="default"' in wrapper
+    assert 'docker_context="colima-forge-swebench"' in wrapper
+    assert 'docker_host="unix:///var/run/docker.sock"' in wrapper
+    assert 'export DOCKER_CONTEXT="${docker_context}"' in wrapper
+    assert 'export FORGE_DOCKER_CONTEXT="${docker_context}"' in wrapper
+    assert 'export DOCKER_HOST="${docker_host}"' in wrapper
+    assert "export HF_DATASETS_OFFLINE=1" in wrapper
+    assert "export HF_HUB_OFFLINE=1" in wrapper
+    assert 'export HF_HOME="${hf_home}"' in wrapper
+    assert 'export HF_DATASETS_CACHE="${hf_home}/datasets"' in wrapper
+    assert 'export HF_HUB_CACHE="${hf_home}/hub"' in wrapper
     assert '--state-root "${state}"' in wrapper
     assert "Type=oneshot" in service
     assert "TimeoutStartSec=2800" in service
     assert "ReadWritePaths=/root/rsi-lab/state" in service
+    assert "ReadWritePaths=/root/.cache/huggingface/datasets" in service
+    assert "ReadWritePaths=/root/.cache/huggingface/hub" in service
     assert "ReadOnlyPaths=/root/rsi-lab/current" in service
     assert "ProtectHome=read-only" in service
     assert "NoNewPrivileges=true" in service

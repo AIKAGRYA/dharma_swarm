@@ -9,6 +9,7 @@ import platform
 from typing import Any
 
 from dharma_swarm.forge_lab.sync_identity import (
+    DEFAULT_REMOTE_ROOT,
     RELEASE_SCHEMA,
     SyncError,
     _checkout_identity,
@@ -223,6 +224,63 @@ def _ensure_release_links(release: Path, root: Path) -> None:
         _safe_symlink(root / "secrets", release / "secrets")
 
 
+def _python_abi(python: Path) -> str:
+    try:
+        abi = _run(
+            [
+                str(python),
+                "-I",
+                "-c",
+                "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')",
+            ],
+            timeout=15,
+        ).stdout.strip()
+    except SyncError as exc:
+        raise SyncError(
+            "RUNTIME_INCOMPATIBLE",
+            "unable to establish the Python ABI for the SWE-bench runtime",
+        ) from exc
+    if not abi.startswith("python") or not abi[6:].replace(".", "", 1).isdigit():
+        raise SyncError("RUNTIME_INCOMPATIBLE", "invalid Python ABI marker")
+    return abi
+
+
+def _swebench_import_root(root: Path, *, release_python: Path) -> Path | None:
+    """Return the ABI-bound host SWE-bench site-packages root, if provisioned."""
+
+    venv = root / "runtime" / "swebench-venv"
+    if not venv.is_dir():
+        return None
+    runtime_python = venv / "bin" / "python"
+    if not runtime_python.exists():
+        raise SyncError(
+            "RUNTIME_INCOMPATIBLE",
+            "SWE-bench runtime Python is missing",
+        )
+    release_abi = _python_abi(release_python)
+    if _python_abi(runtime_python) != release_abi:
+        raise SyncError(
+            "RUNTIME_INCOMPATIBLE",
+            "SWE-bench and release Python ABIs disagree",
+        )
+    expected = venv / "lib" / release_abi / "site-packages"
+    candidates = [
+        path.resolve()
+        for path in sorted((venv / "lib").glob("python*/site-packages"))
+        if all((path / package).is_dir() for package in ("swebench", "docker", "datasets"))
+    ]
+    if (
+        len(candidates) != 1
+        or candidates[0] != expected.resolve(strict=False)
+        or not candidates[0].is_relative_to(venv.resolve())
+    ):
+        raise SyncError(
+            "RUNTIME_INCOMPATIBLE",
+            "SWE-bench runtime must expose one venv-owned site-packages root",
+        )
+    return candidates[0]
+
+
 def _verify_release(release: Path, plan: dict[str, Any]) -> dict[str, Any]:
     identity = _checkout_identity(release / "repo")
     mismatches = _identity_mismatches(identity, plan)
@@ -243,24 +301,64 @@ def _run_offline_verification(
     python = release / ".venv" / "bin" / "python"
     repo = release / "repo"
     pydeps = release / "pydeps"
+    swebench_pydeps = _swebench_import_root(root, release_python=python)
+    runtime_required = bool(
+        platform.system() == "Linux"
+        and root.resolve() == DEFAULT_REMOTE_ROOT.resolve()
+    )
+    if runtime_required and swebench_pydeps is None:
+        raise SyncError(
+            "RUNTIME_INCOMPATIBLE",
+            "canonical Linux activation requires the dedicated SWE-bench runtime",
+        )
     env = os.environ.copy()
+    env.pop("PYTHONHOME", None)
+    env.pop("PYTHONINSPECT", None)
     env.update(
         {
             "DHARMA_HOME": str(root / "state" / ".dharma"),
+            "HF_DATASETS_OFFLINE": "1",
+            "HF_HUB_OFFLINE": "1",
             "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONNOUSERSITE": "1",
             "PYTHONPATH": os.pathsep.join(
                 item
-                for item in (str(repo), str(pydeps), env.get("PYTHONPATH", ""))
+                for item in (
+                    str(repo),
+                    str(pydeps),
+                    str(swebench_pydeps) if swebench_pydeps else "",
+                )
                 if item
             ),
             "RSI_LAB_BASE": str(release),
             "RSI_LAB_REPO": str(repo),
             "RSI_LAB_PYTHON": str(python),
             "RSI_LAB_PYDEPS": str(pydeps),
+            "RSI_LAB_SWEBENCH_PYDEPS": (
+                str(swebench_pydeps) if swebench_pydeps else ""
+            ),
+            "RSI_LAB_REQUIRE_SWEBENCH_PYDEPS": "1" if runtime_required else "0",
             "RSI_LAB_STATE": str(root / "state"),
         }
     )
     started = _now()
+    runtime_smoke = _run(
+        [
+            str(python),
+            "-c",
+            (
+                "import json,sys; "
+                "from dharma_swarm.forge_lab.operator_views import "
+                "swebench_runtime_readiness as check; "
+                "result=check(); print(json.dumps(result,sort_keys=True)); "
+                "sys.exit(0 if result['ready'] else 9)"
+            ),
+        ],
+        cwd=repo,
+        env=env,
+        timeout=60,
+    )
+    runtime_result = json.loads(runtime_smoke.stdout)
     result = _run(
         [
             str(python),
@@ -287,5 +385,14 @@ def _run_offline_verification(
         "command": "python -m pytest -q -p no:cacheprovider "
         + " ".join(plan["verification_tests"]),
         "stdout_tail": result.stdout.strip()[-1200:],
+        "swebench_runtime": {
+            "ready": True,
+            "version": runtime_result["version"],
+            "import_root": str(swebench_pydeps) if swebench_pydeps else None,
+            "record_digests": runtime_result["record_digests"],
+            "tree_digests": runtime_result["tree_digests"],
+            "tree_file_counts": runtime_result["tree_file_counts"],
+            "network_or_provider_calls": False,
+        },
         "network_or_provider_calls": False,
     }
