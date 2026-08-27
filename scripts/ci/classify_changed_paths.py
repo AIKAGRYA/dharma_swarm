@@ -52,6 +52,7 @@ CLASS_RULES: dict[str, tuple[str, ...]] = {
     # drives.
     "go": ("tools/", "*.go", "go.mod", "go.sum", "Makefile"),
     "dashboard": ("dashboard/",),
+    "desktop": ("desktop-shell/",),
     "terminal": ("terminal/",),
     # Anything that can change Python behaviour, including the dependency
     # pins that decide which Python actually runs.
