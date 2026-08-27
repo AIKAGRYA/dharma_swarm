@@ -575,7 +575,13 @@ def test_external_watchdog_terminates_the_child_process_group(
             return -15
 
     process = TimedProcess()
-    monkeypatch.setattr(subprocess, "Popen", lambda *_args, **_kwargs: process)
+    child_argv: list[str] = []
+
+    def fake_popen(argv, **_kwargs):
+        child_argv.extend(argv)
+        return process
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
     signals = []
     monkeypatch.setattr(unattended.os, "killpg", lambda pid, sig: signals.append((pid, sig)))
     spec = tmp_path / "spec.json"
@@ -594,6 +600,13 @@ def test_external_watchdog_terminates_the_child_process_group(
     assert timed_out is True
     assert halted is False
     assert signals == [(4242, unattended.signal.SIGTERM)]
+    assert child_argv == [
+        unattended.sys.executable,
+        "-m",
+        "dharma_swarm.forge_lab.unattended_explore",
+        "--child-spec",
+        str(spec),
+    ]
 
 
 def test_halt_latch_terminates_running_child_and_is_typed_inconclusive(

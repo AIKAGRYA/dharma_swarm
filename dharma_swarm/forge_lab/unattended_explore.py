@@ -70,6 +70,7 @@ RUNNER_SCHEMA = "rsi_lab.unattended_explore.v1"
 LEDGER_SCHEMA = "rsi_lab.unattended_budget_ledger.v1"
 RECEIPT_SCHEMA = "rsi_lab.unattended_receipt_chain.v1"
 CHILD_SCHEMA = "rsi_lab.unattended_child_result.v1"
+CHILD_MODULE = "dharma_swarm.forge_lab.unattended_explore"
 
 # Fixed live shape and hard policy maxima.  Dollar reservations are accounting
 # ceilings, not vendor billing telemetry; that distinction is repeated in every
@@ -412,7 +413,7 @@ def _run_child_process(
     halted = False
     with os.fdopen(descriptor, "wb") as log_handle:
         process = subprocess.Popen(
-            [sys.executable, "-m", __name__, "--child-spec", str(spec_path)],
+            [sys.executable, "-m", CHILD_MODULE, "--child-spec", str(spec_path)],
             stdin=subprocess.DEVNULL,
             stdout=log_handle,
             stderr=subprocess.STDOUT,
