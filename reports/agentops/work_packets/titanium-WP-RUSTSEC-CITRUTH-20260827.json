@@ -1,0 +1,82 @@
+{
+  "id": "titanium-WP-RUSTSEC-CITRUTH-20260827",
+  "base_ref": "4f7aac020c9fee735638545481eb53350876423d",
+  "branch": "codex/security-dependencies-20260827",
+  "worktree": ".",
+  "intent": "Close the exact-head CI truth completeness failure introduced by the new desktop-shell verification lane: classify the PR-visible desktop-shell check as an advisory desktop build signal with the same make target used by the workflow contract, without changing branch-protection requirements or weakening completeness enforcement.",
+  "allowed_files": [
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "reports/agentops/work_packets/titanium-WP-RUSTSEC-CITRUTH-20260827.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "ci-truth-contracts",
+      "command": "python3 -m pytest -q tests/test_ci_truth_contract_completeness.py tests/test_ci_truth.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-integrity",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "missing-desktop-contract-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('docs/governance/CI_TRUTH_CONTRACT.json'); t=p.read_text(); p.write_text(t.replace('\\\"names\\\": [\\\"desktop-shell\\\"]','\\\"names\\\": [\\\"desktop-shell-negative-control\\\"]')); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_ci_truth_contract_completeness.py::test_every_pr_visible_check_is_contracted_or_excluded'],check=False); p.write_text(t); sys.exit(0 if r.returncode != 0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(ci): contract desktop shell check"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RUSTSEC-CITRUTH",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "4f7aac020c9fee735638545481eb53350876423d",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The new tests/desktop-shell PR-visible job had no row in docs/governance/CI_TRUTH_CONTRACT.json, so both full Python matrices correctly failed CI truth completeness after otherwise passing 16,181 tests.",
+      "The first remediation packet focused on toolchain and lockfile contracts but did not run tests/test_ci_truth_contract_completeness.py, so it did not detect the missing registry row before push."
+    ],
+    "closest_existing_implementation": [
+      "docs/governance/CI_TRUTH_CONTRACT.json",
+      "tests/test_ci_truth_contract_completeness.py",
+      "tests/test_ci_truth.py",
+      "Makefile"
+    ],
+    "honest_blockers": [
+      "This follow-up exists because exact-head hosted CI found an omission that the first focused verifier did not cover. Both Python matrices failed on the same single missing desktop-shell contract row; the failure is not classified as flaky or ignored.",
+      "The desktop-shell job is advisory rather than required because this packet does not alter the branch-protection required-context manifest. It remains PR-visible and completeness-enforced, with make desktop-shell-check as its local reproduction command.",
+      "The two medium dependency alerts outside PR 1447 remain tracked in issue 1448 and are not changed or claimed resolved here."
+    ],
+    "rollback": "Revert this packet and its CI truth row together. That rollback will intentionally restore the exact completeness failure for every PR that publishes the desktop-shell check; it must not be described as a safe green state.",
+    "packet_digest": "2b247e50bab57ab4390c9869b852c9d03b3e6ff56804ef0c52b60d699a2f9908"
+  }
+}
