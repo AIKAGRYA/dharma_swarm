@@ -8,6 +8,7 @@ loop while the explicit entry, time, and byte budgets take effect.
 from __future__ import annotations
 
 import fnmatch
+import io
 import os
 import time
 from collections import deque
@@ -188,15 +189,19 @@ def bounded_read_lines(
     file_size = path.stat().st_size
     if file_size > max_file_bytes:
         return file_size, []
+    with path.open("rb") as stream:
+        raw = stream.read(max_file_bytes + 1)
+    if len(raw) > max_file_bytes:
+        return len(raw), []
     lines: list[str] = []
-    with path.open("r", encoding="utf-8", errors="replace") as stream:
+    with io.StringIO(raw.decode("utf-8", errors="replace")) as stream:
         for line_number, line in enumerate(stream, start=1):
             if line_number < offset:
                 continue
             if len(lines) >= limit:
                 break
             lines.append(line.rstrip("\r\n"))
-    return file_size, lines
+    return len(raw), lines
 
 
 def bounded_replace_text(
@@ -263,11 +268,21 @@ def bounded_grep(
             if file_size > max_file_bytes:
                 oversized_skipped += 1
                 continue
-            if bytes_considered + file_size > max_total_bytes:
+            remaining_bytes = max_total_bytes - bytes_considered
+            if file_size > remaining_bytes:
                 stop_reason = "byte_limit"
                 break
-            bytes_considered += file_size
-            with candidate.open("r", encoding="utf-8", errors="replace") as stream:
+            read_limit = min(max_file_bytes, remaining_bytes)
+            with candidate.open("rb") as stream:
+                raw = stream.read(read_limit + 1)
+            if len(raw) > read_limit:
+                if read_limit < max_file_bytes:
+                    stop_reason = "byte_limit"
+                    break
+                oversized_skipped += 1
+                continue
+            bytes_considered += len(raw)
+            with io.StringIO(raw.decode("utf-8", errors="replace")) as stream:
                 for line_number, line in enumerate(stream, start=1):
                     if time.monotonic() >= deadline:
                         stop_reason = "deadline"

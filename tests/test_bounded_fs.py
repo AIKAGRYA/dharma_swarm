@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import dharma_swarm.bounded_fs as bounded_fs_module
-from dharma_swarm.bounded_fs import bounded_glob, bounded_grep
+from dharma_swarm.bounded_fs import bounded_glob, bounded_grep, bounded_read_lines
 
 
 def test_bounded_glob_preserves_root_and_recursive_pattern_semantics(tmp_path: Path):
@@ -117,8 +118,43 @@ def test_bounded_grep_discloses_skipped_file_symlink(tmp_path: Path):
     assert result.discovery.skipped_symlinks == 1
 
 
-def test_bounded_grep_stops_before_total_byte_budget(tmp_path: Path):
-    (tmp_path / "candidate.txt").write_text("needle exceeds budget\n")
+def test_bounded_read_lines_caps_bytes_after_underreported_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "growing.txt"
+    source.write_text("x" * 20)
+    original_stat = Path.stat
+
+    def underreported_stat(path: Path, *args, **kwargs):
+        if path == source:
+            return SimpleNamespace(st_size=1)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", underreported_stat)
+
+    observed_bytes, lines = bounded_read_lines(
+        source, offset=1, limit=5, max_file_bytes=10
+    )
+
+    assert observed_bytes == 11
+    assert lines == []
+
+
+def test_bounded_grep_stops_at_actual_total_byte_budget_after_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "candidate.txt"
+    source.write_text("needle exceeds budget\n")
+    original_stat = Path.stat
+
+    def underreported_stat(path: Path, *args, **kwargs):
+        if path == source:
+            return SimpleNamespace(st_size=1)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", underreported_stat)
 
     result = bounded_grep(
         tmp_path,

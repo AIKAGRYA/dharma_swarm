@@ -239,7 +239,7 @@ async def test_route_next_fills_remaining_slots_after_constraint_block():
 
 
 @pytest.mark.asyncio
-async def test_collect_completed_frees_concurrency_capacity(agents):
+async def test_route_next_reaps_completed_tasks_before_capacity_check(agents):
     board = MockTaskBoard()
     board.tasks = [Task(id="t-after-collect", title="Runs after collection")]
     pool = MockAgentPool(agents[:1])
@@ -253,13 +253,11 @@ async def test_collect_completed_frees_concurrency_capacity(agents):
     await completed
     orch._running_tasks["completed"] = completed
 
-    assert await orch.route_next() == []
-
-    await orch._collect_completed()
     dispatches = await orch.route_next()
 
     assert len(dispatches) == 1
     assert dispatches[0].task_id == "t-after-collect"
+    assert "completed" not in orch._running_tasks
 
 
 @pytest.mark.asyncio

@@ -840,6 +840,13 @@ def _local_tool_runner_and_task(
     return AgentRunner(local_config), task
 
 
+def _slow_empty_bounded_glob(*_args, **_kwargs):
+    from dharma_swarm.bounded_fs import BoundedGlobResult
+
+    time.sleep(0.05)
+    return BoundedGlobResult((), 0, True)
+
+
 @pytest.mark.asyncio
 async def test_local_glob_stops_after_truncation_probe(
     config,
@@ -867,15 +874,11 @@ async def test_local_glob_runs_blocking_scan_off_event_loop(
     monkeypatch: pytest.MonkeyPatch,
 ):
     import dharma_swarm.agent_runner as agent_runner_module
-    from dharma_swarm.bounded_fs import BoundedGlobResult
 
     runner, task = _local_tool_runner_and_task(config, tmp_path)
-
-    def slow_scan(*_args, **_kwargs):
-        time.sleep(0.05)
-        return BoundedGlobResult((), 0, True)
-
-    monkeypatch.setattr(agent_runner_module, "bounded_glob", slow_scan)
+    monkeypatch.setattr(
+        agent_runner_module, "bounded_glob", _slow_empty_bounded_glob
+    )
     call = asyncio.create_task(
         runner._execute_local_tool("glob_files", {"pattern": "*.txt"}, task=task)
     )

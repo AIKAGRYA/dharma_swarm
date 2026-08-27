@@ -433,7 +433,7 @@ class Orchestrator:
         import time as _tt; _rn0 = _tt.monotonic()  # noqa: E702
         if self._board is None or self._pool is None:
             return []
-
+        await self._collect_completed()
         ready = await self._board.get_ready_tasks()
         logger.info("route_next: ready=%d (%.1fs)", len(ready), _tt.monotonic() - _rn0)
         idle = await self._pool.get_idle_agents()
