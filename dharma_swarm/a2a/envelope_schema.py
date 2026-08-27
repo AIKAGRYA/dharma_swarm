@@ -23,6 +23,24 @@ SEND_SCHEMA_VERSION = "dharma.a2a.send.v1"
 # dead-lettering envelopes that already deliver today.
 REQUIRED_SEND_FIELDS: tuple[str, ...] = ("packet_id", "ack_subject")
 
+# Fields the builder owns. A caller cannot override them through ``extra``:
+# a shadowed packet_id/subject pair would desynchronize the derived
+# ack/reply subjects (acks routed to the wrong subscription) while still
+# passing validation, so collision is rejected outright.
+RESERVED_ENVELOPE_FIELDS: frozenset[str] = frozenset({
+    "schema_version",
+    "packet_id",
+    "timestamp",
+    "from",
+    "to",
+    "kind",
+    "route",
+    "target_uid",
+    "subject",
+    "ack_subject",
+    "reply_subject",
+})
+
 
 class EnvelopeValidationError(ValueError):
     """A payload violates the canonical ``dharma.a2a.send.v1`` contract."""
@@ -86,6 +104,12 @@ def build_send_envelope(
         "reply_subject": reply_subject or f"{subject}.reply.{packet_id}",
     }
     if extra:
+        collisions = sorted(RESERVED_ENVELOPE_FIELDS.intersection(extra))
+        if collisions:
+            raise EnvelopeValidationError(
+                "extra fields cannot override canonical envelope fields: "
+                + ", ".join(collisions)
+            )
         envelope.update(extra)
     validate_send_envelope(envelope)
     return envelope

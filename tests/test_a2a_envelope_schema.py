@@ -89,3 +89,46 @@ def test_negative_control_bridge_dead_letters_missing_ack_subject():
     )
     with pytest.raises(a2a_inbox_bridge.MalformedEnvelope):
         a2a_inbox_bridge._parse_envelope(message)
+
+
+def test_extra_fields_cannot_override_reserved_identity_fields():
+    # A reserved key in extra must be rejected, not silently applied:
+    # a shadowed packet_id/subject would desynchronize the derived
+    # ack/reply subjects while still passing validation.
+    with pytest.raises(EnvelopeValidationError, match="packet_id"):
+        build_send_envelope(
+            packet_id="pkt-1",
+            sender="operator",
+            to="hermes-m5",
+            subject="dharma.agent.hermes-m5.inbox",
+            extra={"packet_id": "impostor-id", "content": "x"},
+        )
+    with pytest.raises(EnvelopeValidationError, match="ack_subject"):
+        build_send_envelope(
+            packet_id="pkt-2",
+            sender="operator",
+            to="hermes-m5",
+            subject="dharma.agent.hermes-m5.inbox",
+            extra={"ack_subject": "wrong.ack.subject"},
+        )
+    with pytest.raises(EnvelopeValidationError, match="subject"):
+        build_send_envelope(
+            packet_id="pkt-3",
+            sender="operator",
+            to="hermes-m5",
+            subject="dharma.agent.hermes-m5.inbox",
+            extra={"reply_subject": "wrong.reply.subject"},
+        )
+
+
+def test_extra_fields_still_merge_when_not_reserved():
+    env = build_send_envelope(
+        packet_id="pkt-4",
+        sender="operator",
+        to="hermes-m5",
+        subject="dharma.agent.hermes-m5.inbox",
+        extra={"content": "payload", "sha256": "deadbeef"},
+    )
+    assert env["content"] == "payload"
+    assert env["sha256"] == "deadbeef"
+    assert env["packet_id"] == "pkt-4"
