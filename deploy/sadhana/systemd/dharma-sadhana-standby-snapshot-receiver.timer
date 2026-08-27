@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile interrupted or poisoned SADHANA standby uploads
+PartOf=dharma-sadhana-standby.target
+ConditionPathExists=!/etc/dharma-sadhana/receipts/standby/deadline-stopped.v1.json
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Unit=dharma-sadhana-standby-snapshot-receiver.service
+
+[Install]
+WantedBy=dharma-sadhana-standby.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=SADHANA explicit dispatch phase
+Requires=dharma-sadhana.target dharma-sadhana-dispatch-enable.service dharma-sadhana-supervisor.service
+After=dharma-sadhana.target dharma-sadhana-dispatch-enable.service
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight

@@ -1,0 +1,11 @@
+[Unit]
+Description=Stop and disable the SADHANA standby receiver at the exact deadline
+
+[Timer]
+OnCalendar=2026-09-01 17:15:12 UTC
+AccuracySec=1s
+Persistent=true
+Unit=dharma-sadhana-standby-stop.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,53 @@
+[Unit]
+Description=Prove twenty immutable SADHANA observer responses before dispatch
+Requires=dharma-sadhana-api.service
+After=dharma-sadhana-api.service
+Before=dharma-sadhana-dispatch-enable.service dharma-sadhana-supervisor.service
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py probe-observer-health --role writer --release-sha @RELEASE_SHA@
+RemainAfterExit=yes
+TimeoutStartSec=60s
+RuntimeMaxSec=60s
+TasksMax=32
+MemoryMax=256M
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/systemd/system/dharma-sadhana-api.service
+ReadWritePaths=/etc/dharma-sadhana/receipts/preactivation
+InaccessiblePaths=/etc/dharma-sadhana/credentials /etc/dharma-sadhana/inputs /etc/dharma-sadhana/supervisor.env /etc/dharma-sadhana/verifier.env /var/lib/dharma-sadhana/state /var/lib/dharma-sadhana/workspace /var/lib/dharma-sadhana/leases /run/dharma-sadhana/control /run/dharma-sadhana/oracle
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=~ptrace process_vm_readv process_vm_writev
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077
+
+[Install]
+WantedBy=dharma-sadhana.target

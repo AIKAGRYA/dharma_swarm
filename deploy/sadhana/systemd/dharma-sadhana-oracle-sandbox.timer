@@ -1,0 +1,15 @@
+[Unit]
+Description=Retry pending SADHANA oracle requests without a busy path loop
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=dharma-sadhana-oracle-sandbox.service
+
+[Install]
+WantedBy=dharma-sadhana.target
