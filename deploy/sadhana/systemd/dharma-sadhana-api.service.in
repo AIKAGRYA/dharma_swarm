@@ -1,0 +1,51 @@
+[Unit]
+Description=SADHANA loopback immutable-projection observer
+Requires=dharma-sadhana-projection-sync.service dharma-sadhana-control-directories.service dharma-sadhana-oracle-directories.service
+After=dharma-sadhana-projection-sync.service dharma-sadhana-control-directories.service dharma-sadhana-oracle-directories.service
+Wants=dharma-sadhana-projection-sync.timer
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=simple
+User=dharma-sadhana-observer
+Group=dharma-sadhana-observer
+EnvironmentFile=/etc/dharma-sadhana/api.env
+WorkingDirectory=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python -m uvicorn scripts.runtime.sadhana_immutable_api:app --host 127.0.0.1 --port ${SADHANA_API_PORT} --workers 1 --no-access-log --no-proxy-headers
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /var/lib/dharma-sadhana/api-state
+InaccessiblePaths=/etc/dharma-sadhana /var/lib/dharma-sadhana/state /var/lib/dharma-sadhana/workspace /var/lib/dharma-sadhana/leases /var/lib/dharma-sadhana/snapshots /var/lib/dharma-sadhana/projection-source /var/lib/dharma-sadhana/emergency-inflight /run/dharma-sadhana/control /run/dharma-sadhana/emergency-quarantine
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077
+
+[Install]
+WantedBy=dharma-sadhana.target

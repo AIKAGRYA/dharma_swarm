@@ -1,0 +1,48 @@
+[Unit]
+Description=Private tailnet TCP bridge to the fenced SADHANA replication SSH route
+Requires=tailscaled.service
+After=network-online.target tailscaled.service
+Before=dharma-sadhana-standby-snapshot-receiver.path dharma-sadhana-standby-snapshot-receiver.timer
+PartOf=dharma-sadhana-standby.target
+ConditionPathExists=!/etc/dharma-sadhana/receipts/standby/deadline-stopped.v1.json
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role standby
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py standby-tailscale-start --role standby --release-sha @RELEASE_SHA@
+ExecStop=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py standby-tailscale-stop --role standby --release-sha @RELEASE_SHA@
+RemainAfterExit=yes
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateNetwork=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ReadWritePaths=/etc/dharma-sadhana/receipts/preactivation
+RemoveIPC=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=dharma-sadhana-standby.target
+RequiredBy=dharma-sadhana-standby.target

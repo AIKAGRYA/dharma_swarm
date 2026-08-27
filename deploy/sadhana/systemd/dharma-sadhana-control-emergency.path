@@ -1,0 +1,15 @@
+[Unit]
+Description=Watch the root-governed SADHANA emergency-stop inbox
+After=dharma-sadhana-control-directories.service
+Requires=dharma-sadhana-control-directories.service
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Path]
+DirectoryNotEmpty=/run/dharma-sadhana/control/emergency
+Unit=dharma-sadhana-control-emergency.service
+
+[Install]
+WantedBy=dharma-sadhana.target

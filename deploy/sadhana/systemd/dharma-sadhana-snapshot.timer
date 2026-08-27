@@ -1,0 +1,16 @@
+[Unit]
+Description=Create a fresh fenced-standby SADHANA snapshot every five minutes
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Persistent=true
+Unit=dharma-sadhana-snapshot.service
+
+[Install]
+WantedBy=timers.target

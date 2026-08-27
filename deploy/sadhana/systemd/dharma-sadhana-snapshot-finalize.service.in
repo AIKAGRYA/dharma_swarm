@@ -1,0 +1,46 @@
+[Unit]
+Description=Root-claim, freeze, and upload staged SADHANA snapshots
+After=network-online.target
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/dharma-sadhana/replication.env
+WorkingDirectory=/
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_snapshot.py finalize-local --mission-id sadhana-10-20260823 --role writer --release-sha @RELEASE_SHA@ --ssh-key ${SADHANA_REPLICATION_SSH_KEY} --standby dharma-sadhana@100.79.111.89 --standby-port 2222 --standby-root /var/lib/dharma-sadhana/snapshot-incoming/uploads --known-hosts /etc/dharma-sadhana/known_hosts
+TimeoutStartSec=240s
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+AmbientCapabilities=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana
+ReadWritePaths=/var/lib/dharma-sadhana/snapshot-staging /var/lib/dharma-sadhana/snapshot-finalizing /var/lib/dharma-sadhana/snapshots /var/lib/dharma-sadhana/snapshot-quarantine /var/lib/dharma-sadhana/snapshot-receipts /var/lib/dharma-sadhana/snapshot-outbox
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+IPAddressDeny=any
+IPAddressAllow=100.79.111.89/32
+UMask=0077
