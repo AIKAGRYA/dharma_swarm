@@ -34,6 +34,8 @@ from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from dharma_swarm.daemon_config import runtime_report_dir
+from dharma_swarm.mission_control_contract import ReconciliationState
+from dharma_swarm.models import TaskPriority, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,9 @@ _SEMANTIC_RECEIPT_CARD_LOADER: Any | None = None
 _MISSION_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}")
 _SAFE_ERROR_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,79}")
 _MISSION_AUTHORITY = "TaskBoard+RuntimeStateStore"
+_TASK_STATUSES = frozenset(member.value for member in TaskStatus)
+_TASK_PRIORITIES = frozenset(member.value for member in TaskPriority)
+_RECONCILIATION_STATES = frozenset(member.value for member in ReconciliationState)
 _MISSION_SNAPSHOT_FIELDS = frozenset(
     {
         "mission",
@@ -244,9 +249,10 @@ def _validated_public_view(
                 f"mission snapshot {view_name}.{field} must be a string or null"
             )
         candidate = value.get(field)
-        if candidate is not None and not isinstance(candidate, str):
-            raise TypeError(
-                f"mission snapshot {view_name}.{field} must be a string or null"
+        if candidate is not None:
+            _validated_iso_timestamp(
+                candidate,
+                field=f"{view_name}.{field}",
             )
     public_fields = (
         string_fields + mapping_fields + boolean_fields + nullable_string_fields
@@ -294,19 +300,17 @@ def _validated_public_collection(
     return result
 
 
-def _validated_observed_at(value: Any) -> str:
-    """Require an unambiguous ISO timestamp before promoting observed state."""
+def _validated_iso_timestamp(value: Any, *, field: str) -> str:
+    """Require an unambiguous ISO timestamp at a snapshot time boundary."""
     if not isinstance(value, str):
-        raise TypeError("mission snapshot observed_at must be an ISO timestamp")
+        raise TypeError(f"mission snapshot {field} must be an ISO timestamp")
     normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
-        raise ValueError(
-            "mission snapshot observed_at must be an ISO timestamp"
-        ) from exc
+        raise ValueError(f"mission snapshot {field} must be an ISO timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("mission snapshot observed_at must include a timezone")
+        raise ValueError(f"mission snapshot {field} must include a timezone")
     return value
 
 
@@ -353,6 +357,10 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         mapping_fields=("metadata",),
         nullable_string_fields=("created_at", "updated_at"),
     )
+    if any(task["status"] not in _TASK_STATUSES for task in tasks):
+        raise ValueError("mission snapshot task status is not canonical")
+    if any(task["priority"] not in _TASK_PRIORITIES for task in tasks):
+        raise ValueError("mission snapshot task priority is not canonical")
     attempts = _validated_public_collection(
         projected,
         field="attempts",
@@ -408,9 +416,15 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         mapping_fields=("payload",),
         nullable_string_fields=("created_at",),
     )
-    if not isinstance(projected.get("reconciliation"), str):
+    reconciliation = projected.get("reconciliation")
+    if not isinstance(reconciliation, str):
         raise TypeError("mission snapshot reconciliation must be a string")
-    observed_at = _validated_observed_at(projected.get("observed_at"))
+    if reconciliation not in _RECONCILIATION_STATES:
+        raise ValueError("mission snapshot reconciliation is not canonical")
+    observed_at = _validated_iso_timestamp(
+        projected.get("observed_at"),
+        field="observed_at",
+    )
     if projected.get("authority") != _MISSION_AUTHORITY:
         raise ValueError("mission snapshot authority is not canonical")
     if projected.get("proves_executor_liveness") is not False:
@@ -421,7 +435,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         "attempts": attempts,
         "leases": leases,
         "receipts": receipts,
-        "reconciliation": projected["reconciliation"],
+        "reconciliation": reconciliation,
         "observed_at": observed_at,
         "authority": projected["authority"],
         "proves_executor_liveness": False,

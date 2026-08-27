@@ -355,6 +355,63 @@ def test_malformed_or_ambiguous_observation_time_fails_closed(
     assert body["source_errors"][0]["error"] == "read failed (ValueError)"
 
 
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["tasks"][0].update(status="pending "),
+        lambda value: value["tasks"][0].update(priority="high "),
+        lambda value: value.update(reconciliation="coherent "),
+    ],
+)
+def test_noncanonical_task_or_reconciliation_enum_fails_closed(
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    mutate(value)
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
+@pytest.mark.parametrize(
+    ("view", "field"),
+    [
+        ("mission", "created_at"),
+        ("mission", "updated_at"),
+        ("tasks", "created_at"),
+        ("tasks", "updated_at"),
+        ("attempts", "started_at"),
+        ("attempts", "completed_at"),
+        ("leases", "heartbeat_at"),
+        ("leases", "stale_after"),
+        ("receipts", "created_at"),
+    ],
+)
+def test_malformed_nested_timestamp_fails_closed(view: str, field: str) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    member = value[view] if view == "mission" else value[view][0]
+    member[field] = "definitely-not-a-timestamp"
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
 def test_sync_provider_is_offloaded_while_event_loop_remains_live() -> None:
     mission_id = "fleet-advancement-20260826"
     started = threading.Event()
