@@ -14,6 +14,7 @@ whole loop runs hermetically.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -56,7 +57,10 @@ class GenerationReport:
     spend_usd: float = 0.0
     ring2_checked: int = 0
     ring2_survivors: int = 0
+    ring2_promotion_blocked: int = 0
+    provider_failures: int = 0
     survival_rates: list[float] = field(default_factory=list)
+    trip_reasons: dict[str, int] = field(default_factory=dict)
 
     def mean_survival(self) -> float:
         return sum(self.survival_rates) / len(self.survival_rates) if self.survival_rates else 0.0
@@ -74,6 +78,8 @@ class FoundryLoop:
     per_generation: int = 6
     timing_floor_s: float = 0.0
     survival_threshold: float = 0.5
+    # A candidate must beat the measured baseline, not merely score above zero.
+    win_floor: float = 0.0
     budget: MutationBudget = field(default_factory=MutationBudget)
     descriptor_fn: DescriptorFn = _default_descriptor
     grid: EliteGrid = field(default_factory=EliteGrid)
@@ -83,12 +89,46 @@ class FoundryLoop:
     on_survivor: Callable[[Candidate, float, HeldoutOutcome], None] | None = None
 
     def __post_init__(self) -> None:
-        self.evaluator.prepare()
+        if not isinstance(self.per_generation, int) or self.per_generation < 0:
+            raise ValueError("per_generation must be a non-negative integer")
+        if not math.isfinite(self.timing_floor_s) or self.timing_floor_s < 0:
+            raise ValueError("timing_floor_s must be finite and non-negative")
+        if (
+            not math.isfinite(self.survival_threshold)
+            or not 0.0 <= self.survival_threshold <= 1.0
+        ):
+            raise ValueError("survival_threshold must be finite and within [0, 1]")
+        if not math.isfinite(self.win_floor):
+            raise ValueError("win_floor must be finite")
+        if (
+            not math.isfinite(self.budget.cap_usd)
+            or self.budget.cap_usd < 0
+            or not math.isfinite(self.budget.spent_usd)
+            or self.budget.spent_usd < 0
+            or self.budget.spent_usd > self.budget.cap_usd
+        ):
+            raise ValueError("mutation budget must be finite, non-negative, and within cap")
 
-    def _ring1(self, candidate: Candidate, seed: int) -> tuple[float, TripwireReport, tuple[str, ...]]:
+        prepared: set[int] = set()
+        self.evaluator.prepare()
+        prepared.add(id(self.evaluator))
+        for evaluator in self.heldout_evaluators.values():
+            if id(evaluator) not in prepared:
+                evaluator.prepare()
+                prepared.add(id(evaluator))
+
+    def _ring1(
+        self, candidate: Candidate, seed: int
+    ) -> tuple[float, TripwireReport, tuple[str, ...], bool, dict | None]:
         report = scan_tripwires(candidate, allowed_paths=self.allowed_paths)
-        receipt = blind_evaluate(self.evaluator, candidate, seed=seed,
-                                 tripwires_fired=report.fired)
+        first = blind_evaluate(
+            self.evaluator,
+            candidate,
+            seed=seed,
+            tripwires_fired=report.fired,
+        )
+        receipt = first
+        second = None
         fired = list(report.fired)
         # Only re-verify apparent wins with the expensive determinism/timing checks.
         if receipt.fitness > 0:
@@ -101,7 +141,31 @@ class FoundryLoop:
             if det or tim:
                 receipt = blind_evaluate(self.evaluator, candidate, seed=seed,
                                          tripwires_fired=tuple(fired))
-        return receipt.fitness, report, tuple(fired)
+        promotion = receipt.promotion_allowed
+        isolation_proof = receipt.isolation_proof
+        if second is not None:
+            promotion = bool(
+                promotion
+                and first.promotion_allowed
+                and second.promotion_allowed
+            )
+            isolation_proof = (
+                {
+                    "schema_version": "foundry_ring1_isolation.v1",
+                    "promotion_allowed": True,
+                    "primary": first.isolation_proof,
+                    "determinism_recheck": second.isolation_proof,
+                }
+                if promotion
+                else None
+            )
+        return (
+            receipt.fitness,
+            report,
+            tuple(fired),
+            promotion,
+            isolation_proof,
+        )
 
     def run_generation(self, generation: int) -> GenerationReport:
         killswitch.check(agents_root=self.agents_root, state_root=self.state_root)
@@ -110,37 +174,53 @@ class FoundryLoop:
                                  seed=generation)
         parent = self.grid.best()
         parent_id = parent.candidate_id if parent else None
-        new_wins: list[tuple[Candidate, float]] = []
+        new_wins: list[tuple[Candidate, float, bool, dict | None]] = []
 
         for i, model in enumerate(models):
             if not self.budget.can_afford(model):
                 continue  # metered lane out of budget; free lanes still run
             candidate = self.propose_fn(model, parent_id, generation * 1000 + i)
+            if candidate.metadata.get("proposal_status") == "provider_error":
+                report.provider_failures += 1
+                report.trip_reasons["provider_error"] = (
+                    report.trip_reasons.get("provider_error", 0) + 1
+                )
+                continue
             report.spend_usd += self.budget.charge(model)
             report.proposed += 1
-            fitness, _, fired = self._ring1(candidate, seed=generation)
+            fitness, _, fired, ring1_promotion, ring1_proof = self._ring1(
+                candidate, seed=generation
+            )
             if fired:
                 report.tripwire_trips += 1
-            if fitness > 0:
+                for reason in fired:
+                    report.trip_reasons[reason] = report.trip_reasons.get(reason, 0) + 1
+            if fitness > 0.0 and fitness > self.win_floor:
                 report.ring1_wins += 1
                 if self.grid.add(self.descriptor_fn(candidate), candidate.candidate_id,
                                  fitness, {"origin_model": model.id}):
-                    new_wins.append((candidate, fitness))
+                    new_wins.append((candidate, fitness, ring1_promotion, ring1_proof))
 
         # Ring 2: re-verify newly promoted elites on held-out workloads.
         if self.heldout_evaluators:
-            for candidate, fitness in new_wins:
+            for candidate, fitness, ring1_promotion, ring1_proof in new_wins:
                 outcome = run_heldout(
                     candidate, self.heldout_evaluators,
-                    in_loop_fitness=fitness, seed=generation,
+                    in_loop_fitness=fitness,
+                    baseline_fitness=self.win_floor,
+                    seed=generation,
                     survival_threshold=self.survival_threshold,
+                    in_loop_promotion_allowed=ring1_promotion,
+                    in_loop_isolation_proof=ring1_proof,
                 )
                 report.ring2_checked += 1
                 report.survival_rates.append(outcome.survival_rate)
-                if outcome.survived:
+                if outcome.survived and outcome.promotion_allowed:
                     report.ring2_survivors += 1
                     if self.on_survivor is not None:
                         self.on_survivor(candidate, fitness, outcome)
+                elif outcome.survived:
+                    report.ring2_promotion_blocked += 1
 
         report.grid_coverage = self.grid.coverage()
         best = self.grid.best()

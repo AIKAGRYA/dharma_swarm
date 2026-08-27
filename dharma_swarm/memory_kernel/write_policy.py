@@ -390,6 +390,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('dharma_swarm/custodians.py', 'install_launchd_service', 'path_write', '9c7f9f689336', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/dual_audit.py', 'DualAudit._persist', 'path_write', 'a8cfe9ea3a9d', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/economic_spine.py', 'EconomicSpine.__init__', 'sqlite_connect', '7f61bf97a3a8', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('dharma_swarm/foundry/killswitch.py', 'persist_terminal_kill', 'path_open_write', 'd4e7b82d8e96', 'operational_state', occurrences=1, review_note='Exclusive first-cause KILL.json under ~/.dharma/foundry records terminal operational state; it never writes canonical memory rows.'),
         ReviewedWriteBaselineEntry('dharma_swarm/foundry/target_ingest.py', 'ingest', 'path_write', '76808f750d07', 'generated_artifact', occurrences=1, review_note='Foundry target pin manifest (<id>.pin.json) under ~/.dharma/foundry/targets — a reproducibility pin (repo/sha/tree-digest), not canonical memory (PR #1389).'),
         ReviewedWriteBaselineEntry('dharma_swarm/ginko_orchestrator.py', 'save_state', 'path_write', '535ccc087541', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('dharma_swarm/guardian_crew.py', '_create_issue_if_needed', 'path_write', 'e08815565330', 'operational_state', occurrences=3),

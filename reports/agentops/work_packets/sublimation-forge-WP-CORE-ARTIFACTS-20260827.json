@@ -1,0 +1,155 @@
+{
+  "allowed_files": [
+    "dharma_swarm/foundry/artifacts.py",
+    "dharma_swarm/foundry/patches.py",
+    "dharma_swarm/foundry/campaign.py",
+    "dharma_swarm/foundry/evaluator.py",
+    "dharma_swarm/foundry/heldout.py",
+    "dharma_swarm/foundry/killswitch.py",
+    "dharma_swarm/foundry/loop.py",
+    "dharma_swarm/foundry/tripwires.py",
+    "dharma_swarm/memory_kernel/write_policy.py",
+    "tests/test_foundry_artifacts.py",
+    "tests/test_foundry_patches.py",
+    "tests/test_foundry_campaign.py",
+    "tests/test_foundry_evaluator.py",
+    "tests/test_foundry_heldout.py",
+    "tests/test_foundry_killswitch.py",
+    "tests/test_foundry_loop.py",
+    "tests/test_foundry_tripwires.py",
+    "docs/governance/CANONICAL_DOC_STACK.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/assertions.yaml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "reports/agentops/work_packets/sublimation-forge-WP-CORE-ARTIFACTS-20260827.json"
+  ],
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "base_ref": "9bd7d797e57022dab6e019a44e2d8038a36cec73",
+  "branch": "codex/sublimation-foundry-core-artifacts-9bd7-20260827",
+  "commit": {
+    "allowed": false,
+    "message": "foundry: land fail-closed offline core and artifact lineage"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "Makefile",
+    "api/**",
+    "dashboard/src/app/dashboard/cockpit/**",
+    "dashboard/src/components/cockpit/**",
+    "dashboard/src/components/operator-coherence/v2/**",
+    "deploy/sadhana/**",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/mission_control*.py",
+    "docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md",
+    "docs/foundry/RUNNING_NONSTOP.md",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "scripts/forge_lab/**",
+    "scripts/foundry/**",
+    "scripts/runtime/sadhana_release.py",
+    "specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md",
+    "terminal/**",
+    "tests/forge_lab_v1/**",
+    "tests/test_foundry_campaign_cycle.py",
+    "tests/test_foundry_daemon.py",
+    "tests/test_foundry_runner_isolation.py",
+    "tests/test_foundry_status.py",
+    "tests/test_foundry_systemd.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_artifacts.py tests/test_foundry_patches.py tests/test_foundry_campaign.py tests/test_foundry_evaluator.py tests/test_foundry_heldout.py tests/test_foundry_killswitch.py tests/test_foundry_loop.py tests/test_foundry_tripwires.py tests/test_memory_writer_sentinel.py",
+      "expected_exit": 0,
+      "name": "offline-core-artifact-safety-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/foundry/artifacts.py dharma_swarm/foundry/patches.py dharma_swarm/foundry/campaign.py dharma_swarm/foundry/evaluator.py dharma_swarm/foundry/heldout.py dharma_swarm/foundry/killswitch.py dharma_swarm/foundry/loop.py dharma_swarm/foundry/tripwires.py dharma_swarm/memory_kernel/write_policy.py tests/test_foundry_artifacts.py tests/test_foundry_patches.py tests/test_foundry_campaign.py tests/test_foundry_evaluator.py tests/test_foundry_heldout.py tests/test_foundry_killswitch.py tests/test_foundry_loop.py tests/test_foundry_tripwires.py",
+      "expected_exit": 0,
+      "name": "ruff-scoped",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "module-line-budget",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "name": "docops-integrity",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "sublimation-forge-WP-CORE-ARTIFACTS-20260827",
+  "intent": "Land one current-main-based, offline-only Sublimation Forge core repair: fail-closed no-op and proof-gated promotion semantics, a durable first-cause terminal kill marker registered with the memory write-policy sentinel, and immutable cumulative artifact lineage with exact local replay. Refresh only the DocOps surfaces required by the changed corpus. This packet does not activate a daemon, provider, campaign, container, service, remote host, promotion route, or participant flow.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_loop.py -k unproven",
+      "expected_exit": 0,
+      "name": "unproven-heldout-score-cannot-promote",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "sublimation-forge-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/foundry/loop.py",
+      "dharma_swarm/foundry/killswitch.py",
+      "dharma_swarm/foundry/runner_isolation.py",
+      "dharma_swarm/foundry/receipts.py",
+      "historical source commit 588690ed37e2a7d8f264e47aad973e149615901a",
+      "historical packet foundry-live-WP-2026-08-19",
+      "historical packet foundry-humming-WP-2026-08-25"
+    ],
+    "collision": {
+      "checked_at_sha": "9bd7d797e57022dab6e019a44e2d8038a36cec73",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The historical source commit and packet IDs are archaeological evidence only: they do not authorize this work, prove current-main compatibility, or establish live service state.",
+      "The offline core cannot promote any candidate until a separate evaluator supplies strong-isolation proof for both ring 1 and every held-out workload.",
+      "The lineage manifest’s resolved_sha is a syntax-checked asserted locator, not an independently verified checkout attestation: this slice proves exact replay only for the declared evolve_file bytes. The sibling digest/pre-registration layer must bind the full target checkout and immutable execution-image identity before any promotion claim.",
+      "Artifact replay does not prove benchmark validity, external usefulness, upstream acceptance, or production readiness.",
+      "The offline campaign intentionally emits no promotion receipt. The sibling digest layer must bind the exact replay artifact, pre-registration state, and isolation proofs before any later receipt persistence.",
+      "The sibling immutable-image lane exclusively owns runner isolation, campaign-cycle, status, daemon, installer, unit, and nonstop-runbook surfaces and is intentionally outside this packet.",
+      "No Docker pull, live provider, deployment, service start, network campaign, VPS mutation, participant data access, or production probe is authorized."
+    ],
+    "interface_mismatches": [
+      "The current offline loop treats any positive synthetic score as promotable and mints ring-2 receipts without an executed isolation proof; this packet makes confirmation fail closed while preserving exploration.",
+      "The historical terminal KILL writer used an exclusive file create but omitted its write from the reviewed memory write-policy baseline; this packet registers that exact operational-state write.",
+      "The historical cumulative artifact module depended on a live evaluator module; this packet separates strict patch replay into a bounded offline core module so artifact verification has no live-service dependency.",
+      "The historical offline campaign minted receipt-shaped identifiers without a verified digest binding; this packet removes that authority claim and leaves exact artifact-to-receipt binding to the sibling digest layer.",
+      "The canonical documentation registry does not currently name the existing Sublimation Forge runbook as an operator projection; this packet registers its authority boundary without editing the sibling-owned runbook."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "ec4dbb7680b7ee216ccb7971e0c11a785d84a34ab587e629ccf26c91ff00728a",
+    "rollback": "Revert the single packet-scoped implementation commit. Runtime state is not migrated or deleted; no service is started or changed, and historical packet/source references remain historical only.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-CORE-ARTIFACTS-20260827"
+  },
+  "worktree": "."
+}

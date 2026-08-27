@@ -10,9 +10,16 @@ failure mode).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
-from dharma_swarm.foundry.evaluator import Candidate, Evaluator, blind_evaluate
+from dharma_swarm.foundry.evaluator import (
+    Candidate,
+    Evaluator,
+    blind_evaluate,
+    validate_isolation_proof_payload,
+)
+from dharma_swarm.foundry.tripwires import check_determinism
 
 
 @dataclass(frozen=True)
@@ -24,6 +31,29 @@ class HeldoutOutcome:
     survived: bool
     workloads: tuple[str, ...] = ()
     per_workload: dict[str, float] = field(default_factory=dict)
+    promotion_allowed: bool = False
+    isolation_proofs: dict[str, dict] = field(default_factory=dict)
+
+
+def _valid_ring1_proof(proof: dict | None) -> bool:
+    expected = {
+        "schema_version",
+        "promotion_allowed",
+        "primary",
+        "determinism_recheck",
+    }
+    if type(proof) is not dict or set(proof) != expected:
+        return False
+    if (
+        proof.get("schema_version") != "foundry_ring1_isolation.v1"
+        or proof.get("promotion_allowed") is not True
+    ):
+        return False
+    for key in ("primary", "determinism_recheck"):
+        _, allows = validate_isolation_proof_payload(proof.get(key))
+        if not allows:
+            return False
+    return True
 
 
 def run_heldout(
@@ -31,34 +61,100 @@ def run_heldout(
     heldout_evaluators: dict[str, Evaluator],
     *,
     in_loop_fitness: float,
+    baseline_fitness: float = 0.0,
     seed: int = 0,
     survival_threshold: float = 0.5,
+    in_loop_promotion_allowed: bool = False,
+    in_loop_isolation_proof: dict | None = None,
 ) -> HeldoutOutcome:
     """Re-verify a candidate on never-in-loop workloads and score its survival.
 
-    ``survival_rate`` is mean held-out fitness divided by the in-loop fitness,
-    clamped to [0, 1]. ``survived`` is True when that rate meets
+    ``survival_rate`` is the held-out gain above ``baseline_fitness`` divided
+    by the in-loop gain above that same baseline, clamped to [0, 1].
+    ``survived`` is True when that rate meets
     ``survival_threshold`` (default: at least half the claimed gain holds).
     """
-    per_workload: dict[str, float] = {}
-    for name, evaluator in heldout_evaluators.items():
-        receipt = blind_evaluate(evaluator, candidate, seed=seed)
-        per_workload[name] = receipt.fitness
+    if not math.isfinite(survival_threshold) or not 0.0 <= survival_threshold <= 1.0:
+        raise ValueError("survival_threshold must be finite and within [0, 1]")
+    if not math.isfinite(baseline_fitness):
+        raise ValueError("baseline_fitness must be finite")
+    if not math.isfinite(in_loop_fitness):
+        in_loop_fitness = 0.0
 
-    mean_heldout = (
-        sum(per_workload.values()) / len(per_workload) if per_workload else 0.0
-    )
-    if in_loop_fitness <= 0:
+    per_workload: dict[str, float] = {}
+    proofs: dict[str, dict] = {}
+    if in_loop_isolation_proof is not None:
+        proofs["ring1"] = in_loop_isolation_proof
+    workload_promotion: list[bool] = []
+    for name, evaluator in heldout_evaluators.items():
+        primary = blind_evaluate(evaluator, candidate, seed=seed)
+        recheck = blind_evaluate(evaluator, candidate, seed=seed)
+        deterministic = check_determinism(primary, recheck) is None
+        per_workload[name] = primary.fitness if deterministic else 0.0
+        proof_bundle = {
+            "schema_version": "foundry_heldout_isolation.v1",
+            "promotion_allowed": bool(
+                deterministic
+                and primary.promotion_allowed
+                and recheck.promotion_allowed
+            ),
+            "primary": primary.isolation_proof,
+            "determinism_recheck": recheck.isolation_proof,
+        }
+        workload_promotion.append(
+            proof_bundle["promotion_allowed"] is True
+            and isinstance(primary.isolation_proof, dict)
+            and isinstance(recheck.isolation_proof, dict)
+            and primary.isolation_proof.get("promotion_allowed") is True
+            and recheck.isolation_proof.get("promotion_allowed") is True
+        )
+        if primary.isolation_proof is not None or recheck.isolation_proof is not None:
+            proofs[name] = proof_bundle
+
+    try:
+        mean_heldout = (
+            math.fsum(per_workload.values()) / len(per_workload)
+            if per_workload
+            else 0.0
+        )
+    except (OverflowError, ValueError):
+        mean_heldout = 0.0
+    if not math.isfinite(mean_heldout):
+        mean_heldout = 0.0
+    in_loop_gain = in_loop_fitness - baseline_fitness
+    heldout_gain = mean_heldout - baseline_fitness
+    if (
+        not math.isfinite(in_loop_gain)
+        or not math.isfinite(heldout_gain)
+        or in_loop_gain <= 0
+        or heldout_gain <= 0
+    ):
         survival_rate = 0.0
     else:
-        survival_rate = max(0.0, min(1.0, mean_heldout / in_loop_fitness))
+        ratio = heldout_gain / in_loop_gain
+        survival_rate = max(0.0, min(1.0, ratio)) if math.isfinite(ratio) else 0.0
+    # Threshold zero may be useful for exploration reports, but a candidate
+    # that preserves none of its measured gain is never a promotion survivor.
+    survived = (
+        bool(per_workload)
+        and survival_rate > 0.0
+        and survival_rate >= survival_threshold
+    )
 
     return HeldoutOutcome(
         candidate_id=candidate.candidate_id,
         in_loop_fitness=in_loop_fitness,
         heldout_fitness=mean_heldout,
         survival_rate=survival_rate,
-        survived=survival_rate >= survival_threshold,
+        survived=survived,
         workloads=tuple(sorted(per_workload)),
         per_workload=per_workload,
+        promotion_allowed=(
+            survived
+            and in_loop_promotion_allowed is True
+            and _valid_ring1_proof(in_loop_isolation_proof)
+            and bool(workload_promotion)
+            and all(workload_promotion)
+        ),
+        isolation_proofs=proofs,
     )
