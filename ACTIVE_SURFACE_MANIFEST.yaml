@@ -1269,7 +1269,7 @@ autocatalytic_portfolio:
       ordinal: 8
       label: "Operator Experience Membrane"
       role: "Project verified releases into legible, explicitly authorized operator actions."
-      project_bindings: [helm-worldclass-terminal-2026-06]
+      project_bindings: [organism-rewire-2026-07]
       authority: projection_only
       input_signal: verified_release
       output_signal: authorized_action
@@ -1283,7 +1283,7 @@ autocatalytic_portfolio:
         - dharma_swarm/terminal_bridge.py
         - tests/test_terminal_bridge.py
       proof_obligations:
-        - "A fresh measurable Helm delta, not a shipped-track label, justifies activation."
+        - "A fresh measurable operator-experience delta under Organism Rewire, not a shipped Helm label, justifies activation."
         - "Approval identity is persisted before any consequential action."
       promotion_checks: [authorization.granted]
       health_check_ids: [autocatalytic_contract_complete, autocatalytic_proof_refs_exist, autocatalytic_node_page_exists]
