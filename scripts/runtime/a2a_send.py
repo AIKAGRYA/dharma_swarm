@@ -62,6 +62,7 @@ from dharma_swarm.a2a.agent_card import (  # noqa: E402
     a2a_inbox_subject,
     resolve_agent_uid,
 )
+from dharma_swarm.a2a.envelope_schema import build_send_envelope  # noqa: E402
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash  # noqa: E402
 from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore  # noqa: E402
 from dharma_swarm.spine.identity import ExecutionIdentity  # noqa: E402
@@ -149,22 +150,21 @@ def build_envelope(
         rel_path = str(file_path.resolve().relative_to(REPO_ROOT))
     except ValueError:
         rel_path = str(file_path)
-    return {
-        "schema_version": "dharma.a2a.send.v1",
-        "packet_id": packet_id,
-        "timestamp": utc_now(),
-        "from": sender,
-        "to": target_uid,
-        "kind": kind,
-        "route": route,
-        "target_uid": target_uid,
-        "subject": subject,
-        "ack_subject": f"{subject}.ack.{packet_id}",
-        "reply_subject": f"{subject}.reply.{packet_id}",
-        "file": rel_path,
-        "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-        "content": content,
-    }
+    return build_send_envelope(
+        packet_id=packet_id,
+        sender=sender,
+        to=target_uid,
+        subject=subject,
+        kind=kind,
+        route=route,
+        target_uid=target_uid,
+        timestamp=utc_now(),
+        extra={
+            "file": rel_path,
+            "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            "content": content,
+        },
+    )
 
 
 async def _publish_and_wait(
