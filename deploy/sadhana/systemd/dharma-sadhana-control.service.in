@@ -1,0 +1,62 @@
+[Unit]
+Description=Authenticated loopback SADHANA operator-control request admission
+After=dharma-sadhana-control-directories.service
+Requires=dharma-sadhana-control-directories.service
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Service]
+Type=simple
+User=dharma-sadhana-control
+Group=dharma-sadhana-control
+EnvironmentFile=/etc/dharma-sadhana/control.env
+LoadCredential=operator_bearer:/etc/dharma-sadhana/credentials/operator_bearer
+LoadCredential=control_hmac_key:/etc/dharma-sadhana/credentials/control_hmac_key
+LoadCredential=tailscale_operator_login:/etc/dharma-sadhana/credentials/tailscale_operator_login
+Environment=SADHANA_CONTROL_TAILSCALE_LOGIN_FILE=%d/tailscale_operator_login
+Environment=SADHANA_CONTROL_NORMAL_INBOX=/run/dharma-sadhana/control/normal
+Environment=SADHANA_CONTROL_EMERGENCY_INBOX=/run/dharma-sadhana/control/emergency
+Environment=SADHANA_CONTROL_SEMANTICS_SHA256=69a0eb088277882e333ac41a6fb7014f6ed9d792e6d4a4b2b8510f20de15077c
+Environment=SADHANA_CONTROL_HTTP_BINDING_SHA256=9e1aec44c75cf6b24341389b8227f57fe4d4cf48328992f2125bffca34fcf3eb
+Environment=SADHANA_CONTROL_AUTHORITY_BINDING_SHA256=495f16964248948c68f97b5ec02b7e5d3e00e006979bf283ea783127e303d52d
+Environment=SADHANA_ACCOUNT_UI_CONFIRMATION_HTTP_BINDING_SHA256=60996ccfa8de0db715d26ecf062d13604e09ab019c51d9047cb250e39652dad1
+Environment=SADHANA_ACCOUNT_UI_CONFIRMATION_ENDPOINT=/v1/account-ui-confirmations
+Environment=SADHANA_RELEASE_SHA=@RELEASE_SHA@
+WorkingDirectory=/opt/dharma-sadhana/releases/@RELEASE_SHA@
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-start --role writer
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python -m scripts.runtime.sadhana_control_api
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana
+ReadWritePaths=/run/dharma-sadhana/control/normal /run/dharma-sadhana/control/emergency /run/dharma-sadhana/control/account-ui-confirmation
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077
+
+[Install]
+WantedBy=dharma-sadhana.target

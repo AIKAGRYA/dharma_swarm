@@ -1,0 +1,15 @@
+[Unit]
+Description=Refresh the isolated SADHANA observer read model
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Timer]
+OnActiveSec=1s
+OnUnitActiveSec=2s
+AccuracySec=1s
+Unit=dharma-sadhana-projection-sync.service
+
+[Install]
+WantedBy=dharma-sadhana.target

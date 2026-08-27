@@ -1,0 +1,11 @@
+[Unit]
+Description=Stop SADHANA at the exact 240-hour campaign end
+
+[Timer]
+OnCalendar=2026-09-01 17:15:12 UTC
+AccuracySec=1s
+Persistent=true
+Unit=dharma-sadhana-campaign-stop.service
+
+[Install]
+WantedBy=timers.target

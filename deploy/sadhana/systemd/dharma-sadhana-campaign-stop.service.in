@@ -1,0 +1,39 @@
+[Unit]
+Description=Persist and enforce the exact SADHANA campaign stop
+
+[Service]
+Type=oneshot
+User=dharma-sadhana
+Group=dharma-sadhana
+EnvironmentFile=/etc/dharma-sadhana/supervisor.env
+WorkingDirectory=/var/lib/dharma-sadhana/workspace
+ExecStartPre=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py guard-stop --role writer
+ExecStart=+/usr/bin/systemctl stop dharma-sadhana.target
+ExecStart=/opt/dharma-sadhana/releases/@RELEASE_SHA@/.venv/bin/python /opt/dharma-sadhana/releases/@RELEASE_SHA@/scripts/runtime/sadhana_release.py persist-stop --role writer --writer-lock-path ${SADHANA_WRITER_LOCK_PATH} --projection-path ${SADHANA_PROJECTION_PATH}
+TimeoutStartSec=60s
+NoNewPrivileges=true
+CapabilityBoundingSet=
+KeyringMode=private
+LockPersonality=true
+PrivateDevices=true
+PrivateIPC=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+ReadOnlyPaths=/opt/dharma-sadhana/releases/@RELEASE_SHA@ /etc/dharma-sadhana
+ReadWritePaths=/var/lib/dharma-sadhana/state /var/lib/dharma-sadhana/workspace /var/lib/dharma-sadhana/projection-source
+UMask=0077

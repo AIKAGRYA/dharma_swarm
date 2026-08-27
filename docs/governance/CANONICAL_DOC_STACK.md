@@ -67,6 +67,7 @@ is no longer a forced first-read surface.
 | First-token organism map / claim-language guard | `docs/governance/SWARM_GENOME.md` | Defers to owners for live state and doctrine |
 | Reality debt / guarded overclaim language | `docs/governance/REALITY_DEBT_LEDGER.md` | Defers to source owners for claim upgrades |
 | Runtime truth command cutover matrix | `docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md` | Defers to RuntimeStateStore, spine modules, and tests for proof |
+| SADHANA unsealed deployment-candidate contract | `deploy/sadhana/README.md` | Operational source contract only; defers live state to receipts and refuses seal/deploy/activation until its Fleet-owned interface prerequisite is separately present and admitted |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
 | External-gradient / autoresearch-node portfolio (build spec) | `docs/architecture/EXTERNAL_GRADIENT_PORTFOLIO_SPEC.md` | Defers to `ACTIVE_TRACK.yaml` (track state), One Wire quorum owners, and receipts for live facts |
 | Memory first-token ordering (build spec) | `docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md` | Defers to `context_compiler.py`/MemoryKernel code and trust-gate C5 for live state |

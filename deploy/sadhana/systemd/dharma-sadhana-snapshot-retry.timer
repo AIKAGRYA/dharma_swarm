@@ -1,0 +1,15 @@
+[Unit]
+Description=Retry durable SADHANA snapshot outbox intents
+PartOf=dharma-sadhana.target
+ConditionPathExists=/etc/dharma-sadhana/writer-enabled
+ConditionPathExists=!/etc/dharma-sadhana/receipts/control/emergency/emergency-stopped
+ConditionDirectoryNotEmpty=!/var/lib/dharma-sadhana/emergency-inflight
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Unit=dharma-sadhana-snapshot-finalize.service
+
+[Install]
+WantedBy=dharma-sadhana.target
