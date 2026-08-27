@@ -21,24 +21,49 @@ import json
 import os
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 from uuid import uuid4
 
 from dharma_swarm.forge_lab.operator_views import doctor
+from dharma_swarm.forge_lab.model_onboarding import activation_status
 from dharma_swarm.forge_lab.provider_selftest import validate_provider_receipt
+from dharma_swarm.forge_lab.reconciliation_view import (
+    composite_reconciliation_status as reconciliation_status,
+)
 from dharma_swarm.forge_lab.source_guard import require_execution_source
 from dharma_swarm.forge_lab.state_io import (
-    canonical_json,
     content_digest,
     safe_json,
     write_json_exclusive,
+)
+from dharma_swarm.forge_lab.unattended_call_shape import (
+    EXPECTED_PROVIDER_CALLS,
+    CallShapeError,
+    RunnerPolicy,
+    build_bounded_child_seams,
+    execution_shape_matches,
+    validate_child_spec,
+    validated_child_result,
+)
+from dharma_swarm.forge_lab.unattended_ledger import (
+    BudgetCeilings,
+    LedgerError,
+    append_chain as _ledger_append_chain,
+    chain_digest as _ledger_chain_digest,
+    read_chain as _ledger_read_chain,
+    reserve_budget as _ledger_reserve_budget,
+)
+from dharma_swarm.forge_lab.unattended_model_evidence import (
+    ModelEvidenceError,
+    selected_model_evidence,
 )
 
 RUNNER_SCHEMA = "rsi_lab.unattended_explore.v1"
@@ -52,21 +77,38 @@ CHILD_SCHEMA = "rsi_lab.unattended_child_result.v1"
 GENERATIONS = 1
 CHILDREN = 1
 TASKS = 1
-LOGICAL_PROVIDER_CALL_SLOTS = 4
+LOGICAL_PROVIDER_CALL_SLOTS = 5
 PER_CALL_TOKENS = 8_000
-PER_CANDIDATE_TOKENS = 8_000
-PER_CANDIDATE_USD = 0.25
-MAX_EXPERIMENT_TOKENS = 24_000
-RUN_USD_RESERVATION = PER_CANDIDATE_USD * LOGICAL_PROVIDER_CALL_SLOTS
+PER_CALL_USD = 0.25
+PER_CANDIDATE_TOKENS = 16_000
+PER_CANDIDATE_USD = 0.50
+MAX_EXPERIMENT_TOKENS = 40_000
+RUN_USD_RESERVATION = PER_CALL_USD * LOGICAL_PROVIDER_CALL_SLOTS
 DAILY_USD_CAP = 3.0
-MONTHLY_USD_CAP = 30.0
+MONTHLY_USD_CAP = 40.0
 DAILY_CALL_CAP = 12
 MONTHLY_CALL_CAP = 120
 DEFAULT_TIMEOUT_SECONDS = 2_700
 MAX_TIMEOUT_SECONDS = 3_000
 PROVIDER_TTL_SECONDS = 3_600
+MODEL_ROLES = ("mutator", "solver", "verifier")
 
 TERMINAL_SUCCESS_STATES = {"inconclusive_low_power", "measured_negative"}
+RUNNER_POLICY = RunnerPolicy(
+    runner_schema=RUNNER_SCHEMA,
+    ledger_schema=LEDGER_SCHEMA,
+    child_schema=CHILD_SCHEMA,
+    generations=GENERATIONS,
+    children=CHILDREN,
+    tasks=TASKS,
+    logical_provider_call_slots=LOGICAL_PROVIDER_CALL_SLOTS,
+    per_call_tokens=PER_CALL_TOKENS,
+    per_candidate_tokens=PER_CANDIDATE_TOKENS,
+    per_candidate_usd=PER_CANDIDATE_USD,
+    max_experiment_tokens=MAX_EXPERIMENT_TOKENS,
+    max_timeout_seconds=MAX_TIMEOUT_SECONDS,
+    run_usd_reservation=RUN_USD_RESERVATION,
+)
 
 
 class UnattendedError(RuntimeError):
@@ -93,6 +135,7 @@ class LogicalCallBudget:
 
     limit: int = LOGICAL_PROVIDER_CALL_SLOTS
     used: int = 0
+    by_label: dict[str, int] = field(default_factory=dict)
 
     def consume(self, label: str) -> None:
         if self.used >= self.limit:
@@ -101,6 +144,7 @@ class LogicalCallBudget:
                 f"provider call slot refused before {label}: {self.used}/{self.limit}",
             )
         self.used += 1
+        self.by_label[label] = self.by_label.get(label, 0) + 1
 
 
 def _now() -> str:
@@ -111,19 +155,8 @@ def _now() -> str:
     )
 
 
-def _utc_periods(at: str) -> tuple[str, str]:
-    try:
-        instant = datetime.fromisoformat(at.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise UnattendedError("LEDGER_TIME_INVALID", f"invalid UTC time: {at}") from exc
-    if instant.tzinfo is None:
-        raise UnattendedError("LEDGER_TIME_INVALID", "ledger time must carry a UTC offset")
-    instant = instant.astimezone(timezone.utc)
-    return instant.strftime("%Y-%m-%d"), instant.strftime("%Y-%m")
-
-
 def _chain_digest(payload: dict[str, Any], digest_field: str) -> str:
-    return content_digest({key: value for key, value in payload.items() if key != digest_field})
+    return _ledger_chain_digest(payload, digest_field)
 
 
 def read_chain(
@@ -132,42 +165,10 @@ def read_chain(
     schema: str,
     digest_field: str,
 ) -> list[dict[str, Any]]:
-    """Read and verify one strict newline-terminated JSONL hash chain."""
-
-    if not path.exists():
-        return []
-    if path.is_symlink() or not path.is_file():
-        raise UnattendedError("CHAIN_PATH_UNSAFE", f"unsafe chain path: {path}")
-    if path.stat().st_mode & 0o077:
-        raise UnattendedError("CHAIN_MODE_UNSAFE", f"chain must be owner-only: {path}")
     try:
-        raw = path.read_bytes()
-    except OSError as exc:
-        raise UnattendedError("CHAIN_UNREADABLE", f"cannot read {path}: {exc}") from exc
-    if len(raw) > 16 * 1024 * 1024:
-        raise UnattendedError("CHAIN_TOO_LARGE", f"chain exceeds 16 MiB: {path}")
-    if raw and not raw.endswith(b"\n"):
-        raise UnattendedError("CHAIN_TRUNCATED", f"chain lacks final newline: {path}")
-    rows: list[dict[str, Any]] = []
-    previous: str | None = None
-    for index, line in enumerate(raw.splitlines(), start=1):
-        try:
-            row = json.loads(line)
-        except (UnicodeError, json.JSONDecodeError) as exc:
-            raise UnattendedError(
-                "CHAIN_MALFORMED", f"invalid JSON at {path}:{index}"
-            ) from exc
-        if not isinstance(row, dict):
-            raise UnattendedError("CHAIN_MALFORMED", f"non-object at {path}:{index}")
-        if row.get("schema") != schema or row.get("sequence") != index:
-            raise UnattendedError("CHAIN_SEQUENCE", f"schema/sequence mismatch at {path}:{index}")
-        if row.get("previous_digest") != previous:
-            raise UnattendedError("CHAIN_PREVIOUS", f"previous digest mismatch at {path}:{index}")
-        if row.get(digest_field) != _chain_digest(row, digest_field):
-            raise UnattendedError("CHAIN_DIGEST", f"digest mismatch at {path}:{index}")
-        previous = str(row[digest_field])
-        rows.append(row)
-    return rows
+        return _ledger_read_chain(path, schema=schema, digest_field=digest_field)
+    except LedgerError as exc:
+        raise UnattendedError(exc.code, str(exc)) from exc
 
 
 def append_chain(
@@ -177,28 +178,15 @@ def append_chain(
     schema: str,
     digest_field: str,
 ) -> dict[str, Any]:
-    """Verify then append one fsync-backed chain row while the host lock is held."""
-
-    rows = read_chain(path, schema=schema, digest_field=digest_field)
-    row = {
-        **payload,
-        "schema": schema,
-        "sequence": len(rows) + 1,
-        "previous_digest": rows[-1][digest_field] if rows else None,
-    }
-    row[digest_field] = _chain_digest(row, digest_field)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
-    with os.fdopen(descriptor, "ab", closefd=True) as handle:
-        handle.write(canonical_json(row) + b"\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    return row
+    try:
+        return _ledger_append_chain(
+            path,
+            payload,
+            schema=schema,
+            digest_field=digest_field,
+        )
+    except LedgerError as exc:
+        raise UnattendedError(exc.code, str(exc)) from exc
 
 
 def reserve_budget(
@@ -209,79 +197,24 @@ def reserve_budget(
     policy: BudgetPolicy = BudgetPolicy(),
 ) -> dict[str, Any]:
     """Reserve the full run ceiling against UTC daily and monthly caps."""
-
-    rows = read_chain(
-        ledger_path,
-        schema=LEDGER_SCHEMA,
-        digest_field="ledger_digest",
-    )
-    if not (
-        0 < policy.run_usd <= RUN_USD_RESERVATION
-        and 0 < policy.run_calls <= LOGICAL_PROVIDER_CALL_SLOTS
-        and 0 < policy.daily_usd <= DAILY_USD_CAP
-        and 0 < policy.monthly_usd <= MONTHLY_USD_CAP
-        and 0 < policy.daily_calls <= DAILY_CALL_CAP
-        and 0 < policy.monthly_calls <= MONTHLY_CALL_CAP
-    ):
-        raise UnattendedError("BUDGET_POLICY_INVALID", "policy exceeds hard-coded maxima")
-    if any(row.get("run_id") == run_id for row in rows):
-        raise UnattendedError("BUDGET_DUPLICATE_RUN", f"reservation already exists: {run_id}")
-    for row in rows:
-        try:
-            row_usd = float(row.get("reserved_usd"))
-            row_calls = int(row.get("reserved_logical_calls"))
-        except (TypeError, ValueError) as exc:
-            raise UnattendedError("BUDGET_LEDGER_SEMANTICS", "invalid reservation row") from exc
-        if (
-            row.get("kind") != "reservation"
-            or row_usd < 0
-            or row_usd > RUN_USD_RESERVATION
-            or row_calls < 0
-            or row_calls > LOGICAL_PROVIDER_CALL_SLOTS
-        ):
-            raise UnattendedError("BUDGET_LEDGER_SEMANTICS", "reservation row outside policy")
-    day, month = _utc_periods(at)
-    daily = [row for row in rows if row.get("day") == day]
-    monthly = [row for row in rows if row.get("month") == month]
-    daily_usd = sum(float(row.get("reserved_usd") or 0.0) for row in daily)
-    monthly_usd = sum(float(row.get("reserved_usd") or 0.0) for row in monthly)
-    daily_calls = sum(int(row.get("reserved_logical_calls") or 0) for row in daily)
-    monthly_calls = sum(int(row.get("reserved_logical_calls") or 0) for row in monthly)
-    refusals: list[str] = []
-    if daily_usd + policy.run_usd > policy.daily_usd + 1e-9:
-        refusals.append("daily_usd_reservation_cap")
-    if monthly_usd + policy.run_usd > policy.monthly_usd + 1e-9:
-        refusals.append("monthly_usd_reservation_cap")
-    if daily_calls + policy.run_calls > policy.daily_calls:
-        refusals.append("daily_logical_call_cap")
-    if monthly_calls + policy.run_calls > policy.monthly_calls:
-        refusals.append("monthly_logical_call_cap")
-    if refusals:
-        raise UnattendedError("BUDGET_CAP", ",".join(refusals))
-    return append_chain(
-        ledger_path,
-        {
-            "kind": "reservation",
-            "at": at,
-            "run_id": run_id,
-            "day": day,
-            "month": month,
-            "reserved_usd": policy.run_usd,
-            "reserved_logical_calls": policy.run_calls,
-            "caps": {
-                "daily_usd": policy.daily_usd,
-                "monthly_usd": policy.monthly_usd,
-                "daily_logical_calls": policy.daily_calls,
-                "monthly_logical_calls": policy.monthly_calls,
-            },
-            "accounting_semantics": (
-                "conservative reservation ceiling; provider billing telemetry unavailable; "
-                "transport-level retries are not independently metered"
+    try:
+        return _ledger_reserve_budget(
+            ledger_path,
+            run_id=run_id,
+            at=at,
+            policy=policy,
+            ceilings=BudgetCeilings(
+                run_usd=RUN_USD_RESERVATION,
+                run_calls=LOGICAL_PROVIDER_CALL_SLOTS,
+                daily_usd=DAILY_USD_CAP,
+                monthly_usd=MONTHLY_USD_CAP,
+                daily_calls=DAILY_CALL_CAP,
+                monthly_calls=MONTHLY_CALL_CAP,
             ),
-        },
-        schema=LEDGER_SCHEMA,
-        digest_field="ledger_digest",
-    )
+            ledger_schema=LEDGER_SCHEMA,
+        )
+    except LedgerError as exc:
+        raise UnattendedError(exc.code, str(exc)) from exc
 
 
 @contextmanager
@@ -308,43 +241,83 @@ def host_lock(path: Path) -> Iterator[None]:
         os.close(descriptor)
 
 
-def _selected_routes(provider_check: dict[str, Any]) -> list[dict[str, str]]:
-    receipt_path = provider_check.get("receipt")
-    path = Path(str(receipt_path)) if receipt_path else None
-    payload = safe_json(path) if path is not None else None
-    if payload is None or path is None:
-        raise UnattendedError("PROVIDER_RECEIPT_MISSING", "fresh provider receipt is unreadable")
-    failures = validate_provider_receipt(payload, path=path)
-    if failures:
-        raise UnattendedError("PROVIDER_RECEIPT_INVALID", ",".join(failures))
-    routes: list[dict[str, str]] = []
-    providers: set[str] = set()
-    for row in payload.get("rows") or []:
-        if not isinstance(row, dict) or not row.get("callable"):
+def _selected_model_evidence(provider_check: dict[str, Any]) -> dict[str, Any]:
+    """Bind active role assignments to one fresh, exact provider receipt."""
+
+    try:
+        return selected_model_evidence(
+            provider_check,
+            model_roles=MODEL_ROLES,
+            activation_status_fn=activation_status,
+            validate_provider_receipt_fn=validate_provider_receipt,
+            safe_json_fn=safe_json,
+        )
+    except ModelEvidenceError as exc:
+        raise UnattendedError(exc.code, str(exc)) from exc
+
+
+def _validated_state_root(value: Path) -> Path:
+    raw = value.expanduser()
+    if not raw.is_absolute() or raw == Path("/"):
+        raise UnattendedError(
+            "STATE_ROOT_UNSAFE", "state root must be a non-root absolute path"
+        )
+    for label, path in (
+        ("state_root", raw),
+        ("dharma_home", raw / ".dharma"),
+        ("forge_root", raw / ".dharma" / "forge_lab"),
+    ):
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            if label == "state_root":
+                raise UnattendedError("STATE_ROOT_UNSAFE", f"state root is missing: {raw}")
             continue
-        provider = str(row.get("provider") or "").strip().casefold()
-        model = str(row.get("model_id") or row.get("requested_model") or "").strip()
-        if provider and model and provider not in providers:
-            providers.add(provider)
-            routes.append({"provider": provider, "model_id": model})
-        if len(routes) == 2:
-            break
-    if len(routes) != 2:
-        raise UnattendedError("TWO_PROVIDER_POLICY", f"callable independent routes: {len(routes)}/2")
-    return routes
+        except OSError as exc:
+            raise UnattendedError("STATE_ROOT_UNSAFE", f"cannot inspect {path}") from exc
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            raise UnattendedError(
+                "STATE_ROOT_UNSAFE", f"{label} must be a real directory: {path}"
+            )
+    try:
+        resolved = raw.resolve(strict=True)
+    except OSError as exc:
+        raise UnattendedError("STATE_ROOT_UNSAFE", f"cannot resolve {raw}") from exc
+    if resolved != raw:
+        raise UnattendedError("STATE_ROOT_UNSAFE", f"state root is not canonical: {raw}")
+    forge_root = (resolved / ".dharma" / "forge_lab").resolve(strict=False)
+    if forge_root != resolved and not forge_root.is_relative_to(resolved):
+        raise UnattendedError("STATE_ROOT_UNSAFE", "forge root escaped state root")
+    return resolved
 
 
 def admission_status(state_root: Path) -> dict[str, Any]:
     """Evaluate all pre-spend gates and return selected redacted route IDs."""
 
     reasons: list[str] = []
+    try:
+        state_root = _validated_state_root(state_root)
+    except UnattendedError as exc:
+        return {
+            "ready": False,
+            "reasons": [f"{exc.code}:{exc}"],
+            "halt_path": None,
+            "source": {},
+            "doctor": {},
+            "reconciliation": {},
+            "routes": [],
+            "role_bindings": {},
+            "model_profile_digest": None,
+            "provider_receipt_digest": None,
+            "task_id": None,
+        }
     halt = state_root / ".dharma" / "forge_lab" / "HALT"
     if halt.exists():
         reasons.append(f"HALT_present:{halt}")
     if os.environ.get("RSI_LAB_DEV_SOURCE") == "1":
         reasons.append("development_source_forbidden")
     configured_state = os.environ.get("RSI_LAB_STATE", "").strip()
-    if not configured_state or Path(configured_state).expanduser().resolve(strict=False) != state_root:
+    if not configured_state or Path(configured_state).expanduser() != state_root:
         reasons.append("explicit_state_root_not_anchored")
     try:
         source = require_execution_source()
@@ -358,14 +331,28 @@ def admission_status(state_root: Path) -> dict[str, Any]:
         reasons.append("doctor_unavailable")
     if not report.get("ok"):
         reasons.append("doctor_not_ready")
+    try:
+        reconciliation = reconciliation_status()
+    except Exception as exc:
+        reconciliation = {
+            "ok": False,
+            "error": f"{type(exc).__name__}:{exc}"[:500],
+        }
+        reasons.append("reconciliation_unavailable")
+    if not reconciliation.get("ok"):
+        reasons.append("control_plane_reconciliation_required")
     provider_check = ((report.get("checks") or {}).get("providers") or {})
     if int(provider_check.get("ttl_seconds") or 0) > PROVIDER_TTL_SECONDS:
         reasons.append("provider_ttl_policy_too_weak")
     try:
-        routes = _selected_routes(provider_check) if provider_check.get("ready") else []
+        model_evidence = (
+            _selected_model_evidence(provider_check) if provider_check.get("ready") else {}
+        )
     except UnattendedError as exc:
         reasons.append(f"{exc.code}:{exc}")
-        routes = []
+        model_evidence = {}
+    routes = model_evidence.get("routes") or []
+    role_bindings = model_evidence.get("role_bindings") or {}
     grader = ((report.get("checks") or {}).get("grader") or {})
     if not grader.get("ready") or not grader.get("docker_daemon_reachable"):
         reasons.append("isolated_docker_grader_not_ready")
@@ -374,12 +361,16 @@ def admission_status(state_root: Path) -> dict[str, Any]:
     if not taskbed.get("ready") or not task_id:
         reasons.append("state_anchored_isolated_task_unavailable")
     return {
-        "ready": not reasons and len(routes) == 2,
+        "ready": not reasons and set(role_bindings) == set(MODEL_ROLES) and len(routes) >= 2,
         "reasons": reasons,
         "halt_path": str(halt),
         "source": source,
         "doctor": report,
+        "reconciliation": reconciliation,
         "routes": routes,
+        "role_bindings": role_bindings,
+        "model_profile_digest": model_evidence.get("model_profile_digest"),
+        "provider_receipt_digest": model_evidence.get("provider_receipt_digest"),
         "task_id": task_id or None,
     }
 
@@ -461,23 +452,13 @@ def _append_receipt(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validated_child_result(path: Path, *, run_id: str) -> dict[str, Any] | None:
-    if path.is_symlink():
-        return None
-    payload = safe_json(path)
-    if payload is None or payload.get("schema") != CHILD_SCHEMA:
-        return None
-    if payload.get("run_id") != run_id or payload.get("positive_rsi_claim") is not False:
-        return None
-    if payload.get("result_digest") != _chain_digest(payload, "result_digest"):
-        return None
-    try:
-        used = int(payload.get("logical_provider_calls_used"))
-        limit = int(payload.get("logical_provider_call_limit"))
-    except (TypeError, ValueError):
-        return None
-    if used < 0 or used > LOGICAL_PROVIDER_CALL_SLOTS or limit != LOGICAL_PROVIDER_CALL_SLOTS:
-        return None
-    return payload
+    return validated_child_result(
+        path,
+        run_id=run_id,
+        policy=RUNNER_POLICY,
+        safe_json_fn=safe_json,
+        chain_digest_fn=_chain_digest,
+    )
 
 
 def _validate_child_spec(
@@ -486,78 +467,22 @@ def _validate_child_spec(
     *,
     admission: dict[str, Any],
 ) -> None:
-    """Bind the hidden child to the parent's reservation and canonical paths."""
-
-    run_id = str(spec.get("run_id") or "")
-    state_root = Path(str(spec.get("state_root") or "")).resolve(strict=False)
-    control_root = state_root / ".dharma" / "forge_lab" / "unattended_explore"
-    expected_run_dir = control_root / "runs" / run_id
-    expected_spec = expected_run_dir / "child_spec.json"
-    expected_result = expected_run_dir / "child_result.json"
-    expected_archive = state_root / ".dharma" / "evolution_archive"
-    expected_scratch = state_root / ".dharma" / "evolution_worktrees"
-    if spec_path.resolve(strict=False) != expected_spec.resolve(strict=False):
-        raise UnattendedError("CHILD_SPEC_PATH", "child spec is outside its run directory")
-    if Path(str(spec.get("result_path") or "")).resolve(strict=False) != expected_result.resolve(
-        strict=False
-    ):
-        raise UnattendedError("CHILD_RESULT_PATH", "child result path is not canonical")
-    if Path(str(spec.get("archive_root") or "")).resolve(strict=False) != expected_archive.resolve(
-        strict=False
-    ):
-        raise UnattendedError("CHILD_ARCHIVE_PATH", "archive root is not state-anchored")
-    if Path(str(spec.get("scratch_root") or "")).resolve(strict=False) != expected_scratch.resolve(
-        strict=False
-    ):
-        raise UnattendedError("CHILD_SCRATCH_PATH", "scratch root is not state-anchored")
-    source = admission["source"]
-    if Path(str(spec.get("source_repo") or "")).resolve(strict=False) != Path(
-        source["repo"]
-    ).resolve(strict=False):
-        raise UnattendedError("CHILD_SOURCE_PATH", "source path changed after admission")
-    if not spec.get("task_id") or spec.get("task_id") != admission.get("task_id"):
-        raise UnattendedError("CHILD_TASK", "isolated task changed after admission")
-    expected_shape = {"generations": GENERATIONS, "children": CHILDREN, "tasks": TASKS}
-    if spec.get("shape") != expected_shape:
-        raise UnattendedError("CHILD_SHAPE", "child shape is not fixed 1x1x1")
-    limits = spec.get("limits") if isinstance(spec.get("limits"), dict) else {}
-    expected_limits = {
-        "logical_provider_call_slots": LOGICAL_PROVIDER_CALL_SLOTS,
-        "per_call_tokens": PER_CALL_TOKENS,
-        "per_candidate_tokens": PER_CANDIDATE_TOKENS,
-        "per_candidate_usd": PER_CANDIDATE_USD,
-        "max_experiment_tokens": MAX_EXPERIMENT_TOKENS,
-        "external_timeout_seconds": limits.get("external_timeout_seconds"),
-    }
-    if limits != expected_limits:
-        raise UnattendedError("CHILD_LIMITS", "child limits differ from fixed policy")
-    timeout = int(limits.get("external_timeout_seconds") or 0)
-    if timeout < 60 or timeout > MAX_TIMEOUT_SECONDS:
-        raise UnattendedError("CHILD_TIMEOUT", "child timeout is outside fixed policy")
-    ledger = read_chain(
-        control_root / "budget_ledger.jsonl",
-        schema=LEDGER_SCHEMA,
-        digest_field="ledger_digest",
-    )
-    reservation = next(
-        (row for row in ledger if row.get("ledger_digest") == spec.get("reservation_digest")),
-        None,
-    )
-    if (
-        reservation is None
-        or reservation.get("run_id") != run_id
-        or reservation.get("reserved_usd") != RUN_USD_RESERVATION
-        or reservation.get("reserved_logical_calls") != LOGICAL_PROVIDER_CALL_SLOTS
-    ):
-        raise UnattendedError("CHILD_RESERVATION", "exact parent reservation is absent")
+    try:
+        validate_child_spec(
+            spec,
+            spec_path,
+            admission=admission,
+            policy=RUNNER_POLICY,
+            read_chain_fn=read_chain,
+        )
+    except CallShapeError as exc:
+        raise UnattendedError(exc.code, str(exc)) from exc
 
 
 def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Admit and execute one bounded run.  No retry occurs inside this function."""
 
-    state_root = state_root.expanduser().resolve(strict=False)
-    if not state_root.is_absolute() or state_root == Path("/"):
-        raise UnattendedError("STATE_ROOT_UNSAFE", "state root must be a non-root absolute path")
+    state_root = _validated_state_root(state_root)
     timeout_seconds = int(timeout_seconds)
     if timeout_seconds < 60 or timeout_seconds > MAX_TIMEOUT_SECONDS:
         raise UnattendedError("TIMEOUT_POLICY", f"timeout must be 60..{MAX_TIMEOUT_SECONDS} seconds")
@@ -588,6 +513,7 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
         )
         source = admission["source"]
         routes = admission["routes"]
+        role_bindings = admission["role_bindings"]
         run_dir = control_root / "runs" / run_id
         result_path = run_dir / "child_result.json"
         spec_path = run_dir / "child_spec.json"
@@ -603,6 +529,9 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             "scratch_root": str(state_root / ".dharma" / "evolution_worktrees"),
             "result_path": str(result_path),
             "routes": routes,
+            "role_bindings": role_bindings,
+            "model_profile_digest": admission["model_profile_digest"],
+            "provider_receipt_digest": admission["provider_receipt_digest"],
             "task_id": admission["task_id"],
             "shape": {"generations": GENERATIONS, "children": CHILDREN, "tasks": TASKS},
             "limits": {
@@ -626,6 +555,8 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                 "run_id": run_id,
                 "source_commit": source["commit"],
                 "provider_families": [route["provider"] for route in routes],
+                "model_profile_digest": spec["model_profile_digest"],
+                "role_bindings": role_bindings,
                 "task_id": spec["task_id"],
                 "shape": spec["shape"],
                 "limits": spec["limits"],
@@ -711,64 +642,13 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
 def _bounded_child_seams(spec: dict[str, Any], counter: LogicalCallBudget):
     """Build seams with exactly one provider dispatch per logical slot."""
 
-    from dharma_swarm.api_keys import bootstrap_runtime_env
-    from dharma_swarm.forge_lab import grade_explore
-    from dharma_swarm.forge_lab.experiment import Seams
-    from dharma_swarm.forge_v1.providers import PoolCompletion
-    from dharma_swarm.forge_v1.forge_v2.runner import _pull_task_context
-    from dharma_swarm.forge_v1.forge_v2.taskbed_ledger import allocate_task_ids
-
-    bootstrap_runtime_env()
-    base = grade_explore.production_seams()
-    original_propose = base.propose_slot
-
-    def propose_once(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        counter.consume("candidate_generation")
-        kwargs["continue_rounds"] = 0
-        return original_propose(*args, **kwargs)
-
-    def forbidden_arm(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
-        raise UnattendedError("UNBOUNDED_ARM_REFUSED", "unattended lane admits freeform_single only")
-
-    grade = replace(
-        base,
-        propose_slot=propose_once,
-        self_moa_arm=forbidden_arm,
-        verify_chain_arm=forbidden_arm,
-        mixed_moa_arm=forbidden_arm,
-    )
-    routes = spec["routes"]
-    mutation_completion = PoolCompletion(routes[1]["model_id"])
-    taskbed_db = Path(spec["state_root"]) / ".dharma" / "forge_v1" / "taskbed.db"
-
-    def state_anchored_allocate(**kwargs: Any) -> dict[str, Any]:
-        if kwargs.pop("count", None) != 1:
-            raise UnattendedError("TASK_SHAPE", "unattended allocation requires one task")
-        return allocate_task_ids(
-            task_ids=[spec["task_id"]], db_path=taskbed_db, **kwargs
-        )
-
-    def bounded_mutation(prompt: str) -> tuple[str, int]:
-        counter.consume("mutation")
-        text, tokens = mutation_completion.complete(prompt)
-        child = {
-            "arm_kind": "freeform_single",
-            "generator_model": routes[0]["model_id"],
-            "verifier_model": routes[1]["model_id"],
-            "per_call_tokens": PER_CALL_TOKENS,
-            "window_chars": 24_000,
-            "extra_instruction": str(text or "")[:4_000],
-            "notes": "bounded_unattended_mutation_projection",
-        }
-        return json.dumps(child, sort_keys=True), int(tokens)
-
-    return Seams(
-        grade=grade,
-        pull_task_context=_pull_task_context,
-        allocate_explore=state_anchored_allocate,
-        mutate_complete=bounded_mutation,
-        make_worktree=_clone_scratch,
-        remove_worktree=_remove_clone_scratch,
+    return build_bounded_child_seams(
+        spec,
+        counter,
+        per_call_tokens=PER_CALL_TOKENS,
+        error_factory=UnattendedError,
+        clone_scratch=_clone_scratch,
+        remove_clone_scratch=_remove_clone_scratch,
     )
 
 
@@ -867,22 +747,28 @@ def run_child(spec_path: Path) -> int:
         raise UnattendedError("SOURCE_CHANGED", "source commit changed after parent admission")
     if admission["routes"] != spec.get("routes"):
         raise UnattendedError("PROVIDER_RECEIPT_CHANGED", "provider routes changed after admission")
+    if admission["role_bindings"] != spec.get("role_bindings"):
+        raise UnattendedError("MODEL_PROFILE_CHANGED", "model roles changed after admission")
+    if admission["model_profile_digest"] != spec.get("model_profile_digest"):
+        raise UnattendedError("MODEL_PROFILE_CHANGED", "model profile changed after admission")
+    if admission["provider_receipt_digest"] != spec.get("provider_receipt_digest"):
+        raise UnattendedError("PROVIDER_RECEIPT_CHANGED", "provider receipt changed after admission")
     _validate_child_spec(spec, spec_path, admission=admission)
 
     os.environ["DHARMA_EVOLUTION_WORKTREE_ROOT"] = spec["scratch_root"]
     counter = LogicalCallBudget()
-    routes = spec["routes"]
+    role_bindings = spec["role_bindings"]
     cfg = ExperimentConfig(
         generations=GENERATIONS,
         children=CHILDREN,
         tasks_per_generation=TASKS,
-        solver_model=routes[0]["model_id"],
-        verifier_model=routes[1]["model_id"],
-        mutator_model=routes[1]["model_id"],
+        solver_model=role_bindings["solver"]["model_id"],
+        verifier_model=role_bindings["verifier"]["model_id"],
+        mutator_model=role_bindings["mutator"]["model_id"],
         seed_genome={
             "arm_kind": "freeform_single",
-            "generator_model": routes[0]["model_id"],
-            "verifier_model": routes[1]["model_id"],
+            "generator_model": role_bindings["solver"]["model_id"],
+            "verifier_model": role_bindings["verifier"]["model_id"],
             "per_call_tokens": PER_CALL_TOKENS,
             "window_chars": 24_000,
             "extra_instruction": "bounded unattended EXPLORE control",
@@ -902,13 +788,28 @@ def run_child(spec_path: Path) -> int:
     )
     closeout = asyncio.run(run_experiment(cfg, seams=_bounded_child_seams(spec, counter)))
     closeout = _redact_secret_values(closeout)
+    stats = closeout.get("stats") if isinstance(closeout.get("stats"), dict) else {}
+    counters = stats.get("counters") if isinstance(stats.get("counters"), dict) else {}
+    execution_shape_ok = execution_shape_matches(
+        counter,
+        counters,
+        slots=LOGICAL_PROVIDER_CALL_SLOTS,
+    )
+    effective_state = (
+        closeout.get("closeout_state")
+        if execution_shape_ok
+        else "inconclusive_generation"
+    )
     result = {
         "schema": CHILD_SCHEMA,
         "run_id": run_id,
         "experiment_id": closeout.get("experiment_id"),
-        "closeout_state": closeout.get("closeout_state"),
+        "closeout_state": effective_state,
         "logical_provider_calls_used": counter.used,
         "logical_provider_call_limit": counter.limit,
+        "logical_provider_calls_by_role": counter.by_label,
+        "expected_provider_calls_by_role": EXPECTED_PROVIDER_CALLS,
+        "execution_shape_ok": execution_shape_ok,
         "experiment_closeout": closeout,
         "epistemic_modality": "EXPLORE_ONLY",
         "positive_rsi_claim": False,
@@ -916,7 +817,7 @@ def run_child(spec_path: Path) -> int:
     }
     result["result_digest"] = content_digest(result)
     write_json_exclusive(Path(spec["result_path"]), result)
-    return 0 if closeout.get("closeout_state") in TERMINAL_SUCCESS_STATES else 1
+    return 0 if effective_state in TERMINAL_SUCCESS_STATES else 1
 
 
 def _redact_secret_values(payload: Any) -> Any:

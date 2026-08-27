@@ -190,10 +190,20 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
         "worker",
         "alerts",
         "archive",
+        "daily",
         "sync",
     }
-    assert set(_subcommands(root["provider"])) == {"selftest"}
-    assert set(_subcommands(root["taskpack"])) == {"build"}
+    provider = _subcommands(root["provider"])
+    assert set(provider) == {"selftest", "models", "credential"}
+    assert set(_subcommands(provider["models"])) == {
+        "list",
+        "status",
+        "plan",
+        "apply",
+        "rollback",
+    }
+    assert set(_subcommands(provider["credential"])) == {"status", "plan", "apply"}
+    assert set(_subcommands(root["taskpack"])) == {"build", "status", "plan", "apply"}
     assert set(_subcommands(root["campaign"])) == {
         "plan",
         "run",
@@ -211,6 +221,7 @@ def test_packet_a_registers_the_target_operator_command_tree() -> None:
     assert set(_subcommands(root["worker"])) == {"list", "enroll", "revoke"}
     assert set(_subcommands(root["alerts"])) == {"list", "ack"}
     assert set(_subcommands(root["archive"])) == {"inspect"}
+    assert set(_subcommands(root["daily"])) == {"status"}
     assert set(_subcommands(root["sync"])) == {
         "status",
         "plan",
@@ -407,6 +418,99 @@ def test_provider_selftest_route_requirement_fails_closed_without_live() -> None
     assert "live_probe_required_for_independent_routes" in payload["result"]["failures"]
 
 
+def test_provider_selftest_invalid_bounds_are_not_mistyped_as_profile_errors() -> None:
+    result = _invoke(
+        MODULE_COMMAND,
+        "provider",
+        "selftest",
+        "--profile",
+        "staged",
+        "--timeout-s",
+        "0",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_taskpack_cli_error_preserves_terminal_evidence_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from dharma_swarm.forge_lab import rsi_operations
+    from dharma_swarm.forge_lab.taskpack_ops import TaskpackError
+
+    receipt = tmp_path / "failed-action.json"
+
+    def fail(_args: argparse.Namespace):
+        raise TaskpackError("IMPORTER_FAILED", "bounded failure", receipt_path=receipt)
+
+    monkeypatch.setattr(rsi_operations, "_taskpack", fail)
+    result = rsi_operations.dispatch(
+        argparse.Namespace(_command_path="taskpack status", json=True)
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert result == rsi_operations.OPERATION_FAILURE_EXIT
+    assert payload["error"]["details"]["receipt_path"] == str(receipt)
+    assert f"evidence: {receipt}" in captured.err
+
+
+def test_provider_model_plan_is_exact_credential_free_and_ready() -> None:
+    result = _invoke(
+        MODULE_COMMAND,
+        "provider",
+        "models",
+        "plan",
+        "--mutator-provider",
+        "zhipu",
+        "--mutator-model",
+        "glm-5.2",
+        "--solver-provider",
+        "ollama",
+        "--solver-model",
+        "deepseek-v4-pro:cloud",
+        "--verifier-provider",
+        "zhipu",
+        "--verifier-model",
+        "glm-5.2",
+        "--json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["result"]["outcome"] == "ready"
+    assert payload["result"]["staged_models"] == [
+        "glm-5.2",
+        "deepseek-v4-pro:cloud",
+    ]
+    assert payload["result"]["claim_boundary"]["credentials_loaded"] is False
+    assert payload["result"]["claim_boundary"]["promotion_authority"] is False
+
+
+def test_provider_credential_plan_names_existing_store_but_never_takes_value() -> None:
+    result = _invoke(
+        MODULE_COMMAND,
+        "provider",
+        "credential",
+        "plan",
+        "--provider",
+        "ollama",
+        "--json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    plan = payload["result"]
+    assert plan["credential_env"] == "OLLAMA_API_KEY"
+    assert plan["input_channel"] == "hidden_prompt_or_stdin_only"
+    assert plan["secret_values_recorded"] is False
+    assert plan["secret_digests_recorded"] is False
+
+
 @pytest.mark.parametrize(
     "args",
     [
@@ -564,6 +668,31 @@ def test_minimum_read_only_cli_views_are_implemented(tmp_path: Path) -> None:
     report = json.loads(reconcile.stdout)["result"]
     assert report["read_only"] is True
     assert report["findings"]
+
+
+def test_reconcile_rejects_mutation_arguments_outside_explicit_apply() -> None:
+    ignored_apply = _invoke(
+        MODULE_COMMAND,
+        "reconcile",
+        "--request-id",
+        "must-not-be-ignored",
+        "--plan-digest",
+        "sha256:" + "0" * 64,
+        "--json",
+    )
+    polluted_plan = _invoke(
+        MODULE_COMMAND,
+        "reconcile",
+        "--plan",
+        "--request-id",
+        "must-not-be-ignored",
+        "--json",
+    )
+
+    assert ignored_apply.returncode != 0
+    assert polluted_plan.returncode != 0
+    assert json.loads(ignored_apply.stdout)["error"]["code"] == "INVALID_MODE_ARGUMENTS"
+    assert json.loads(polluted_plan.stdout)["error"]["code"] == "INVALID_MODE_ARGUMENTS"
 
 
 def test_new_cli_never_imports_legacy_or_live_experiment_modules() -> None:

@@ -14,6 +14,11 @@ def add_operator_commands(
     leaf: ParserFactory,
     json_flag: JsonFlag,
 ) -> None:
+    def role_arguments(parser: Any) -> None:
+        for role in ("mutator", "solver", "verifier"):
+            parser.add_argument(f"--{role}-provider", required=True)
+            parser.add_argument(f"--{role}-model", required=True)
+
     provider = commands.add_parser("provider", help="inspect provider routes")
     provider_commands = provider.add_subparsers(dest="provider_command", required=True)
     provider_selftest = leaf(
@@ -42,6 +47,95 @@ def add_operator_commands(
     )
     json_flag(provider_selftest)
 
+    provider_models = provider_commands.add_parser(
+        "models", help="plan and activate exact model-role routes"
+    )
+    provider_model_commands = provider_models.add_subparsers(
+        dest="provider_model_command", required=True
+    )
+    provider_models_list = leaf(
+        provider_model_commands,
+        "list",
+        command_path="provider models list",
+        help_text="list source-supported exact routes without loading keys",
+    )
+    json_flag(provider_models_list)
+    provider_models_status = leaf(
+        provider_model_commands,
+        "status",
+        command_path="provider models status",
+        help_text="show the active role profile",
+    )
+    json_flag(provider_models_status)
+    provider_models_plan = leaf(
+        provider_model_commands,
+        "plan",
+        command_path="provider models plan",
+        help_text="dry-run an exact mutator/solver/verifier profile",
+    )
+    role_arguments(provider_models_plan)
+    provider_models_plan.add_argument("--expected-current-digest")
+    json_flag(provider_models_plan)
+    provider_models_apply = leaf(
+        provider_model_commands,
+        "apply",
+        command_path="provider models apply",
+        help_text="activate a digest-bound role profile",
+    )
+    role_arguments(provider_models_apply)
+    provider_models_apply.add_argument("--plan-digest", required=True)
+    provider_models_apply.add_argument("--request-id", required=True)
+    provider_models_apply.add_argument("--expected-current-digest")
+    json_flag(provider_models_apply)
+    provider_models_rollback = leaf(
+        provider_model_commands,
+        "rollback",
+        command_path="provider models rollback",
+        help_text="reactivate an ancestor profile as a new generation",
+    )
+    provider_models_rollback.add_argument("--request-id", required=True)
+    provider_models_rollback.add_argument("--expected-current-digest", required=True)
+    provider_models_rollback.add_argument("--target-profile-digest")
+    json_flag(provider_models_rollback)
+
+    provider_credential = provider_commands.add_parser(
+        "credential", help="hand a provider key to the existing host-only store"
+    )
+    credential_commands = provider_credential.add_subparsers(
+        dest="provider_credential_command", required=True
+    )
+    credential_status = leaf(
+        credential_commands,
+        "status",
+        command_path="provider credential status",
+        help_text="show credential names and presence only",
+    )
+    credential_status.add_argument("--provider")
+    json_flag(credential_status)
+    credential_plan = leaf(
+        credential_commands,
+        "plan",
+        command_path="provider credential plan",
+        help_text="plan a hidden-input credential handoff",
+    )
+    credential_plan.add_argument("--provider", required=True)
+    json_flag(credential_plan)
+    credential_apply = leaf(
+        credential_commands,
+        "apply",
+        command_path="provider credential apply",
+        help_text="apply a key from a hidden prompt or stdin, never argv",
+    )
+    credential_apply.add_argument("--provider", required=True)
+    credential_apply.add_argument("--plan-digest", required=True)
+    credential_apply.add_argument("--request-id", required=True)
+    credential_apply.add_argument(
+        "--stdin",
+        action="store_true",
+        help="read exactly one credential line from stdin instead of prompting",
+    )
+    json_flag(credential_apply)
+
     taskpack = commands.add_parser("taskpack", help="manage evaluation taskpacks")
     taskpack_commands = taskpack.add_subparsers(dest="taskpack_command", required=True)
     taskpack_build = leaf(
@@ -52,6 +146,33 @@ def add_operator_commands(
     )
     taskpack_build.add_argument("--profile", required=True)
     json_flag(taskpack_build)
+    taskpack_status = leaf(
+        taskpack_commands,
+        "status",
+        command_path="taskpack status",
+        help_text="inspect the anchored taskbed without mutation",
+    )
+    json_flag(taskpack_status)
+    for name in ("plan", "apply"):
+        taskpack_action = leaf(
+            taskpack_commands,
+            name,
+            command_path=f"taskpack {name}",
+            help_text=f"{name} a content-addressed governed taskpack",
+        )
+        taskpack_action.add_argument("--manifest", required=True)
+        taskpack_action.add_argument("--manifest-digest", required=True)
+        taskpack_action.add_argument("--model-cutoff", required=True)
+        taskpack_action.add_argument(
+            "--mode",
+            choices=("governed_fresh", "search_only_public_swebench"),
+            default="governed_fresh",
+        )
+        if name == "apply":
+            taskpack_action.add_argument("--plan-digest", required=True)
+            taskpack_action.add_argument("--request-id", required=True)
+            taskpack_action.add_argument("--timeout-seconds", type=int, default=90)
+        json_flag(taskpack_action)
 
     campaign = commands.add_parser("campaign", help="manage governed RSI campaigns")
     campaign_commands = campaign.add_subparsers(dest="campaign_command", required=True)
@@ -155,8 +276,23 @@ def add_operator_commands(
         command_path="reconcile",
         help_text="report control-plane drift",
     )
-    reconcile.add_argument("--apply", action="store_true")
+    reconcile_mode = reconcile.add_mutually_exclusive_group()
+    reconcile_mode.add_argument("--plan", action="store_true")
+    reconcile_mode.add_argument("--apply", action="store_true")
+    reconcile.add_argument("--plan-digest")
+    reconcile.add_argument("--request-id")
+    reconcile.add_argument("--campaign")
     json_flag(reconcile)
+
+    daily = commands.add_parser("daily", help="inspect the bounded daily lane")
+    daily_commands = daily.add_subparsers(dest="daily_command", required=True)
+    daily_status = leaf(
+        daily_commands,
+        "status",
+        command_path="daily status",
+        help_text="show one read-only daily readiness projection",
+    )
+    json_flag(daily_status)
 
     backup = commands.add_parser("backup", help="manage control-plane snapshots")
     backup_commands = backup.add_subparsers(dest="backup_command", required=True)

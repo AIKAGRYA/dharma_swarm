@@ -7,6 +7,8 @@ import subprocess
 import pytest
 
 from dharma_swarm.forge_lab import unattended_explore as unattended
+from dharma_swarm.forge_lab import unattended_ledger
+from dharma_swarm.forge_lab import provider_selftest
 
 
 def test_hash_chain_is_append_only_and_tamper_evident(tmp_path: Path) -> None:
@@ -41,6 +43,28 @@ def test_hash_chain_is_append_only_and_tamper_evident(tmp_path: Path) -> None:
             schema=unattended.RECEIPT_SCHEMA,
             digest_field="receipt_digest",
         )
+
+
+def test_first_chain_append_fsyncs_its_parent_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    synced: list[Path] = []
+    monkeypatch.setattr(
+        unattended_ledger,
+        "_fsync_directory",
+        lambda path: synced.append(path),
+    )
+    path = tmp_path / "chain" / "receipts.jsonl"
+
+    unattended.append_chain(
+        path,
+        {"kind": "durable"},
+        schema=unattended.RECEIPT_SCHEMA,
+        digest_field="receipt_digest",
+    )
+
+    assert synced == [path.parent]
 
 
 def test_budget_ledger_reserves_before_run_and_caps_utc_periods(tmp_path: Path) -> None:
@@ -81,13 +105,13 @@ def test_budget_ledger_reserves_before_run_and_caps_utc_periods(tmp_path: Path) 
     assert next_day["sequence"] == 2
 
 
-def test_logical_provider_call_budget_refuses_the_fifth_dispatch() -> None:
+def test_logical_provider_call_budget_refuses_after_the_fixed_dispatch_shape() -> None:
     counter = unattended.LogicalCallBudget()
-    for index in range(4):
+    for index in range(unattended.LOGICAL_PROVIDER_CALL_SLOTS):
         counter.consume(f"call-{index}")
     assert counter.used == unattended.LOGICAL_PROVIDER_CALL_SLOTS
     with pytest.raises(unattended.UnattendedError) as error:
-        counter.consume("fifth")
+        counter.consume("sixth")
     assert error.value.code == "LOGICAL_PROVIDER_CALL_CAP"
 
 
@@ -104,6 +128,123 @@ def _ready_doctor() -> dict[str, object]:
             "taskbed": {"ready": True, "next_explore_task_id": "task-fixture"},
         },
     }
+
+
+def _role_bindings() -> dict[str, dict[str, str]]:
+    return {
+        "mutator": {
+            "role": "mutator",
+            "provider": "provider-a",
+            "model_id": "model-a",
+        },
+        "solver": {
+            "role": "solver",
+            "provider": "provider-a",
+            "model_id": "model-a",
+        },
+        "verifier": {
+            "role": "verifier",
+            "provider": "provider-b",
+            "model_id": "model-b",
+        },
+    }
+
+
+def _model_evidence() -> dict[str, object]:
+    return {
+        "role_bindings": _role_bindings(),
+        "routes": [
+            {"provider": "provider-a", "model_id": "model-a"},
+            {"provider": "provider-b", "model_id": "model-b"},
+        ],
+        "model_profile_digest": "sha256:" + "a" * 64,
+        "provider_receipt_digest": "sha256:" + "b" * 64,
+    }
+
+
+def test_admission_rejects_symlinked_state_substrate_before_control_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = (tmp_path / "state").resolve()
+    outside = tmp_path / "outside"
+    state.mkdir()
+    outside.mkdir()
+    (state / ".dharma").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setenv("RSI_LAB_STATE", str(state))
+
+    status = unattended.admission_status(state)
+
+    assert status["ready"] is False
+    assert status["reasons"][0].startswith("STATE_ROOT_UNSAFE:")
+    assert list(outside.iterdir()) == []
+
+
+def test_model_evidence_requires_receipt_bound_to_exact_active_roles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    receipt = tmp_path / "provider.json"
+    activation_bindings = list(_role_bindings().values())
+    policy = {
+        "configuration": {
+            "model_selection": {
+                "source": "active_model_role_profile",
+                "activation_profile_digest": "sha256:" + "a" * 64,
+                "role_bindings": activation_bindings,
+            }
+        }
+    }
+    payload = {
+        "schema": provider_selftest.PROVIDER_SELFTEST_SCHEMA,
+        "profile": "staged",
+        "live": True,
+        "ok": True,
+        "policy": policy,
+        "policy_digest": unattended.content_digest(policy),
+        "rows": [
+            {
+                "callable": True,
+                "provider": "provider-a",
+                "requested_model": "model-a",
+            },
+            {
+                "callable": True,
+                "provider": "provider-b",
+                "requested_model": "model-b",
+            },
+        ],
+        "receipt": str(receipt),
+        "cached": False,
+    }
+    payload["receipt_digest"] = provider_selftest._receipt_digest(payload)
+    receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        unattended,
+        "activation_status",
+        lambda: {
+            "active": True,
+            "integrity": "verified",
+            "current_profile_digest": "sha256:" + "a" * 64,
+            "role_bindings": activation_bindings,
+        },
+    )
+
+    evidence = unattended._selected_model_evidence({"receipt": str(receipt)})
+
+    assert evidence["role_bindings"] == _role_bindings()
+    assert evidence["model_profile_digest"] == "sha256:" + "a" * 64
+    assert evidence["provider_receipt_digest"] == payload["receipt_digest"]
+
+    payload["policy"]["configuration"]["model_selection"][
+        "activation_profile_digest"
+    ] = "sha256:" + "c" * 64
+    payload["policy_digest"] = unattended.content_digest(payload["policy"])
+    payload["receipt_digest"] = provider_selftest._receipt_digest(payload)
+    receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(unattended.UnattendedError) as error:
+        unattended._selected_model_evidence({"receipt": str(receipt)})
+    assert error.value.code == "PROVIDER_RECEIPT_PROFILE_MISMATCH"
 
 
 def test_admission_requires_halt_absent_exact_state_and_two_routes(
@@ -125,11 +266,13 @@ def test_admission_requires_halt_absent_exact_state_and_two_routes(
     monkeypatch.setattr(unattended, "doctor", _ready_doctor)
     monkeypatch.setattr(
         unattended,
-        "_selected_routes",
-        lambda _check: [
-            {"provider": "provider-a", "model_id": "model-a"},
-            {"provider": "provider-b", "model_id": "model-b"},
-        ],
+        "reconciliation_status",
+        lambda: {"ok": True, "read_only": True, "findings": []},
+    )
+    monkeypatch.setattr(
+        unattended,
+        "_selected_model_evidence",
+        lambda _check: _model_evidence(),
     )
 
     admitted = unattended.admission_status(state.resolve())
@@ -142,6 +285,50 @@ def test_admission_requires_halt_absent_exact_state_and_two_routes(
     refused = unattended.admission_status(state.resolve())
     assert refused["ready"] is False
     assert any(reason.startswith("HALT_present") for reason in refused["reasons"])
+
+
+def test_admission_refuses_unreconciled_control_plane_before_spend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    monkeypatch.setenv("RSI_LAB_STATE", str(state))
+    monkeypatch.setattr(
+        unattended,
+        "require_execution_source",
+        lambda *_args, **_kwargs: {
+            "ready": True,
+            "repo": str(tmp_path / "release" / "repo"),
+            "commit": "a" * 40,
+        },
+    )
+    monkeypatch.setattr(unattended, "doctor", _ready_doctor)
+    monkeypatch.setattr(
+        unattended,
+        "reconciliation_status",
+        lambda: {
+            "ok": False,
+            "read_only": True,
+            "findings": [
+                {
+                    "code": "ACTIVE_CAMPAIGN_MISSING_RUN",
+                    "campaign": "stale-campaign",
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        unattended,
+        "_selected_model_evidence",
+        lambda _check: _model_evidence(),
+    )
+
+    refused = unattended.admission_status(state.resolve())
+
+    assert refused["ready"] is False
+    assert "control_plane_reconciliation_required" in refused["reasons"]
+    assert refused["reconciliation"]["findings"][0]["campaign"] == "stale-campaign"
 
 
 def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
@@ -183,6 +370,9 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
             {"provider": "provider-a", "model_id": "model-a"},
             {"provider": "provider-b", "model_id": "model-b"},
         ],
+        "role_bindings": _role_bindings(),
+        "model_profile_digest": "sha256:" + "a" * 64,
+        "provider_receipt_digest": "sha256:" + "b" * 64,
         "task_id": "task-fixture",
         "shape": {"generations": 1, "children": 1, "tasks": 1},
         "limits": {
@@ -210,10 +400,24 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
             "reasons": [],
             "source": {"commit": "b" * 40, "repo": str(source_repo)},
             "routes": spec["routes"],
+            "role_bindings": spec["role_bindings"],
+            "model_profile_digest": spec["model_profile_digest"],
+            "provider_receipt_digest": spec["provider_receipt_digest"],
             "task_id": spec["task_id"],
         },
     )
-    monkeypatch.setattr(unattended, "_bounded_child_seams", lambda *_args: object())
+    def fake_seams(_spec, counter):
+        for label in (
+            "candidate_generation",
+            "candidate_generation",
+            "mutation",
+            "candidate_solver",
+            "candidate_verifier",
+        ):
+            counter.consume(label)
+        return object()
+
+    monkeypatch.setattr(unattended, "_bounded_child_seams", fake_seams)
     captured = {}
 
     async def fake_run(cfg, *, seams):
@@ -223,6 +427,9 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
             "experiment_id": "experiment-1",
             "closeout_state": "inconclusive_low_power",
             "reasons": [f"provider fixture accidentally included {fake_secret}"],
+            "stats": {
+                "counters": {"graded": 2, "paired_controls": 1, "blocked": 0}
+            },
         }
 
     monkeypatch.setattr(
@@ -237,6 +444,9 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
     assert cfg.force_single_llm_mutation is True
     assert cfg.budget_cap_tokens == unattended.PER_CANDIDATE_TOKENS
     assert cfg.max_experiment_tokens == unattended.MAX_EXPERIMENT_TOKENS
+    assert cfg.mutator_model == "model-a"
+    assert cfg.solver_model == "model-a"
+    assert cfg.verifier_model == "model-b"
     result = json.loads(result_path.read_text())
     assert result["positive_rsi_claim"] is False
     assert result["epistemic_modality"] == "EXPLORE_ONLY"
@@ -272,6 +482,9 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
             "reasons": [],
             "source": {"commit": "c" * 40, "repo": str(tmp_path / "release" / "repo")},
             "routes": routes,
+            "role_bindings": _role_bindings(),
+            "model_profile_digest": "sha256:" + "a" * 64,
+            "provider_receipt_digest": "sha256:" + "b" * 64,
             "task_id": "task-fixture",
             "halt_path": str(state / ".dharma" / "forge_lab" / "HALT"),
         },
@@ -287,8 +500,21 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
             "run_id": run_id,
             "experiment_id": "experiment-fixture",
             "closeout_state": "inconclusive_low_power",
-            "logical_provider_calls_used": 4,
-            "logical_provider_call_limit": 4,
+            "logical_provider_calls_used": unattended.LOGICAL_PROVIDER_CALL_SLOTS,
+            "logical_provider_call_limit": unattended.LOGICAL_PROVIDER_CALL_SLOTS,
+            "logical_provider_calls_by_role": {
+                "candidate_generation": 2,
+                "mutation": 1,
+                "candidate_solver": 1,
+                "candidate_verifier": 1,
+            },
+            "expected_provider_calls_by_role": {
+                "candidate_generation": 2,
+                "mutation": 1,
+                "candidate_solver": 1,
+                "candidate_verifier": 1,
+            },
+            "execution_shape_ok": True,
             "positive_rsi_claim": False,
         }
         child["result_digest"] = unattended.content_digest(child)
@@ -306,7 +532,7 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
         schema=unattended.LEDGER_SCHEMA,
         digest_field="ledger_digest",
     )
-    assert ledger[0]["reserved_usd"] == 1.0
+    assert ledger[0]["reserved_usd"] == unattended.RUN_USD_RESERVATION
     receipts = unattended.read_chain(
         control / "receipts.jsonl",
         schema=unattended.RECEIPT_SCHEMA,

@@ -8,6 +8,274 @@ The cross-host release and drift contract is defined in
 [`RSI_LAB_SYNC.md`](RSI_LAB_SYNC.md). Use `rsi sync`; never copy an active
 checkout or mutable state between hosts.
 
+## START_HERE
+
+First verify the release from the Mac operator host:
+
+```bash
+rsi sync status --json
+```
+
+Then run the operational projection on authoritative Meghadharma from the
+activated immutable release. `daily status` is the single read-only projection
+for doctor readiness, reconciliation, the active model-role profile, taskpack
+custody, the installed systemd bytes/state, and the most recent unattended
+closeout:
+
+```bash
+rsi daily status --json
+```
+
+A healthy projection reports `ready_for_next_run: true` and
+`last_cycle_healthy: true`. Before the first supervised closeout,
+`awaiting_first_run: true` explains why overall `ok` remains false even when
+the pre-run authorities are green. The latest closeout counts only while its
+exact child-result and log preimages still validate under the recorded digests.
+
+A nonzero status is a fail-closed finding, not permission to bypass a gate.
+Converge code only through the official `rsi sync` commands in
+[`RSI_LAB_SYNC.md`](RSI_LAB_SYNC.md#start_here); never use `rsync`, `scp` of a
+working tree, or a mutable checkout.
+
+### Credential handoff (secret never in argv)
+
+Inspect and plan one provider at a time, then copy the returned plan digest into
+the apply command:
+
+```bash
+rsi provider credential status --provider zhipu --json
+rsi provider credential plan --provider zhipu --json
+rsi provider credential apply \
+  --provider zhipu \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-zhipu-key \
+  --json
+```
+
+The apply command prompts with hidden input. There is deliberately no
+credential-value flag or positional value. For a secret-manager integration,
+add `--stdin` and pipe exactly one secret line; never put a literal secret in
+the command, shell history, logs, JSON, or a request ID. Repeat status/plan/apply
+for any other required provider, such as `ollama`. The value-free plan, status,
+and receipt record only credential names and presence; an unknown provider
+returns `IMPLEMENTATION_REQUIRED` rather than creating an ad hoc route or key
+store.
+
+If credential apply reports `RECEIPT_WRITE_FAILED` or a later replay reports
+`OUTCOME_UNKNOWN`, inspect credential status and the durable intent. Reusing the
+same request ID will not reapply a value; use a new request ID only for a
+deliberate explicit replacement.
+
+### Activate exact model routes
+
+List the source-owned route catalog and current profile first:
+
+```bash
+rsi provider models list --json
+rsi provider models status --json
+```
+
+The following currently catalogued example binds all three roles while staging
+two independent provider entitlements. Plan and apply must repeat the exact six
+role flags:
+
+```bash
+rsi provider models plan \
+  --mutator-provider zhipu --mutator-model glm-5.2 \
+  --solver-provider ollama --solver-model deepseek-v4-pro:cloud \
+  --verifier-provider zhipu --verifier-model glm-5.2 \
+  --json
+
+rsi provider models apply \
+  --mutator-provider zhipu --mutator-model glm-5.2 \
+  --solver-provider ollama --solver-model deepseek-v4-pro:cloud \
+  --verifier-provider zhipu --verifier-model glm-5.2 \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-model-profile \
+  --json
+
+rsi provider models status --json
+```
+
+Omit `--expected-current-digest` only for the first activation, when status
+reports no current profile. Every replacement must add
+`--expected-current-digest sha256:<current-profile-digest>` to both plan and
+apply. Rollback is also compare-and-swap protected; without an explicit target
+it selects the immediate predecessor, while a target must be an ancestor:
+
+```bash
+rsi provider models rollback \
+  --request-id operator-YYYYMMDD-model-rollback \
+  --expected-current-digest sha256:<current-profile-digest> \
+  --target-profile-digest sha256:<ancestor-profile-digest> \
+  --json
+```
+
+Only choose rows whose catalog entry says `runtime_selectable: true`. An unknown
+provider, an unknown exact route, or a provider/model ID that is ambiguous in
+the current runtime is not onboarded by configuration: planning returns
+`implementation_required` or `source_change_required`, and the missing
+provider-qualified execution path must be implemented and reviewed first.
+Activation selects roles only. It does not load credentials, call a provider,
+edit source, change weights, attest availability or quality, or grant promotion
+authority.
+
+### Stage and prove live callability
+
+After credential handoff and model activation, run the same bounded staged
+policy used by the hourly refresher:
+
+```bash
+rsi provider selftest \
+  --profile staged --live --require-independent-routes 2 \
+  --timeout-s 20 --max-probes 6 --min-refresh-interval-s 3000 \
+  --json
+```
+
+The staged profile uses the active model-role profile when there is no explicit
+process-local `RSI_LAB_STAGED_MODELS` override. A configuration-only selftest
+(without `--live`) is intentionally non-ready. A live receipt proves bounded
+callability under its exact policy; it does not prove model quality or confer
+judge/promotion authority.
+
+### Replenish the taskbed through a sealed taskpack
+
+`--manifest` is an actual newline-terminated `.jsonl` file path, while
+`--manifest-digest` is the SHA-256 of those exact bytes. Use the same path,
+digest, model cutoff, and mode for plan and apply:
+
+```bash
+rsi taskpack status --json
+rsi taskpack plan \
+  --manifest /root/rsi-lab/state/intake/<sealed-taskpack>.jsonl \
+  --manifest-digest sha256:<64-hex-manifest-digest> \
+  --model-cutoff <ISO-8601-model-cutoff> \
+  --mode search_only_public_swebench \
+  --json
+
+rsi taskpack apply \
+  --manifest /root/rsi-lab/state/intake/<sealed-taskpack>.jsonl \
+  --manifest-digest sha256:<64-hex-manifest-digest> \
+  --model-cutoff <ISO-8601-model-cutoff> \
+  --mode search_only_public_swebench \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-taskpack \
+  --timeout-seconds 90 \
+  --json
+
+rsi taskpack status --json
+```
+
+`search_only_public_swebench` is the admitted daily EXPLORE corpus mode. It
+checks a strict official-SWE-bench-shaped row contract, but it does not
+cryptographically prove membership against a pinned official dataset seal.
+Public pretraining contamination therefore remains possible. Its custody is
+always `EXPLORE_ONLY`, `promotion_eligible: false`, and
+`confirm_eligible: false`; it cannot support a confirm or improvement claim.
+`governed_fresh` fails with `MODEL_CUTOFF_AUTHORITY_REQUIRED` until every active
+model role has authoritative cutoff evidence and the requested cutoff is no
+earlier than the minimum of those authorities. An operator-supplied date alone
+is not freshness authority.
+
+### Reconcile a stale active-campaign projection
+
+Broad status remains read-only. The only currently actionable finding is
+`ACTIVE_CAMPAIGN_MISSING_RUN`; all other findings refuse mutation. Use the
+campaign ID reported by status and preserve the same ID across plan/apply:
+
+```bash
+rsi reconcile --json
+rsi reconcile --plan --campaign <campaign-id> --json
+rsi reconcile --apply \
+  --campaign <campaign-id> \
+  --plan-digest sha256:<64-hex-plan-digest> \
+  --request-id operator-YYYYMMDD-reconcile \
+  --json
+rsi reconcile --json
+```
+
+Apply revalidates the missing-run condition, source, HALT state, locks, and
+active-process evidence. It quarantines the stale projection without deleting
+history and writes an immutable receipt. If an interrupted apply has an unknown
+outcome, retry the exact same apply with the same plan digest and request ID;
+there is no generic `rsi recover` command.
+
+### HALT, stop, recover, and start
+
+There are no top-level `rsi halt`, `start`, `stop`, or `recover` commands.
+Emergency control is the host latch plus systemd. Latch first so the running
+parent can record `InconclusiveOperatorHalt`, then stop future scheduling:
+
+```bash
+install -o root -g root -m 0600 /dev/null \
+  /root/rsi-lab/state/.dharma/forge_lab/HALT
+systemctl stop rsi-lab-explore.timer
+systemctl status rsi-lab-explore.service --no-pager
+rsi daily status --json
+```
+
+If the oneshot does not terminate through its HALT poll, an operator may stop
+the current service explicitly:
+
+```bash
+systemctl stop rsi-lab-explore.service
+```
+
+Before recovery, inspect receipts, alerts, the budget chain, Docker, doctor,
+and reconciliation. Repair only through the specific plan/apply or rollback
+surface that owns the finding:
+
+```bash
+rsi doctor --json
+rsi reconcile --json
+rsi alerts list --json
+journalctl -u rsi-lab-explore.service --since '36 hours ago' --no-pager
+rsi daily status --json
+```
+
+Only after those checks are understood and repaired, remove the latch and
+resume the already-installed timer:
+
+```bash
+unlink /root/rsi-lab/state/.dharma/forge_lab/HALT
+systemctl start rsi-lab-explore.timer
+systemctl status rsi-lab-explore.timer --no-pager
+rsi daily status --json
+```
+
+Run `/root/rsi-lab/bin/rsi-unattended-explore --timeout-seconds 2700` only as a
+supervised proof. Install, verify, enable, and start the systemd units manually
+only after that proof succeeds; activation/sync never installs or enables them.
+The timer then admits one run daily at `03:35 UTC` with at most `25m` randomized
+delay. The independent provider refresh cron runs hourly at minute `:17`.
+
+### Budget, artifacts, and claim boundary
+
+Each fixed `1 x 1 x 1` run reserves `$1.25` and five logical provider-call slots
+before launch. The hard reservation ceilings are `$3`/12 slots per UTC day and
+`$40`/120 slots per UTC month; reservations are not refunded after a crash.
+These are conservative accounting reservations, not authoritative vendor
+billing telemetry.
+
+On Meghadharma, inspect the host-owned evidence under:
+
+```text
+/root/.dharma/provider_credential_receipts/
+/root/rsi-lab/state/.dharma/forge_lab/provider_selftests/
+/root/rsi-lab/state/.dharma/forge_lab/model_onboarding/
+/root/rsi-lab/state/.dharma/forge_lab/taskpack_actions/
+/root/rsi-lab/state/.dharma/forge_lab/reconciliation/
+/root/rsi-lab/state/.dharma/forge_lab/unattended_explore/budget_ledger.jsonl
+/root/rsi-lab/state/.dharma/forge_lab/unattended_explore/receipts.jsonl
+/root/rsi-lab/state/.dharma/forge_lab/unattended_explore/runs/
+```
+
+Every unattended result remains `EXPLORE_ONLY` and
+`positive_rsi_claim: false`. A successful service closeout is evidence that a
+bounded experiment ran and closed under the recorded controls; it is not a
+scientific RSI result, production promotion, or evidence that the lab is
+generally self-improving.
+
 ## Canonical roots
 
 Use the stable logical paths below in commands, manifests, receipts, and
@@ -46,9 +314,10 @@ connect to NATS, launch a campaign, or start a persistent process.
 ## Bounded operator-control slice
 
 The current development release implements finite, receipt-backed inspection,
-a hermetic control-plane pilot, and one narrowly bounded unattended EXPLORE
-oneshot. It does **not** implement an unattended `explore-open` campaign,
-promotion, backup mutation, a general persistent supervisor, or a scientific
+a hermetic control-plane pilot, model/credential/taskpack/reconciliation
+plan-apply surfaces, and one narrowly bounded unattended EXPLORE oneshot. It
+does **not** implement an unattended `explore-open` campaign, promotion, backup
+mutation, a general persistent campaign supervisor, or a scientific
 recursive-improvement claim. Those broader commands remain nonzero and fail
 closed.
 
@@ -65,9 +334,11 @@ rsi alerts list --json
 rsi archive inspect --json
 ```
 
-`reconcile`, worker, alert, archive, campaign list/status/progress/events, and
-doctor are read-only. `reconcile --apply` and `campaign events --follow` are
-explicit refusals in this slice.
+Default `reconcile`, worker, alert, archive, campaign
+list/status/progress/events, doctor, and `daily status` are read-only.
+Reconciliation mutation is limited to the digest-bound `--plan`/`--apply`
+workflow for `ACTIVE_CAMPAIGN_MISSING_RUN` documented in `START_HERE`;
+`campaign events --follow` remains an explicit refusal in this slice.
 
 Provider configuration inspection never claims callability. The only passing
 selftest is a live receipt with at least one callable route; confirm admission
@@ -75,10 +346,9 @@ requires two distinct provider entitlements, not two model-family labels. A
 bounded operator refresh is:
 
 ```bash
-export RSI_LAB_STAGED_MODELS='model-id-on-provider-a,model-id-on-provider-b'
 rsi provider selftest \
   --profile staged --live --require-independent-routes 2 \
-  --timeout-s 20 --max-probes 4 --min-refresh-interval-s 3600 --json
+  --timeout-s 20 --max-probes 6 --min-refresh-interval-s 3000 --json
 ```
 
 Live selftests write append-only `rsi_lab.provider_selftest.v2` receipts with a
@@ -90,7 +360,8 @@ GLM minor alias is accepted only after a second bounded probe of the declared
 served ID returns callable content; arbitrary family substitutions still fail.
 
 Do not place credentials in `RSI_LAB_STAGED_MODELS` or any command argument.
-The scheduled form and legacy-cron retirement are documented in
+With no process-local staged override, the selftest reads the active model-role
+profile. The scheduled form and legacy-cron retirement are documented in
 [`RSI_LAB_SYNC.md`](RSI_LAB_SYNC.md#retire-the-unversioned-provider-cron).
 
 ### Five-attempt offline pilot
@@ -170,6 +441,9 @@ when all of the following are simultaneously true:
 - `RSI_LAB_STATE`/`DHARMA_HOME` resolve to the explicit host state root;
 - the state-anchored `forge_v1/taskbed.db` is schema-valid and exposes at least
   one eligible EXPLORE task without mutating the ledger during doctor;
+- an integrity-valid active three-role model profile selects only exact,
+  runtime-selectable routes already present in the source-owned catalog;
+- read-only reconciliation reports no control-plane finding;
 - the HALT file is absent and the nonblocking host lock is available;
 - `rsi doctor` is ready, including retirement of legacy provider controls;
 - a valid live provider receipt, no older than one hour, attests two distinct
@@ -177,24 +451,28 @@ when all of the following are simultaneously true:
 - the official SWE-bench Docker daemon is reachable. Candidate grading still
   must emit a complete `rsi_lab.grader_isolation_proof.v1` to become comparable.
 
-The child shape is permanently `generations=1`, `children=1`, `tasks=1`. It
-uses only `freeform_single`, disables continuation calls, reserves four logical
-provider-call slots before launch, hard-caps each grade at 8,000 tokens and
-$0.25 accounting cost, and caps recorded experiment generation at 24,000
-tokens. The parent polls the HALT latch at most every two seconds and terminates
+The child shape is permanently `generations=1`, `children=1`, `tasks=1`. The
+seed/control candidate uses `freeform_single`; the one child uses a bounded
+`verify_chain` so the configured verifier is actually dispatched. Continuation
+calls are disabled. The exact call shape is two seed/control generations, one
+mutation, one child solver, and one child verifier. Each call is capped at
+8,000 tokens and `$0.25` accounting cost, each candidate at 16,000 tokens and
+`$0.50`, and the full experiment at 40,000 tokens. A closeout whose counters do
+not prove that exact role shape is non-successful. The parent polls the HALT
+latch at most every two seconds and terminates
 the child process group when it appears, recording
 `InconclusiveOperatorHalt`. The parent also applies a 2,700-second subprocess
 timeout; systemd adds a second 2,800-second fuse. Scratch code is a standalone
 exact-commit clone under state, so execution never writes the immutable release
 Git dir.
 
-Reservations are conservative: $1/four logical call slots per run,
-$3/12 slots per UTC day, and $30/120 slots per UTC month. They are never
+Reservations are conservative: `$1.25`/five logical call slots per run,
+`$3`/12 slots per UTC day, and `$40`/120 slots per UTC month. They are never
 refunded after a crash. These dollars are **not vendor billing telemetry**, and
 transport-level retries are not separately metered; absence of authoritative
 billing remains an explicit limitation. The budget ledger and run receipts are
 strict, fsync-backed hash chains. A truncated row, bad link, changed digest,
-fifth logical dispatch, stale receipt, dirty release, Docker failure, or HALT
+sixth logical dispatch, stale receipt, dirty release, Docker failure, or HALT
 file refuses the run before additional spend.
 
 Run one operator-supervised smoke only after `rsi doctor --json` is green:
