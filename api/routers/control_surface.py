@@ -7,6 +7,7 @@ GET  /api/control-surface/ds-goal/cards   -> ds-goal ledgers as BoardStore cards
 GET  /api/control-surface/agentops/cards  -> AgentOps work packets as BoardStore cards (envelope)
 GET  /api/control-surface/a2a/cards       -> A2A receipts as BoardStore cards (envelope)
 GET  /api/control-surface/semantic-receipts/cards -> SemanticReceipt artifacts as BoardStore cards (envelope)
+GET  /api/control-surface/missions/{id}/snapshot -> one configured read-only MissionSnapshot
 POST /api/control-surface/rows/{id}/handoff-prompt -> agent handoff prompt
 GET  /api/control-surface/stream          -> SSE stream of updated rows
 
@@ -17,15 +18,19 @@ runtime/code/evidence adapters.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
+import re
 import threading
 import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from dharma_swarm.daemon_config import runtime_report_dir
 
@@ -47,6 +52,23 @@ _DS_GOAL_CARD_LOADER: Any | None = None
 _AGENTOPS_CARD_LOADER: Any | None = None
 _A2A_SEND_CARD_LOADER: Any | None = None
 _SEMANTIC_RECEIPT_CARD_LOADER: Any | None = None
+_MISSION_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+_SAFE_ERROR_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,79}")
+_MISSION_AUTHORITY = "TaskBoard+RuntimeStateStore"
+_MISSION_SNAPSHOT_RECORD_LIMIT = 500
+_MISSION_SNAPSHOT_FIELDS = frozenset(
+    {
+        "mission",
+        "tasks",
+        "attempts",
+        "leases",
+        "receipts",
+        "reconciliation",
+        "observed_at",
+        "authority",
+        "proves_executor_liveness",
+    }
+)
 
 
 def _get_envelope_types() -> tuple[Any, Any, Any]:
@@ -170,6 +192,323 @@ def _find_row_object(row_id: str, *, memory_depth: str = "snapshot"):  # noqa: A
         if row.id == row_id:
             return row
     return None
+
+
+def _mission_snapshot_projection(
+    mission_id: str,
+    *,
+    state: str,
+    snapshot: dict[str, Any] | None = None,
+    runtime_projection_mode: str = "unavailable",
+) -> dict[str, Any]:
+    """Build a non-promotional read model for one configured mission."""
+    return {
+        "schema_version": "dharma.control_surface.mission_snapshot_projection.v1",
+        "mission_id": mission_id,
+        "state": state,
+        "authority": _MISSION_AUTHORITY,
+        "source_mode": "injected_read_only",
+        "runtime_projection_mode": runtime_projection_mode,
+        "simulation": False,
+        "snapshot": snapshot,
+        # Lifecycle rows, leases, heartbeats, acks, and receipts do not prove
+        # that an executor process is alive at observation time.
+        "proves_executor_liveness": False,
+    }
+
+
+_SENSITIVE_KEY_PARTS = frozenset(
+    {
+        "apikey",
+        "authorization",
+        "bearer",
+        "clientsecret",
+        "cookie",
+        "credential",
+        "passwd",
+        "password",
+        "privatekey",
+        "refreshtoken",
+        "secret",
+        "sessioncookie",
+        "token",
+    }
+)
+
+
+def _sensitive_key(key: str) -> bool:
+    compact = re.sub(r"[^a-z0-9]", "", key.casefold())
+    parts = tuple(part for part in re.split(r"[^a-z0-9]+", key.casefold()) if part)
+    sensitive_suffixes = (
+        "apikey",
+        "authorization",
+        "cookie",
+        "credential",
+        "password",
+        "privatekey",
+        "secret",
+        "token",
+    )
+    return (
+        compact in _SENSITIVE_KEY_PARTS
+        or any(part in _SENSITIVE_KEY_PARTS for part in parts)
+        or any(compact.endswith(suffix) for suffix in sensitive_suffixes)
+    )
+
+
+def _bounded_public_json(value: Any) -> Any:
+    """Redact secret-shaped keys and bound open owner metadata/payload."""
+    budget = {"nodes": 0}
+
+    def visit(current: Any, depth: int, *, key: str | None = None) -> Any:
+        budget["nodes"] += 1
+        if budget["nodes"] > 512 or depth > 6:
+            return "[TRUNCATED]"
+        if key is not None and _sensitive_key(key):
+            return "[REDACTED]"
+        if current is None or isinstance(current, (bool, int)):
+            return current
+        if isinstance(current, float):
+            return (
+                current
+                if current == current and abs(current) != float("inf")
+                else "[UNSUPPORTED]"
+            )
+        if isinstance(current, str):
+            return current if len(current) <= 2_048 else current[:2_048] + "[TRUNCATED]"
+        if isinstance(current, list):
+            return [visit(item, depth + 1) for item in current[:64]]
+        if isinstance(current, dict):
+            selected: list[tuple[str, Any]] = []
+            for raw_key, raw_value in current.items():
+                if len(selected) >= 64:
+                    break
+                if isinstance(raw_key, str):
+                    selected.append((raw_key, raw_value))
+            selected.sort(key=lambda pair: pair[0])
+            result: dict[str, Any] = {}
+            for raw_key, raw_value in selected:
+                clean_key = raw_key[:128]
+                if clean_key not in result:
+                    result[clean_key] = visit(raw_value, depth + 1, key=raw_key)
+            return result
+        return "[UNSUPPORTED]"
+
+    return visit(value, 0)
+
+
+def _validated_public_view(
+    value: Any,
+    *,
+    view_name: str,
+    string_fields: tuple[str, ...],
+    identifier_fields: tuple[str, ...] = (),
+    mapping_fields: tuple[str, ...] = (),
+    boolean_fields: tuple[str, ...] = (),
+    nullable_string_fields: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Return only fields in one public view after validating wire types."""
+    if not isinstance(value, dict):
+        raise TypeError(f"mission snapshot {view_name} must be an object")
+    for field in string_fields + identifier_fields:
+        if field not in value or not isinstance(value[field], str):
+            raise TypeError(f"mission snapshot {view_name}.{field} must be a string")
+    for field in identifier_fields:
+        if _MISSION_IDENTIFIER.fullmatch(value[field]) is None:
+            raise ValueError(
+                f"mission snapshot {view_name}.{field} must be a bounded identifier"
+            )
+    for field in mapping_fields:
+        if field not in value or not isinstance(value[field], dict):
+            raise TypeError(f"mission snapshot {view_name}.{field} must be an object")
+    for field in boolean_fields:
+        if field not in value or not isinstance(value[field], bool):
+            raise TypeError(f"mission snapshot {view_name}.{field} must be a boolean")
+    for field in nullable_string_fields:
+        if field not in value:
+            raise TypeError(
+                f"mission snapshot {view_name}.{field} must be a string or null"
+            )
+        candidate = value.get(field)
+        if candidate is not None and not isinstance(candidate, str):
+            raise TypeError(
+                f"mission snapshot {view_name}.{field} must be a string or null"
+            )
+    public_fields = (
+        string_fields
+        + identifier_fields
+        + mapping_fields
+        + boolean_fields
+        + nullable_string_fields
+    )
+    result = {field: value[field] for field in public_fields}
+    for field in mapping_fields:
+        result[field] = _bounded_public_json(result[field])
+    return result
+
+
+def _validated_public_collection(
+    projected: dict[str, Any],
+    *,
+    field: str,
+    mission_id: str,
+    identity_field: str,
+    string_fields: tuple[str, ...],
+    identifier_fields: tuple[str, ...],
+    mapping_fields: tuple[str, ...] = (),
+    boolean_fields: tuple[str, ...] = (),
+    nullable_string_fields: tuple[str, ...] = (),
+) -> list[dict[str, Any]]:
+    """Validate every bounded collection member and its mission identity."""
+    values = projected.get(field)
+    if not isinstance(values, list):
+        raise TypeError(f"mission snapshot field {field!r} must be a list")
+    if len(values) > _MISSION_SNAPSHOT_RECORD_LIMIT:
+        raise ValueError(f"mission snapshot field {field!r} exceeds the public bound")
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, value in enumerate(values):
+        public_view = _validated_public_view(
+            value,
+            view_name=f"{field}[{index}]",
+            string_fields=string_fields,
+            identifier_fields=identifier_fields,
+            mapping_fields=mapping_fields,
+            boolean_fields=boolean_fields,
+            nullable_string_fields=nullable_string_fields,
+        )
+        if public_view["mission_id"] != mission_id:
+            raise ValueError(
+                f"mission snapshot {field}[{index}] identity does not match the request"
+            )
+        record_id = public_view[identity_field]
+        if record_id in seen:
+            raise ValueError(
+                f"mission snapshot {field!r} contains a duplicate {identity_field}"
+            )
+        seen.add(record_id)
+        result.append(public_view)
+    return result
+
+
+def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]:
+    """Validate a provider result against the bounded public snapshot shape."""
+    projected = jsonable_encoder(snapshot)
+    if not isinstance(projected, dict):
+        raise TypeError("mission snapshot provider returned a non-object")
+    if set(projected) != _MISSION_SNAPSHOT_FIELDS:
+        raise ValueError("mission snapshot fields do not match the public contract")
+    mission = _validated_public_view(
+        projected.get("mission"),
+        view_name="mission",
+        string_fields=("title", "goal", "operator_id", "status"),
+        identifier_fields=("mission_id", "session_id"),
+        mapping_fields=("metadata",),
+        nullable_string_fields=("created_at", "updated_at"),
+    )
+    if mission["mission_id"] != mission_id:
+        raise ValueError("mission snapshot identity does not match the request")
+    tasks = _validated_public_collection(
+        projected,
+        field="tasks",
+        mission_id=mission_id,
+        identity_field="task_id",
+        string_fields=(
+            "title",
+            "description",
+            "status",
+            "priority",
+            "assigned_to",
+            "result",
+        ),
+        identifier_fields=("task_id", "mission_id"),
+        mapping_fields=("metadata",),
+        nullable_string_fields=("created_at", "updated_at"),
+    )
+    attempts = _validated_public_collection(
+        projected,
+        field="attempts",
+        mission_id=mission_id,
+        identity_field="attempt_id",
+        string_fields=(
+            "assigned_to",
+            "assigned_by",
+            "status",
+            "failure_code",
+            "idempotency_key",
+        ),
+        identifier_fields=(
+            "attempt_id",
+            "mission_id",
+            "session_id",
+            "task_id",
+            "claim_id",
+        ),
+        mapping_fields=("metadata",),
+        nullable_string_fields=("started_at", "completed_at"),
+    )
+    leases = _validated_public_collection(
+        projected,
+        field="leases",
+        mission_id=mission_id,
+        identity_field="claim_id",
+        string_fields=("attempt_id", "status"),
+        identifier_fields=(
+            "claim_id",
+            "mission_id",
+            "session_id",
+            "task_id",
+            "agent_id",
+        ),
+        mapping_fields=("metadata",),
+        boolean_fields=("active", "expired"),
+        nullable_string_fields=("heartbeat_at", "stale_after"),
+    )
+    receipts = _validated_public_collection(
+        projected,
+        field="receipts",
+        mission_id=mission_id,
+        identity_field="receipt_id",
+        string_fields=("receipt_type", "status", "idempotency_key"),
+        identifier_fields=(
+            "receipt_id",
+            "mission_id",
+            "task_id",
+            "attempt_id",
+            "agent_id",
+        ),
+        mapping_fields=("payload",),
+        nullable_string_fields=("created_at",),
+    )
+    if projected.get("reconciliation") not in {
+        "coherent",
+        "needs_task_projection",
+        "missing_terminal_receipt",
+        "conflicting_active_claims",
+        "active_claim_without_run",
+        "expired_lease",
+        "evidence_scan_saturated",
+        "foreign_runtime_record",
+        "conflicting_terminal_evidence",
+    }:
+        raise ValueError("mission snapshot reconciliation is not a public state")
+    if not isinstance(projected.get("observed_at"), str):
+        raise TypeError("mission snapshot observed_at must be an ISO timestamp")
+    if projected.get("authority") != _MISSION_AUTHORITY:
+        raise ValueError("mission snapshot authority is not canonical")
+    if projected.get("proves_executor_liveness") is not False:
+        raise ValueError("mission snapshot cannot claim executor liveness")
+    return {
+        "mission": mission,
+        "tasks": tasks,
+        "attempts": attempts,
+        "leases": leases,
+        "receipts": receipts,
+        "reconciliation": projected["reconciliation"],
+        "observed_at": projected["observed_at"],
+        "authority": projected["authority"],
+        "proves_executor_liveness": False,
+    }
 
 
 @router.get("/summary")
@@ -389,6 +728,127 @@ def control_surface_semantic_receipt_cards(
                 "cards": [],
             },
             [{"source": "semantic_receipt_cards", "error": str(e)}],
+        )
+
+
+@router.get("/missions/{mission_id}/snapshot")
+async def control_surface_mission_snapshot(
+    mission_id: str,
+    request: Request,
+    response: Response,
+) -> dict[str, Any]:
+    """Project one canonical MissionSnapshot through one configured reader.
+
+    The standard ``api.main`` bearer ingress authenticates this non-public
+    route.  This handler deliberately does not create a second credential
+    scheme.  It also never constructs MissionControl, TaskBoard,
+    RuntimeStateStore, an MCP client, or a background worker: the embedding
+    owner application must inject its already-governed read-only provider.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    mission_id = mission_id.strip()
+    if _MISSION_IDENTIFIER.fullmatch(mission_id) is None:
+        raise HTTPException(
+            status_code=422,
+            detail="mission_id must be a bounded identifier",
+        )
+
+    provider = getattr(request.app.state, "mission_snapshot_provider", None)
+    if provider is None:
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="uninitialized"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": "read-only provider is not injected",
+                }
+            ],
+        )
+
+    configured_mission_id = getattr(provider, "configured_mission_id", None)
+    if (
+        not isinstance(configured_mission_id, str)
+        or _MISSION_IDENTIFIER.fullmatch(configured_mission_id) is None
+    ):
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="uninitialized"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": "provider is not bound to one configured mission",
+                }
+            ],
+        )
+    if configured_mission_id != mission_id:
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="unknown"),
+            [
+                {
+                    "source": "mission_snapshot",
+                    "error": "requested mission is not configured",
+                }
+            ],
+        )
+
+    reader = getattr(provider, "get_snapshot", None)
+    if not callable(reader):
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="unknown"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": "injected provider has no read-only get_snapshot callable",
+                }
+            ],
+        )
+
+    try:
+        candidate = (
+            reader(mission_id)
+            if inspect.iscoroutinefunction(reader)
+            else await run_in_threadpool(reader, mission_id)
+        )
+        snapshot = await candidate if inspect.isawaitable(candidate) else candidate
+        if snapshot is None:
+            return _build_envelope(
+                _mission_snapshot_projection(mission_id, state="unknown"),
+                [
+                    {
+                        "source": "mission_snapshot",
+                        "error": "canonical state was not observed for this mission",
+                    }
+                ],
+            )
+        projected = _project_injected_snapshot(snapshot, mission_id)
+        provider_mode = getattr(provider, "runtime_projection_mode", None)
+        runtime_projection_mode = (
+            provider_mode
+            if provider_mode in {"immutable_copy", "owner_supplied_read_only"}
+            else "unavailable"
+        )
+        return _build_envelope(
+            _mission_snapshot_projection(
+                mission_id,
+                state="observed",
+                snapshot=projected,
+                runtime_projection_mode=runtime_projection_mode,
+            )
+        )
+    except Exception as exc:
+        # The identifier and provider exception are deliberately excluded from
+        # logs: both cross an injection boundary and may contain forged lines.
+        logger.warning("mission snapshot provider failed (kind=read_failed)")
+        error_type = type(exc).__name__
+        if _SAFE_ERROR_TYPE.fullmatch(error_type) is None:
+            error_type = "ProviderError"
+        return _build_envelope(
+            _mission_snapshot_projection(mission_id, state="unknown"),
+            [
+                {
+                    "source": "mission_snapshot_provider",
+                    "error": f"read failed ({error_type})",
+                }
+            ],
         )
 
 

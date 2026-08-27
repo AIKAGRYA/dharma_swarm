@@ -12,6 +12,7 @@ from dharma_swarm.mission_control_contract import (
     TERMINAL_RECEIPT_TYPE,
     AttemptView,
     MissionControlError,
+    MissionSnapshot,
     attempt_view,
     claim_is_active,
     claim_is_expired,
@@ -19,6 +20,7 @@ from dharma_swarm.mission_control_contract import (
     lease_view,
     mission_view,
     receipt_view,
+    public_mission_identifier,
     session_id,
     terminal_receipt_contract,
     task_view,
@@ -39,6 +41,38 @@ from dharma_swarm.task_board import TaskBoard, TaskBoardError
 # Preserve the exported pre-split function path for introspection and pickles.
 reconciliation.__module__ = __name__
 reconciliation.__qualname__ = "reconciliation"
+
+
+class ConfiguredMissionSnapshotProvider:
+    """Expose one configured Mission Control read without mutation methods.
+
+    The embedding owner API supplies an existing :class:`MissionControl` (or
+    another object implementing its async ``get_snapshot`` read).  This
+    adapter neither opens owner storage nor discovers missions, and an ID
+    mismatch is rejected before the canonical reader is invoked.
+    """
+
+    runtime_projection_mode = "owner_supplied_read_only"
+
+    def __init__(self, owner_reader: Any, *, mission_id: str) -> None:
+        reader = getattr(owner_reader, "get_snapshot", None)
+        if not callable(reader):
+            raise MissionControlError("owner reader must provide get_snapshot")
+        self._get_snapshot = reader
+        self._configured_mission_id = public_mission_identifier(mission_id)
+
+    @property
+    def configured_mission_id(self) -> str:
+        return self._configured_mission_id
+
+    async def get_snapshot(self, mission_id: str) -> MissionSnapshot | None:
+        requested = public_mission_identifier(mission_id)
+        if requested != self._configured_mission_id:
+            raise MissionControlError("requested mission is not configured")
+        snapshot = self._get_snapshot(requested)
+        if not hasattr(snapshot, "__await__"):
+            raise MissionControlError("owner get_snapshot must be asynchronous")
+        return await snapshot
 
 
 async def project_assigned_task(
@@ -474,6 +508,7 @@ class MissionControlProjectionMixin:
 
 
 __all__ = [
+    "ConfiguredMissionSnapshotProvider",
     "MissionControlProjectionMixin",
     "attempt_view",
     "lease_view",
