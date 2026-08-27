@@ -1,6 +1,6 @@
 {
-  "id": "organism-rewire-WP-IMMUTABLE-RUNTIME-CUSTODY-20260827",
-  "base_ref": "cc85f31bc7aab6c658e300950a811797a25a655b",
+  "id": "fleet-advancement-WP-IMMUTABLE-RUNTIME-CUSTODY-20260827",
+  "base_ref": "9084e4249ff952b9dbca5bafceb954e741b1c426",
   "branch": "codex/fleet-consolidation-runtime-20260826",
   "worktree": ".",
   "intent": "Bind autonomous runtime imports to one exact immutable release, move operational receipt defaults out of reviewed source custody and under the canonical Dharma state root, and keep those observed receipts epistemically distinct from repository-governed evidence until deliberate promotion.",
@@ -28,7 +28,7 @@
     "tests/test_runtime_release_entrypoint.py",
     "tests/test_runtime_release_runner.py",
     "tests/test_runtime_report_paths.py",
-    "reports/agentops/work_packets/organism-rewire-WP-IMMUTABLE-RUNTIME-CUSTODY-20260827.json"
+    "reports/agentops/work_packets/fleet-advancement-WP-IMMUTABLE-RUNTIME-CUSTODY-20260827.json"
   ],
   "forbidden_files": [],
   "gates": [
@@ -46,7 +46,7 @@
     },
     {
       "name": "diff-check",
-      "command": "git diff --check",
+      "command": "git diff --check 9084e4249ff952b9dbca5bafceb954e741b1c426...HEAD",
       "expected_exit": 0,
       "timeout_seconds": 120
     }
@@ -88,11 +88,11 @@
       "owner_files"
     ],
     "work_packet": "WP-IMMUTABLE-RUNTIME-CUSTODY-20260827",
-    "active_track": "organism-rewire-2026-07",
-    "owner": "@AmitabhainArunachala",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
     "collision": {
       "status": "clear",
-      "checked_at_sha": "cc85f31bc7aab6c658e300950a811797a25a655b",
+      "checked_at_sha": "9084e4249ff952b9dbca5bafceb954e741b1c426",
       "details": []
     },
     "interface_mismatches": [
@@ -107,12 +107,12 @@
       "dharma_swarm/runtime_process_identity.py"
     ],
     "honest_blockers": [
-      "This packet retrospectively binds the complete pull-request range from exact main cc85f31bc; the implementation commits predate the packet and gain no independent runtime authority from that chronology.",
+      "This rebinding retrospectively covers the complete pull-request range from exact four-lane authority commit 9084e4249ff952b9dbca5bafceb954e741b1c426. The implementation commits and their earlier organism-era packet predate this final Fleet envelope; no claim is made that a fresh preflight admitted those historical edits before they occurred.",
       "Repository tests prove release-root admission and default receipt custody. They do not install or restart launchd, cron, a VPS service, an A2A consumer, or the autonomous swarm.",
       "A receipt located below the state root remains an observation, not proof of external delivery, semantic processing, task success, or repository standing.",
       "The isolated release entrypoint intentionally admits only orchestrate-live; other commands remain denied until separately typed and governed."
     ],
     "rollback": "Revert this pull request as one unit. Restore runtime service configuration only through the separately receipted fleet cutover procedure; repository rollback alone neither deletes state-root receipts nor authorizes restarting the older autonomous release.",
-    "packet_digest": "4a7a98e0712bf8febf0297f80d24db36ff5868b920f99fa55e1b6f498c8545b7"
+    "packet_digest": "21e98828ae36f12816dcd8a30e967fdc1de91a8731271f9474f02eb49ef987f1"
   }
 }
