@@ -442,6 +442,19 @@ The release-owned activation sequence is:
    activation explicitly records that end-to-end replication is still
    unproven. Missing, stale, mis-custodied, wrong-role, timer-drifted, or
    nonempty-Serve evidence produces no new effect.
+
+   If activation crossed its durable intent edge but compensated before its
+   completion receipt, do not delete or rename the fixed receipts manually.
+   Stage the replacement release, then run
+   `retire-failed-standby-activation --role standby --failed-release-sha OLD --replacement-release-sha NEW --failed-intent-receipt-digest DIGEST`.
+   The root-only transaction requires the complete activation/clock/Serve
+   intent→ownership→stop chain, an empty private route, masked-and-stopped
+   writer units, no writer or dispatch marker, and supervisor PID zero. It
+   writes a durable retirement intent, archives the exact bytes beneath the
+   failed release receipt root, re-proves the quiet poststate, and publishes a
+   completion receipt before freeing the singleton paths. An interrupted
+   retirement leaves a fixed pending guard that blocks both a fresh clock
+   proof and standby activation until exact replay converges.
 2. Only after AGNI is fenced and live, perform Megh's non-root
    `verify --role writer` with the private input-set manifest and archive,
    restore root custody, and run `prepare-host --role writer`. Install

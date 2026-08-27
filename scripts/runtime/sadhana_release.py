@@ -37,6 +37,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -198,8 +199,8 @@ _UV_0_11_2_EGG_INFO_FILES = (
     (
         "SOURCES.txt",
         0o600,
-        77815,
-        "0d129f9b098ea385dc25e14034b69f5a893bddb22949da85d6d419a15ea7a0b7",
+        77856,
+        "ed8884b7bb6c85d2fa54a39fdb6ca6e9e864eecfc88ca910075c3d561fc0c610",
     ),
     (
         "dependency_links.txt",
@@ -414,18 +415,35 @@ ROLLBACK_RECEIPT = Path(
 ROLLBACK_SCHEMA_VERSION = "dharma.sadhana.release_rollback.v3"
 STANDBY_TARGET = "dharma-sadhana-standby.target"
 STANDBY_STOP_TIMER = "dharma-sadhana-standby-stop.timer"
+STANDBY_STOP_SERVICE = "dharma-sadhana-standby-stop.service"
 STANDBY_REPLICATION_SERVE_UNIT = (
     "dharma-sadhana-standby-replication-serve.service"
 )
+STANDBY_RECEIVER_PATH = "dharma-sadhana-standby-snapshot-receiver.path"
+STANDBY_RECEIVER_TIMER = "dharma-sadhana-standby-snapshot-receiver.timer"
+STANDBY_RECEIVER_SERVICE = "dharma-sadhana-standby-snapshot-receiver.service"
 STANDBY_ACTIVATION_RECEIPT = Path(
     "/etc/dharma-sadhana/receipts/preactivation/standby-activation.v1.json"
 )
 STANDBY_ACTIVATION_INTENT = Path(
     "/etc/dharma-sadhana/receipts/preactivation/standby-activation-intent.v1.json"
 )
+STANDBY_ACTIVATION_LOCK = Path(
+    "/etc/dharma-sadhana/receipts/preactivation/standby-activation.lock"
+)
+STANDBY_RETIREMENT_PENDING = Path(
+    "/etc/dharma-sadhana/receipts/preactivation/"
+    "standby-activation-retirement-pending.v1.json"
+)
 STANDBY_ACTIVATION_SCHEMA_VERSION = "dharma.sadhana.standby_activation.v1"
 STANDBY_ACTIVATION_INTENT_SCHEMA_VERSION = (
     "dharma.sadhana.standby_activation_intent.v1"
+)
+STANDBY_RETIREMENT_INTENT_SCHEMA_VERSION = (
+    "dharma.sadhana.standby_activation_retirement_intent.v2"
+)
+STANDBY_RETIREMENT_SCHEMA_VERSION = (
+    "dharma.sadhana.standby_activation_retirement.v2"
 )
 STANDBY_STOP_MARKER = Path(
     "/etc/dharma-sadhana/receipts/standby/deadline-stopped.v1.json"
@@ -510,11 +528,11 @@ CAMPAIGN_UNITS = (
 STANDBY_UNITS = (
     "dharma-sadhana-standby.target",
     STANDBY_REPLICATION_SERVE_UNIT,
-    "dharma-sadhana-standby-stop.service",
-    "dharma-sadhana-standby-stop.timer",
-    "dharma-sadhana-standby-snapshot-receiver.path",
-    "dharma-sadhana-standby-snapshot-receiver.timer",
-    "dharma-sadhana-standby-snapshot-receiver.service",
+    STANDBY_STOP_SERVICE,
+    STANDBY_STOP_TIMER,
+    STANDBY_RECEIVER_PATH,
+    STANDBY_RECEIVER_TIMER,
+    STANDBY_RECEIVER_SERVICE,
 )
 CAMPAIGN_PARTOF_UNITS = (
     "dharma-sadhana-dispatch.target",
@@ -1262,6 +1280,65 @@ _STANDBY_ACTIVATION_INTENT_FIELDS = {
     "standby_replication_serve_inactive_before",
     "standby_replication_route_absent_before",
     "effect_intent",
+    "writer_authority_transferred",
+    "receipt_digest",
+}
+_STANDBY_RETIREMENT_INTENT_FIELDS = {
+    "schema_version",
+    "campaign_id",
+    "failed_release_sha",
+    "replacement_release_sha",
+    "created_at",
+    "failed_staged_release_admission_receipt_digest",
+    "replacement_staged_release_admission_receipt_digest",
+    "failure_phase",
+    "failed_activation_intent_receipt_digest",
+    "failed_activation_intent_raw_sha256",
+    "failed_clock_proof_receipt_digest",
+    "failed_clock_proof_raw_sha256",
+    "failed_serve_intent_receipt_digest",
+    "failed_serve_intent_raw_sha256",
+    "failed_serve_ownership_receipt_digest",
+    "failed_serve_ownership_raw_sha256",
+    "failed_serve_stop_receipt_digest",
+    "failed_serve_stop_raw_sha256",
+    "archive_root",
+    "effect_intent",
+    "provider_dispatch",
+    "writer_authority_transferred",
+    "receipt_digest",
+}
+_STANDBY_RETIREMENT_FIELDS = {
+    "schema_version",
+    "campaign_id",
+    "failed_release_sha",
+    "replacement_release_sha",
+    "retired_at",
+    "retirement_intent_receipt_digest",
+    "archive_root",
+    "failure_phase",
+    "failed_activation_intent_receipt_digest",
+    "failed_clock_proof_receipt_digest",
+    "failed_serve_intent_receipt_digest",
+    "failed_serve_ownership_receipt_digest",
+    "failed_serve_stop_receipt_digest",
+    "singleton_receipts_absent",
+    "clock_proof_archived",
+    "campaign_units_masked_and_inactive",
+    "standby_target_inactive",
+    "standby_target_disabled",
+    "standby_stop_timer_inactive",
+    "standby_stop_timer_disabled",
+    "standby_replication_serve_inactive",
+    "standby_replication_serve_disabled",
+    "standby_auxiliary_units_inactive",
+    "standby_replication_route_absent",
+    "campaign_and_standby_units_jobless",
+    "writer_marker_absent",
+    "dispatch_marker_absent",
+    "supervisor_main_pid",
+    "effect",
+    "provider_dispatch",
     "writer_authority_transferred",
     "receipt_digest",
 }
@@ -7719,9 +7796,85 @@ def record_preactivation_clock_proof(
     expected_root_gid: int = 0,
 ) -> dict[str, Any]:
     """Record fresh NTP/skew/timer proof obtained through strict SSH custody."""
+    if role == "standby":
+        with _standby_lifecycle_lock(
+            path=STANDBY_ACTIVATION_INTENT.with_name(
+                STANDBY_ACTIVATION_LOCK.name
+            ),
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        ):
+            return _record_preactivation_clock_proof_locked(
+                role=role,
+                release_sha=release_sha,
+                controller_utc=controller_utc,
+                known_hosts_sha256=known_hosts_sha256,
+                strict_host_key_channel=strict_host_key_channel,
+                staged_release_admission_receipt_digest=(
+                    staged_release_admission_receipt_digest
+                ),
+                release_timer_path=release_timer_path,
+                installed_timer_path=installed_timer_path,
+                receipt_path=receipt_path,
+                runner=runner,
+                now=now,
+                observed_node=observed_node,
+                ssh_connection_observed=ssh_connection_observed,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+            )
+    return _record_preactivation_clock_proof_locked(
+        role=role,
+        release_sha=release_sha,
+        controller_utc=controller_utc,
+        known_hosts_sha256=known_hosts_sha256,
+        strict_host_key_channel=strict_host_key_channel,
+        staged_release_admission_receipt_digest=(
+            staged_release_admission_receipt_digest
+        ),
+        release_timer_path=release_timer_path,
+        installed_timer_path=installed_timer_path,
+        receipt_path=receipt_path,
+        runner=runner,
+        now=now,
+        observed_node=observed_node,
+        ssh_connection_observed=ssh_connection_observed,
+        expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
+    )
+
+
+def _record_preactivation_clock_proof_locked(
+    *,
+    role: str,
+    release_sha: str,
+    controller_utc: str,
+    known_hosts_sha256: str,
+    strict_host_key_channel: bool,
+    staged_release_admission_receipt_digest: str,
+    release_timer_path: Path,
+    installed_timer_path: Path,
+    receipt_path: Path = PREACTIVATION_CLOCK_RECEIPT,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = _run,
+    now: datetime | None = None,
+    observed_node: str | None = None,
+    ssh_connection_observed: bool | None = None,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+) -> dict[str, Any]:
+    """Record a proof while any standby lifecycle transaction is excluded."""
     if os.geteuid() != expected_root_uid:
         raise ReleaseContractError("clock proof requires root")
     node = _require_host_role(role, observed_node=observed_node)
+    if role == "standby" and any(
+        path.exists() or path.is_symlink()
+        for path in (
+            STANDBY_RETIREMENT_PENDING,
+            STANDBY_ACTIVATION_INTENT,
+            STANDBY_ACTIVATION_RECEIPT,
+        )
+    ):
+        raise ReleaseContractError("standby clock proof found lifecycle evidence")
     if not _COMMIT_RE.fullmatch(release_sha):
         raise ReleaseContractError("clock proof release SHA is invalid")
     expected_release_timer, expected_installed_timer, timer_unit = (
@@ -7839,6 +7992,7 @@ def validate_preactivation_clock_proof(
     observed_node: str | None = None,
     expected_root_uid: int = 0,
     expected_root_gid: int = 0,
+    require_fresh: bool = True,
 ) -> dict[str, Any]:
     if not _COMMIT_RE.fullmatch(release_sha):
         raise ReleaseContractError("clock-proof release SHA is invalid")
@@ -7929,12 +8083,16 @@ def validate_preactivation_clock_proof(
         raise ReleaseContractError("clock-proof validation time must be aware")
     valid_until = _parse_utc(receipt.get("valid_until", ""), "valid_until")
     observed = observed.astimezone(timezone.utc)
-    if (
+    if require_fresh and (
         valid_until != host_utc + timedelta(seconds=CLOCK_PROOF_FRESHNESS_SECONDS)
         or observed < host_utc
         or observed > valid_until
     ):
         raise ReleaseContractError("clock proof is not fresh")
+    if valid_until != host_utc + timedelta(
+        seconds=CLOCK_PROOF_FRESHNESS_SECONDS
+    ):
+        raise ReleaseContractError("clock-proof validity interval differs")
     return receipt
 
 
@@ -13659,7 +13817,10 @@ def _unit_inactive(
     unit: str,
     *,
     runner: Callable[..., subprocess.CompletedProcess[str]],
+    expected_load_state: str = "loaded",
 ) -> bool:
+    if expected_load_state not in {"loaded", "masked"}:
+        return False
     if unit.endswith(".service"):
         requested_properties = (
             "--property=LoadState",
@@ -13692,7 +13853,7 @@ def _unit_inactive(
             return False
         properties[key] = value
     expected = {
-        "LoadState": "loaded",
+        "LoadState": expected_load_state,
         "ActiveState": properties.get("ActiveState", ""),
     }
     if expected_main_pid is not None:
@@ -13765,6 +13926,20 @@ def _unit_disabled(
         and result.stdout == "disabled\n"
         and not result.stderr
     )
+
+
+def _unit_jobless(
+    unit: str,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]],
+) -> bool:
+    """Require systemd to have no queued job for one exact unit."""
+    result = runner(
+        (SYSTEMCTL_PATH, "show", "--property=Job", "--value", unit),
+        cwd=Path("/"),
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout == "\n" and not result.stderr
 
 
 def _unit_static(
@@ -13965,6 +14140,159 @@ def _rename_noreplace_at(
         os.strerror(error_number),
         f"{source_name} -> {destination_name}",
     )
+
+
+@contextmanager
+def _standby_lifecycle_lock(
+    *,
+    path: Path | None = None,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+) -> Any:
+    """Serialize standby activation and failed-attempt retirement."""
+    expected = STANDBY_ACTIVATION_INTENT.with_name(STANDBY_ACTIVATION_LOCK.name)
+    target = expected if path is None else path
+    if target != expected:
+        raise ReleaseContractError("standby lifecycle lock path differs")
+    _require_secure_parent_chain(target)
+    if not target.exists() and not target.is_symlink():
+        _atomic_private_bytes(
+            target,
+            b"",
+            uid=expected_root_uid,
+            gid=expected_root_gid,
+        )
+    try:
+        identity = target.lstat()
+    except OSError as exc:
+        raise ReleaseContractError("standby lifecycle lock is unavailable") from exc
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if (
+        not nofollow
+        or target.is_symlink()
+        or not stat.S_ISREG(identity.st_mode)
+        or identity.st_uid != expected_root_uid
+        or identity.st_gid != expected_root_gid
+        or stat.S_IMODE(identity.st_mode) != 0o600
+        or identity.st_nlink != 1
+        or identity.st_size != 0
+    ):
+        raise ReleaseContractError("standby lifecycle lock custody differs")
+    descriptor = os.open(target, os.O_RDWR | nofollow)
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_size,
+            opened.st_mtime_ns,
+        ) != (
+            identity.st_dev,
+            identity.st_ino,
+            identity.st_size,
+            identity.st_mtime_ns,
+        ):
+            raise ReleaseContractError("standby lifecycle lock changed during open")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise ReleaseContractError(
+                "standby lifecycle transaction is active"
+            ) from exc
+        if os.read(descriptor, 1) != b"":
+            raise ReleaseContractError("standby lifecycle lock bytes differ")
+        yield
+    finally:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
+def _move_exact_private_receipt(
+    source: Path,
+    destination: Path,
+    *,
+    expected_raw: bytes,
+    expected_uid: int,
+    expected_gid: int,
+    checkpoint: Callable[[str], None] | None = None,
+) -> None:
+    """Converge exactly one source entry into one immutable archive entry."""
+    source_exists = source.exists() or source.is_symlink()
+    destination_exists = destination.exists() or destination.is_symlink()
+    if source_exists and destination_exists:
+        raise ReleaseContractError("standby retirement receipt is duplicated")
+    if destination_exists:
+        archived, _identity = _read_exact_custodied_bytes(
+            destination,
+            expected_uid=expected_uid,
+            expected_gid=expected_gid,
+        )
+        if archived != expected_raw:
+            raise ReleaseContractError("standby retirement archive bytes differ")
+        return
+    if not source_exists:
+        raise ReleaseContractError("standby retirement receipt is absent")
+    admitted, identity = _read_exact_custodied_bytes(
+        source,
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+    )
+    if admitted != expected_raw:
+        raise ReleaseContractError("standby retirement source bytes differ")
+    _require_secure_parent_chain(destination)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    source_descriptor = os.open(
+        source.parent,
+        os.O_RDONLY | directory | nofollow,
+    )
+    destination_descriptor = os.open(
+        destination.parent,
+        os.O_RDONLY | directory | nofollow,
+    )
+    try:
+        current = os.stat(
+            source.name,
+            dir_fd=source_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            current.st_dev,
+            current.st_ino,
+            current.st_size,
+            current.st_mtime_ns,
+        ) != (
+            identity.st_dev,
+            identity.st_ino,
+            identity.st_size,
+            identity.st_mtime_ns,
+        ):
+            raise ReleaseContractError("standby retirement source changed")
+        if checkpoint is not None:
+            checkpoint(f"before:{source.name}")
+        _rename_noreplace_at(
+            source_descriptor,
+            source.name,
+            destination_descriptor,
+            destination.name,
+        )
+        os.fsync(source_descriptor)
+        if destination_descriptor != source_descriptor:
+            os.fsync(destination_descriptor)
+        if checkpoint is not None:
+            checkpoint(f"after:{source.name}")
+    finally:
+        os.close(destination_descriptor)
+        os.close(source_descriptor)
+    archived, _identity = _read_exact_custodied_bytes(
+        destination,
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+    )
+    if archived != expected_raw:
+        raise ReleaseContractError("standby retirement archive changed")
 
 
 def _claim_emergency_candidate(
@@ -14847,6 +15175,8 @@ def _standby_activation_intent(
     expected_root_uid: int,
     expected_root_gid: int,
 ) -> tuple[dict[str, Any], bool]:
+    if STANDBY_RETIREMENT_PENDING.exists() or STANDBY_RETIREMENT_PENDING.is_symlink():
+        raise ReleaseContractError("standby retirement is incomplete")
     expected = {
         "campaign_id": MISSION_ID,
         "release_sha": release_sha,
@@ -14882,6 +15212,17 @@ def _standby_activation_intent(
         return prior, False
     if WRITER_MARKER.exists() or WRITER_MARKER.is_symlink():
         raise ReleaseContractError("standby activation found a writer marker")
+    if any(
+        candidate.exists() or candidate.is_symlink()
+        for candidate in (
+            STANDBY_TAILSCALE_INTENT_RECEIPT,
+            STANDBY_TAILSCALE_OWNERSHIP_RECEIPT,
+            STANDBY_TAILSCALE_STOP_RECEIPT,
+        )
+    ):
+        raise ReleaseContractError(
+            "fresh standby activation found prior Serve evidence"
+        )
     if not (
         _unit_inactive(STANDBY_TARGET, runner=runner)
         and _unit_disabled(STANDBY_TARGET, runner=runner)
@@ -14936,7 +15277,12 @@ def _standby_activation_live_state(
         raise ReleaseContractError("standby activation Serve ownership differs")
     live = {
         "campaign_units_masked_and_inactive": all(
-            _unit_inactive(unit, runner=runner) and _unit_masked(unit, runner=runner)
+            _unit_inactive(
+                unit,
+                runner=runner,
+                expected_load_state="masked",
+            )
+            and _unit_masked(unit, runner=runner)
             for unit in CAMPAIGN_UNITS
         ),
         "standby_stop_timer_active": _unit_active(
@@ -14990,12 +15336,672 @@ def _standby_compensation_is_quiet(
         and _unit_disabled(STANDBY_STOP_TIMER, runner=runner)
         and _unit_inactive(STANDBY_REPLICATION_SERVE_UNIT, runner=runner)
         and all(
-            _unit_inactive(unit, runner=runner)
+            _unit_inactive(
+                unit,
+                runner=runner,
+                expected_load_state="masked",
+            )
             and _unit_masked(unit, runner=runner)
             for unit in CAMPAIGN_UNITS
         )
         and not (WRITER_MARKER.exists() or WRITER_MARKER.is_symlink())
     )
+
+
+def _standby_retirement_archive_root(
+    *,
+    failed_release_sha: str,
+    failed_intent_receipt_digest: str,
+    release_receipt_root: Path,
+) -> Path:
+    if (
+        not _COMMIT_RE.fullmatch(failed_release_sha)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", failed_intent_receipt_digest) is None
+    ):
+        raise ReleaseContractError("standby retirement identity differs")
+    return (
+        release_receipt_root
+        / failed_release_sha
+        / "failed-standby"
+        / failed_intent_receipt_digest.removeprefix("sha256:")
+    )
+
+
+def _standby_retirement_paths(
+    *,
+    failed_release_sha: str,
+    failed_intent_receipt_digest: str,
+    release_receipt_root: Path,
+    activation_intent_path: Path,
+    clock_proof_path: Path,
+    serve_intent_path: Path,
+    serve_ownership_path: Path,
+    serve_stop_path: Path,
+) -> tuple[Path, dict[str, tuple[Path, Path]]]:
+    archive_root = _standby_retirement_archive_root(
+        failed_release_sha=failed_release_sha,
+        failed_intent_receipt_digest=failed_intent_receipt_digest,
+        release_receipt_root=release_receipt_root,
+    )
+    return archive_root, {
+        "activation_intent": (
+            activation_intent_path,
+            archive_root / "standby-activation-intent.v1.json",
+        ),
+        "clock_proof": (
+            clock_proof_path,
+            archive_root / "preactivation-clock-proof.v1.json",
+        ),
+        "serve_intent": (
+            serve_intent_path,
+            archive_root / "standby-replication-serve-intent.v1.json",
+        ),
+        "serve_ownership": (
+            serve_ownership_path,
+            archive_root / "standby-replication-serve-owned.v1.json",
+        ),
+        "serve_stop": (
+            serve_stop_path,
+            archive_root / "standby-replication-serve-stopped.v1.json",
+        ),
+    }
+
+
+def _read_retirement_receipt(
+    source: Path,
+    archive: Path,
+    *,
+    expected_schema: str,
+    expected_root_uid: int,
+    expected_root_gid: int,
+    retain_source: bool = False,
+) -> tuple[dict[str, Any], bytes, Path]:
+    source_exists = source.exists() or source.is_symlink()
+    archive_exists = archive.exists() or archive.is_symlink()
+    if archive_exists:
+        selected = archive
+    elif source_exists:
+        selected = source
+    else:
+        raise ReleaseContractError("standby retirement evidence is absent")
+    if source_exists and archive_exists and not retain_source:
+        raise ReleaseContractError("standby retirement evidence is duplicated")
+    payload, raw, _identity = _read_exact_canonical_json(
+        selected,
+        expected_uid=expected_root_uid,
+        expected_gid=expected_root_gid,
+        expected_schema=expected_schema,
+        digest_field="receipt_digest",
+    )
+    return payload, raw, selected
+
+
+def _standby_retirement_quiet_state(
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]],
+) -> dict[str, Any]:
+    _require_standby_tailscale_route_absent(runner=runner)
+    state = {
+        "campaign_units_masked_and_inactive": all(
+            _unit_inactive(
+                unit,
+                runner=runner,
+                expected_load_state="masked",
+            )
+            and _unit_masked(unit, runner=runner)
+            for unit in CAMPAIGN_UNITS
+        ),
+        "standby_target_inactive": _unit_inactive(STANDBY_TARGET, runner=runner),
+        "standby_target_disabled": _unit_disabled(STANDBY_TARGET, runner=runner),
+        "standby_stop_timer_inactive": _unit_inactive(
+            STANDBY_STOP_TIMER, runner=runner
+        ),
+        "standby_stop_timer_disabled": _unit_disabled(
+            STANDBY_STOP_TIMER, runner=runner
+        ),
+        "standby_replication_serve_inactive": _unit_inactive(
+            STANDBY_REPLICATION_SERVE_UNIT, runner=runner
+        ),
+        "standby_replication_serve_disabled": _unit_disabled(
+            STANDBY_REPLICATION_SERVE_UNIT, runner=runner
+        ),
+        "standby_auxiliary_units_inactive": all(
+            _unit_inactive(unit, runner=runner)
+            for unit in STANDBY_UNITS
+            if unit
+            not in {
+                STANDBY_TARGET,
+                STANDBY_STOP_TIMER,
+                STANDBY_REPLICATION_SERVE_UNIT,
+            }
+        ),
+        "standby_replication_route_absent": True,
+        "campaign_and_standby_units_jobless": all(
+            _unit_jobless(unit, runner=runner)
+            for unit in dict.fromkeys((*CAMPAIGN_UNITS, *STANDBY_UNITS))
+        ),
+        "writer_marker_absent": not (
+            WRITER_MARKER.exists() or WRITER_MARKER.is_symlink()
+        ),
+        "dispatch_marker_absent": not (
+            DISPATCH_ENABLE_MARKER.exists() or DISPATCH_ENABLE_MARKER.is_symlink()
+        ),
+        "supervisor_main_pid": _systemd_main_pid(SUPERVISOR_UNIT, runner=runner),
+    }
+    if any(
+        value is not True
+        for key, value in state.items()
+        if key != "supervisor_main_pid"
+    ):
+        raise ReleaseContractError("standby retirement is not authority-quiet")
+    if state["supervisor_main_pid"] != 0:
+        raise ReleaseContractError("standby retirement found a supervisor process")
+    return state
+
+
+def _validate_standby_retirement_evidence(
+    *,
+    failed_release_sha: str,
+    failed_admission: Mapping[str, Any],
+    failed_intent_receipt_digest: str,
+    paths: Mapping[str, tuple[Path, Path]],
+    expected_root_uid: int,
+    expected_root_gid: int,
+) -> tuple[dict[str, dict[str, Any]], dict[str, bytes], str]:
+    activation, activation_raw, _activation_selected = _read_retirement_receipt(
+        *paths["activation_intent"],
+        expected_schema=STANDBY_ACTIVATION_INTENT_SCHEMA_VERSION,
+        expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
+    )
+    if (
+        set(activation) != _STANDBY_ACTIVATION_INTENT_FIELDS
+        or activation.get("campaign_id") != MISSION_ID
+        or activation.get("release_sha") != failed_release_sha
+        or activation.get("staged_release_admission_receipt_digest")
+        != failed_admission.get("receipt_digest")
+        or activation.get("receipt_digest") != failed_intent_receipt_digest
+        or activation.get("effect_intent") != "InfrastructureEffect"
+        or activation.get("writer_authority_transferred") is not False
+    ):
+        raise ReleaseContractError("failed standby activation intent differs")
+    clock, clock_raw, _clock_selected = _read_retirement_receipt(
+        *paths["clock_proof"],
+        expected_schema=PREACTIVATION_CLOCK_SCHEMA_VERSION,
+        expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
+        retain_source=True,
+    )
+    if (
+        set(clock) != _PREACTIVATION_CLOCK_PROOF_FIELDS
+        or clock.get("mission_id") != MISSION_ID
+        or clock.get("release_sha") != failed_release_sha
+        or clock.get("role") != "standby"
+        or clock.get("hostname") != STANDBY_NODE
+        or clock.get("staged_release_admission_receipt_digest")
+        != failed_admission.get("receipt_digest")
+        or clock.get("receipt_digest")
+        != activation.get("preactivation_clock_proof_receipt_digest")
+        or clock.get("campaign_stop_utc") != CAMPAIGN_STOP_UTC
+        or clock.get("timer_unit") != STANDBY_STOP_TIMER
+        or clock.get("strict_host_key_channel") is not True
+        or clock.get("ssh_connection_observed") is not True
+        or clock.get("ntp_synchronized") is not True
+        or clock.get("installed_timer_match") is not True
+    ):
+        raise ReleaseContractError("failed standby clock proof differs")
+    serve_present = tuple(
+        any(path.exists() or path.is_symlink() for path in paths[label])
+        for label in ("serve_intent", "serve_ownership", "serve_stop")
+    )
+    phase_by_presence = {
+        (False, False, False): "IntentOnlyQuiet",
+        (True, False, False): "ServeIntentOnlyQuiet",
+        (True, True, True): "ServeOwnedStoppedQuiet",
+    }
+    try:
+        failure_phase = phase_by_presence[serve_present]
+    except KeyError as exc:
+        raise ReleaseContractError(
+            "failed standby Serve evidence phase is inadmissible"
+        ) from exc
+    evidence = {
+        "activation_intent": activation,
+        "clock_proof": clock,
+    }
+    raw = {
+        "activation_intent": activation_raw,
+        "clock_proof": clock_raw,
+    }
+    if serve_present[0]:
+        serve_intent, serve_intent_raw, serve_intent_selected = (
+            _read_retirement_receipt(
+                *paths["serve_intent"],
+                expected_schema=STANDBY_TAILSCALE_INTENT_SCHEMA_VERSION,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+            )
+        )
+        _load_standby_tailscale_intent_receipt(
+            serve_intent_selected,
+            release_sha=failed_release_sha,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+        evidence["serve_intent"] = serve_intent
+        raw["serve_intent"] = serve_intent_raw
+    if serve_present[1]:
+        serve_ownership, serve_ownership_raw, serve_ownership_selected = (
+            _read_retirement_receipt(
+                *paths["serve_ownership"],
+                expected_schema=STANDBY_TAILSCALE_OWNERSHIP_SCHEMA_VERSION,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+            )
+        )
+        ownership = _load_standby_tailscale_ownership_receipt(
+            serve_ownership_selected,
+            release_sha=failed_release_sha,
+            intent_path=serve_intent_selected,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+        evidence["serve_ownership"] = serve_ownership
+        raw["serve_ownership"] = serve_ownership_raw
+    if serve_present[2]:
+        serve_stop, serve_stop_raw, serve_stop_selected = (
+            _read_retirement_receipt(
+                *paths["serve_stop"],
+                expected_schema=STANDBY_TAILSCALE_STOP_SCHEMA_VERSION,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+            )
+        )
+        _load_standby_tailscale_stop_receipt(
+            serve_stop_selected,
+            release_sha=failed_release_sha,
+            ownership=ownership,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+        evidence["serve_stop"] = serve_stop
+        raw["serve_stop"] = serve_stop_raw
+    return evidence, raw, failure_phase
+
+
+def retire_failed_standby_activation(
+    *,
+    role: str,
+    failed_release_sha: str,
+    replacement_release_sha: str,
+    failed_intent_receipt_digest: str,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = _run,
+    now: datetime | None = None,
+    observed_node: str | None = None,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+    release_receipt_root: Path = RELEASE_RECEIPT_ROOT,
+    checkpoint: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    """Retire one authority-quiet standby attempt without losing evidence."""
+    if os.geteuid() != expected_root_uid:
+        raise ReleaseContractError("standby retirement requires root")
+    node = _require_host_role(role, observed_node=observed_node)
+    if (
+        role != "standby"
+        or not _COMMIT_RE.fullmatch(failed_release_sha)
+        or not _COMMIT_RE.fullmatch(replacement_release_sha)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", failed_intent_receipt_digest) is None
+        or release_receipt_root != RELEASE_RECEIPT_ROOT
+        or _current_frozen_release_sha() != replacement_release_sha
+    ):
+        raise ReleaseContractError("standby retirement binding differs")
+    observed = now or datetime.now(timezone.utc)
+    if observed.tzinfo is None:
+        raise ReleaseContractError("standby retirement clock must be aware")
+    observed = observed.astimezone(timezone.utc).replace(microsecond=0)
+    guard_campaign_clock(role=role, now=observed, observed_node=node)
+    archive_root, paths = _standby_retirement_paths(
+        failed_release_sha=failed_release_sha,
+        failed_intent_receipt_digest=failed_intent_receipt_digest,
+        release_receipt_root=release_receipt_root,
+        activation_intent_path=STANDBY_ACTIVATION_INTENT,
+        clock_proof_path=PREACTIVATION_CLOCK_RECEIPT,
+        serve_intent_path=STANDBY_TAILSCALE_INTENT_RECEIPT,
+        serve_ownership_path=STANDBY_TAILSCALE_OWNERSHIP_RECEIPT,
+        serve_stop_path=STANDBY_TAILSCALE_STOP_RECEIPT,
+    )
+    archived_retirement_intent = archive_root / "retirement-intent.v1.json"
+    completion_path = archive_root / "retirement-complete.v1.json"
+    with _standby_lifecycle_lock(
+        expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
+    ):
+        if (
+            STANDBY_ACTIVATION_RECEIPT.exists()
+            or STANDBY_ACTIVATION_RECEIPT.is_symlink()
+        ):
+            raise ReleaseContractError("completed standby activation cannot be retired")
+        failed_admission, _failed_account = _verify_activation_staged_release(
+            role=role,
+            release_sha=failed_release_sha,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+        replacement_admission, _replacement_account = _verify_activation_staged_release(
+            role=role,
+            release_sha=replacement_release_sha,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+        for directory in (
+            archive_root.parent,
+            archive_root,
+        ):
+            _ensure_private_directory(
+                directory,
+                uid=expected_root_uid,
+                gid=expected_root_gid,
+            )
+        completed = completion_path.exists() or completion_path.is_symlink()
+        pending = (
+            STANDBY_RETIREMENT_PENDING.exists()
+            or STANDBY_RETIREMENT_PENDING.is_symlink()
+        )
+        if not pending and not completed and any(archive_root.iterdir()):
+            raise ReleaseContractError(
+                "standby retirement found orphaned archive evidence"
+            )
+        if pending:
+            retirement_intent, _raw, _identity = _read_exact_canonical_json(
+                STANDBY_RETIREMENT_PENDING,
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+                expected_schema=STANDBY_RETIREMENT_INTENT_SCHEMA_VERSION,
+                digest_field="receipt_digest",
+            )
+        elif completed:
+            retirement_intent, _raw, _identity = _read_exact_canonical_json(
+                archived_retirement_intent,
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+                expected_schema=STANDBY_RETIREMENT_INTENT_SCHEMA_VERSION,
+                digest_field="receipt_digest",
+            )
+        else:
+            evidence, raw, failure_phase = _validate_standby_retirement_evidence(
+                failed_release_sha=failed_release_sha,
+                failed_admission=failed_admission,
+                failed_intent_receipt_digest=failed_intent_receipt_digest,
+                paths=paths,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+            )
+            validate_preactivation_clock_proof(
+                release_sha=failed_release_sha,
+                role=role,
+                known_hosts_sha256=DEPLOYMENT_KNOWN_HOSTS_SHA256,
+                staged_release_admission_receipt_digest=(
+                    failed_admission["receipt_digest"]
+                ),
+                receipt_path=PREACTIVATION_CLOCK_RECEIPT,
+                now=observed,
+                observed_node=node,
+                expected_root_uid=expected_root_uid,
+                expected_root_gid=expected_root_gid,
+                require_fresh=False,
+            )
+            _standby_retirement_quiet_state(runner=runner)
+            retirement_intent = {
+                "schema_version": STANDBY_RETIREMENT_INTENT_SCHEMA_VERSION,
+                "campaign_id": MISSION_ID,
+                "failed_release_sha": failed_release_sha,
+                "replacement_release_sha": replacement_release_sha,
+                "created_at": observed.isoformat().replace("+00:00", "Z"),
+                "failed_staged_release_admission_receipt_digest": (
+                    failed_admission["receipt_digest"]
+                ),
+                "replacement_staged_release_admission_receipt_digest": (
+                    replacement_admission["receipt_digest"]
+                ),
+                "failure_phase": failure_phase,
+                "archive_root": str(archive_root),
+                "effect_intent": "RecoveryAuthorityEffect",
+                "provider_dispatch": "NoProviderDispatch",
+                "writer_authority_transferred": False,
+                "receipt_digest": "",
+            }
+            for label in (
+                "activation_intent",
+                "clock_proof",
+                "serve_intent",
+                "serve_ownership",
+                "serve_stop",
+            ):
+                admitted = evidence.get(label)
+                retirement_intent[f"failed_{label}_receipt_digest"] = (
+                    admitted["receipt_digest"] if admitted is not None else None
+                )
+                admitted_raw = raw.get(label)
+                retirement_intent[f"failed_{label}_raw_sha256"] = (
+                    "sha256:" + hashlib.sha256(admitted_raw).hexdigest()
+                    if admitted_raw is not None
+                    else None
+                )
+            retirement_intent["receipt_digest"] = _canonical_self_digest(
+                retirement_intent,
+                "receipt_digest",
+            )
+            if set(retirement_intent) != _STANDBY_RETIREMENT_INTENT_FIELDS:
+                raise ReleaseContractError("standby retirement intent fields differ")
+            _publish_or_replay_private_receipt(
+                STANDBY_RETIREMENT_PENDING,
+                retirement_intent,
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+            )
+            pending = True
+        expected_intent = {
+            "campaign_id": MISSION_ID,
+            "failed_release_sha": failed_release_sha,
+            "replacement_release_sha": replacement_release_sha,
+            "failed_staged_release_admission_receipt_digest": failed_admission[
+                "receipt_digest"
+            ],
+            "replacement_staged_release_admission_receipt_digest": (
+                replacement_admission["receipt_digest"]
+            ),
+            "archive_root": str(archive_root),
+            "effect_intent": "RecoveryAuthorityEffect",
+            "provider_dispatch": "NoProviderDispatch",
+            "writer_authority_transferred": False,
+        }
+        if (
+            set(retirement_intent) != _STANDBY_RETIREMENT_INTENT_FIELDS
+            or retirement_intent.get("failed_activation_intent_receipt_digest")
+            != failed_intent_receipt_digest
+            or any(
+                retirement_intent.get(key) != value
+                for key, value in expected_intent.items()
+            )
+        ):
+            raise ReleaseContractError("standby retirement intent differs")
+        evidence, raw, failure_phase = _validate_standby_retirement_evidence(
+            failed_release_sha=failed_release_sha,
+            failed_admission=failed_admission,
+            failed_intent_receipt_digest=failed_intent_receipt_digest,
+            paths=paths,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+        if retirement_intent.get("failure_phase") != failure_phase:
+            raise ReleaseContractError("standby retirement phase differs")
+        for label in (
+            "activation_intent",
+            "clock_proof",
+            "serve_intent",
+            "serve_ownership",
+            "serve_stop",
+        ):
+            admitted = evidence.get(label)
+            admitted_raw = raw.get(label)
+            if (
+                retirement_intent.get(f"failed_{label}_receipt_digest")
+                != (admitted["receipt_digest"] if admitted is not None else None)
+                or retirement_intent.get(f"failed_{label}_raw_sha256")
+                != (
+                    "sha256:" + hashlib.sha256(admitted_raw).hexdigest()
+                    if admitted_raw is not None
+                    else None
+                )
+            ):
+                raise ReleaseContractError("standby retirement evidence differs")
+        if not completed:
+            _publish_or_replay_private_receipt(
+                paths["clock_proof"][1],
+                evidence["clock_proof"],
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+            )
+            for label in (
+                "serve_stop",
+                "serve_ownership",
+                "serve_intent",
+                "activation_intent",
+            ):
+                if label not in raw:
+                    continue
+                _move_exact_private_receipt(
+                    *paths[label],
+                    expected_raw=raw[label],
+                    expected_uid=expected_root_uid,
+                    expected_gid=expected_root_gid,
+                    checkpoint=checkpoint,
+                )
+            quiet = _standby_retirement_quiet_state(runner=runner)
+            singleton_absent = all(
+                not source.exists() and not source.is_symlink()
+                for label, (source, _archive) in paths.items()
+                if label != "clock_proof"
+            )
+            if not singleton_absent:
+                raise ReleaseContractError("standby retirement singleton remains")
+            completion: dict[str, Any] = {
+                "schema_version": STANDBY_RETIREMENT_SCHEMA_VERSION,
+                "campaign_id": MISSION_ID,
+                "failed_release_sha": failed_release_sha,
+                "replacement_release_sha": replacement_release_sha,
+                "retired_at": observed.isoformat().replace("+00:00", "Z"),
+                "retirement_intent_receipt_digest": retirement_intent["receipt_digest"],
+                "archive_root": str(archive_root),
+                "failure_phase": failure_phase,
+                "failed_activation_intent_receipt_digest": evidence[
+                    "activation_intent"
+                ]["receipt_digest"],
+                "failed_clock_proof_receipt_digest": evidence["clock_proof"][
+                    "receipt_digest"
+                ],
+                "failed_serve_intent_receipt_digest": (
+                    evidence["serve_intent"]["receipt_digest"]
+                    if "serve_intent" in evidence
+                    else None
+                ),
+                "failed_serve_ownership_receipt_digest": (
+                    evidence["serve_ownership"]["receipt_digest"]
+                    if "serve_ownership" in evidence
+                    else None
+                ),
+                "failed_serve_stop_receipt_digest": (
+                    evidence["serve_stop"]["receipt_digest"]
+                    if "serve_stop" in evidence
+                    else None
+                ),
+                "singleton_receipts_absent": True,
+                "clock_proof_archived": True,
+                **quiet,
+                "effect": "RecoveryAuthorityEffect",
+                "provider_dispatch": "NoProviderDispatch",
+                "writer_authority_transferred": False,
+                "receipt_digest": "",
+            }
+            completion["receipt_digest"] = _canonical_self_digest(
+                completion,
+                "receipt_digest",
+            )
+            if set(completion) != _STANDBY_RETIREMENT_FIELDS:
+                raise ReleaseContractError("standby retirement fields differ")
+            _publish_or_replay_private_receipt(
+                completion_path,
+                completion,
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+            )
+            _move_exact_private_receipt(
+                STANDBY_RETIREMENT_PENDING,
+                archived_retirement_intent,
+                expected_raw=_canonical_bytes(retirement_intent) + b"\n",
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+                checkpoint=checkpoint,
+            )
+            return completion
+        completion, _raw, _identity = _read_exact_canonical_json(
+            completion_path,
+            expected_uid=expected_root_uid,
+            expected_gid=expected_root_gid,
+            expected_schema=STANDBY_RETIREMENT_SCHEMA_VERSION,
+            digest_field="receipt_digest",
+        )
+        quiet = _standby_retirement_quiet_state(runner=runner)
+        expected_completion = {
+            "campaign_id": MISSION_ID,
+            "failed_release_sha": failed_release_sha,
+            "replacement_release_sha": replacement_release_sha,
+            "retirement_intent_receipt_digest": retirement_intent["receipt_digest"],
+            "archive_root": str(archive_root),
+            "failure_phase": failure_phase,
+            "failed_activation_intent_receipt_digest": evidence["activation_intent"][
+                "receipt_digest"
+            ],
+            "failed_clock_proof_receipt_digest": evidence["clock_proof"][
+                "receipt_digest"
+            ],
+            "failed_serve_intent_receipt_digest": (
+                evidence["serve_intent"]["receipt_digest"]
+                if "serve_intent" in evidence
+                else None
+            ),
+            "failed_serve_ownership_receipt_digest": (
+                evidence["serve_ownership"]["receipt_digest"]
+                if "serve_ownership" in evidence
+                else None
+            ),
+            "failed_serve_stop_receipt_digest": (
+                evidence["serve_stop"]["receipt_digest"]
+                if "serve_stop" in evidence
+                else None
+            ),
+            "singleton_receipts_absent": True,
+            "clock_proof_archived": True,
+            **quiet,
+            "effect": "RecoveryAuthorityEffect",
+            "provider_dispatch": "NoProviderDispatch",
+            "writer_authority_transferred": False,
+        }
+        if set(completion) != _STANDBY_RETIREMENT_FIELDS or any(
+            completion.get(key) != value for key, value in expected_completion.items()
+        ):
+            raise ReleaseContractError("standby retirement completion differs")
+        if pending:
+            _move_exact_private_receipt(
+                STANDBY_RETIREMENT_PENDING,
+                archived_retirement_intent,
+                expected_raw=_canonical_bytes(retirement_intent) + b"\n",
+                expected_uid=expected_root_uid,
+                expected_gid=expected_root_gid,
+                checkpoint=checkpoint,
+            )
+        return completion
 
 
 def _compensate_failed_standby_replay(
@@ -15058,6 +16064,38 @@ def activate_standby(
     expected_root_uid: int = 0,
     expected_root_gid: int = 0,
 ) -> dict[str, Any]:
+    with _standby_lifecycle_lock(
+        path=intent_path.with_name(STANDBY_ACTIVATION_LOCK.name),
+        expected_root_uid=expected_root_uid,
+        expected_root_gid=expected_root_gid,
+    ):
+        return _activate_standby_locked(
+            role=role,
+            release_sha=release_sha,
+            receipt_path=receipt_path,
+            intent_path=intent_path,
+            runner=runner,
+            now=now,
+            clock=clock,
+            observed_node=observed_node,
+            expected_root_uid=expected_root_uid,
+            expected_root_gid=expected_root_gid,
+        )
+
+
+def _activate_standby_locked(
+    *,
+    role: str,
+    release_sha: str,
+    receipt_path: Path = STANDBY_ACTIVATION_RECEIPT,
+    intent_path: Path = STANDBY_ACTIVATION_INTENT,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = _run,
+    now: datetime | None = None,
+    clock: Callable[[], datetime] | None = None,
+    observed_node: str | None = None,
+    expected_root_uid: int = 0,
+    expected_root_gid: int = 0,
+) -> dict[str, Any]:
     """Fence writer units and activate only the receipted append-only standby."""
     if os.geteuid() != expected_root_uid:
         raise ReleaseContractError("standby activation requires root")
@@ -15069,6 +16107,11 @@ def activate_standby(
         or intent_path != STANDBY_ACTIVATION_INTENT
     ):
         raise ReleaseContractError("standby activation binding differs")
+    if (
+        STANDBY_RETIREMENT_PENDING.exists()
+        or STANDBY_RETIREMENT_PENDING.is_symlink()
+    ):
+        raise ReleaseContractError("standby retirement is incomplete")
     replay = receipt_path.exists() or receipt_path.is_symlink()
     crash_intent = not replay and (intent_path.exists() or intent_path.is_symlink())
     try:
@@ -21915,6 +22958,14 @@ def _parser() -> argparse.ArgumentParser:
         "--role", choices=("standby",), required=True
     )
     activate_standby_parser.add_argument("--release-sha", required=True)
+    retire_standby_parser = commands.add_parser(
+        "retire-failed-standby-activation",
+        help="archive one compensated standby attempt before replacement",
+    )
+    retire_standby_parser.add_argument("--role", choices=("standby",), required=True)
+    retire_standby_parser.add_argument("--failed-release-sha", required=True)
+    retire_standby_parser.add_argument("--replacement-release-sha", required=True)
+    retire_standby_parser.add_argument("--failed-intent-receipt-digest", required=True)
     health_probe = commands.add_parser(
         "probe-observer-health",
         help="record twenty exact 18420 observer responses before dispatch",
@@ -22300,6 +23351,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "status": "standby_activated",
                     "receipt_digest": receipt["receipt_digest"],
                     "effect": receipt["effect"],
+                    "writer_authority_transferred": False,
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
+    if args.command == "retire-failed-standby-activation":
+        receipt = retire_failed_standby_activation(
+            role=args.role,
+            failed_release_sha=args.failed_release_sha,
+            replacement_release_sha=args.replacement_release_sha,
+            failed_intent_receipt_digest=args.failed_intent_receipt_digest,
+        )
+        print(
+            json.dumps(
+                {
+                    "status": "failed_standby_activation_retired",
+                    "receipt_digest": receipt["receipt_digest"],
+                    "effect": receipt["effect"],
+                    "provider_dispatch": receipt["provider_dispatch"],
                     "writer_authority_transferred": False,
                 },
                 sort_keys=True,
