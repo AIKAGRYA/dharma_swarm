@@ -34,7 +34,15 @@ from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from dharma_swarm.daemon_config import runtime_report_dir
-from dharma_swarm.mission_control_contract import ReconciliationState
+from dharma_swarm.mission_control_contract import (
+    ACTIVE_CLAIM_STATUSES,
+    OPEN_CLAIM_STATUSES,
+    OWNER_TERMINAL_ATTEMPT_STATUSES,
+    RECOVERY_RECEIPT_TYPE,
+    TERMINAL_RECEIPT_TYPE,
+    ReconciliationState,
+    public_attempt_status,
+)
 from dharma_swarm.models import TaskPriority, TaskStatus
 
 logger = logging.getLogger(__name__)
@@ -60,6 +68,13 @@ _SAFE_ERROR_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,79}")
 _MISSION_AUTHORITY = "TaskBoard+RuntimeStateStore"
 _TASK_STATUSES = frozenset(member.value for member in TaskStatus)
 _TASK_PRIORITIES = frozenset(member.value for member in TaskPriority)
+_ATTEMPT_STATUSES = frozenset(
+    {"queued", "running"}
+    | {public_attempt_status(status) for status in OWNER_TERMINAL_ATTEMPT_STATUSES}
+)
+_LEASE_STATUSES = frozenset(
+    {*OPEN_CLAIM_STATUSES, "completed", "failed", "stale_recovered"}
+)
 _RECONCILIATION_STATES = frozenset(member.value for member in ReconciliationState)
 _MISSION_SNAPSHOT_FIELDS = frozenset(
     {
@@ -340,17 +355,106 @@ def _validate_snapshot_lineage(
     if reconciliation != ReconciliationState.COHERENT.value:
         return
 
+    receipts_by_attempt: dict[str, list[dict[str, Any]]] = {}
+    attempts_by_task: dict[str, list[dict[str, Any]]] = {}
+    receipts_by_task: dict[str, list[dict[str, Any]]] = {}
+    for attempt in attempts:
+        attempts_by_task.setdefault(attempt["task_id"], []).append(attempt)
+    for receipt in receipts:
+        receipts_by_attempt.setdefault(receipt["attempt_id"], []).append(receipt)
+        receipts_by_task.setdefault(receipt["task_id"], []).append(receipt)
     for attempt in attempts:
         lease = lease_by_claim.get(attempt["claim_id"])
         if (
             attempt["task_id"] not in task_by_id
             or not attempt["assigned_to"]
+            or not attempt["idempotency_key"]
             or lease is None
             or lease["attempt_id"] != attempt["attempt_id"]
             or lease["task_id"] != attempt["task_id"]
             or lease["agent_id"] != attempt["assigned_to"]
         ):
             raise ValueError("coherent mission snapshot has orphaned attempt lineage")
+        status = attempt["status"]
+        if status == "queued":
+            lease_matches_status = lease["status"] == "claimed" and not lease["active"]
+        elif status == "running":
+            lease_matches_status = (
+                lease["status"] in ACTIVE_CLAIM_STATUSES
+                and lease["active"]
+                and not lease["expired"]
+            )
+        else:
+            expected_lease_status = (
+                "completed" if status == "succeeded" else status
+            )
+            lease_matches_status = (
+                lease["status"] == expected_lease_status and not lease["active"]
+            )
+        evidence = [
+            receipt
+            for receipt in receipts_by_attempt.get(attempt["attempt_id"], [])
+            if receipt["receipt_type"]
+            in {TERMINAL_RECEIPT_TYPE, RECOVERY_RECEIPT_TYPE}
+        ]
+        if status in {"succeeded", "failed"}:
+            evidence_matches_status = (
+                len(evidence) == 1
+                and evidence[0]["receipt_type"] == TERMINAL_RECEIPT_TYPE
+                and evidence[0]["status"] == status
+            )
+        elif status == "stale_recovered":
+            evidence_matches_status = (
+                len(evidence) == 1
+                and evidence[0]["receipt_type"] == RECOVERY_RECEIPT_TYPE
+                and evidence[0]["status"] == status
+            )
+        else:
+            evidence_matches_status = not evidence
+        if not lease_matches_status or not evidence_matches_status:
+            raise ValueError("coherent mission snapshot attempt evidence conflicts")
+    for task in tasks:
+        task_attempts = attempts_by_task.get(task["task_id"], [])
+        if task["status"] in {"assigned", "running"}:
+            expected_attempt_status = (
+                "queued" if task["status"] == "assigned" else "running"
+            )
+            matching = [
+                attempt
+                for attempt in task_attempts
+                if attempt["status"] == expected_attempt_status
+                and attempt["assigned_to"] == task["assigned_to"]
+                and task["metadata"].get("mission_attempt_id")
+                == attempt["attempt_id"]
+                and task["metadata"].get("mission_claim_id") == attempt["claim_id"]
+            ]
+            task_is_coherent = len(matching) == 1 and all(
+                attempt in matching or attempt["status"] == "stale_recovered"
+                for attempt in task_attempts
+            )
+        elif task["status"] in {"completed", "failed"}:
+            expected_receipt_status = (
+                "succeeded" if task["status"] == "completed" else "failed"
+            )
+            task_is_coherent = (
+                sum(
+                    receipt["receipt_type"] == TERMINAL_RECEIPT_TYPE
+                    and receipt["status"] == expected_receipt_status
+                    for receipt in receipts_by_task.get(task["task_id"], [])
+                )
+                == 1
+                and all(
+                    attempt["status"]
+                    in {expected_receipt_status, "stale_recovered"}
+                    for attempt in task_attempts
+                )
+            )
+        else:
+            task_is_coherent = task["status"] == "pending" and all(
+                attempt["status"] == "stale_recovered" for attempt in task_attempts
+            )
+        if not task_is_coherent:
+            raise ValueError("coherent mission snapshot task evidence conflicts")
     for lease in leases:
         attempt = attempt_by_id.get(lease["attempt_id"])
         if (
@@ -372,6 +476,7 @@ def _validate_snapshot_lineage(
             or lease is None
             or receipt["task_id"] != attempt["task_id"]
             or receipt["agent_id"] != attempt["assigned_to"]
+            or receipt["idempotency_key"] != attempt["idempotency_key"]
         ):
             raise ValueError("coherent mission snapshot has orphaned receipt lineage")
 
@@ -457,6 +562,8 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         mapping_fields=("metadata",),
         nullable_string_fields=("started_at", "completed_at"),
     )
+    if any(attempt["status"] not in _ATTEMPT_STATUSES for attempt in attempts):
+        raise ValueError("mission snapshot attempt status is not canonical")
     leases = _validated_public_collection(
         projected,
         field="leases",
@@ -475,6 +582,8 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         boolean_fields=("active", "expired"),
         nullable_string_fields=("heartbeat_at", "stale_after"),
     )
+    if any(lease["status"] not in _LEASE_STATUSES for lease in leases):
+        raise ValueError("mission snapshot lease status is not canonical")
     receipts = _validated_public_collection(
         projected,
         field="receipts",

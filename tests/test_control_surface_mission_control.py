@@ -89,6 +89,7 @@ def test_async_provider_projects_exact_typed_snapshot() -> None:
     provider = _AsyncProvider(
         _snapshot(
             mission_id,
+            reconciliation="needs_task_projection",
             tasks=[
                 {
                     "task_id": "fleet-t01",
@@ -99,7 +100,12 @@ def test_async_provider_projects_exact_typed_snapshot() -> None:
                     "priority": "high",
                     "assigned_to": "fleet-seat",
                     "result": "",
-                    "metadata": {},
+                    "metadata": {
+                        "schema_version": "dharma.mission_control.v1",
+                        "mission_id": mission_id,
+                        "mission_attempt_id": "attempt-01",
+                        "mission_claim_id": "claim-01",
+                    },
                     "created_at": "2026-08-26T01:00:00Z",
                     "updated_at": "2026-08-26T01:10:00Z",
                 }
@@ -136,7 +142,12 @@ def _populated_snapshot(mission_id: str) -> dict[str, Any]:
                 "priority": "high",
                 "assigned_to": "fleet-seat",
                 "result": "",
-                "metadata": {},
+                "metadata": {
+                    "schema_version": "dharma.mission_control.v1",
+                    "mission_id": mission_id,
+                    "mission_attempt_id": "attempt-01",
+                    "mission_claim_id": "claim-01",
+                },
                 "created_at": "2026-08-26T01:00:00Z",
                 "updated_at": "2026-08-26T01:10:00Z",
             }
@@ -183,7 +194,7 @@ def _populated_snapshot(mission_id: str) -> dict[str, Any]:
                 "agent_id": "fleet-seat",
                 "receipt_type": "progress",
                 "status": "recorded",
-                "idempotency_key": "receipt-01",
+                "idempotency_key": "attempt-01",
                 "payload": {},
                 "created_at": "2026-08-26T01:09:00Z",
             }
@@ -360,10 +371,12 @@ def test_malformed_or_ambiguous_observation_time_fails_closed(
     [
         lambda value: value["tasks"][0].update(status="pending "),
         lambda value: value["tasks"][0].update(priority="high "),
+        lambda value: value["attempts"][0].update(status="running "),
+        lambda value: value["leases"][0].update(status="active "),
         lambda value: value.update(reconciliation="coherent "),
     ],
 )
-def test_noncanonical_task_or_reconciliation_enum_fails_closed(
+def test_noncanonical_projection_vocabulary_fails_closed(
     mutate: Callable[[dict[str, Any]], None],
 ) -> None:
     mission_id = "fleet-advancement-20260826"
@@ -423,6 +436,21 @@ def test_malformed_nested_timestamp_fails_closed(view: str, field: str) -> None:
         lambda value: value["receipts"][0].update(task_id="missing-task"),
         lambda value: value["receipts"][0].update(attempt_id="missing-attempt"),
         lambda value: value["receipts"][0].update(agent_id="another-agent"),
+        lambda value: value["receipts"][0].update(
+            idempotency_key="another-attempt"
+        ),
+        lambda value: value["leases"][0].update(active=False),
+        lambda value: value["attempts"][0].update(status="succeeded"),
+        lambda value: value["receipts"][0].update(
+            receipt_type="mission_attempt_terminal",
+            status="succeeded",
+        ),
+        lambda value: value.update(attempts=[], leases=[], receipts=[]),
+        lambda value: value["tasks"][0]["metadata"].update(
+            mission_attempt_id="another-attempt"
+        ),
+        lambda value: value["tasks"][0].update(status="completed"),
+        lambda value: value["tasks"][0].update(status="cancelled"),
         lambda value: value["tasks"].append(dict(value["tasks"][0])),
     ],
 )
