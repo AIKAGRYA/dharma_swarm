@@ -1,0 +1,91 @@
+{
+  "id": "titanium-WP-RUSTSEC-MSRV-20260827",
+  "base_ref": "cc85f31bc7aab6c658e300950a811797a25a655b",
+  "branch": "codex/security-dependencies-20260827",
+  "worktree": ".",
+  "intent": "Close the safely remediable npm and Rust dependency alerts without falsifying the desktop shell's compiler support: retain the patched dashboard and Cargo lock closures, raise the desktop shell's declared MSRV to the first compiler accepted by the patched serde_with line, and add an exact-MSRV macOS CI lane that runs the locked desktop-shell check and test commands.",
+  "allowed_files": [
+    ".github/workflows/tests.yml",
+    "Makefile",
+    "dashboard/package-lock.json",
+    "desktop-shell/src-tauri/Cargo.lock",
+    "desktop-shell/src-tauri/Cargo.toml",
+    "reports/agentops/work_packets/titanium-WP-RUSTSEC-MSRV-20260827.json",
+    "scripts/ci/classify_changed_paths.py",
+    "tests/test_classify_changed_paths.py",
+    "tests/test_polyglot_ci_contract.py"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "polyglot-ci-and-classifier-contracts",
+      "command": "python3 -m pytest -q tests/test_classify_changed_paths.py tests/test_polyglot_ci_contract.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-integrity",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "lowering-desktop-msrv-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('desktop-shell/src-tauri/Cargo.toml'); t=p.read_text(); p.write_text(t.replace('rust-version = \\\"1.88\\\"','rust-version = \\\"1.77\\\"')); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_polyglot_ci_contract.py::test_desktop_shell_ci_pin_matches_manifest_msrv'],check=False); p.write_text(t); sys.exit(0 if r.returncode != 0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(security): align patched desktop dependencies with Rust 1.88"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RUSTSEC-MSRV",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "cc85f31bc7aab6c658e300950a811797a25a655b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "desktop-shell/src-tauri/Cargo.toml advertised Rust 1.77 while the patched Cargo.lock selected serde_with 3.21.0 and time 0.3.55, both of which require Rust 1.88.",
+      "The required tests workflow had no desktop-shell Rust lane, so a lockfile-only update could pass repository CI without compiling on the declared minimum compiler.",
+      "dashboard/package-lock.json and desktop-shell/src-tauri/Cargo.lock had no Session Entry packet even though the dashboard lockfile is a Mike hot path and both files belong to the same bounded dependency-security change."
+    ],
+    "closest_existing_implementation": [
+      ".github/workflows/tests.yml",
+      "scripts/ci/classify_changed_paths.py",
+      "tests/test_polyglot_ci_contract.py",
+      "desktop-shell/src-tauri/Cargo.toml"
+    ],
+    "honest_blockers": [
+      "CEREMONY ORDER WAS VIOLATED AND THIS RECEIPT SAYS SO: the two lockfile updates were authored before this packet existed. This packet is a retrospective scope binding for those exact files; the MSRV and CI-alignment repair is packet-declared before editing.",
+      "Preserving Rust 1.77 is not compatible with closing both Rust advisories: serde_with 3.21.0 is the first release patched for GHSA-7gcf-g7xr-8hxj and requires Rust 1.88; time 0.3.47 is the first release patched for RUSTSEC-2026-0009 and requires Rust 1.83. The shared safe compiler floor is therefore 1.88.",
+      "Two medium alerts are outside this packet and remain tracked in issue #1448: the frozen LangGraph SQLite oracle needs a receipt-preserving migration, and Tauri's Linux GTK 0.18 graph cannot consume patched glib 0.20 without an upstream-compatible transition.",
+      "Exact Rust 1.88.0 cargo check --locked and cargo test --locked passed locally on macOS before packet closeout. A live CI result on the new lane is not claimed until GitHub executes the pushed head."
+    ],
+    "rollback": "Revert this packet's commits together. That restores the prior lockfiles and Rust 1.77 declaration, which also restores the known dependency advisories; do not roll back only Cargo.toml because that would recreate an impossible compiler claim against the patched lock closure.",
+    "packet_digest": "273a768cfbf4d3dc62640e28252eca8c0bbcc756d2e2cbe57ae61a6305a7a766"
+  }
+}
