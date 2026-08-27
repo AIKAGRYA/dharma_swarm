@@ -14,6 +14,7 @@ Runtime receipts live under ``~/.dharma/foundry/receipts/`` and never enter git
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,11 +62,16 @@ def benchmark_link(
 
 
 def disclosure_link(*, ai_assisted: bool = True, duplicate_checked: bool = True,
-                    test_results: str = "") -> dict[str, Any]:
-    """Link 3: the mandatory AI-assist disclosure + duplicate-check evidence."""
+                    test_results: str = "", diff_sha256: str = "") -> dict[str, Any]:
+    """Link 3: the mandatory AI-assist disclosure + duplicate-check evidence.
+
+    ``diff_sha256`` pins the exact candidate payload the receipt is about, so
+    a third party can match the receipt to the artifact byte-for-byte.
+    """
     return {
         "link": "disclosure", "ai_assisted": ai_assisted,
         "duplicate_checked": duplicate_checked, "test_results": test_results,
+        "diff_sha256": diff_sha256,
     }
 
 
@@ -152,12 +158,21 @@ class FoundryReceipt:
         return canonical_digest(self.to_dict())
 
 
+def _safe_filename(receipt_id: str) -> str:
+    """Filesystem/artifact-safe name: model ids can contain ':' or '/'
+    (e.g. ``qwen3-coder-480b:free``) which GitHub artifact upload rejects.
+    The receipt payload keeps the true ``receipt_id``; only the filename
+    is sanitized.
+    """
+    return re.sub(r"[^A-Za-z0-9._-]", "-", receipt_id)
+
+
 def write_receipt(receipt: FoundryReceipt, *, state_root: Path | None = None) -> Path:
     """Persist a receipt (with its seal) under the runtime receipts root."""
     root = Path(state_root) if state_root is not None else _STATE_ROOT
     root.mkdir(parents=True, exist_ok=True)
     payload = receipt.to_dict()
     payload["sealed_digest"] = receipt.seal()
-    path = root / f"{receipt.receipt_id}.json"
+    path = root / f"{_safe_filename(receipt.receipt_id)}.json"
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path

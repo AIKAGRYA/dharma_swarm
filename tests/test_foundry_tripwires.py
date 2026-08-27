@@ -22,6 +22,22 @@ def _receipt(fitness: float, wall_clock_s: float) -> EvalReceipt:
     )
 
 
+def test_empty_diff_fires_no_op():
+    # The "vacuous fitness" hack: an empty candidate scores baseline fitness
+    # and enters the archive as a win. Must trip.
+    for diff in ("", "   \n  ", "--- a/kernels/x.py\n+++ b/kernels/x.py\n",
+                 "--- a/kernels/x.py\n+++ b/kernels/x.py\n+\n-\n"):
+        report = scan_tripwires(_cand(diff), allowed_paths=["kernels/*.py"])
+        assert "no_op_diff" in report.fired, f"missed no-op: {diff!r}"
+
+
+def test_real_change_does_not_fire_no_op():
+    diff = "--- a/kernels/x.py\n+++ b/kernels/x.py\n+x = 1\n"
+    assert "no_op_diff" not in scan_tripwires(_cand(diff), allowed_paths=["kernels/*.py"]).fired
+    # raw non-diff blob with content is also a real change
+    assert "no_op_diff" not in scan_tripwires(_cand("x = fast_path(y)")).fired
+
+
 def test_out_of_scope_diff_fires():
     diff = "--- a/evaluator.py\n+++ b/evaluator.py\n+cheat = True\n"
     report = scan_tripwires(_cand(diff), allowed_paths=["kernels/*.py"])

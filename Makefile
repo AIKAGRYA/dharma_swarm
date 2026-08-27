@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient vision agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -279,6 +279,7 @@ help:
 	@echo "  make onboarding-macos-compatibility  Reproduce the required GNU Make 3.81 + Darwin proof"
 	@echo "  make organism-status Render the whole-organism projection (runtime, agents, liveness)"
 	@echo "  make orient       Compatibility alias for make organism-status"
+	@echo "  make vision       Print the telos, the One Law, and the vision read-path (read-only)"
 	@echo "  make agent-register Check persistent A2A identity registration route and drift"
 	@echo "  make agent-onboard Compatibility alias for make agent-register"
 	@echo "  make agent-build-preflight PACKET=<path>  Admit one exact packet and baseline"
@@ -796,6 +797,33 @@ organism-status:
 
 # Compatibility name retained for existing callers.
 orient: organism-status
+
+# The why, on demand — a read-only projection of the canonical vision stack.
+# Authority lives in the listed files, not in these echoes; if they drift,
+# trust the files.
+vision:
+	@echo "=================================================================="
+	@echo "VISION (projection — authority: the files listed below)"
+	@echo "=================================================================="
+	@echo ""
+	@echo "TELOS: salvation of the world on all levels — Jagat Kalyan at full"
+	@echo "resolution. [docs/vision_maps/NORTH_STAR.md section 1, operator-authored]"
+	@echo ""
+	@echo "ONE LAW: no cell spawns, grows, or claims status except by closing a"
+	@echo "strange loop on a real, gated, verifiable, diversity-preserving"
+	@echo "outcome. [docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md section V]"
+	@echo ""
+	@echo "READ-PATH (in order):"
+	@echo "  1. docs/vision_maps/NORTH_STAR.md — the whole vision on one page"
+	@echo "  2. docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md — Sakshi+Drishti, the One Law"
+	@echo "  3. foundations/FIVE_FOURTEEN_A.md — the company thesis (witness = steering wheel)"
+	@echo "  4. docs/vision_maps/VISION_TRANSMISSION.md — doctrine vs body, honestly"
+	@echo "  5. docs/ontology/CLAIM_MATURITY_VOCABULARY.md — what evidence may claim"
+	@echo "  6. docs/vision_maps/2026-05-07_operating_company_kernel.md — the company loop + anti-mythology rules"
+	@echo ""
+	@echo "Current mission spearhead: the Sublimation Foundry (docs/foundry/) —"
+	@echo "verified improvement + agent-behavior verification; One Wire quorum"
+	@echo "(N>=5 external receipts, M>=3 domains) gates all self-improvement."
 
 # Fleet-identity registration: the join route for a NEW persistent A2A agent
 # (card, runtime registration, roster, git seat, announcement, presence) plus

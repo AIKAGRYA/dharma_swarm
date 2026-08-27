@@ -15,6 +15,30 @@ from dharma_swarm.foundry.target_ingest import TargetSpec
 
 # --- AI-native first targets (contribution is the native format) -------------
 
+T0_OPENEVOLVE_CPU = TargetSpec(
+    id="openevolve-circle-packing",
+    name="OpenEvolve — circle packing example (CPU-scoreable)",
+    url="https://github.com/algorithmicsuperintelligence/openevolve",
+    sha="",  # pinned at ingest time
+    evolve_paths=["examples/circle_packing/initial_program.py"],
+    oracle_cmd=[
+        "bash", "-c",
+        "cd examples/circle_packing && python -c \"import json, evaluator; "
+        "print('FOUNDRY_METRICS ' + json.dumps(evaluator.evaluate('initial_program.py')))\"",
+    ],
+    subdir="",
+    license="Apache-2.0",
+    ai_policy="native",
+    docker_image="foundry/openevolve-cpu:1",  # python:3.11-slim + numpy (built at ingest)
+    notes=(
+        "First REAL campaign target (2026-08-19 readiness audit): pure-CPU, "
+        "deterministic-oracle, runs on megha (Linux x86). The example's own "
+        "evaluator emits combined_score; the FOUNDRY_METRICS sentinel feeds "
+        "sentinel_metrics_parser. Native venue: OpenEvolve showcases evolved "
+        "records, so an improved packing is an upstreamable contribution."
+    ),
+)
+
 T1_OPENEVOLVE = TargetSpec(
     id="openevolve-mlx",
     name="OpenEvolve — MLX Metal kernel example + evolved records",
@@ -26,10 +50,11 @@ T1_OPENEVOLVE = TargetSpec(
     license="Apache-2.0",
     ai_policy="native",
     notes=(
-        "The reference implementation of the Foundry's own method. The MLX "
-        "example is an honest open problem (README: best evolved kernel is 3.2% "
-        "SLOWER than baseline after eval-validity fixes). Contributing evolved "
-        "records / evaluator hardening is the welcome native contribution."
+        "RECORDS-CONTRIBUTION LANE ONLY (2026-08-19 audit): MLX requires Apple "
+        "Silicon — this oracle cannot benchmark kernel speed on megha (Linux "
+        "x86). Do not select for self-hosted campaigns; kept for upstream "
+        "evolved-records/evaluator-hardening contributions where the scoring "
+        "runs on the contributor's own Apple hardware."
     ),
 )
 
@@ -53,6 +78,7 @@ T2_FLASHINFER_BENCH = TargetSpec(
 )
 
 TARGET_REGISTRY: dict[str, TargetSpec] = {
+    T0_OPENEVOLVE_CPU.id: T0_OPENEVOLVE_CPU,  # first: the CPU-scoreable campaign target
     T1_OPENEVOLVE.id: T1_OPENEVOLVE,
     T2_FLASHINFER_BENCH.id: T2_FLASHINFER_BENCH,
 }

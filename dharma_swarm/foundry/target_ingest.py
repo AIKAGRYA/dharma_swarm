@@ -39,6 +39,10 @@ class TargetSpec:
     license: str = ""
     ai_policy: str = "unknown"  # native | conditional | banned | unknown
     notes: str = ""
+    # Docker image with the target's deps pre-installed (campaigns run with
+    # --network none, so nothing can pip-install at benchmark time; build the
+    # image once at ingest). Empty = the isolation policy's default image.
+    docker_image: str = ""
 
 
 @dataclass(frozen=True)

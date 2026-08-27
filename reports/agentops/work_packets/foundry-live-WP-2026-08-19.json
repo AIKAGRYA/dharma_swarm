@@ -1,0 +1,101 @@
+{
+    "id": "foundry-live-WP-2026-08-19",
+    "base_ref": "5916a7d46dfc1c9046315293ce045ada8cb24fb9",
+    "branch": "cursor/foundry-live-cycle",
+    "worktree": ".",
+    "intent": "Land the live cycle (real OpenAI-compatible model calls, accuracy-to-kill-metrics), honest spend metering (exact token counts at upper-bound rates into CampaignResult.spend_usd), no_op_diff tripwire (empty candidates score zero, not baseline), hash-chained live receipts (tamper-evident chain with verify_live_chain), Independence Charter and Continuity of Intent constitutional docs, make vision read-only projection target, receipt-filename sanitization (colons in model ids broke GitHub artifact upload), and HTTPS-only guard on _http_json. Makefile change is additive only: a new read-only 'vision' phony target. No hot-path logic (orchestrator, swarm, runtime_state, telos_gates) touched.",
+    "allowed_files": [
+        "Makefile",
+        "dharma_swarm/foundry/daemon.py",
+        "dharma_swarm/foundry/live.py",
+        "dharma_swarm/foundry/receipts.py",
+        "dharma_swarm/foundry/tripwires.py",
+        "docs/foundry/CONTINUITY_OF_INTENT.md",
+        "docs/foundry/INDEPENDENCE_CHARTER.md",
+        "scripts/foundry/foundry_daemon.py",
+        "tests/test_foundry_live.py",
+        "tests/test_foundry_tripwires.py",
+        "reports/agentops/work_packets/foundry-live-WP-2026-08-19.json"
+    ],
+    "forbidden_files": [
+        "dharma_swarm/dharma_kernel.py",
+        "dharma_swarm/telos_gates.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/swarm.py",
+        "dharma_swarm/runtime_state.py",
+        "dharma_swarm/signal_bus.py",
+        "dharma_swarm/vsm_channels.py",
+        "dharma_swarm/operator_core/**",
+        "scripts/governance/**",
+        "scripts/runtime/**",
+        ".github/**",
+        "api/**",
+        "dashboard/**"
+    ],
+    "gates": [
+        {
+            "name": "foundry-focused-tests",
+            "command": "python3 -m pytest tests/test_foundry_live.py tests/test_foundry_tripwires.py tests/test_foundry_receipts.py -q",
+            "expected_exit": 0,
+            "timeout_seconds": 300
+        },
+        {
+            "name": "scope-diff-check",
+            "command": "git diff --check",
+            "expected_exit": 0,
+            "timeout_seconds": 60
+        }
+    ],
+    "negative_controls": [
+        {
+            "name": "empty-test-selection-stays-red",
+            "command": "python3 -m pytest tests/test_foundry_live.py -q -k nonexistent_test_ever",
+            "expected_exit": 5,
+            "timeout_seconds": 60
+        }
+    ],
+    "commit": {
+        "allowed": true,
+        "message": "foundry: live cycle + spend metering + doctrine hardening"
+    },
+    "approval": {
+        "before_commit": false,
+        "before_merge": true
+    },
+    "session_entry": {
+        "schema": "dharma_swarm.session_entry.v1",
+        "tool_versions": {
+            "git": "2.54.0",
+            "make": "4.3",
+            "python": "3.12.3"
+        },
+        "authority_precedence": [
+            "executable",
+            "tests",
+            "locks",
+            "git",
+            "owner_files"
+        ],
+        "work_packet": "WP-2026-08-19",
+        "active_track": "organism-rewire-2026-07",
+        "owner": "@AmitabhainArunachala",
+        "collision": {
+            "status": "clear",
+            "checked_at_sha": "5916a7d46dfc1c9046315293ce045ada8cb24fb9",
+            "details": []
+        },
+        "interface_mismatches": [
+            "call_chat return type changed from str to (content, tokens) tuple; single internal caller updated in same commit."
+        ],
+        "closest_existing_implementation": [
+            "dharma_swarm/foundry/live.py",
+            "dharma_swarm/foundry/daemon.py",
+            "dharma_swarm/foundry/receipts.py",
+            "dharma_swarm/foundry/tripwires.py",
+            "scripts/foundry/foundry_daemon.py"
+        ],
+        "honest_blockers": [],
+        "rollback": "revert the foundry-live-cycle commits; dry mode (CI default) is unaffected",
+        "packet_digest": "2333fe6aa6eee3a1747abdb05bdb20d762bc35c1f253b0ebdd1bd9693a9eaa25"
+    }
+}

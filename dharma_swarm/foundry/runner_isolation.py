@@ -35,6 +35,12 @@ class IsolationPolicy:
     cpu_limit: float = 2.0
     allow_degraded: bool = True  # explore degraded; promotion still blocked below
     docker_image: str = "python:3.11-slim"
+    # Read-only workdir: mounts /work as :ro with a writable tmpfs at /tmp, so
+    # the running candidate cannot rewrite tests/oracle files mid-run. Suites
+    # that must write inside their tree can't run under this; the evaluator
+    # falls back to rw + post-run tamper digest (detection instead of
+    # prevention) and records which mode actually ran.
+    readonly_workdir: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,16 +102,20 @@ def run_isolated(
 
 
 def _run_docker(cmd, workdir, policy, runner) -> RunResult:
+    mount = f"{workdir}:/work:ro" if policy.readonly_workdir else f"{workdir}:/work"
     docker_cmd = [
         "docker", "run", "--rm",
         "--network", "none" if policy.network_disabled else "bridge",
         "--memory", policy.memory_limit,
         f"--cpus={policy.cpu_limit}",
-        "-v", f"{workdir}:/work",
+        "-v", mount,
         "-w", "/work",
-        policy.docker_image,
-        "bash", "-c", _as_bash(cmd),
     ]
+    if policy.readonly_workdir:
+        # Writable scratch lives only inside the container, never on the host tree.
+        docker_cmd += ["--tmpfs", "/tmp:rw,size=512m", "-e", "TMPDIR=/tmp",
+                       "-e", "PYTHONDONTWRITEBYTECODE=1"]
+    docker_cmd += [policy.docker_image, "bash", "-c", _as_bash(cmd)]
     return _invoke(docker_cmd, None, policy, runner, IsolationLevel.DOCKER_NONET)
 
 
