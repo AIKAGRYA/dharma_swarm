@@ -249,7 +249,7 @@ def _read_only_db(path: Path, label: str) -> Iterator[sqlite3.Connection]:
     database = _existing_db(path, label)
     connection: sqlite3.Connection | None = None
     with tempfile.TemporaryDirectory(prefix="dharma-mc-a2a-ro-") as raw:
-        snapshot = Path(raw) / "evidence.sqlite3"
+        snapshot = Path(raw) / "evidence.snapshot"
         _snapshot_database(database, snapshot, label)
         uri = f"file:{quote(str(snapshot))}?mode=rw"
         try:
