@@ -30,8 +30,8 @@
   "base_ref": "9bd7d797e57022dab6e019a44e2d8038a36cec73",
   "branch": "codex/sublimation-foundry-core-artifacts-9bd7-20260827",
   "commit": {
-    "allowed": false,
-    "message": "foundry: land fail-closed offline core and artifact lineage"
+    "allowed": true,
+    "message": "foundry: harden lineage admission and storage"
   },
   "forbidden_files": [
     ".github/**",
@@ -141,8 +141,8 @@
       "The canonical documentation registry does not currently name the existing Sublimation Forge runbook as an operator projection; this packet registers its authority boundary without editing the sibling-owned runbook."
     ],
     "owner": "@dhyana",
-    "packet_digest": "ec4dbb7680b7ee216ccb7971e0c11a785d84a34ab587e629ccf26c91ff00728a",
-    "rollback": "Revert the single packet-scoped implementation commit. Runtime state is not migrated or deleted; no service is started or changed, and historical packet/source references remain historical only.",
+    "packet_digest": "de17080e90e7e2e1001a08fd1105c8f704a3ad5ff2d791049b08f8204a30935d",
+    "rollback": "Revert the packet-scoped Foundry commits. Runtime state is not migrated or deleted; no service is started or changed, and historical packet/source references remain historical only.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
       "git": "2.50.1",

@@ -27,6 +27,156 @@ class PatchReplayError(RuntimeError):
     """A patch is unsafe, malformed, stale, or outside the declared scope."""
 
 
+def read_regular_nofollow(
+    path: Path,
+    *,
+    field: str,
+    error_type: type[RuntimeError] = PatchReplayError,
+) -> bytes:
+    """Read the regular file addressed by a no-follow descriptor."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise error_type(f"{field} missing or unreadable: {path}") from exc
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise error_type(f"{field} is not a regular file: {path}")
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            return handle.read()
+    finally:
+        os.close(descriptor)
+
+
+def scoped_regular_file(
+    root: Path,
+    relative: object,
+    *,
+    field: str,
+    error_type: type[RuntimeError] = PatchReplayError,
+) -> Path:
+    """Resolve a bounded regular file while rejecting every symlink component."""
+    try:
+        root = Path(root).resolve(strict=True)
+    except OSError as exc:
+        raise error_type(f"{field} root is unavailable: {root}") from exc
+    text = str(relative)
+    path = PurePosixPath(text)
+    if (
+        not text
+        or text.startswith("/")
+        or "\\" in text
+        or "\x00" in text
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise error_type(f"unsafe {field}: {text!r}")
+    lexical = root / path
+    try:
+        resolved = lexical.resolve(strict=True)
+    except OSError as exc:
+        raise error_type(f"{field} is unavailable: {text}") from exc
+    if not resolved.is_relative_to(root):
+        raise error_type(f"{field} escapes declared root: {text}")
+    cursor = root
+    for part in path.parts:
+        cursor /= part
+        if cursor.is_symlink():
+            raise error_type(f"{field} traverses a symlink: {text}")
+    if not resolved.is_file():
+        raise error_type(f"{field} is not a regular file: {text}")
+    return resolved
+
+
+def write_immutable_beneath(root: Path, relative: str, data: bytes) -> Path:
+    """Create or verify one immutable file through no-follow directory handles."""
+    path = PurePosixPath(relative)
+    if (
+        not relative
+        or relative.startswith("/")
+        or "\\" in relative
+        or "\x00" in relative
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise PatchReplayError(f"unsafe immutable artifact path: {relative!r}")
+    root = Path(root)
+    directory_flags = (
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        directory_fd = os.open(root, directory_flags)
+    except OSError as exc:
+        raise PatchReplayError(f"immutable artifact root is unsafe: {root}") from exc
+    try:
+        for part in path.parts[:-1]:
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=directory_fd)
+            except FileExistsError:
+                pass
+            except OSError as exc:
+                raise PatchReplayError(
+                    f"immutable artifact parent is unsafe: {relative}"
+                ) from exc
+            try:
+                next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
+            except OSError as exc:
+                raise PatchReplayError(
+                    f"immutable artifact parent is unsafe: {relative}"
+                ) from exc
+            os.close(directory_fd)
+            directory_fd = next_fd
+
+        name = path.parts[-1]
+        create_flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            descriptor = os.open(name, create_flags, 0o600, dir_fd=directory_fd)
+        except FileExistsError:
+            read_flags = (
+                os.O_RDONLY
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_NONBLOCK", 0)
+            )
+            try:
+                descriptor = os.open(name, read_flags, dir_fd=directory_fd)
+                with os.fdopen(descriptor, "rb") as handle:
+                    if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                        raise PatchReplayError(
+                            f"immutable artifact is not regular: {relative}"
+                        )
+                    existing = handle.read()
+            except OSError as exc:
+                raise PatchReplayError(
+                    f"immutable artifact is unsafe: {relative}"
+                ) from exc
+            if existing != data:
+                raise PatchReplayError(f"content-address collision at {relative}")
+        except OSError as exc:
+            raise PatchReplayError(f"immutable artifact is unsafe: {relative}") from exc
+        else:
+            try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.fsync(directory_fd)
+            except OSError as exc:
+                try:
+                    os.unlink(name, dir_fd=directory_fd)
+                except OSError:
+                    pass
+                raise PatchReplayError(
+                    f"immutable artifact write failed: {relative}"
+                ) from exc
+    finally:
+        os.close(directory_fd)
+    return root / Path(*path.parts)
+
+
 @dataclass(frozen=True)
 class PatchHunk:
     old_start: int

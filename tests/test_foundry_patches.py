@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import difflib
 import os
+import shutil
 from pathlib import Path
 
 import pytest
 
-from dharma_swarm.foundry.patches import PatchReplayError, apply_unified_diff
+import dharma_swarm.foundry.artifacts as artifacts
+from dharma_swarm.foundry.artifacts import ArtifactReplayError, build_lineage
+from dharma_swarm.foundry.patches import (
+    PatchReplayError,
+    apply_unified_diff,
+    write_immutable_beneath,
+)
+from dharma_swarm.foundry.target_ingest import compute_tree_digest
 
 
 def _patch(old: str, new: str, path: str = "src/value.py", *, context: int = 3) -> str:
@@ -216,3 +224,108 @@ def test_symlinked_target_is_rejected_even_when_link_resolves_inside_root(tmp_pa
             _patch("VALUE = 1\n", "VALUE = 2\n"),
             allowed_paths=["src/value.py"],
         )
+
+
+def _lineage_kwargs(tmp_path, state):
+    base, seeded = tmp_path / "base", tmp_path / "seeded"
+    _target(base)
+    shutil.copytree(base, seeded)
+    return {
+        "state_root": state,
+        "target_id": "target",
+        "resolved_sha": "a" * 40,
+        "base_root": base,
+        "seeded_root": seeded,
+        "base_tree_digest": compute_tree_digest(base, ["src/value.py"]),
+        "evolve_file": "src/value.py",
+        "delta": _patch("VALUE = 1\n", "VALUE = 2\n"),
+    }
+
+
+@pytest.mark.parametrize(
+    "unsafe_parent", ["artifacts", "artifacts/deltas", "artifacts/manifests"]
+)
+def test_lineage_never_writes_through_symlinked_storage_parent(
+    tmp_path, unsafe_parent
+):
+    state, outside = tmp_path / "state", tmp_path / "outside"
+    state.mkdir()
+    outside.mkdir()
+    link = state / unsafe_parent
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ArtifactReplayError, match="artifact storage rejected"):
+        build_lineage(**_lineage_kwargs(tmp_path, state))
+    assert list(outside.iterdir()) == []
+
+
+def test_lineage_rejects_symlinked_state_root_before_blob_write(tmp_path):
+    outside, state = tmp_path / "outside", tmp_path / "state"
+    outside.mkdir()
+    state.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ArtifactReplayError, match="artifact storage rejected"):
+        build_lineage(**_lineage_kwargs(tmp_path, state))
+    assert list(outside.iterdir()) == []
+
+
+def test_immutable_writer_does_not_follow_existing_symlink_leaf(tmp_path):
+    root, outside = tmp_path / "state", tmp_path / "outside.patch"
+    (root / "artifacts").mkdir(parents=True)
+    outside.write_bytes(b"operator-owned")
+    (root / "artifacts" / "blob.patch").symlink_to(outside)
+    with pytest.raises(PatchReplayError, match="immutable artifact is unsafe"):
+        write_immutable_beneath(root, "artifacts/blob.patch", b"attacker-data")
+    assert outside.read_bytes() == b"operator-owned"
+
+
+def _synthetic_lineage(depth):
+    return [
+        {"lineage_digest": "sha256:" + f"{index:064x}", "index": index}
+        for index in range(depth)
+    ]
+
+
+def test_lineage_walk_is_iterative_beyond_python_recursion_limit(tmp_path, monkeypatch):
+    chain = _synthetic_lineage(1_200)
+    calls = []
+
+    def verify_node(base_root, manifest, **kwargs):
+        index = manifest["index"]
+        calls.append(index)
+        parent = chain[index - 1] if index else None
+        parent_path = tmp_path / f"{index - 1}.patch" if parent else None
+        return f"tree-{index}", parent, parent_path
+
+    monkeypatch.setattr(artifacts, "_verify_lineage_node", verify_node)
+    result = artifacts.verify_lineage(
+        tmp_path, chain[-1], artifact_path=tmp_path / "1199.patch"
+    )
+    assert result == "tree-1199"
+    assert len(calls) == len(chain)
+
+
+def test_lineage_walk_rejects_cycles(tmp_path, monkeypatch):
+    first, second = _synthetic_lineage(2)
+
+    def verify_node(base_root, manifest, **kwargs):
+        parent = second if manifest is first else first
+        return "tree", parent, tmp_path / "parent.patch"
+
+    monkeypatch.setattr(artifacts, "_verify_lineage_node", verify_node)
+    with pytest.raises(ArtifactReplayError, match="lineage cycle detected"):
+        artifacts.verify_lineage(tmp_path, first, artifact_path=tmp_path / "child.patch")
+
+
+def test_lineage_walk_propagates_deep_typed_failure(tmp_path, monkeypatch):
+    chain = _synthetic_lineage(1_100)
+
+    def verify_node(base_root, manifest, **kwargs):
+        index = manifest["index"]
+        if index == 100:
+            raise ArtifactReplayError("deep parent is corrupt")
+        parent = chain[index - 1] if index else None
+        return "tree", parent, tmp_path / f"{index - 1}.patch" if parent else None
+
+    monkeypatch.setattr(artifacts, "_verify_lineage_node", verify_node)
+    with pytest.raises(ArtifactReplayError, match="deep parent is corrupt"):
+        artifacts.verify_lineage(tmp_path, chain[-1], artifact_path=tmp_path / "head.patch")

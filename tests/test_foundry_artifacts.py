@@ -224,7 +224,7 @@ def test_verifier_rejects_child_after_parent_manifest_disappears(tmp_path):
         verify_lineage(base, second, artifact_path=state / second["cumulative_artifact"])
 
 
-def test_verifier_recursively_requires_every_parent_manifest(tmp_path):
+def test_verifier_iteratively_requires_every_parent_manifest(tmp_path):
     base, _, first = _first_lineage(tmp_path)
     second = _child_lineage(tmp_path, base, first)
     third = _child_lineage(tmp_path, base, second, value=4)

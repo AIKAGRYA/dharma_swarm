@@ -1,11 +1,6 @@
 """Immutable, cumulative, replay-verified Foundry artifact lineage.
-
-Each promoted delta is preserved separately while a cumulative patch is rebuilt
-from one immutable upstream base. The manifest binds the declared evolve-file
-scope, parent relation, delta bytes, cumulative bytes, and replayed scoped tree.
-It does not independently attest that the surrounding checkout came from the
-declared commit. Benchmark validity, full-tree pin custody, and promotion remain
-separate proof obligations.
+The manifest binds each delta, cumulative patch, parent, and scoped replay. It
+does not attest the surrounding checkout, benchmark, or promotion authority.
 """
 
 from __future__ import annotations
@@ -13,10 +8,8 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
-import os
 import re
 import shutil
-import stat
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -24,7 +17,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from dharma_swarm.foundry.evaluator import canonical_digest
-from dharma_swarm.foundry.patches import PatchReplayError, apply_unified_diff
+from dharma_swarm.foundry.patches import (
+    PatchReplayError,
+    apply_unified_diff,
+    read_regular_nofollow,
+    scoped_regular_file,
+    write_immutable_beneath,
+)
 from dharma_swarm.foundry.target_ingest import compute_tree_digest
 
 LINEAGE_SCHEMA = "foundry_artifact_lineage.v1"
@@ -58,19 +57,7 @@ def _is_canonical_digest(value: str) -> bool:
 
 
 def _read_regular(path: Path, *, field: str) -> bytes:
-    """Read one non-symlink regular file through the descriptor we inspect."""
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
-    try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
-        raise ArtifactReplayError(f"{field} missing or unreadable: {path}") from exc
-    try:
-        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-            raise ArtifactReplayError(f"{field} is not a regular file: {path}")
-        with os.fdopen(descriptor, "rb", closefd=False) as handle:
-            return handle.read()
-    finally:
-        os.close(descriptor)
+    return read_regular_nofollow(path, field=field, error_type=ArtifactReplayError)
 
 
 def _safe_relative(value: object, *, field: str) -> str:
@@ -84,26 +71,9 @@ def _safe_relative(value: object, *, field: str) -> str:
 
 
 def _scoped_file(root: Path, relative: str, *, field: str) -> Path:
-    try:
-        root = Path(root).resolve(strict=True)
-    except OSError as exc:
-        raise ArtifactReplayError(f"{field} root is unavailable: {root}") from exc
-    safe = _safe_relative(relative, field=field)
-    lexical = root / safe
-    try:
-        resolved = lexical.resolve(strict=True)
-    except OSError as exc:
-        raise ArtifactReplayError(f"{field} is unavailable: {safe}") from exc
-    if not resolved.is_relative_to(root):
-        raise ArtifactReplayError(f"{field} escapes declared root: {safe}")
-    cursor = root
-    for part in PurePosixPath(safe).parts:
-        cursor = cursor / part
-        if cursor.is_symlink():
-            raise ArtifactReplayError(f"{field} traverses a symlink: {safe}")
-    if not resolved.is_file():
-        raise ArtifactReplayError(f"{field} is not a regular file: {safe}")
-    return resolved
+    return scoped_regular_file(
+        root, relative, field=field, error_type=ArtifactReplayError
+    )
 
 
 def _copy_tree(source: Path) -> Path:
@@ -141,16 +111,11 @@ def _cumulative_patch(base_root: Path, candidate_root: Path, evolve_file: str) -
     return patch if patch.endswith("\n") else patch + "\n"
 
 
-def _write_immutable(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _write_artifact(root: Path, relative: str, data: bytes) -> Path:
     try:
-        with path.open("xb") as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except FileExistsError:
-        if not path.is_file() or path.is_symlink() or path.read_bytes() != data:
-            raise ArtifactReplayError(f"content-address collision at {path}")
+        return write_immutable_beneath(root, relative, data)
+    except PatchReplayError as exc:
+        raise ArtifactReplayError(f"artifact storage rejected: {exc}") from exc
 
 
 def _manifest_locator(root: Path, value: object, *, field: str) -> Path:
@@ -222,15 +187,15 @@ def _verify_delta_relation(
         shutil.rmtree(work, ignore_errors=True)
 
 
-def verify_lineage(
+def _verify_lineage_node(
     base_root: Path,
     manifest: dict[str, Any],
     *,
     artifact_path: Path,
     delta_path: Path | None = None,
     expected_parent_artifact_sha256: str | None = None,
-) -> str:
-    """Replay a cumulative patch and verify the final declared evolve-file tree."""
+) -> tuple[str, dict[str, Any] | None, Path | None]:
+    """Verify one lineage node and return its authenticated parent, if any."""
     required = {
         "schema_version",
         "target_id",
@@ -325,6 +290,8 @@ def verify_lineage(
     artifact_bytes = _read_regular(artifact_path, field="cumulative artifact")
     if sha256_bytes(artifact_bytes) != manifest["cumulative_sha256"]:
         raise ArtifactReplayError("cumulative artifact sha256 mismatch")
+    parent_manifest: dict[str, Any] | None = None
+    parent_artifact: Path | None = None
     if parent_lineage:
         parent_manifest_path = _manifest_locator(
             artifact_root,
@@ -351,7 +318,6 @@ def verify_lineage(
         parent_artifact = _manifest_locator(
             artifact_root, parent_manifest.get("cumulative_artifact", ""), field="parent cumulative artifact"
         )
-        verify_lineage(base_root, parent_manifest, artifact_path=parent_artifact)
     declared_delta = _manifest_locator(
         artifact_root, manifest["delta_artifact"], field="delta_artifact"
     )
@@ -392,9 +358,44 @@ def verify_lineage(
                 "replayed candidate tree mismatch: "
                 f"expected={manifest['candidate_tree_digest']} actual={actual_candidate}"
             )
-        return actual_candidate
+        return actual_candidate, parent_manifest, parent_artifact
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def verify_lineage(
+    base_root: Path,
+    manifest: dict[str, Any],
+    *,
+    artifact_path: Path,
+    delta_path: Path | None = None,
+    expected_parent_artifact_sha256: str | None = None,
+) -> str:
+    """Iteratively verify a cumulative lineage from child through genesis."""
+    current, current_artifact = manifest, Path(artifact_path)
+    current_delta, expected_parent = delta_path, expected_parent_artifact_sha256
+    visited: set[str] = set()
+    verified_candidate = ""
+    while True:
+        claimed = str(current.get("lineage_digest", ""))
+        if claimed in visited:
+            raise ArtifactReplayError(f"lineage cycle detected: {claimed or '<missing>'}")
+        visited.add(claimed)
+        actual, parent, parent_artifact = _verify_lineage_node(
+            base_root,
+            current,
+            artifact_path=current_artifact,
+            delta_path=current_delta,
+            expected_parent_artifact_sha256=expected_parent,
+        )
+        if not verified_candidate:
+            verified_candidate = actual
+        if (parent is None) != (parent_artifact is None):
+            raise ArtifactReplayError("lineage parent traversal relation is incomplete")
+        if parent is None:
+            return verified_candidate
+        current, current_artifact = parent, parent_artifact
+        current_delta, expected_parent = None, None
 
 
 def build_lineage(
@@ -460,10 +461,12 @@ def build_lineage(
         shutil.rmtree(candidate_root, ignore_errors=True)
 
     foundry_root = Path(state_root)
-    delta_path = foundry_root / "artifacts" / "deltas" / f"{delta_sha}.patch"
-    cumulative_path = foundry_root / "artifacts" / f"{cumulative_sha}.patch"
-    _write_immutable(delta_path, delta_bytes)
-    _write_immutable(cumulative_path, cumulative_bytes)
+    delta_locator = f"artifacts/deltas/{delta_sha}.patch"
+    cumulative_locator = f"artifacts/{cumulative_sha}.patch"
+    _write_artifact(foundry_root, delta_locator, delta_bytes)
+    cumulative_path = _write_artifact(
+        foundry_root, cumulative_locator, cumulative_bytes
+    )
 
     body: dict[str, Any] = {
         "schema_version": LINEAGE_SCHEMA,
@@ -477,23 +480,21 @@ def build_lineage(
         "cumulative_sha256": cumulative_sha,
         "candidate_tree_digest": candidate_digest,
         "evolve_file": evolve_file,
-        "delta_artifact": str(delta_path.relative_to(foundry_root)),
-        "cumulative_artifact": str(cumulative_path.relative_to(foundry_root)),
+        "delta_artifact": delta_locator,
+        "cumulative_artifact": cumulative_locator,
         "replay_verified": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     body["lineage_digest"] = canonical_digest(body)
-    manifest_path = (
-        foundry_root
-        / "artifacts"
-        / "manifests"
-        / f"{body['lineage_digest'].removeprefix('sha256:')}.json"
+    manifest_locator = (
+        "artifacts/manifests/"
+        f"{body['lineage_digest'].removeprefix('sha256:')}.json"
     )
-    body["manifest_path"] = str(manifest_path.relative_to(foundry_root))
+    body["manifest_path"] = manifest_locator
     manifest_bytes = (json.dumps(body, indent=2, sort_keys=True) + "\n").encode("utf-8")
     verify_lineage(base_root, body, artifact_path=cumulative_path)
     # Publish the claim only after its parent, delta, and cumulative replay all
     # verify. A failed build may leave harmless content-addressed patch blobs,
     # but it must never leave a manifest claiming ``replay_verified=true``.
-    _write_immutable(manifest_path, manifest_bytes)
+    _write_artifact(foundry_root, manifest_locator, manifest_bytes)
     return body
