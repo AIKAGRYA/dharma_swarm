@@ -6,9 +6,11 @@
   "intent": "Bound the autonomous local-tool filesystem surface that caused the Mac swarm daemon to synchronously enumerate a 168,881-file repository and become jetsam-eligible: cap glob consumption before sorting, reject or stream file reads, bound recursive grep candidates and file size, and limit route_next background dispatch width without claiming authority over explicit topology dispatch. Preserve the existing provider, sandbox, task, and release boundaries.",
   "allowed_files": [
     "dharma_swarm/agent_runner.py",
+    "dharma_swarm/bounded_fs.py",
     "dharma_swarm/config.py",
     "dharma_swarm/orchestrator.py",
     "tests/test_agent_runner.py",
+    "tests/test_bounded_fs.py",
     "tests/test_config.py",
     "tests/test_orchestrator.py",
     "reports/agentops/work_packets/dharmagraph-WP-RUNTIME-RESOURCE-BOUNDS-20260827.json"
@@ -17,21 +19,21 @@
   "gates": [
     {
       "name": "runtime-resource-bounds-tests",
-      "command": "python3 -m pytest -q tests/test_agent_runner.py tests/test_config.py tests/test_orchestrator.py",
+      "command": "python3 -m pytest -q tests/test_agent_runner.py tests/test_bounded_fs.py tests/test_config.py tests/test_orchestrator.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
     {
       "name": "runtime-resource-bounds-ruff",
-      "command": "python3 -m ruff check dharma_swarm/agent_runner.py dharma_swarm/config.py dharma_swarm/orchestrator.py tests/test_agent_runner.py tests/test_config.py tests/test_orchestrator.py",
+      "command": "python3 -m ruff check dharma_swarm/agent_runner.py dharma_swarm/bounded_fs.py dharma_swarm/config.py dharma_swarm/orchestrator.py tests/test_agent_runner.py tests/test_bounded_fs.py tests/test_config.py tests/test_orchestrator.py",
       "expected_exit": 0,
       "timeout_seconds": 180
     }
   ],
   "negative_controls": [
     {
-      "name": "glob-limit-widening-must-fail",
-      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/agent_runner.py'); t=p.read_text(); old='_LOCAL_TOOL_GLOB_RESULT_LIMIT = 50'; old in t or sys.exit(3); p.write_text(t.replace(old, '_LOCAL_TOOL_GLOB_RESULT_LIMIT = 5000', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_agent_runner.py::test_local_glob_stops_after_truncation_probe']).returncode)\"",
+      "name": "entry-limit-removal-must-fail",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/bounded_fs.py'); t=p.read_text(); old='if entries_seen >= max_entries:'; old in t or sys.exit(3); p.write_text(t.replace(old, 'if False and entries_seen >= max_entries:', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_bounded_fs.py::test_bounded_glob_counts_unmatched_entries_before_entry_cap']).returncode)\"",
       "expected_exit": 1,
       "timeout_seconds": 180
     }
@@ -82,6 +84,6 @@
       "The old cc85 release remains valid rollback evidence for bridge and cron processes but is not safe to restart as the autonomous swarm because it retains the unbounded local-tool implementation."
     ],
     "rollback": "Stop the autonomous swarm, revert this pull request as one unit, and keep com.dharma.swarm unloaded. Do not restart the cc85 autonomous daemon as rollback; its preserved release contains the incident mechanism. Bridge and cron rollback remain separately admissible after their own exact-release checks.",
-    "packet_digest": "eba421fab87a9ab8a08d842296aaa469cac133a740cfbdf7b328c180fd535da1"
+    "packet_digest": "c91091e37cc396e6fcfc1b3e7072588687344c67343d329fd97fef7cdbf19a62"
   }
 }

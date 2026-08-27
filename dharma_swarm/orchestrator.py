@@ -126,8 +126,8 @@ class Orchestrator:
         self._running = False
         self._superstep_id: int = 0
         self._active_dispatches: dict[str, TaskDispatch] = {}
-        # Track running asyncio tasks for actual LLM execution
         self._running_tasks: dict[str, asyncio.Task] = {}
+        self._max_concurrent_tasks = _cfg.max_concurrent_tasks
         self._default_timeout_seconds = _cfg.task_timeout_seconds
         self._default_claim_timeout_seconds = _cfg.claim_timeout_seconds
         self._default_max_retries = _cfg.max_retries
@@ -441,18 +441,18 @@ class Orchestrator:
         if not ready or not idle:
             return []
 
-        # Skip tasks already being executed or waiting for retry backoff.
         ready = [t for t in ready if t.id not in self._running_tasks]
         ready = [t for t in ready if self._is_retry_window_open(t)]
-
+        remaining_slots = max(0, self._max_concurrent_tasks - len(self._running_tasks))
         dispatches: list[TaskDispatch] = []
         available = list(idle)
         for task in ready:
+            if len(dispatches) >= remaining_slots:
+                break
             agent = self._select_idle_agent(task, available)
             if agent is None:
                 break
 
-            # YogaNode constraint check — if wired, filter before dispatch
             if self._yoga is not None:
                 checks = self._yoga.can_dispatch(task, agent)
                 blocking = [

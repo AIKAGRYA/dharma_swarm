@@ -6,7 +6,6 @@ and that the module-level singleton is accessible.
 
 from __future__ import annotations
 
-import os
 import pytest
 from pydantic import ValidationError
 
@@ -22,8 +21,10 @@ from dharma_swarm.config import (
 
 
 class TestOrchestratorConfig:
-    def test_defaults(self) -> None:
+    def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("DGC_MAX_CONCURRENT_TASKS", raising=False)
         cfg = OrchestratorConfig()
+        assert cfg.max_concurrent_tasks == 4
         assert cfg.task_timeout_seconds == 300.0
         assert cfg.claim_timeout_seconds == 420.0
         assert cfg.max_retries == 0
@@ -38,6 +39,36 @@ class TestOrchestratorConfig:
     def test_bounds_reject_too_large(self) -> None:
         with pytest.raises(ValidationError):
             OrchestratorConfig(task_timeout_seconds=99999)
+
+    def test_max_concurrent_tasks_env_override(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("DGC_MAX_CONCURRENT_TASKS", "7")
+        assert OrchestratorConfig().max_concurrent_tasks == 7
+
+    @pytest.mark.parametrize("value", [0, 257])
+    def test_max_concurrent_tasks_bounds(self, value: int) -> None:
+        with pytest.raises(ValidationError):
+            OrchestratorConfig(max_concurrent_tasks=value)
+
+    @pytest.mark.parametrize("value", ["0", "257"])
+    def test_max_concurrent_tasks_env_bounds(
+        self,
+        value: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("DGC_MAX_CONCURRENT_TASKS", value)
+        with pytest.raises(ValidationError):
+            OrchestratorConfig()
+
+    def test_max_concurrent_tasks_env_rejects_non_integer(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("DGC_MAX_CONCURRENT_TASKS", "many")
+        with pytest.raises(ValueError, match="DGC_MAX_CONCURRENT_TASKS"):
+            OrchestratorConfig()
 
 
 class TestAgentConfig:
