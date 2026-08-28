@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import stat
 import subprocess
 import sys
 from dataclasses import dataclass, replace
@@ -144,6 +145,39 @@ def _tree_fingerprint(root: Path) -> dict[str, tuple[int, str]]:
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }
+
+
+def _coordination_shm_paths(ctx: _Context, root: Path) -> frozenset[str]:
+    databases = (
+        Path(ctx.board._db_path),  # noqa: SLF001
+        Path(ctx.runtime.db_path),
+        ctx.job_db,
+    )
+    return frozenset(
+        str(Path(f"{database}-shm").relative_to(root)) for database in databases
+    )
+
+
+def _durable_tree_fingerprint(
+    root: Path,
+    *,
+    coordination_shm: frozenset[str],
+) -> dict[str, tuple[int, str]]:
+    durable: dict[str, tuple[int, str]] = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = str(path.relative_to(root))
+        if relative.endswith("-shm"):
+            assert relative in coordination_shm
+            assert not path.is_symlink()
+            assert stat.S_ISREG(path.lstat().st_mode)
+            continue
+        durable[relative] = (
+            path.stat().st_size,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+    return durable
 
 
 def _delivery_id(path: Path, delivery: dict, envelope: dict) -> str:
@@ -1241,7 +1275,11 @@ async def test_projection_preserves_exact_source_file_set_and_bytes(
     tmp_path: Path,
 ) -> None:
     ctx = await _context(tmp_path, proposal=True)
-    before = _tree_fingerprint(tmp_path)
+    coordination_shm = _coordination_shm_paths(ctx, tmp_path)
+    before = _durable_tree_fingerprint(
+        tmp_path,
+        coordination_shm=coordination_shm,
+    )
 
     observation = await ctx.projection.observe(
         ctx.mission_id,
@@ -1250,7 +1288,17 @@ async def test_projection_preserves_exact_source_file_set_and_bytes(
     )
 
     assert observation.phase is A2AEvidencePhase.VERIFYING
-    assert _tree_fingerprint(tmp_path) == before
+    assert _durable_tree_fingerprint(
+        tmp_path,
+        coordination_shm=coordination_shm,
+    ) == before
+
+
+def test_durable_fingerprint_rejects_unexpected_shm_artifact(tmp_path: Path) -> None:
+    (tmp_path / "artifact-shm").write_bytes(b"durable")
+
+    with pytest.raises(AssertionError):
+        _durable_tree_fingerprint(tmp_path, coordination_shm=frozenset())
 
 
 @pytest.mark.asyncio
@@ -1289,10 +1337,17 @@ async def test_held_open_wal_job_is_visible(tmp_path: Path) -> None:
             "UPDATE semantic_jobs SET status = 'PENDING' WHERE event_id = 'packet-1'",
         )
         writer.commit()
-        before = _tree_fingerprint(tmp_path)
+        coordination_shm = _coordination_shm_paths(ctx, tmp_path)
+        before = _durable_tree_fingerprint(
+            tmp_path,
+            coordination_shm=coordination_shm,
+        )
         observation = await ctx.projection.observe(ctx.mission_id, ctx.task_id)
         assert observation.semantic_job_status == "PENDING"
-        assert _tree_fingerprint(tmp_path) == before
+        assert _durable_tree_fingerprint(
+            tmp_path,
+            coordination_shm=coordination_shm,
+        ) == before
     finally:
         writer.close()
 

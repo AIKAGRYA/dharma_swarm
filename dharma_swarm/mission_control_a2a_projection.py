@@ -34,7 +34,8 @@ from dharma_swarm.mission_control_a2a_candidate import (
     unwrap_exact_proposal,
 )
 from dharma_swarm.mission_control_a2a_io import (
-    _read_only_db,
+    ReadQuery,
+    _read_only_queries,
     read_json,
     read_semantic_job,
     read_task,
@@ -92,11 +93,17 @@ class MissionControlA2AProjection:
             "external_a2a_task_id, message_id, event_id, artifact_id, proposal_id, "
             "metadata_json"
         )
-        with _read_only_db(self._runtime_db, "RuntimeState") as connection:
-            rows = connection.execute(
-                f"SELECT {columns} FROM execution_identities WHERE run_id = ? LIMIT 2",
-                (run_id,),
-            ).fetchall()
+        (rows,) = _read_only_queries(
+            self._runtime_db,
+            "RuntimeState",
+            (
+                ReadQuery(
+                    f"SELECT {columns} FROM execution_identities "
+                    "WHERE run_id = ? LIMIT 2",
+                    (run_id,),
+                ),
+            ),
+        )
         if not rows:
             return None
         if len(rows) != 1:

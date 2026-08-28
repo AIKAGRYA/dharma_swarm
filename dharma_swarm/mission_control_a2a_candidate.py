@@ -17,10 +17,11 @@ from dharma_swarm.mission_control_a2a import (
     _DELIVERY_ID,
     _FOUNDRY_DIGEST,
     _GIT_SHA,
+    _SCAN_LIMIT,
     _SHA256,
     _safe_token,
 )
-from dharma_swarm.mission_control_a2a_io import _read_only_db
+from dharma_swarm.mission_control_a2a_io import ReadQuery, _read_only_queries
 from dharma_swarm.mission_control_contract import MissionControlError, clean_identifier
 from dharma_swarm.runtime_state import RuntimeReceipt
 from dharma_swarm.spine.identity import ExecutionIdentity
@@ -37,6 +38,11 @@ _EXACT_PROPOSAL_WRAPPER_FIELDS = {
     "operation_hash",
 }
 _STORE_OBSERVATION_SEAL = object()
+
+
+def _require_scan_limit(scan_limit: int) -> None:
+    if type(scan_limit) is not int or not 1 <= scan_limit <= _SCAN_LIMIT:
+        raise MissionControlError("self-mod proposal scan limit is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,12 +152,112 @@ def load_exact_proposals(
 ) -> list[ExactProposalRecord]:
     """Read proposal receipts and their exact idempotency slots in one snapshot."""
 
-    with _read_only_db(runtime_db, "RuntimeState") as connection:
-        return load_exact_proposals_from_connection(
-            connection,
-            ref,
-            scan_limit=scan_limit,
+    _require_scan_limit(scan_limit)
+
+    proposal_columns = (
+        "receipt_id", "receipt_type", "status", "run_id", "task_id",
+        "trace_id", "correlation_id", "causation_id", "parent_run_id",
+        "agent_id", "idempotency_key", "side_effect_key", "payload_json",
+        "created_at",
+    )
+    slot_columns = (
+        "idempotency_key", "side_effect_key", "run_id", "task_id", "trace_id",
+        "correlation_id", "status", "result_receipt_id", "metadata_json",
+        "created_at", "updated_at",
+    )
+    projection = ", ".join(
+        ["proposal.proposal_rowid AS proposal_rowid"]
+        + [f"proposal.{name} AS proposal_{name}" for name in proposal_columns]
+        + ["slot.rowid AS slot_rowid"]
+        + [f"slot.{name} AS slot_{name}" for name in slot_columns]
+    )
+    (rows,) = _read_only_queries(
+        runtime_db,
+        "RuntimeState",
+        (
+            ReadQuery(
+                "WITH proposal AS ("
+                "SELECT rowid AS proposal_rowid, "
+                f"{', '.join(proposal_columns)} FROM runtime_receipts "
+                "WHERE correlation_id = ? AND receipt_type = 'self_mod_proposal' "
+                "ORDER BY created_at ASC, rowid ASC LIMIT ?"
+                f") SELECT {projection} FROM proposal "
+                "LEFT JOIN idempotency_records AS slot ON slot.rowid IN ("
+                "SELECT candidate.rowid FROM idempotency_records AS candidate "
+                "WHERE candidate.side_effect_key = proposal.side_effect_key "
+                "ORDER BY candidate.rowid LIMIT 3"
+                ") ORDER BY proposal.created_at ASC, proposal.proposal_rowid ASC, "
+                "slot.rowid ASC",
+                (ref.correlation_id, scan_limit + 1),
+            ),
+        ),
+    )
+    order: list[int] = []
+    grouped: dict[int, tuple[RuntimeReceipt, list[dict[str, Any]]]] = {}
+    for row in rows:
+        proposal_rowid = row["proposal_rowid"]
+        if type(proposal_rowid) is not int:
+            raise MissionControlError("self-mod proposal row identity is malformed")
+        if proposal_rowid not in grouped:
+            order.append(proposal_rowid)
+            grouped[proposal_rowid] = (_receipt_from_row(row, "proposal_"), [])
+        receipt, slots = grouped[proposal_rowid]
+        if receipt != _receipt_from_row(row, "proposal_"):
+            raise MissionControlError("self-mod proposal evidence changed within row set")
+        if row["slot_rowid"] is not None:
+            slots.append(_idempotency_from_row(row, "slot_"))
+    return [
+        ExactProposalRecord(
+            receipt=grouped[proposal_rowid][0],
+            idempotency_rows=tuple(grouped[proposal_rowid][1]),
         )
+        for proposal_rowid in order
+    ]
+
+
+def _receipt_from_row(row: Any, prefix: str = "") -> RuntimeReceipt:
+    payload = _load_canonical_object(
+        str(row[f"{prefix}payload_json"] or "{}"),
+        label="self-mod proposal evidence",
+    )
+    try:
+        created_at = datetime.fromisoformat(str(row[f"{prefix}created_at"]))
+    except ValueError as exc:
+        raise MissionControlError("self-mod proposal evidence is malformed") from exc
+    return RuntimeReceipt(
+        receipt_id=str(row[f"{prefix}receipt_id"]),
+        receipt_type=str(row[f"{prefix}receipt_type"]),
+        status=str(row[f"{prefix}status"]),
+        run_id=str(row[f"{prefix}run_id"] or ""),
+        task_id=str(row[f"{prefix}task_id"] or ""),
+        trace_id=str(row[f"{prefix}trace_id"] or ""),
+        correlation_id=str(row[f"{prefix}correlation_id"] or ""),
+        causation_id=str(row[f"{prefix}causation_id"] or ""),
+        parent_run_id=str(row[f"{prefix}parent_run_id"] or ""),
+        agent_id=str(row[f"{prefix}agent_id"] or ""),
+        idempotency_key=str(row[f"{prefix}idempotency_key"] or ""),
+        side_effect_key=str(row[f"{prefix}side_effect_key"] or ""),
+        payload=payload,
+        created_at=created_at,
+    )
+
+
+def _idempotency_from_row(row: Any, prefix: str = "") -> dict[str, Any]:
+    metadata = _load_canonical_object(
+        str(row[f"{prefix}metadata_json"] or "{}"),
+        label="self-mod proposal idempotency evidence",
+    )
+    return {
+        **{
+            key: str(row[f"{prefix}{key}"] or "")
+            for key in (
+                "idempotency_key", "side_effect_key", "run_id", "task_id",
+                "trace_id", "correlation_id", "status", "result_receipt_id",
+                "created_at", "updated_at",
+            )
+        },
+        "metadata": metadata,
+    }
 
 
 def load_exact_proposals_from_connection(
@@ -162,6 +268,8 @@ def load_exact_proposals_from_connection(
 ) -> list[ExactProposalRecord]:
     """Read exact proposal pairs through an already stable owner snapshot."""
 
+    _require_scan_limit(scan_limit)
+
     columns = (
         "receipt_id, receipt_type, status, run_id, task_id, trace_id, "
         "correlation_id, causation_id, parent_run_id, agent_id, "
@@ -171,69 +279,20 @@ def load_exact_proposals_from_connection(
     rows = connection.execute(
         f"SELECT {columns} FROM runtime_receipts "
         "WHERE correlation_id = ? AND receipt_type = 'self_mod_proposal' "
-        "ORDER BY created_at ASC LIMIT ?",
+        "ORDER BY created_at ASC, rowid ASC LIMIT ?",
         (ref.correlation_id, scan_limit + 1),
     ).fetchall()
     for row in rows:
-        payload = _load_canonical_object(
-            str(row["payload_json"] or "{}"),
-            label="self-mod proposal evidence",
-        )
-        try:
-            created_at = datetime.fromisoformat(str(row["created_at"]))
-        except ValueError as exc:
-            raise MissionControlError(
-                "self-mod proposal evidence is malformed",
-            ) from exc
-        receipt = RuntimeReceipt(
-            receipt_id=str(row["receipt_id"]),
-            receipt_type=str(row["receipt_type"]),
-            status=str(row["status"]),
-            run_id=str(row["run_id"] or ""),
-            task_id=str(row["task_id"] or ""),
-            trace_id=str(row["trace_id"] or ""),
-            correlation_id=str(row["correlation_id"] or ""),
-            causation_id=str(row["causation_id"] or ""),
-            parent_run_id=str(row["parent_run_id"] or ""),
-            agent_id=str(row["agent_id"] or ""),
-            idempotency_key=str(row["idempotency_key"] or ""),
-            side_effect_key=str(row["side_effect_key"] or ""),
-            payload=payload,
-            created_at=created_at,
-        )
+        receipt = _receipt_from_row(row)
         rows_for_slot = connection.execute(
             "SELECT idempotency_key, side_effect_key, run_id, task_id,"
             " trace_id, correlation_id, status, result_receipt_id,"
             " metadata_json, created_at, updated_at"
-            " FROM idempotency_records WHERE side_effect_key = ? LIMIT 3",
+            " FROM idempotency_records WHERE side_effect_key = ?"
+            " ORDER BY rowid ASC LIMIT 3",
             (receipt.side_effect_key,),
         ).fetchall()
-        idempotency_rows: list[dict[str, Any]] = []
-        for slot_row in rows_for_slot:
-            metadata = _load_canonical_object(
-                str(slot_row["metadata_json"] or "{}"),
-                label="self-mod proposal idempotency evidence",
-            )
-            idempotency_rows.append(
-                {
-                    **{
-                        key: str(slot_row[key] or "")
-                        for key in (
-                            "idempotency_key",
-                            "side_effect_key",
-                            "run_id",
-                            "task_id",
-                            "trace_id",
-                            "correlation_id",
-                            "status",
-                            "result_receipt_id",
-                            "created_at",
-                            "updated_at",
-                        )
-                    },
-                    "metadata": metadata,
-                },
-            )
+        idempotency_rows = [_idempotency_from_row(slot) for slot in rows_for_slot]
         records.append(
             ExactProposalRecord(
                 receipt=receipt,
