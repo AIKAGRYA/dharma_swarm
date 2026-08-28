@@ -426,6 +426,19 @@ def provider_available(provider: str, env: Mapping[str, str] | None = None) -> b
     return env_has_value(env_var, env)
 
 
+def strip_metered_anthropic_key(env: dict[str, str]) -> dict[str, str]:
+    """Drop ANTHROPIC_API_KEY from a claude subprocess env unless the operator
+    forces the metered API.
+
+    The claude binary prefers an API key over Max-plan OAuth, so an unfunded
+    key in the environment silently meters the lane ("Credit balance is too
+    low") instead of using the flat-fee login. Mutates and returns ``env``,
+    which must already be a copy — never ``os.environ`` itself.
+    """
+    if not env_value("DHARMA_FORCE_ANTHROPIC_API", env):
+        env.pop(ANTHROPIC_API_KEY_ENV, None)
+    return env
+
 __all__ = [
     "ALL_API_KEY_ENV_KEYS",
     "ANTHROPIC_API_KEY_ENV",
@@ -486,6 +499,7 @@ __all__ = [
     "TOGETHER_BASE_URL_ENV",
     "env_has_value",
     "env_value",
+    "strip_metered_anthropic_key",
     "load_runtime_env_files",
     "normalize_env_aliases",
     "present_api_key_envs",

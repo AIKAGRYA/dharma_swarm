@@ -43,6 +43,7 @@ from dharma_swarm.api_keys import (
     ZHIPU_API_KEY_ENV,
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
+from dharma_swarm.api_keys import strip_metered_anthropic_key
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
 from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
@@ -715,7 +716,7 @@ class _SubprocessProvider(LLMProvider):
         # `--output-format text` headless args below and breaks every nested
         # subprocess agent in a Claude Code on the web session. Drop it.
         env.pop("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", None)
-        return env
+        return strip_metered_anthropic_key(env)
 
     @jikoku_traced_provider
     async def complete(self, request: LLMRequest) -> LLMResponse:
