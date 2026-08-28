@@ -6,26 +6,30 @@
     "semantics": "Exact attestation digests are promotion authority after review; judge identifiers are not cryptographic identity authentication. This file is intentionally excluded from the candidate source digest so ratification cannot alter the evidence it authorizes."
   },
   "ratifications": {
-    "codex-independent-oraclepin-20260809-4c836606": [
-      "3e6f03bf4c771ce7838f8c0b3b95373ecc515df233650d3e9fff90e78944218e"
-    ],
-    "codex-independent-lg11-reseal-20260828-274921": [
-      "8014b4a9885da7cc3ef9a395b88cfa8dd4e0c05c029bc43d877b014cfc5f3bcf"
-    ],
-    "codex-independent-no-effect-reseal-20260828": [
-      "5fe9364dc93ebd4109f32ea2e93b2f4fe991317a25a3fcdb957f01a337bf81dd"
-    ],
-    "codex-independent-no-effect-fleet-reseal-20260828": [
-      "f210d6e056cc4b41065eaa25b09a47728b3f6bbd87641e6b846d72b70f638445"
-    ],
-    "codex-judge-3d40063d8": [
-      "72198603d0178b5bf86221552fd920049ded646ac4f020191532b2d80a5c8566"
-    ],
     "claude-judge-c62fdf4dd": [
       "450479a2a4a072fccc4d062573a06bb2f17889fb986c62c1f7521804498e56c4"
     ],
     "claude-judge-c83df531c": [
       "abfcfd4f2439b9c0a33bc511730a3dc1797a8b267c237c0a234eca5cde0da86a"
+    ],
+    "codex-independent-lg11-reseal-20260828-274921": [
+      "6f226beabfa6f5f3592e281aed12e98d2998fb85411b4c553996080599b2053a",
+      "8014b4a9885da7cc3ef9a395b88cfa8dd4e0c05c029bc43d877b014cfc5f3bcf"
+    ],
+    "codex-independent-no-effect-final-merge-reseal-20260828-beb663": [
+      "0a019cd694919c87897fa103bd4b5cc58f503d960aeb1db5e6fb67286adb75b1"
+    ],
+    "codex-independent-no-effect-fleet-reseal-20260828": [
+      "f210d6e056cc4b41065eaa25b09a47728b3f6bbd87641e6b846d72b70f638445"
+    ],
+    "codex-independent-no-effect-reseal-20260828": [
+      "5fe9364dc93ebd4109f32ea2e93b2f4fe991317a25a3fcdb957f01a337bf81dd"
+    ],
+    "codex-independent-oraclepin-20260809-4c836606": [
+      "3e6f03bf4c771ce7838f8c0b3b95373ecc515df233650d3e9fff90e78944218e"
+    ],
+    "codex-judge-3d40063d8": [
+      "72198603d0178b5bf86221552fd920049ded646ac4f020191532b2d80a5c8566"
     ]
   }
 }
