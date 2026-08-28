@@ -1,0 +1,104 @@
+{
+  "allowed_files": [
+    "dharma_swarm/foundry/patches.py",
+    "dharma_swarm/foundry/patches_atomic.py",
+    "reports/agentops/work_packets/sublimation-forge-WP-ATOMIC-PATCH-REPLAY-20260828.json",
+    "tests/test_foundry_patches.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "4a6fbff11b2f27d1fcc2e4907742f6951ebc0d2b",
+  "branch": "codex/governed-patch-reflex-effect-fence-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "fix(foundry): harden atomic patch replay"
+  },
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/mission_control*.py",
+    "dharma_swarm/runtime_state.py",
+    "scripts/runtime/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_patches.py",
+      "expected_exit": 0,
+      "name": "foundry-atomic-patch-tests",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/foundry/patches.py dharma_swarm/foundry/patches_atomic.py tests/test_foundry_patches.py",
+      "expected_exit": 0,
+      "name": "foundry-atomic-patch-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "foundry-atomic-patch-module-budget",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "git diff --check 4a6fbff11b2f27d1fcc2e4907742f6951ebc0d2b",
+      "expected_exit": 0,
+      "name": "foundry-atomic-patch-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "sublimation-forge-WP-ATOMIC-PATCH-REPLAY-20260828",
+  "intent": "Harden the existing one-file Foundry unified-diff replay without adding a second patch engine. Resolve the scoped UTF-8 target through held no-follow directory descriptors; bind optional root and preimage identities; write, mode, and fsync one same-directory temporary inode; compare-and-replace only the unchanged target; fsync the parent directory; and support deterministic exact-temp recovery for process crashes. Expose a separate exact replacement fsync primitive so a higher authority layer can distinguish visible bytes from a durably synchronized postimage. This packet owns no Mission Control, effect-authority, TaskBoard, provider, deployment, or production completion semantics.",
+  "negative_controls": [
+    {
+      "command": "python3 -c 'from pathlib import Path\nimport tempfile\nfrom dharma_swarm.foundry.patches import PatchReplayError, apply_unified_diff\nroot = Path(tempfile.mkdtemp())\n(root / \"src\").mkdir()\ntarget = root / \"src/value.py\"\ntarget.write_bytes(b\"VALUE = 1\\n\")\ninfo = target.stat()\ndiff = \"--- a/src/value.py\\n+++ b/src/value.py\\n@@ -1 +1 @@\\n-VALUE = 1\\n+VALUE = 2\\n\"\ntry:\n    apply_unified_diff(root, diff, allowed_paths=(\"src/value.py\",), expected_identity=(info.st_dev, info.st_ino + 1, info.st_ctime_ns))\nexcept PatchReplayError:\n    pass\nelse:\n    raise AssertionError(\"drifted identity was accepted\")\nassert target.read_bytes() == b\"VALUE = 1\\n\"'",
+      "expected_exit": 0,
+      "name": "foundry-drifted-target-identity-fails-closed",
+      "timeout_seconds": 180
+    }
+  ],
+  "session_entry": {
+    "active_track": "sublimation-forge-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/foundry/patches.py",
+      "dharma_swarm/forge_lab/worktree.py",
+      "tests/test_foundry_patches.py"
+    ],
+    "collision": {
+      "checked_at_sha": "4a6fbff11b2f27d1fcc2e4907742f6951ebc0d2b",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The primitive provides descriptor-anchored one-file replay and explicit fsync boundaries; it does not claim hostile same-UID filesystem custody or a cross-filesystem transaction.",
+      "A caller that receives an exception after rename must treat the target as indeterminate and reclassify exact bytes before retry; an exception is not evidence that the pathname remained at the preimage.",
+      "This packet does not mint repository-effect authority or authorize Mission Control completion.",
+      "Every stacked PR requires external human approval before merge."
+    ],
+    "interface_mismatches": [
+      "A visible rename is not by itself a durable effect; the exact file and parent directory must both be synchronized.",
+      "A caller-supplied path string is not target identity; optional device, inode, ctime, and root identity pins supply the compare side of replay.",
+      "A deterministic recovery temp is evidence only when its device, inode shape, ownership, mode, link count, length, and bytes all match."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "59079c56007058c8a339430f110cc16a59532b60494d83fb9c3135d03020ce15",
+    "rollback": "Revert the Foundry atomic replay commit and its packet. Any disposable scratch target already replaced must be reclassified or recreated from its pinned base; Git rollback does not reinterpret filesystem history.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-ATOMIC-PATCH-REPLAY-20260828"
+  },
+  "worktree": "."
+}

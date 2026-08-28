@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import dharma_swarm.foundry.artifacts as artifacts
+import dharma_swarm.foundry.patches_atomic as patches_atomic
 from dharma_swarm.foundry.artifacts import ArtifactReplayError, build_lineage
 from dharma_swarm.foundry.patches import (
     PatchReplayError,
@@ -48,6 +49,136 @@ def test_exact_patch_replays_atomically_and_preserves_mode(tmp_path):
     )
     assert target.read_text(encoding="utf-8") == "VALUE = 2\n"
     assert target.stat().st_mode & 0o777 == 0o640
+
+
+def test_exact_patch_requires_the_pinned_preimage_inode(tmp_path):
+    target = _target(tmp_path)
+    metadata = target.stat()
+    expected = (metadata.st_dev, metadata.st_ino, metadata.st_ctime_ns)
+    apply_unified_diff(
+        tmp_path,
+        _patch("VALUE = 1\n", "VALUE = 2\n"),
+        allowed_paths=["src/value.py"],
+        expected_identity=expected,
+    )
+    assert target.read_text(encoding="utf-8") == "VALUE = 2\n"
+
+    current = target.stat()
+    with pytest.raises(PatchReplayError, match="identity drifted"):
+        apply_unified_diff(
+            tmp_path,
+            _patch("VALUE = 2\n", "VALUE = 3\n"),
+            allowed_paths=["src/value.py"],
+            expected_identity=(current.st_dev, metadata.st_ino, current.st_ctime_ns),
+        )
+    assert target.read_text(encoding="utf-8") == "VALUE = 2\n"
+
+
+def test_path_swap_before_replace_is_detected_without_patch_write(
+    tmp_path, monkeypatch
+):
+    target = _target(tmp_path)
+    original_create = patches_atomic._create_temp
+
+    def swap_after_temp(parent_fd, mode, operation_id):
+        descriptor, name, created = original_create(parent_fd, mode, operation_id)
+        target.unlink()
+        target.write_text("ATTACKER\n", encoding="utf-8")
+        return descriptor, name, created
+
+    monkeypatch.setattr(patches_atomic, "_create_temp", swap_after_temp)
+    with pytest.raises(PatchReplayError, match="identity drifted before replace"):
+        apply_unified_diff(
+            tmp_path,
+            _patch("VALUE = 1\n", "VALUE = 2\n"),
+            allowed_paths=["src/value.py"],
+        )
+    assert target.read_text(encoding="utf-8") == "ATTACKER\n"
+    assert not list(target.parent.glob(".foundry-replay-*"))
+
+
+def test_parent_component_swap_before_replace_is_detected_without_write(
+    tmp_path, monkeypatch
+):
+    target = _target(tmp_path)
+    original_create = patches_atomic._create_temp
+    displaced = tmp_path / "displaced-src"
+
+    def swap_parent_after_temp(parent_fd, mode, operation_id):
+        descriptor, name, created = original_create(parent_fd, mode, operation_id)
+        target.parent.rename(displaced)
+        target.parent.mkdir()
+        target.write_text("ATTACKER\n", encoding="utf-8")
+        return descriptor, name, created
+
+    monkeypatch.setattr(patches_atomic, "_create_temp", swap_parent_after_temp)
+    with pytest.raises(PatchReplayError, match="directory pathname drifted"):
+        apply_unified_diff(
+            tmp_path,
+            _patch("VALUE = 1\n", "VALUE = 2\n"),
+            allowed_paths=["src/value.py"],
+        )
+    assert target.read_text(encoding="utf-8") == "ATTACKER\n"
+    assert (displaced / "value.py").read_text(encoding="utf-8") == "VALUE = 1\n"
+    assert not list(displaced.glob(".foundry-replay-*"))
+
+
+def test_deterministic_temp_resumes_preimage_crash_window(tmp_path):
+    target = _target(tmp_path)
+    operation_id = "a" * 64
+    temporary = target.parent / f".foundry-replay-{operation_id}"
+    temporary.write_text("VALUE = 2\n", encoding="utf-8")
+    metadata = target.stat()
+    temporary.chmod(metadata.st_mode & 0o777)
+
+    apply_unified_diff(
+        tmp_path,
+        _patch("VALUE = 1\n", "VALUE = 2\n"),
+        allowed_paths=["src/value.py"],
+        expected_identity=(metadata.st_dev, metadata.st_ino, metadata.st_ctime_ns),
+        expected_root_identity=(tmp_path.stat().st_dev, tmp_path.stat().st_ino),
+        operation_id=operation_id,
+    )
+    assert target.read_text(encoding="utf-8") == "VALUE = 2\n"
+    assert not temporary.exists()
+
+
+def test_deterministic_temp_rejects_hardlink_alias(tmp_path):
+    target = _target(tmp_path)
+    operation_id = "b" * 64
+    alias = target.parent / "attacker-alias"
+    alias.write_text("VALUE = 2\n", encoding="utf-8")
+    alias.chmod(target.stat().st_mode & 0o777)
+    temporary = target.parent / f".foundry-replay-{operation_id}"
+    os.link(alias, temporary)
+    metadata = target.stat()
+
+    with pytest.raises(PatchReplayError, match="recovery temp does not match"):
+        apply_unified_diff(
+            tmp_path,
+            _patch("VALUE = 1\n", "VALUE = 2\n"),
+            allowed_paths=["src/value.py"],
+            expected_identity=(metadata.st_dev, metadata.st_ino, metadata.st_ctime_ns),
+            expected_root_identity=(tmp_path.stat().st_dev, tmp_path.stat().st_ino),
+            operation_id=operation_id,
+        )
+    assert target.read_text(encoding="utf-8") == "VALUE = 1\n"
+    assert alias.read_text(encoding="utf-8") == "VALUE = 2\n"
+    assert temporary.exists()
+    assert temporary.stat().st_nlink == 2
+
+
+def test_wrong_pinned_root_identity_refuses_before_write(tmp_path):
+    target = _target(tmp_path)
+    before = target.read_bytes()
+    with pytest.raises(PatchReplayError, match="root identity drifted"):
+        apply_unified_diff(
+            tmp_path,
+            _patch("VALUE = 1\n", "VALUE = 2\n"),
+            allowed_paths=["src/value.py"],
+            expected_root_identity=(tmp_path.stat().st_dev, tmp_path.stat().st_ino + 1),
+        )
+    assert target.read_bytes() == before
 
 
 def test_stale_context_fails_without_mutating_target(tmp_path):
