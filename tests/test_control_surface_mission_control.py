@@ -591,6 +591,24 @@ def test_stale_recovery_requires_an_actually_expired_lease(
     assert body["data"]["snapshot"] is None
 
 
+@pytest.mark.parametrize("failure_code", ["", "stale_lease_recovered "])
+def test_stale_recovery_requires_canonical_failure_code(
+    failure_code: str,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _recovered_snapshot(mission_id)
+    value["attempts"][0]["failure_code"] = failure_code
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

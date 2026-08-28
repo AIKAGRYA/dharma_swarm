@@ -239,7 +239,11 @@ def _validate_coherent_lineage(
                 and not lease["active"]
                 and (
                     status != "stale_recovered"
-                    or (lease["expired"] and lease_is_expired)
+                    or (
+                        attempt["failure_code"] == "stale_lease_recovered"
+                        and lease["expired"]
+                        and lease_is_expired
+                    )
                 )
             )
         evidence = [

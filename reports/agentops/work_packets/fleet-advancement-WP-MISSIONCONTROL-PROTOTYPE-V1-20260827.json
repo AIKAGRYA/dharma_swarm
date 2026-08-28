@@ -93,6 +93,7 @@
       "There is no canonical unbounded mission-list API; the endpoint and cockpit require one explicit bounded mission identifier.",
       "The existing cockpit report is a broad repository projection while MissionSnapshot is a typed mission projection; the UI must display their provenance separately.",
       "The HTTP boundary proves only PubliclyWitnessed[State] over retained fields and trusts the injected canonical owner for hidden causal identity; it does not independently re-prove omitted evidence.",
+      "A coherent stale-recovery projection requires the retained attempt failure_code to equal stale_lease_recovered and the retained lease to prove expiry.",
       "The current visual shell predates the locked matte indigo-sumi canon, so this packet scopes the canonical treatment to Mission Control without changing unrelated dashboard routes."
     ],
     "closest_existing_implementation": [
@@ -112,6 +113,6 @@
       "This packet does not deploy, start or restart a daemon, initialize a state store, discover missions, mutate runtime state, use a live provider, or grant command authority."
     ],
     "rollback": "Revert the packet-scoped Mission Control API and cockpit commit. No canonical owner state, runtime database, transport, daemon, deployment, credential, ACL, or external system is changed.",
-    "packet_digest": "60704749cea207b8dbd1d89f18c9f346d9c0c3bf5677752a2822f499ca49d80e"
+    "packet_digest": "39c281d20d996563dda351b15dc7cd776e70658ac330db31bae51e12d08ce696"
   }
 }
