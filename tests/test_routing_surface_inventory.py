@@ -4,7 +4,7 @@ Adds are intentional: extend ``KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES`` and 
 tier in comments. Scope excludes ``scripts/`` (operator utilities).
 
 ``KNOWN_NATIVE_PROCESS_REPLACEMENT_SINKS`` is a separate, deliberately narrow
-inventory of Python ``os.exec*`` process-replacement calls under ``dharma_swarm``
+inventory of all Python ``os.exec*`` process-replacement calls under ``dharma_swarm``
 and ``api``.  It classifies shell handoffs as well as the native interactive
 provider handoff, but does not claim to cover subprocess calls, SDK calls, shell
 scripts, or every possible inference sink.
@@ -88,10 +88,10 @@ KNOWN_NATIVE_PROCESS_REPLACEMENT_SINKS: dict[
     (
         "dharma_swarm/terminal_commands/surfaces.py",
         "cmd_chat",
-        "execvpe",
-        "runtime.binary_path",
+        "execve",
+        "executable",
         1,
-    ): "provider_interactive:claude_code:provider_resolved:model_native_deferred",
+    ): "provider_interactive:claude_code:provider_resolved:absolute_execve:model_native_deferred",
 }
 
 
@@ -135,7 +135,17 @@ class _NativeExecVisitor(ast.NodeVisitor):
             isinstance(func, ast.Attribute)
             and isinstance(func.value, ast.Name)
             and func.value.id == "os"
-            and func.attr in {"execvp", "execvpe", "execlp", "execlpe"}
+            and func.attr
+            in {
+                "execl",
+                "execle",
+                "execlp",
+                "execlpe",
+                "execv",
+                "execve",
+                "execvp",
+                "execvpe",
+            }
             and node.args
         ):
             enclosing_function = (
@@ -196,10 +206,10 @@ def test_dgc_chat_native_provider_exec_is_runtime_and_policy_resolved() -> None:
         (
             "dharma_swarm/terminal_commands/surfaces.py",
             "cmd_chat",
-            "execvpe",
-            "runtime.binary_path",
+            "execve",
+            "executable",
             1,
-        ): "provider_interactive:claude_code:provider_resolved:model_native_deferred"
+        ): "provider_interactive:claude_code:provider_resolved:absolute_execve:model_native_deferred"
     }
 
     source = (REPO_ROOT / "dharma_swarm/terminal_commands/surfaces.py").read_text(
@@ -212,8 +222,14 @@ def test_dgc_chat_native_provider_exec_is_runtime_and_policy_resolved() -> None:
     assert "available_providers=[ProviderType.CLAUDE_CODE]" in source
     assert '"ANTHROPIC_API_KEY"' in source
     assert '"ANTHROPIC_AUTH_TOKEN"' in source
-    assert "        os.execvpe(runtime.binary_path, command, env)" in source.splitlines()
-    assert 'os.execvpe("claude"' not in source
+    assert "def _normalize_chat_executable(" in source
+    exec_line = next(
+        line
+        for line in source.splitlines()
+        if "os.execve(executable, command, env)" in line
+    )
+    assert "nosemgrep: python.lang.security.audit.dangerous-os-exec" in exec_line
+    assert "os.execvpe(" not in source
 
 
 def test_dashboard_chat_bypass_remains_inventoried() -> None:

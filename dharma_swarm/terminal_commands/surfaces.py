@@ -153,6 +153,28 @@ def _resolve_chat_runtime(
     return runtime
 
 
+def _normalize_chat_executable(binary_path: str) -> str:
+    """Return a canonical absolute path for the native ``execve`` handoff.
+
+    Runtime discovery is allowed to follow the operator's configured PATH, but
+    the process-replacement boundary must not perform a second PATH lookup.
+    Requiring an absolute provider result and resolving aliases here gives
+    ``execve`` one concrete executable identity.
+    """
+    expanded = os.path.expanduser(binary_path)
+    if not os.path.isabs(expanded):
+        raise ValueError(
+            "dgc chat runtime executable must be an absolute provider-resolved path"
+        )
+    if "\x00" in expanded:
+        raise ValueError("dgc chat runtime executable contains a null byte")
+
+    executable = os.path.realpath(expanded)
+    if not os.path.isabs(executable):  # defensive invariant across platforms
+        raise ValueError("dgc chat runtime executable did not normalize absolutely")
+    return executable
+
+
 def cmd_chat(
     continue_last: bool = False,
     offline: bool = False,
@@ -170,6 +192,8 @@ def cmd_chat(
 
     try:
         runtime = _resolve_chat_runtime(env=env, model=model)
+        assert runtime.binary_path is not None  # narrowed by _resolve_chat_runtime
+        executable = _normalize_chat_executable(runtime.binary_path)
     except FileNotFoundError:
         print("claude CLI not found. Install Claude Code first.")
         sys.exit(1)
@@ -177,8 +201,7 @@ def cmd_chat(
         print(f"Failed to launch Claude Code: {e}")
         sys.exit(1)
 
-    assert runtime.binary_path is not None  # narrowed by _resolve_chat_runtime
-    command = [runtime.binary_path]
+    command = [executable]
     if continue_last:
         command.append("--continue")
     if model:
@@ -198,7 +221,9 @@ def cmd_chat(
             )
 
     try:
-        os.execvpe(runtime.binary_path, command, env)
+        # The executable is absolute/realpath-normalized above; argv is an
+        # array and execve never invokes a shell or performs a PATH lookup.
+        os.execve(executable, command, env)  # nosemgrep: python.lang.security.audit.dangerous-os-exec-tainted-env-args.dangerous-os-exec-tainted-env-args
     except FileNotFoundError:
         print("claude CLI not found. Install Claude Code first.")
         sys.exit(1)

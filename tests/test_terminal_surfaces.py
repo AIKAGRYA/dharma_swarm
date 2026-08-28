@@ -114,7 +114,7 @@ def test_cmd_chat_uses_resolved_binary_after_resolve_and_route(
     monkeypatch.setattr(surfaces, "resolve_runtime_provider_config", _resolve)
     monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
     monkeypatch.setattr(surfaces, "_build_chat_context_snapshot", lambda: "snapshot")
-    monkeypatch.setattr(surfaces.os, "execvpe", _exec)
+    monkeypatch.setattr(surfaces.os, "execve", _exec)
 
     surfaces.cmd_chat(
         continue_last=True,
@@ -188,7 +188,7 @@ def test_cmd_chat_does_not_inject_resolved_default_model(
     monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
     monkeypatch.setattr(
         surfaces.os,
-        "execvpe",
+        "execve",
         lambda file, command, env: launched.update(command=command),
     )
 
@@ -227,7 +227,7 @@ def test_cmd_chat_unavailable_runtime_never_execs(
     )
     monkeypatch.setattr(
         surfaces.os,
-        "execvpe",
+        "execve",
         lambda *args: exec_calls.append(True),
     )
 
@@ -252,7 +252,7 @@ def test_cmd_chat_runtime_provider_mismatch_never_execs(
     )
     monkeypatch.setattr(
         surfaces.os,
-        "execvpe",
+        "execve",
         lambda *args: exec_calls.append(True),
     )
 
@@ -288,7 +288,7 @@ def test_cmd_chat_policy_provider_mismatch_never_execs(
     monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
     monkeypatch.setattr(
         surfaces.os,
-        "execvpe",
+        "execve",
         lambda *args: exec_calls.append(True),
     )
 
@@ -321,7 +321,7 @@ def test_cmd_chat_policy_model_mismatch_never_execs(monkeypatch, capsys) -> None
     monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
     monkeypatch.setattr(
         surfaces.os,
-        "execvpe",
+        "execve",
         lambda *args: exec_calls.append(True),
     )
 
@@ -354,7 +354,7 @@ def test_cmd_chat_continue_preserves_native_session_model(monkeypatch) -> None:
     monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
     monkeypatch.setattr(
         surfaces.os,
-        "execvpe",
+        "execve",
         lambda file, command, env: launched.update(command=command),
     )
 
@@ -365,3 +365,78 @@ def test_cmd_chat_continue_preserves_native_session_model(monkeypatch) -> None:
     )
 
     assert launched["command"] == ["/opt/dgc/bin/claude", "--continue"]
+
+
+def test_cmd_chat_normalizes_absolute_executable_without_path_search(
+    monkeypatch,
+) -> None:
+    launched: dict[str, object] = {}
+    monkeypatch.setattr(
+        surfaces,
+        "resolve_runtime_provider_config",
+        lambda provider, **kwargs: _runtime(
+            binary_path="/opt/dgc/aliases/../bin/claude"
+        ),
+    )
+
+    class _Policy:
+        def __init__(self, *, config):
+            pass
+
+        def route(self, request, *, available_providers=None):
+            return SimpleNamespace(
+                selected_provider=ProviderType.CLAUDE_CODE,
+                selected_model_hint=None,
+            )
+
+    monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
+    monkeypatch.setattr(
+        surfaces.os,
+        "execve",
+        lambda file, command, env: launched.update(file=file, command=command),
+    )
+
+    surfaces.cmd_chat(include_context=False)
+
+    assert launched == {
+        "file": "/opt/dgc/bin/claude",
+        "command": ["/opt/dgc/bin/claude"],
+    }
+
+
+@pytest.mark.parametrize("binary_path", ["claude", "bin/claude", "./claude"])
+def test_cmd_chat_rejects_non_absolute_runtime_executable(
+    monkeypatch,
+    capsys,
+    binary_path: str,
+) -> None:
+    exec_calls: list[bool] = []
+    monkeypatch.setattr(
+        surfaces,
+        "resolve_runtime_provider_config",
+        lambda provider, **kwargs: _runtime(binary_path=binary_path),
+    )
+
+    class _Policy:
+        def __init__(self, *, config):
+            pass
+
+        def route(self, request, *, available_providers=None):
+            return SimpleNamespace(
+                selected_provider=ProviderType.CLAUDE_CODE,
+                selected_model_hint=None,
+            )
+
+    monkeypatch.setattr(surfaces, "ProviderPolicyRouter", _Policy)
+    monkeypatch.setattr(
+        surfaces.os,
+        "execve",
+        lambda *args: exec_calls.append(True),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        surfaces.cmd_chat(include_context=False)
+
+    assert exc_info.value.code == 1
+    assert exec_calls == []
+    assert "must be an absolute provider-resolved path" in capsys.readouterr().out

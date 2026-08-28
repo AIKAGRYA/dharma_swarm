@@ -163,7 +163,7 @@ active_tracks:
       - dashboard/src/components/operator-coherence/v2/**
       - terminal/**
       - dharma_swarm/terminal_commands/surfaces.py
-      - dharma_swarm/runtime_activity.py
+      - dharma_swarm/runtime_activity/**
       - dharma_swarm/operator_views.py
       - dharma_swarm/runtime_graph_views.py
       - dharma_swarm/runtime_platform_views.py
@@ -178,6 +178,7 @@ active_tracks:
       - tests/test_runtime_graph_api.py
       - tests/test_operator_core_adapters.py
       - tests/test_tui_helpers.py
+      - docs/architecture/NAVIGATION.md
       - docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md
       - specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
     moves_vital_signs:
