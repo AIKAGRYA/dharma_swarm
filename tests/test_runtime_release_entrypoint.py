@@ -100,6 +100,65 @@ def test_entrypoint_forwards_only_semantic_responder_arguments(monkeypatch) -> N
     assert called == [["loop", "--interval-s", "60", "--limit", "1"]]
 
 
+def test_entrypoint_forwards_only_governed_patch_responder_arguments(
+    monkeypatch,
+) -> None:
+    called: list[list[str]] = []
+    module_name = "scripts.runtime.governed_patch_responder"
+    module = types.ModuleType(module_name)
+    module.main = lambda args: called.append(args) or 10  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, module_name, module)
+    monkeypatch.setenv("DHARMA_RELEASE_ROOT", str(REPO_ROOT))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "runtime-release",
+            "governed-patch-responder",
+            "once",
+            "--packet-id",
+            "packet-1",
+            "--delivery-record",
+            "delivery.json",
+        ],
+    )
+
+    result = runtime_release_entrypoint.main()
+
+    assert result == 10
+    assert called == [
+        [
+            "once",
+            "--packet-id",
+            "packet-1",
+            "--delivery-record",
+            "delivery.json",
+        ]
+    ]
+
+
+def test_entrypoint_rejects_mismatched_release_before_responder_dispatch(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    called: list[list[str]] = []
+    module_name = "scripts.runtime.governed_patch_responder"
+    module = types.ModuleType(module_name)
+    module.main = lambda args: called.append(args) or 10  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, module_name, module)
+    monkeypatch.setenv("DHARMA_RELEASE_ROOT", str(tmp_path))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["runtime-release", "governed-patch-responder", "serve"],
+    )
+
+    with pytest.raises(SystemExit, match="installed package does not match"):
+        runtime_release_entrypoint.main()
+
+    assert called == []
+
+
 @pytest.mark.parametrize(
     ("command", "module_name"),
     (

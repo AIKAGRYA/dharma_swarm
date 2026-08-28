@@ -10,12 +10,16 @@ import pytest
 from dharma_swarm.foundry.evaluator import Candidate, candidate_digest
 from dharma_swarm.governed_patch_evidence import (
     GOVERNED_PATCH_REQUEST_SCHEMA,
+    GOVERNED_PATCH_REQUEST_V2_SCHEMA,
     MAX_SOURCE_BYTES,
     MAX_VERIFIER_EVIDENCE_BYTES,
     GovernedPatchEvidenceError,
     NativePatchBindings,
     NoEffectOutcome,
     build_candidate_bundle,
+    build_governed_patch_request_v2_content,
+    canonical_semantic_intent_sha256,
+    governed_patch_task_snapshot_sha256,
     load_candidate_bundle,
     parse_governed_patch_request,
     record_no_effect_result,
@@ -34,6 +38,8 @@ DIFF = """--- a/pkg/example.py
 -    return "old"
 +    return "new"
 """
+SEMANTIC_INTENT = "Change value() to return the new marker."
+SEMANTIC_ARTIFACT_SHA = "f" * 64
 
 
 def _bindings(**overrides: str) -> NativePatchBindings:
@@ -91,6 +97,40 @@ def _request(repo: Path, bindings: NativePatchBindings):
     )
 
 
+def _task_snapshot(bindings: NativePatchBindings) -> str:
+    return governed_patch_task_snapshot_sha256(
+        mission_id=bindings.mission_id,
+        task_id=bindings.task_id,
+        title="Make the bounded change",
+        description="Change only the authorized source file.",
+        mission_task_creation_hash="e" * 64,
+        completion_contract="governed_patch_effect_v1",
+        status="pending",
+        assigned_to=None,
+        result=None,
+    )
+
+
+def _request_v2(repo: Path, bindings: NativePatchBindings):
+    task_snapshot = _task_snapshot(bindings)
+    content = build_governed_patch_request_v2_content(
+        bindings,
+        authorized_source_path=SOURCE_PATH,
+        oracle_argv=["python3", "-m", "pytest", "tests/test_example.py", "-q"],
+        semantic_intent=SEMANTIC_INTENT,
+        task_snapshot_sha256=task_snapshot,
+    )
+    return parse_governed_patch_request(
+        content,
+        repo_root=repo,
+        expected=bindings,
+        accepted_base_sha=BASE_SHA,
+        expected_content_sha256=hashlib.sha256(content.encode()).hexdigest(),
+        expected_semantic_intent=SEMANTIC_INTENT,
+        expected_task_snapshot_sha256=task_snapshot,
+    )
+
+
 def _candidate(roots: tuple[Path, Path]):
     repo, evidence = roots
     bindings = _bindings()
@@ -142,6 +182,152 @@ def test_candidate_bundle_is_exact_immutable_and_restart_loadable(
         accepted_base_sha=BASE_SHA,
     )
     assert loaded == first
+
+
+def test_v2_request_and_candidate_bind_reconstructible_semantic_chain(
+    roots: tuple[Path, Path],
+) -> None:
+    repo, evidence = roots
+    bindings = _bindings()
+    request = _request_v2(repo, bindings)
+
+    assert request.schema_version == GOVERNED_PATCH_REQUEST_V2_SCHEMA
+    assert request.semantic_intent == SEMANTIC_INTENT
+    assert request.semantic_intent_sha256 == canonical_semantic_intent_sha256(
+        SEMANTIC_INTENT
+    )
+    assert request.task_snapshot_sha256 == _task_snapshot(bindings)
+
+    candidate = build_candidate_bundle(
+        request,
+        DIFF,
+        bundle_root=evidence,
+        semantic_artifact_sha256=SEMANTIC_ARTIFACT_SHA,
+    )
+    manifest = json.loads(candidate.manifest_path.read_text(encoding="utf-8"))
+    candidate_payload = json.loads(
+        candidate.candidate_path.read_text(encoding="utf-8")
+    )
+    for payload in (manifest, candidate_payload["metadata"]):
+        assert payload["semantic_intent_sha256"] == request.semantic_intent_sha256
+        assert payload["task_snapshot_sha256"] == request.task_snapshot_sha256
+        assert payload["semantic_artifact_sha256"] == SEMANTIC_ARTIFACT_SHA
+    loaded = load_candidate_bundle(
+        evidence,
+        candidate.bundle_sha256,
+        repo_root=repo,
+        expected=bindings,
+        accepted_base_sha=BASE_SHA,
+    )
+    assert loaded == candidate
+
+
+def test_v2_constructor_is_local_canonical_and_parser_requires_expected_bindings(
+    roots: tuple[Path, Path],
+) -> None:
+    repo, _ = roots
+    bindings = _bindings()
+    snapshot = _task_snapshot(bindings)
+    content = build_governed_patch_request_v2_content(
+        bindings,
+        authorized_source_path=SOURCE_PATH,
+        oracle_argv=["python3", "-m", "pytest"],
+        semantic_intent=SEMANTIC_INTENT,
+        task_snapshot_sha256=snapshot,
+    )
+    assert content == json.dumps(
+        json.loads(content), sort_keys=True, separators=(",", ":")
+    )
+    with pytest.raises(GovernedPatchEvidenceError, match="requires expected"):
+        parse_governed_patch_request(
+            content,
+            repo_root=repo,
+            expected=bindings,
+            accepted_base_sha=BASE_SHA,
+        )
+    with pytest.raises(GovernedPatchEvidenceError, match="intent binding"):
+        parse_governed_patch_request(
+            content,
+            repo_root=repo,
+            expected=bindings,
+            accepted_base_sha=BASE_SHA,
+            expected_semantic_intent="Different intent",
+            expected_task_snapshot_sha256=snapshot,
+        )
+    with pytest.raises(GovernedPatchEvidenceError, match="snapshot binding"):
+        parse_governed_patch_request(
+            content,
+            repo_root=repo,
+            expected=bindings,
+            accepted_base_sha=BASE_SHA,
+            expected_semantic_intent=SEMANTIC_INTENT,
+            expected_task_snapshot_sha256="0" * 64,
+        )
+
+
+def test_task_snapshot_digest_is_closed_reconstructible_and_sensitive() -> None:
+    bindings = _bindings()
+    first = _task_snapshot(bindings)
+    second = _task_snapshot(bindings)
+    changed = governed_patch_task_snapshot_sha256(
+        mission_id=bindings.mission_id,
+        task_id=bindings.task_id,
+        title="Make the bounded change",
+        description="A changed canonical description.",
+        mission_task_creation_hash="e" * 64,
+        completion_contract="governed_patch_effect_v1",
+        status="pending",
+        assigned_to=None,
+        result=None,
+    )
+
+    assert first == second
+    assert first != changed
+    assert len(first) == 64
+    with pytest.raises(GovernedPatchEvidenceError, match="creation_hash"):
+        governed_patch_task_snapshot_sha256(
+            mission_id=bindings.mission_id,
+            task_id=bindings.task_id,
+            title="title",
+            description="description",
+            mission_task_creation_hash="opaque",
+            completion_contract="governed_patch_effect_v1",
+            status="pending",
+            assigned_to=None,
+            result=None,
+        )
+
+    for authority_override in (
+        {"status": "running", "assigned_to": None, "result": None},
+        {"status": "pending", "assigned_to": "codex_composer", "result": None},
+        {"status": "pending", "assigned_to": None, "result": "already done"},
+    ):
+        with pytest.raises(GovernedPatchEvidenceError, match="authority"):
+            governed_patch_task_snapshot_sha256(
+                mission_id=bindings.mission_id,
+                task_id=bindings.task_id,
+                title="title",
+                description="description",
+                mission_task_creation_hash="e" * 64,
+                completion_contract="governed_patch_effect_v1",
+                **authority_override,
+            )
+
+
+def test_v1_request_cannot_be_reinterpreted_as_intent_bound(
+    roots: tuple[Path, Path],
+) -> None:
+    repo, _ = roots
+    bindings = _bindings()
+    with pytest.raises(GovernedPatchEvidenceError, match="v1.*cannot bind"):
+        parse_governed_patch_request(
+            _content(bindings),
+            repo_root=repo,
+            expected=bindings,
+            accepted_base_sha=BASE_SHA,
+            expected_semantic_intent=SEMANTIC_INTENT,
+            expected_task_snapshot_sha256=_task_snapshot(bindings),
+        )
 
 
 def test_verified_candidate_snapshots_survive_later_path_swap_but_reload_refuses(
@@ -306,7 +492,17 @@ def test_request_rejects_non_argv_or_shell_oracle(
         )
 
 
-@pytest.mark.parametrize("path", ["../escape.py", "/tmp/escape.py", "missing.py"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "../escape.py",
+        "/tmp/escape.py",
+        "missing.py",
+        "pkg/space name.py",
+        "pkg/back`tick.py",
+        "pkg/tab\tname.py",
+    ],
+)
 def test_request_rejects_unsafe_or_missing_source(
     roots: tuple[Path, Path],
     path: str,
@@ -401,8 +597,9 @@ def test_candidate_refuses_repository_bundle_root_and_detects_tamper(
 ) -> None:
     repo, _ = roots
     request = _request(repo, _bindings())
-    with pytest.raises(GovernedPatchEvidenceError, match="outside"):
-        build_candidate_bundle(request, DIFF, bundle_root=repo / ".evidence")
+    for unsafe_root in (repo, repo / ".evidence", repo.parent, Path("/")):
+        with pytest.raises(GovernedPatchEvidenceError, match="disjoint"):
+            build_candidate_bundle(request, DIFF, bundle_root=unsafe_root)
     candidate = build_candidate_bundle(request, DIFF, bundle_root=repo.parent / "safe")
     candidate.diff_path.write_text("tampered", encoding="utf-8")
     with pytest.raises(GovernedPatchEvidenceError, match="tampered"):
