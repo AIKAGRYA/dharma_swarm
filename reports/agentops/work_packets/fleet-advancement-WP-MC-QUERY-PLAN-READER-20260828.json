@@ -1,0 +1,86 @@
+{
+  "allowed_files": [
+    "dharma_swarm/mission_control_a2a.py",
+    "dharma_swarm/mission_control_a2a_candidate.py",
+    "dharma_swarm/mission_control_a2a_io.py",
+    "dharma_swarm/mission_control_a2a_projection.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-MC-QUERY-PLAN-READER-20260828.json",
+    "tests/test_mission_control_a2a.py",
+    "tests/test_mission_control_a2a_io.py"
+  ],
+  "approval": {"before_commit": false, "before_merge": true},
+  "base_ref": "ff9074fcc124314e545f5f10418e7ded3d59cd55",
+  "branch": "codex/mc-bounded-reader-20260828",
+  "commit": {"allowed": true, "message": "fix(control): bound Mission Control query plans"},
+  "forbidden_files": [
+    "api/**", "dashboard/**", "deploy/**", "dharma_swarm/foundry/**",
+    "dharma_swarm/forge_lab/**", "scripts/foundry/**",
+    "scripts/runtime/governed_patch_responder.py", "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_mission_control_a2a_io.py tests/test_mission_control_a2a.py",
+      "expected_exit": 0,
+      "name": "mission-control-query-plan-reader-tests",
+      "timeout_seconds": 360
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/mission_control_a2a.py dharma_swarm/mission_control_a2a_candidate.py dharma_swarm/mission_control_a2a_io.py dharma_swarm/mission_control_a2a_projection.py tests/test_mission_control_a2a_io.py tests/test_mission_control_a2a.py",
+      "expected_exit": 0,
+      "name": "mission-control-query-plan-reader-ruff",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_model_key_routing_guard.py::test_model_literals_do_not_escape_canonical_registries",
+      "expected_exit": 0,
+      "name": "canonical-model-literal-guard",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check ff9074fcc124314e545f5f10418e7ded3d59cd55",
+      "expected_exit": 0,
+      "name": "mission-control-query-plan-reader-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-MC-QUERY-PLAN-READER-20260828",
+  "intent": "Replace full SQLite snapshot copying with one bounded internal query-plan executor for canonical Mission Control A2A observations. Callers submit immutable SQL-plus-parameter data before open; no live sqlite connection, cursor, callable, hook, transaction control, or filesystem capability escapes. The executor pins one read transaction, incrementally materializes detached rows under transaction-wide row/byte/VM/time limits, rejects unsafe sidecars and rollback journals, postchecks file identity and zero local changes, closes, then returns results. Normal WAL reads may update exact known SHM coordination paths; clean databases use immutable mode only under exact main/absent-sidecar bracketing. Require exact active mission status and byte-bound semantic JSON before materialization.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_mission_control_a2a_io.py -k 'connection_capability_never_escapes or inactive_mission_refuses or utf8_bytes'",
+      "expected_exit": 0,
+      "name": "capability-status-and-byte-controls",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": ["executable", "tests", "locks", "git", "owner_files"],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_a2a_io.py",
+      "dharma_swarm/mission_control_a2a_projection.py",
+      "dharma_swarm/mission_control_a2a_candidate.py",
+      "dharma_swarm/mission_control_a2a_owner_snapshot.py"
+    ],
+    "collision": {"checked_at_sha": "ff9074fcc124314e545f5f10418e7ded3d59cd55", "details": [], "status": "clear"},
+    "honest_blockers": [
+      "A prior diagnostic mode=rw SELECT probe created coordination sidecars and coincided with unexplained RuntimeState file-size drift; this packet performs no live cleanup, checkpoint, or reinterpretation.",
+      "An active mission row is admission state only, never executor/provider/verifier/effect liveness.",
+      "The direct pathname reader retains an lstat-to-VFS-open TOCTOU residual inside the trusted owner root; postchecks reject drift but cannot prevent pre-rejection SHM coordination effects.",
+      "This packet authorizes observation only; every stacked PR still requires external human approval before merge."
+    ],
+    "interface_mismatches": [
+      "A raw sqlite connection is an authority capability, not a read result; it must never cross the reader boundary.",
+      "SQLite SHM is mutable coordination state and cannot be treated as durable evidence or held byte-identical during legitimate WAL reads.",
+      "SQLite length(text) counts characters, while evidence bounds are UTF-8 bytes.",
+      "Per-value and row-count caps do not bound aggregate result memory; one transaction-wide detached-result byte budget is required."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "9bf78337044ef72967cbda62a4b5fd2390176bf04aaac3a90e7849b70e677679",
+    "rollback": "Revert the packet-scoped query-plan reader commit. No task state, provider evidence, repository effect, runtime receipt, database checkpoint, or live sidecar cleanup is part of this packet.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {"git": "2.50.1", "make": "3.81", "python": "3.13.12"},
+    "work_packet": "WP-MC-QUERY-PLAN-READER-20260828"
+  },
+  "worktree": "."
+}

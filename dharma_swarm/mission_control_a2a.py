@@ -296,8 +296,12 @@ _LAZY_EXPORTS = {
     "read_bytes": ("dharma_swarm.mission_control_a2a_io", "read_bytes"),
     "read_json": ("dharma_swarm.mission_control_a2a_io", "read_json"),
     "safe_file": ("dharma_swarm.mission_control_a2a_io", "safe_file"),
+    "ReadQuery": ("dharma_swarm.mission_control_a2a_io", "ReadQuery"),
     "_existing_db": ("dharma_swarm.mission_control_a2a_io", "_existing_db"),
-    "_read_only_db": ("dharma_swarm.mission_control_a2a_io", "_read_only_db"),
+    "_read_only_queries": (
+        "dharma_swarm.mission_control_a2a_io",
+        "_read_only_queries",
+    ),
     "_regular_state": ("dharma_swarm.mission_control_a2a_io", "_regular_state"),
     "_snapshot_database": (
         "dharma_swarm.mission_control_a2a_io",
