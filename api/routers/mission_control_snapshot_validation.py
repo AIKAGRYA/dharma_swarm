@@ -239,11 +239,7 @@ def _validate_coherent_lineage(
                 and not lease["active"]
                 and (
                     status != "stale_recovered"
-                    or (
-                        attempt["failure_code"] == "stale_lease_recovered"
-                        and lease["expired"]
-                        and lease_is_expired
-                    )
+                    or (lease["expired"] and lease_is_expired)
                 )
             )
         evidence = [
@@ -356,7 +352,17 @@ def _validate_snapshot_lineage(
     _index_public_views(attempts, identity_field="attempt_id", view_name="attempt")
     _index_public_views(leases, identity_field="claim_id", view_name="lease")
     _index_public_views(receipts, identity_field="receipt_id", view_name="receipt")
+    if any(
+        attempt["status"] == "stale_recovered"
+        and attempt["failure_code"] != "stale_lease_recovered"
+        for attempt in attempts
+    ):
+        raise ValueError(
+            "mission snapshot stale recovery failure code is not canonical"
+        )
     for lease in leases:
+        if lease["active"] and lease["status"] not in ACTIVE_CLAIM_STATUSES:
+            raise ValueError("mission snapshot lease activity projection conflicts")
         _, actually_expired = lease_deadline(lease, observed_at=observed_at)
         if lease["expired"] != actually_expired or (
             actually_expired and lease["active"]

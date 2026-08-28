@@ -609,6 +609,30 @@ def test_stale_recovery_requires_canonical_failure_code(
     assert body["data"]["snapshot"] is None
 
 
+def test_stale_recovery_failure_code_precedes_noncoherent_label() -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _recovered_snapshot(mission_id)
+    value["tasks"][0].update(status="assigned", assigned_to="fleet-seat")
+    value["tasks"][0]["metadata"].update(
+        mission_attempt_id="attempt-01",
+        mission_claim_id="claim-01",
+    )
+    value["reconciliation"] = "needs_task_projection"
+
+    observed = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    ).json()
+    assert observed["source_errors"] == []
+    assert observed["data"]["state"] == "observed"
+
+    value["attempts"][0]["failure_code"] = "forged_recovery"
+    rejected = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    ).json()
+    assert rejected["data"]["state"] == "unknown"
+    assert rejected["data"]["snapshot"] is None
+
+
 @pytest.mark.parametrize(
     "mutate",
     [
@@ -848,6 +872,29 @@ def test_named_noncoherent_snapshot_preserves_orphan_evidence_for_action() -> No
     assert body["data"]["state"] == "observed"
     assert body["data"]["snapshot"]["reconciliation"] == "active_claim_without_run"
     assert body["data"]["snapshot"]["leases"][0]["attempt_id"] == "missing-attempt"
+
+
+def test_claimed_orphan_lease_cannot_project_active() -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    value["attempts"] = []
+    value["receipts"] = []
+    value["leases"][0].update(
+        attempt_id="missing-attempt",
+        status="claimed",
+        active=True,
+    )
+    value["leases"][0]["metadata"].update(
+        attempt_id="missing-attempt",
+        attempt_key="missing-attempt",
+    )
+    value["reconciliation"] = "active_claim_without_run"
+
+    body = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    ).json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
 
 
 @pytest.mark.parametrize("attempt_id", ["", "bad id"])
@@ -1265,3 +1312,32 @@ def test_provider_failure_is_sanitized(caplog: pytest.LogCaptureFixture) -> None
     ]
     assert "fleet-advancement-20260826" not in caplog.text
     assert "FORGED LOG LINE" not in caplog.text
+
+
+def test_provider_descriptor_failure_is_sanitized(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class RaisingDescriptorProvider:
+        @property
+        def get_snapshot(self) -> None:
+            raise RuntimeError("secret descriptor\nFORGED DESCRIPTOR LINE")
+
+    with caplog.at_level(logging.WARNING, logger="api.routers.control_surface"):
+        response = _client(RaisingDescriptorProvider()).get(
+            "/api/control-surface/missions/fleet-advancement-20260826/snapshot"
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["source"] == "mission_snapshot_provider"
+    assert body["source_errors"][0]["error"] == "read failed (RuntimeError)"
+    assert caplog.messages == [
+        "mission snapshot provider failed (kind=read_failed)"
+    ]
+    assert "secret descriptor" not in response.text
+    assert "secret descriptor" not in caplog.text
+    assert "FORGED DESCRIPTOR LINE" not in response.text
+    assert "FORGED DESCRIPTOR LINE" not in caplog.text
+    assert "fleet-advancement-20260826" not in caplog.text

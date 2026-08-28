@@ -455,21 +455,22 @@ async def control_surface_mission_snapshot(
             ],
         )
 
-    reader = getattr(provider, "get_snapshot", None)
-    if reader is None and callable(provider):
-        reader = provider
-    if not callable(reader):
-        return _build_envelope(
-            _mission_snapshot_projection(mission_id, state="unknown"),
-            [
-                {
-                    "source": "mission_snapshot_provider",
-                    "error": "injected provider has no read-only get_snapshot callable",
-                }
-            ],
-        )
-
     try:
+        reader = getattr(provider, "get_snapshot", None)
+        if reader is None and callable(provider):
+            reader = provider
+        if not callable(reader):
+            return _build_envelope(
+                _mission_snapshot_projection(mission_id, state="unknown"),
+                [
+                    {
+                        "source": "mission_snapshot_provider",
+                        "error": (
+                            "injected provider has no read-only get_snapshot callable"
+                        ),
+                    }
+                ],
+            )
         candidate = (
             reader(mission_id)
             if inspect.iscoroutinefunction(reader)
