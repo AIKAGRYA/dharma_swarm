@@ -1,0 +1,422 @@
+schema_version: rudra.work_packet_dag.v0
+program_id: rudra-v0-pointed-spear
+spec_evidence_base: 884ee4fa75bb28877633f9c7a7ddadb8e3b1e19b
+
+base_policy:
+  launch_base: RECOMPUTE_FROM_ORIGIN_MAIN_AFTER_ADMISSION_MERGE
+  require_exact_head: true
+  require_clean_worktree: true
+  allow_rebase_during_packet: false
+  shared_dirty_checkout_forbidden: /Users/dhyana/dharma_swarm
+  packet_worktree_pattern: /Users/dhyana/worktrees/rudra/<packet-id>
+
+write_zones:
+  executor_repository_mutations: mutation_workcell_only
+  supervisor_runtime: $DHARMA_STATE_DIR/rudra
+  base_checkout: zero_mutation
+  curated_reports: separate_report_only_commit_after_proof
+
+integration_policy:
+  single_integration_writer: true
+  integration_role: integration_captain
+  cherry_pick_one_packet_at_a_time: true
+  rerun_focused_tests_after_each_join: true
+  worker_conflict_resolution_forbidden: true
+  shared_paths_owned_by_integration_writer:
+    - dharma_swarm/rudra/__init__.py
+    - dharma_swarm/dgc_cli.py
+    - dharma_swarm/terminal_commands/rudra.py
+    - pyproject.toml
+    - uv.lock
+    - docs/governance/ACTIVE_TRACK.yaml
+
+global_forbidden_paths:
+  - /Users/dhyana/dharma_swarm/**
+  - .git/**
+  - pyproject.toml
+  - uv.lock
+  - dharma_swarm/runtime_state.py
+  - dharma_swarm/orchestrator.py
+  - dharma_swarm/sandbox.py
+  - dharma_swarm/autonomous_agent.py
+
+worker_handoff_contract:
+  required:
+    - packet_id
+    - base_sha
+    - commit_sha
+    - changed_file_manifest
+    - exact_verification_commands
+    - verification_exit_codes
+    - evidence_paths
+    - assumptions
+    - unresolved_risks
+    - next_safe_action
+  rules:
+    - Workers are not alone in the codebase and must not revert sibling changes.
+    - Workers may modify only their exclusive_write_paths.
+    - Workers must stop on an ownership, base, or write-scope mismatch.
+    - Workers must not push, merge, open a PR, or mutate a tracker unless separately authorized.
+    - Runtime probes write raw evidence only under the supervisor state root; report paths receive only curated copies after process quiescence and base-preservation proof.
+
+packets:
+  - id: A0_TRACK_ADMISSION
+    title: Ratify RUDRA owner and surface scope
+    phase: authority
+    owner_role: integration_captain
+    mode: human_merge_required
+    required_for: v0
+    depends_on: []
+    exclusive_write_paths:
+      - docs/governance/ACTIVE_TRACK.yaml
+      - CLAUDE.md
+      - docs/governance/SOVEREIGN_MANIFEST.md
+      - reports/agentops/work_packets/rudra-A0-track-admission.json
+    forbidden_write_paths:
+      - dharma_swarm/**
+      - tests/**
+    deliverables:
+      - Amend organism-rewire-2026-07 with one bounded RUDRA next item and exact owned surfaces.
+      - Render managed active-track includes using repository tooling.
+      - Land the authority-only PR through human review before product work starts.
+    verification:
+      - make onboard
+      - python3 scripts/governance/check_track_status.py
+      - python3 scripts/governance/sprawl_guard.py
+    acceptance:
+      - The amendment is human-merged; silence or a proposed issue comment is not admission.
+      - Active-track count does not exceed the configured maximum.
+      - No sibling owned-surface collision exists.
+    stop_conditions:
+      - Operator rejects the recommended owner or does not authorize an alternative.
+      - Product code appears in the authority PR.
+
+  - id: A1_APP_SERVER_SPIKE
+    title: Bind and falsify the Codex app-server protocol assumptions
+    phase: spike
+    owner_role: protocol_researcher
+    mode: isolated_runtime_probe
+    required_for: v0
+    depends_on:
+      - A0_TRACK_ADMISSION
+    exclusive_write_paths:
+      - reports/rudra/spikes/protocol.json
+    forbidden_write_paths:
+      - dharma_swarm/**
+      - tests/**
+      - docs/governance/**
+    deliverables:
+      - Exact Codex binary version/hash and generated v2 schema digest.
+      - Thread start, turn, token/diff observation, client restart, server restart, and resume transcript.
+      - Deterministic clientUserMessageId ambiguous-delivery finding.
+      - Verified model, provider, service-tier, cwd, approval, sandbox, and effort parameter locations.
+    verification:
+      - codex --version
+      - codex app-server generate-json-schema --out <fresh-temp-dir>
+      - run the protocol probe from a disposable repository worktree
+    acceptance:
+      - App-server can drive one harmless real turn without dangerous-full-access.
+      - Resume semantics are proven or one compact fresh-thread handoff is selected.
+      - Mutating RPC ambiguity is observable and can be reconciled without resend.
+    stop_conditions:
+      - Correctness appears to require a custom session or sandbox framework.
+
+  - id: A2_CONTAINMENT_CREDENTIAL_SPIKE
+    title: Falsify containment, credential, and process-ownership assumptions
+    phase: spike
+    owner_role: containment_researcher
+    mode: isolated_runtime_probe
+    required_for: v0
+    depends_on:
+      - A0_TRACK_ADMISSION
+    exclusive_write_paths:
+      - reports/rudra/spikes/containment.json
+    forbidden_write_paths:
+      - dharma_swarm/**
+      - tests/**
+      - docs/governance/**
+    deliverables:
+      - Allowed mutation-workcell write plus denied unauthorized write and denied tool-network probes.
+      - A credential canary proving model-visible tools cannot read provider authentication material.
+      - Supervisor/app-server/tool process-tree kill, setsid-escape probe, and zero-descendant evidence.
+    verification:
+      - run containment and credential probes from a disposable repository worktree
+      - kill every owned process group and enumerate descendants independently
+    acceptance:
+      - Unauthorized write, credential read, tool egress, approval escalation, MCP/plugin/app use, and surviving descendants are absent.
+      - One ProcessOwner can account for and reap every spawned process identity.
+    stop_conditions:
+      - Sandbox or cleanup silently falls back or cannot fail closed.
+      - A former executor may remain alive when a new turn starts.
+      - Provider credentials are reachable through model-visible tools.
+      - A descendant can escape the owned process topology.
+
+  - id: A3_RUNTIME_FIXTURE_SPIKE
+    title: Bind the runtime environment and prove the baseline-red repair fixture
+    phase: spike
+    owner_role: runtime_researcher
+    mode: isolated_runtime_probe
+    required_for: v0
+    depends_on:
+      - A0_TRACK_ADMISSION
+    exclusive_write_paths:
+      - reports/rudra/spikes/runtime_environment.json
+      - reports/rudra/spikes/fixture.json
+    forbidden_write_paths:
+      - dharma_swarm/**
+      - tests/**
+      - docs/governance/**
+    deliverables:
+      - Resolved interpreter, sys.path, .pth files, distributions/RECORD digests, import origins, and explicit pytest plugins.
+      - Absolute tool paths, hashes, versions, lock digest, and exact clean base.
+      - Reproduced NEW-12 ImportError and structured six-node skipped baseline, plus current owner/admission status.
+    verification:
+      - run the admitted Python contract sentinel from the clean evidence base
+      - run the six exact pytest nodes with plugin autoload disabled and JUnit output outside the repository
+    acceptance:
+      - The environment manifest is complete enough to reproduce imports, not just lockfile intent.
+      - The chosen repair is genuinely baseline-red and separately owner-admitted before D0.
+    stop_conditions:
+      - The fixture is already green, flaky, or requires test edits or dependency installation.
+      - The interpreter or import graph cannot be pinned.
+
+  - id: B0_GOALGATE
+    title: Build immutable mission admission and the independent oracle
+    phase: spinal_cord
+    owner_role: goal_gate_builder
+    mode: coding_worktree
+    required_for: v0
+    depends_on:
+      - A1_APP_SERVER_SPIKE
+      - A2_CONTAINMENT_CREDENTIAL_SPIKE
+      - A3_RUNTIME_FIXTURE_SPIKE
+    exclusive_write_paths:
+      - dharma_swarm/rudra/contracts.py
+      - dharma_swarm/rudra/goal_gate.py
+      - tests/test_rudra_contracts.py
+      - tests/test_rudra_goal_gate.py
+      - tests/fixtures/rudra/goal_gate/**
+    forbidden_write_paths:
+      - dharma_swarm/rudra/__init__.py
+      - dharma_swarm/rudra/workcell.py
+      - dharma_swarm/rudra/codex_driver.py
+      - dharma_swarm/rudra/runner.py
+      - dharma_swarm/dgc_cli.py
+      - dharma_swarm/terminal_commands/**
+    production_loc_target: 250
+    deliverables:
+      - Strict duplicate-key-rejecting mission parser and canonical admission digest.
+      - Exact base/toolchain/protocol/path-policy binding.
+      - Bounded argv verifier runner with scrubbed environment and process-group cleanup.
+      - Raw Git/filesystem scope inventory and final GoalGatePassed constructor.
+      - Canonical reported-complete-is-not-reproduced negative fixture.
+      - Frozen GoalGate, Workcell, ProcessOwner, CodexDriver, GateResult, RecoveryView, and TurnObservation interfaces.
+    verification:
+      - <python> -m pytest -q tests/test_rudra_contracts.py tests/test_rudra_goal_gate.py
+      - <ruff> check dharma_swarm/rudra/contracts.py dharma_swarm/rudra/goal_gate.py tests/test_rudra_contracts.py tests/test_rudra_goal_gate.py
+    acceptance:
+      - Executor success prose and exit zero remain red when the admitted verifier fails.
+      - Wrong base/workcell/digest, stale result, test edit, symlink, hidden Git control, or post-verification mutation cannot pass.
+      - Empty and shell-string verifier contracts are rejected.
+    stop_conditions:
+      - Any false green in the mutant corpus.
+      - GoalGate requires a generic evidence framework, task store, or model judge.
+
+  - id: B1_CODEX_DRIVER
+    title: Build the narrow persistent app-server driver
+    phase: hands
+    owner_role: protocol_builder
+    mode: coding_worktree
+    required_for: v0
+    depends_on:
+      - B0_GOALGATE
+    exclusive_write_paths:
+      - dharma_swarm/rudra/codex_driver.py
+      - tests/test_rudra_codex_driver.py
+      - tests/fixtures/rudra/fake_app_server.py
+      - tests/fixtures/rudra/protocol/**
+    forbidden_write_paths:
+      - dharma_swarm/rudra/contracts.py
+      - dharma_swarm/rudra/goal_gate.py
+      - dharma_swarm/rudra/workcell.py
+      - dharma_swarm/rudra/runner.py
+      - dharma_swarm/rudra/__init__.py
+      - dharma_swarm/dgc_cli.py
+    production_loc_target: 225
+    deliverables:
+      - Bounded stdio JSON-RPC client with concurrent stdout/stderr draining.
+      - Hard outgoing method allowlist and explicit denial of unexpected server requests.
+      - Thread start/resume, turn start/interrupt, token/diff/terminal observation, and deterministic message IDs.
+      - Protocol deadlines, size limits, and resume/fresh-handoff result over a ProcessOwner-supplied channel.
+      - Reconcile-only handling for mutation-capable RPCs once any request byte may have been written.
+    verification:
+      - <python> -m pytest -q tests/test_rudra_codex_driver.py
+      - <ruff> check dharma_swarm/rudra/codex_driver.py tests/test_rudra_codex_driver.py
+    acceptance:
+      - Malformed, partial, oversized, duplicate, reordered, late, wrong-ID, EOF, and stderr-backpressure fixtures fail honestly.
+      - thread/shellCommand, command/exec, MCP, plugin/app, auth, config mutation, filesystem RPC, and autoapproval are unreachable.
+      - Real spike behavior matches the driver contract.
+    stop_conditions:
+      - Driver recreates Codex tool/session machinery.
+      - Driver spawns, signals, reaps, or otherwise owns an OS process.
+      - Unknown approval or protocol messages can hang or autoapprove.
+
+  - id: B2_WORKCELL_RECOVERY
+    title: Build the private Git workcell, mission lock, process owner, journal, and reconciliation
+    phase: body
+    owner_role: recovery_builder
+    mode: coding_worktree
+    required_for: v0
+    depends_on:
+      - B0_GOALGATE
+    exclusive_write_paths:
+      - dharma_swarm/rudra/workcell.py
+      - tests/test_rudra_workcell.py
+      - tests/fixtures/rudra/process_tree_fixture.py
+      - tests/fixtures/rudra/workcell/**
+    forbidden_write_paths:
+      - dharma_swarm/rudra/contracts.py
+      - dharma_swarm/rudra/goal_gate.py
+      - dharma_swarm/rudra/codex_driver.py
+      - dharma_swarm/rudra/runner.py
+      - dharma_swarm/rudra/__init__.py
+      - dharma_swarm/dgc_cli.py
+    production_loc_target: 275
+    deliverables:
+      - Deterministic private Git-directory workcell whose object alternate is read-only and whose base checkout receives zero Git mutation.
+      - Never-unlinked mission-level fcntl lock, safe derived mission key, and full OS boot/process-start identity.
+      - Sole ProcessOwner for spawn, PID/PGID identity, signal, kill, and reap.
+      - Monotonic JSONL journal with intent/result rows, complete-write loop, and fsync.
+      - Safe torn-tail repair, corrupt-middle rejection, process-tree teardown, and reconciliation reducer.
+    verification:
+      - <python> -m pytest -q tests/test_rudra_workcell.py tests/test_subprocess_cancellation.py
+      - <ruff> check dharma_swarm/rudra/workcell.py tests/test_rudra_workcell.py
+    acceptance:
+      - Barrier-synchronized 32 contenders times 200 rounds produce exactly one mission owner each round.
+      - Stale metadata cannot split the lock inode or signal a reused/ambiguous PID.
+      - Base checkout bytes, Git metadata, index, refs, objects, and HEAD remain unchanged and all descendants are reaped.
+    stop_conditions:
+      - Lock takeover relies on age, unlink, or PID alone.
+      - Journal skips malformed/corrupt records or omits fsync.
+
+  - id: C0_RUNNER_CLI_INTEGRATION
+    title: Join GoalGate, Workcell, and CodexDriver into the one loop
+    phase: integration
+    owner_role: integration_captain
+    mode: integration_worktree
+    required_for: v0
+    depends_on:
+      - B1_CODEX_DRIVER
+      - B2_WORKCELL_RECOVERY
+    exclusive_write_paths:
+      - dharma_swarm/rudra/__init__.py
+      - dharma_swarm/rudra/runner.py
+      - dharma_swarm/terminal_commands/rudra.py
+      - dharma_swarm/dgc_cli.py
+      - tests/test_rudra_runner.py
+      - tests/test_rudra_cli.py
+    forbidden_write_paths:
+      - dharma_swarm/runtime_state.py
+      - dharma_swarm/orchestrator.py
+      - dharma_swarm/sandbox.py
+      - pyproject.toml
+      - uv.lock
+    production_loc_target: 250
+    deliverables:
+      - Sole-writer FSM and bounded verify-turn-reconcile loop.
+      - Candidate freeze, local commit, final detached verification workcell, and five terminal types.
+      - dgc rudra run, status, and stop commands through the existing dgc entrypoint.
+      - Compare-and-seal terminal commit, honest stale/recovery status, and `CANCELLED_OPERATOR` stop semantics.
+    verification:
+      - <python> -m pytest -q tests/test_rudra_contracts.py tests/test_rudra_goal_gate.py tests/test_rudra_codex_driver.py tests/test_rudra_workcell.py tests/test_rudra_runner.py tests/test_rudra_cli.py
+      - <ruff> check dharma_swarm/rudra dharma_swarm/terminal_commands/rudra.py dharma_swarm/dgc_cli.py tests/test_rudra_*.py
+    acceptance:
+      - One fake-app-server mission converges only through fresh GoalGate evidence.
+      - Relaunch performs recovery and never starts a turn beside an unresolved executor.
+      - Status cannot infer liveness from stale files and stop cannot signal an ambiguous PID.
+    stop_conditions:
+      - Mission Control, NATS, Temporal, a council, or a new scheduler enters the hot path.
+      - Total pre-slice production hot path exceeds 1000 LOC without deletion review.
+
+  - id: C1_ADVERSARIAL_RECOVERY
+    title: Attack terminal truth and every durable crash window
+    phase: independent_verification
+    owner_role: verification_spear
+    mode: test_only_worktree
+    required_for: v0
+    depends_on:
+      - C0_RUNNER_CLI_INTEGRATION
+    exclusive_write_paths:
+      - tests/test_rudra_adversarial.py
+      - tests/fixtures/rudra/fault_injector.py
+      - tests/fixtures/rudra/adversarial/**
+      - reports/rudra/verification/fault_matrix.json
+    forbidden_write_paths:
+      - dharma_swarm/**
+      - docs/governance/**
+    deliverables:
+      - Full false-green mutant corpus.
+      - At least five SIGKILL trials at each of twenty journal/effect/verifier/terminal cutpoints.
+      - Torn-tail, corrupt-middle, short-write, ENOSPC, duplicate/reorder, reused-PID, 32-contender, and descendant-escape fixtures.
+      - Replay determinism and terminal-conflict properties.
+    verification:
+      - <python> -m pytest -q tests/test_rudra_adversarial.py
+      - <python> -m pytest -q tests/test_rudra_*.py tests/test_subprocess_cancellation.py tests/test_mission_control.py tests/test_receipt_append_concurrency.py
+      - make verifier-selfcheck
+    acceptance:
+      - At least 100 forced-restart trials pass with five or more at every durable cutpoint.
+      - Zero false greens, duplicate effect keys, overlapping owners, corrupt-record skips, conflicting accepted terminals, base/unauthorized writes, or leaked descendants.
+      - Replay is deterministic and idempotent.
+    stop_conditions:
+      - One wrong-workspace, stale, or forged result reaches COMPLETE_REPRODUCED.
+      - A hostile descendant escapes plain process ownership; such workloads must be reclassified to a borrowed VM/container lane.
+
+  - id: D0_REAL_TASK_AB
+    title: Prove the beast on a real repair against direct Codex
+    phase: real_provider_proof
+    owner_role: integration_captain
+    mode: live_model_isolated_workcells
+    required_for: v0
+    depends_on:
+      - C1_ADVERSARIAL_RECOVERY
+    exclusive_write_paths:
+      - reports/rudra/ab/**
+    runtime_candidate_scope:
+      - isolated RUDRA workcells only
+      - separately admitted Titanium candidate if NEW-12 remains red
+    forbidden_write_paths:
+      - shared base checkout
+      - tests/**
+      - docs/governance/**
+    deliverables:
+      - Baseline-red proof and current owner admission for the selected real repair.
+      - Three RUDRA and three bare one-turn app-server attempts with identical model, effort, gate, containment, total wall/token/resource budgets, and no iterative GoalGate feedback in the direct arm.
+      - One matched forced-kill attempt in each arm and complete RUDRA recovery evidence.
+      - Token, wall-time, intervention, verifier, truth-gap, workcell, thread, schema, and candidate-commit measurements.
+    verification:
+      - run independent GoalGate against every final candidate
+      - verify selected repository tests and lint exactly as admitted
+      - verify base checkout preservation and zero surviving descendants after every arm
+    acceptance:
+      - RUDRA closes 3 of 3 with no test edits, external effects, or human steering.
+      - The killed RUDRA run converges with a complete valid journal; the killed direct arm remains a fair measured control.
+      - Every formerly skipped required assertion is observed passing.
+      - RUDRA improves verified recovery or closure and uses no more than 2 times direct-control tokens.
+    stop_conditions:
+      - Any false green, base/unauthorized mutation, duplicate mutation, containment escape, or missing real-provider evidence.
+      - The selected repair is already green at base; select a new baseline-red task instead of claiming success.
+      - Wrapper shows no verified recovery or closure gain; retire it and retain GoalGate.
+      - Wrapper exceeds 2 times direct-arm tokens; retire it and retain GoalGate.
+
+terminal_join:
+  v0_complete_when:
+    - A0_TRACK_ADMISSION
+    - A1_APP_SERVER_SPIKE
+    - A2_CONTAINMENT_CREDENTIAL_SPIKE
+    - A3_RUNTIME_FIXTURE_SPIKE
+    - B0_GOALGATE
+    - B1_CODEX_DRIVER
+    - B2_WORKCELL_RECOVERY
+    - C0_RUNNER_CLI_INTEGRATION
+    - C1_ADVERSARIAL_RECOVERY
+    - D0_REAL_TASK_AB

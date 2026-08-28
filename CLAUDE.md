@@ -80,8 +80,8 @@ Command boundaries: `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
 - **`rsi-lab-meghadharma-2026-08`** — RSI Lab — exact-code Mac and Meghadharma campaign lane (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 1)
   - owns: dharma_swarm/forge_lab/**, scripts/forge_lab/**, tests/forge_lab_v1/**, docs/ops/RSI_LAB_SYNC.md
   - admission scopes: mac_build (declared build authority; not runtime evidence)
-- **`sublimation-forge-2026-08`** — Sublimation Forge — offline-first governed foundry (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 1)
-  - owns: dharma_swarm/foundry/**, scripts/foundry/**, tests/test_foundry_*.py, docs/foundry/**
+- **`sublimation-forge-2026-08`** — Sublimation Forge — offline-first governed foundry (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 2)
+  - owns: dharma_swarm/foundry/**, scripts/foundry/**, tests/test_foundry_*.py, docs/foundry/**, dharma_swarm/rudra/**, dharma_swarm/terminal_commands/rudra.py, tests/test_rudra_*.py, tests/fixtures/rudra/**, reports/rudra/**, docs/plans/rudra_v0/**
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
