@@ -362,13 +362,13 @@ active_tracks:
       - tests/test_rudra_*.py
       - tests/fixtures/rudra/**
       - reports/rudra/**
-      - dharma_swarm/dgc_cli.py
+      - docs/plans/rudra_v0/**
     moves_vital_signs:
       - quality_gates
       - eval_coverage
       - cost_efficiency
     target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion. RUDRA v0 carve-out (amended 2026-08-27, operator RUDRA ASCENT campaign): the RUDRA supervisor's A/B release proof may drive the operator-authenticated Codex app-server executor under its mission contract containment — provider egress to the configured model service only, tool network denied, no external effects; COMPLETE_REPRODUCED grants no push, merge, deploy, publish, or spend authority."
+    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion. RUDRA v0 carve-out (amended 2026-08-28, operator RUDRA ASCENT campaign): the RUDRA v0 release proof — and only that proof, on operator-authored mission contracts under docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md — may drive the operator-authenticated Codex app-server executor with provider egress to the configured model service only and tool network denied. This is not a standing license for track agents: every live-executor run requires its own admitted mission contract, and COMPLETE_REPRODUCED grants no push, merge, deploy, publish, or spend authority."
     description: |
       Consolidate the existing foundry into the Sublimation Forge: an
       offline-first, held-out, receipted improvement loop whose candidate
@@ -386,6 +386,11 @@ active_tracks:
       - id: foundry_heldout_tests_pass
         kind: test_passes
         test: tests/test_foundry_heldout.py
+      - id: rudra_ab_proof_receipt_valid
+        kind: receipt_valid
+        file: reports/rudra/AB_PROOF_V0.json
+        fresh_ttl_days: 365
+        requires_keys: [schema, mission_id, arms, kills_recovered, verdict]
     non_goals:
       - Do not use live providers, deploy, mutate a VPS, contact external humans, or promote a candidate without separate authority.
       - Do not let self-score or model consensus substitute for held-out evidence.
@@ -396,7 +401,7 @@ active_tracks:
         kind: evidence
         blocker: true
       - id: rudra-v0-spear
-        what: "Build RUDRA v0 per ~/rudra_build_spec_20260814/ (spec rudra.build.v0.1): frozen mission contract -> private Git workcell -> persistent Codex app-server thread -> independent GoalGate -> fresh-verifier COMPLETE_REPRODUCED. Release proof: 3 RUDRA vs 3 bare-control attempts on one real baseline-red repair (NEW-12-equivalent, revalidated red at merged main 2026-08-27) with matched mid-work kills in both arms and no second-executor / unauthorized-write / stale-green / human-steering failures."
+        what: "Build RUDRA v0 per the repository-visible spec at docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md (spec rudra.build.v0.1): frozen mission contract -> private Git workcell -> persistent Codex app-server thread -> independent GoalGate -> fresh-verifier COMPLETE_REPRODUCED. Release proof closes the rudra_ab_proof_receipt_valid criterion: 3 RUDRA vs 3 bare-control attempts on one real baseline-red repair (NEW-12-equivalent, revalidated red at merged main 2026-08-27) with matched mid-work kills in both arms and no second-executor / unauthorized-write / stale-green / human-steering failures. The narrow dgc_cli.py parser/dispatch seam edit rides per-PR under its own Session Entry packet allowed_files, not under track file ownership."
         kind: code
         blocker: true
 

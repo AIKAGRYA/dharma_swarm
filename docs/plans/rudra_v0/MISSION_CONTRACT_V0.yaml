@@ -1,0 +1,192 @@
+# Normative v0 shape and audited NEW-12 example.
+# Every identity below MUST be recomputed at launch. Admission rejects a stale
+# base, binary, lock, or schema digest; this file is not authority by itself.
+
+schema_version: rudra.mission.v0
+mission_id: new-12-routing
+objective: >-
+  Implement _resolve_agent_model_override and close the missing Claude Code and
+  OpenRouter Direct routing behavior in dharma_swarm/autonomous_agent.py. Do not
+  edit tests. Make the existing skipped routing assertions execute and pass.
+
+repository:
+  canonical_remote: https://github.com/AIKAGRYA/dharma_swarm.git
+  base_sha: 884ee4fa75bb28877633f9c7a7ddadb8e3b1e19b
+
+scope:
+  required_changed_paths:
+    - dharma_swarm/autonomous_agent.py
+  allowed_changed_paths:
+    - dharma_swarm/autonomous_agent.py
+  forbidden_changed_paths:
+    - tests/**
+    - .github/**
+    - docs/governance/**
+    - pyproject.toml
+    - uv.lock
+  forbidden_diff_literals:
+    - pytest.skip
+    - pytest.mark.skip
+    - pytest.mark.xfail
+    - nosec
+  reject_symlinks: true
+  max_changed_files: 1
+  max_diff_bytes: 50000
+
+toolchain:
+  lockfile:
+    path: uv.lock
+    sha256: 1aaf7c313f5fde5816445c63476ffa95edb624a2ca09a16c1138543043adb399
+  environment_manifest:
+    kind: installed-environment-v1
+    covers:
+      - resolved_interpreter
+      - sys_path
+      - pth_files
+      - installed_distributions_and_record_digests
+      - first_party_import_origins
+      - explicit_pytest_plugins
+    sha256: 1e16f218953daaeb69a3d0557e52c2d1ed60a3515466021d9242e1f06359b996
+  executables:
+    python:
+      path: /Users/dhyana/dharma_swarm/.venv/bin/python
+      sha256: e425798f1fd82ff2450b84a24b58150996345c0f8fb7f07aae68a5033ba8df19
+      version: Python 3.13.12
+    ruff:
+      path: /Users/dhyana/dharma_swarm/.venv/bin/ruff
+      sha256: 7faa9bd21d58705de56de7da891b837cb970ec9806c0eeaf487caa80b05a380a
+      version: ruff 0.15.16
+    git:
+      path: /usr/bin/git
+      sha256: 179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818
+      version: git version 2.50.1 (Apple Git-155)
+  require_first_party_imports_from_workcell: true
+  allowed_pytest_plugins:
+    - pytest_asyncio.plugin
+
+acceptance:
+  cwd: .
+  commands:
+    - id: import-and-route-contract
+      argv:
+        - /Users/dhyana/dharma_swarm/.venv/bin/python
+        - -c
+        - >-
+          from dharma_swarm.autonomous_agent import _resolve_agent_model_override
+          as r; assert r('gemini') == ('openrouter_direct',
+          'google/gemini-2.5-pro'); assert r('glm-5') == ('ollama',
+          'glm-5:cloud'); assert r('codex') == ('codex', 'gpt-5.4'); assert
+          r('openrouter:anthropic/claude-opus-4-6') == ('openrouter_direct',
+          'anthropic/claude-opus-4-6'); print('RUDRA_ROUTE_OK')
+      timeout_seconds: 60
+      expect:
+        exit_code: 0
+        stdout_must_match:
+          - ^RUDRA_ROUTE_OK\s*$
+    - id: formerly-skipped-routing-tests
+      argv:
+        - /Users/dhyana/dharma_swarm/.venv/bin/python
+        - -m
+        - pytest
+        - -q
+        - -rA
+        - -p
+        - no:cacheprovider
+        - -p
+        - pytest_asyncio.plugin
+        - --junitxml=${RUDRA_ARTIFACT_DIR}/routing.junit.xml
+        - tests/test_autonomous_agent.py::TestPresetAgents::test_preset_agents_use_subscription_claude_code_lane
+        - tests/test_autonomous_agent.py::TestCliWakeModelRouting::test_resolves_tui_model_aliases
+        - tests/test_autonomous_agent.py::TestCliWakeModelRouting::test_resolves_explicit_provider_model_route
+        - tests/test_autonomous_agent.py::TestCliWakeModelRouting::test_cli_wake_model_override_does_not_mutate_preset
+        - tests/test_autonomous_agent.py::TestCallLLM::test_claude_code_dispatch
+        - tests/test_autonomous_agent.py::TestCallLLM::test_openrouter_direct_dispatch
+      timeout_seconds: 300
+      expect:
+        exit_code: 0
+        structured_result:
+          kind: pytest_junit
+          artifact: routing.junit.xml
+          required_testcases:
+            - tests.test_autonomous_agent.TestPresetAgents::test_preset_agents_use_subscription_claude_code_lane
+            - tests.test_autonomous_agent.TestCliWakeModelRouting::test_resolves_tui_model_aliases
+            - tests.test_autonomous_agent.TestCliWakeModelRouting::test_resolves_explicit_provider_model_route
+            - tests.test_autonomous_agent.TestCliWakeModelRouting::test_cli_wake_model_override_does_not_mutate_preset
+            - tests.test_autonomous_agent.TestCallLLM::test_claude_code_dispatch
+            - tests.test_autonomous_agent.TestCallLLM::test_openrouter_direct_dispatch
+          require_counts:
+            passed: 6
+            skipped: 0
+            failures: 0
+            errors: 0
+    - id: lint-target
+      argv:
+        - /Users/dhyana/dharma_swarm/.venv/bin/ruff
+        - check
+        - dharma_swarm/autonomous_agent.py
+      timeout_seconds: 120
+      expect:
+        exit_code: 0
+  environment:
+    LANG: C.UTF-8
+    LC_ALL: C.UTF-8
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+executor:
+  driver: codex_app_server_stdio
+  binary:
+    path: /Users/dhyana/.npm-global/bin/codex
+    sha256: 134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477
+    version: codex-cli 0.147.0
+  protocol_schema_sha256: f3dec1e031d99a420b137b903f02196d4325eece57620c925bb7130b25f168d2
+  model: gpt-5.6-sol
+  model_provider: openai
+  reasoning_effort: high
+  service_tier: priority
+
+containment:
+  risk_class: trusted_operator_coding
+  sandbox: workspace-write
+  writable_roots:
+    - WORKCELL_ONLY
+  provider_egress: configured_model_service_only
+  tool_network_access: false
+  approval_policy: never
+  allow_mcp: false
+  allow_plugins: false
+  allow_external_effects: false
+  allow_dependency_install: false
+
+budgets:
+  max_turns: 10
+  max_total_tokens: 400000
+  max_tokens_per_turn: 80000
+  max_wall_seconds: 5400
+  max_turn_seconds: 1200
+  max_verifier_seconds: 600
+  max_cpu_seconds: 3600
+  max_memory_bytes: 8589934592
+  max_processes: 32
+  max_disk_bytes: 2147483648
+  max_captured_output_bytes: 8388608
+  max_context_resets: 1
+  max_consecutive_no_delta_turns: 2
+
+recovery:
+  resume_policy: prefer_same_thread
+  resume_failure: one_verified_compact_handoff
+  max_fresh_thread_handoffs: 1
+  unresolved_turn_token_charge: max_tokens_per_turn
+  rpc_retry_policy:
+    read_only_before_response: 2
+    thread_start_after_any_byte: reconcile_only
+    turn_start_after_any_byte: reconcile_only
+
+result:
+  require_baseline_red: true
+  require_nonempty_diff: true
+  require_local_candidate_commit: true
+  require_final_clean_worktree: true
+  allow_push: false
+  allow_merge: false
