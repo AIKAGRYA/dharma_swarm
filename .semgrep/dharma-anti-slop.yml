@@ -498,12 +498,12 @@ rules:
   # ===========================================================================
   # Rule 6: dharma.providers-canonical
   # All anthropic/openai/ollama SDK imports must live inside the canonical
-  # provider factory module (dharma_swarm/providers.py or providers_extended.py).
+  # provider factory module (dharma_swarm/providers.py).
   # ===========================================================================
   - id: dharma.providers-canonical
     message: |
-      LLM provider SDK import outside the canonical providers.py /
-      providers_extended.py factory. This duplicates connection handling,
+      LLM provider SDK import outside the canonical providers.py factory.
+      This duplicates connection handling,
       bypasses retry/budget controls, and confuses provider-routing.
       Move the SDK import into providers.py and call through the factory.
       Known offender at the time this rule was added:
@@ -516,7 +516,6 @@ rules:
     paths:
       exclude:
         - "dharma_swarm/providers.py"
-        - "dharma_swarm/providers_extended.py"
         - "dharma_swarm/runtime_provider/"
     pattern-either:
       - pattern: from anthropic import $X

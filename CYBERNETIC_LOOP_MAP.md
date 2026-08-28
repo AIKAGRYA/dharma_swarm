@@ -135,7 +135,7 @@ and by the `HARNESS_PROVEN`/`CLOSED_LIVE` verdict tiers for current claims.
 ```
 SENSE:   orchestrator.tick() → route_next() → find ready tasks + idle agents
 ACT:     orchestrator._execute_task() → agent_runner.run_task() → provider.complete_for_task()
-         → router_v1.build_routing_signals() → tiny_router_shadow (heuristic fallback)
+         → router_v1.build_routing_signals()
          → ModelRouter selects provider → LLM call → response
 EVALUATE: orchestrator._execute_task() → on_task_complete():
          - Writes result to shared notes (~/.dharma/shared/)

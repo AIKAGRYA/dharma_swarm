@@ -118,7 +118,7 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | Find the data model | `dharma_swarm/models.py` |
 | Find the config | `dharma_swarm/config.py` (env var overrides) |
 | Add a new gate | `dharma_swarm/telos_gates.py` (GateRegistry.propose) |
-| Add a new provider | `dharma_swarm/providers.py` + `providers_extended.py` |
+| Add a new provider | `dharma_swarm/providers.py` |
 | Understand the pillar foundations | `foundations/PILLAR_*.md` |
 | See spec-forge specs | `spec-forge/` |
 
@@ -193,7 +193,6 @@ Stop the Go track and return to the operator if a Go PR does any of the followin
 | `orchestrator.py` | 2,078 | Task routing, dispatching, priority management, retry logic | Modifying task dispatch strategy |
 | `agent_runner.py` | 2,094 | **AgentRunner** (single agent lifecycle) + **AgentPool** (fleet management). Heartbeats, task execution, fitness signal emission. | Modifying agent execution behavior |
 | `providers.py` | 2,098 | 9 LLM providers: Anthropic, OpenAI, OpenRouter, NVIDIA NIM, Local, ClaudeCode, Codex, OpenRouter Free, Ollama. `create_default_router()`. | Adding providers or changing routing |
-| `providers_extended.py` | 214 | Extended provider configurations | Provider-specific extensions |
 | `base_provider.py` | 198 | Abstract base class for all providers | Only if changing provider contract |
 | `free_fleet.py` | 408 | Free model fleet (Ollama Cloud, NVIDIA NIM, OpenRouter Free) | Adding free model sources |
 | `provider_policy.py` | 428 | Provider selection policies and cost optimization | Changing provider selection logic |

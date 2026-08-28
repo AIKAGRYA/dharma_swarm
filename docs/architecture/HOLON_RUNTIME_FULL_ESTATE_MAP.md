@@ -554,7 +554,7 @@ PYTHONPATH=$PWD PYTHONDONTWRITEBYTECODE=1 \
   tests/test_runtime_provider.py tests/test_model_routing.py \
   tests/test_provider_matrix.py tests/test_model_key_routing_guard.py \
   tests/test_routing_surface_inventory.py tests/test_provider_smoke.py \
-  tests/test_provider_registry.py tests/test_provider_policy.py
+  tests/test_provider_policy.py
 
 PYTHONPATH=$PWD PYTHONDONTWRITEBYTECODE=1 \
   /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q -p no:cacheprovider \

@@ -112,8 +112,8 @@ frozen gradient — today it is online drift, unmeasured.
   converge on "always route to the strongest model" — that is skill-selection death and violates
   the Transcendence Principle's routing-by-specialty mandate.
 - **Receipts:** every evaluated policy writes a replay scorecard (policy hash, replay-pack hash,
-  regret, lane-entropy) under `~/.dharma/`; shadow comparison against the live policy via the
-  existing `tiny_router_shadow.py` pattern before any policy is promoted to production defaults.
+  regret, lane-entropy) under `~/.dharma/`; shadow comparison against the live policy before
+  any policy is promoted to production defaults.
 
 **Key design decision:** counterfactual replay on receipted dispatches — the gradient is real
 outcomes the spine already recorded, so iteration is free (no API spend) and the signal cannot be

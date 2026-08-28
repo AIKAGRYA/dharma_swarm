@@ -46,7 +46,7 @@ incomplete/implicit/scattered; **OUT-OF-SCOPE** = intentionally not built here
 | # | Pattern (book chapter) | Coverage | Key modules | Notes |
 |---|---|---|---|---|
 | 1 | Prompt Chaining | PARTIAL | `prompt_builder.py`, `autonomous_agent.py` (ReAct loop), `cascade.py` | Chaining is implicit in the ReAct message accumulator; no first-class composable pipeline unit. |
-| 2 | Routing | **STRONG** | `orchestrator.py`, `provider_policy.py`, `router_v1.py`, `tiny_router_shadow.py`, `spine/routing.py` | Policy-driven dispatch + provider selection + topology-aware assignment. |
+| 2 | Routing | **STRONG** | `orchestrator.py`, `provider_policy.py`, `router_v1.py`, `spine/routing.py` | Policy-driven dispatch + provider selection + topology-aware assignment. |
 | 3 | Parallelization | **STRONG** | `orchestrator.py` (fan-out/fan-in), `workflow_graph.py` (DAG), `workflow.py`, `yoga_node.py` | Async orchestration with concurrent exec + topological ordering. |
 | 4 | Reflection | PARTIAL | `telos_gates.py` (`check_with_reflective_reroute` — a real critique→revise→recheck loop, up to `max_reroutes`), `reflexion.py` (verbal-RL self-correction, Shinn et al.), `neural_consolidator.py` (advocate/critic), `verify/` | STRONGER than a first pass suggests: a genuine self-correction loop exists in the gate layer + `reflexion.py`. Gap is that it is **not a first-class composable agent organ** (no `cognition/reflection.py`), bounded to witness-recovery on mandatory think phases. |
 | 5 | Tool Use | **STRONG** | `tool_registry.py`, `autonomous_agent.py`, `agent_runner.py` (tool-call parsing), `langgraph_parity/tools.py` | Full ReAct-style tool calling: schema collection, dispatch, result integration. |

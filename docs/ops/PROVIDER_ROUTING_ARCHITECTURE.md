@@ -125,7 +125,8 @@ Expanded, in strict order:
 4. **Stage 4 — collapse & document overlays.** The six passes named and ordered
    per §2; one audit log line per decision.
 5. **Stage 5 — drift cleanup.** `AgentConfig` default model, hardcoded literals,
-   delete dead `providers_extended.py`, reconcile `.env.example`/`.env.template`
+   delete the dead extended-provider duplicate module (done 2026-08-29,
+   routing-canon D1), reconcile `.env.example`/`.env.template`
    with the 18-member enum.
 
 ---
@@ -160,8 +161,10 @@ Stages 1–4 shipped; Stage 5 done with scoped exceptions recorded below.
   - `AgentConfig.model = "claude-sonnet-4-20250514"` — agent-identity surface,
     a codebase-wide convention across 10+ files; belongs to the identity owners,
     not routing. The router resolves model hints from the data layer regardless.
-  - `providers_extended.py` — NOT dead code: `test_providers_quality_track.py`
-    imports its `MoonshotProvider`. Left intact.
+  - The extended-provider duplicate module (Ollama/NIM/Moonshot copies) was kept
+    at the time because `test_providers_quality_track.py` imported it. Deleted
+    2026-08-29 under routing-canon D1; that test now targets the live classes in
+    `providers.py` / `moonshot_provider.py`.
   - Model-specific literals in `cost_tracker.py` (pricing table), TUI
     `ModelProfile`s, and CLI `--model` defaults — legitimately per-model config,
     not routing drift.
