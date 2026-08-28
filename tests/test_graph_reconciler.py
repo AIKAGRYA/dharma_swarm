@@ -1405,7 +1405,7 @@ def test_reconcile_report_summary_shape():
 
 
 # ---------------------------------------------------------------------------
-# Boot ordering: reconciler must settle receipted runs BEFORE the stale reaper
+# Boot authority: read-only skips reconciliation; writable reconciles before reaping
 # ---------------------------------------------------------------------------
 
 
@@ -1415,16 +1415,123 @@ def test_init_reconciles_before_stale_reaper_source_order():
     from dharma_swarm.swarm import SwarmManager
 
     src = inspect.getsource(SwarmManager.init)
+    read_only_guard = src.index("if self._read_only_boot")
+    reconcile = src.index("reconcile_graph_runs")
+    assert read_only_guard < reconcile, (
+        "read-only boot must branch before graph reconciliation"
+    )
+    assert "return" in src[read_only_guard:reconcile], (
+        "read-only boot must return without mutating graph authority"
+    )
     assert src.index("reconcile_graph_runs") < src.index("_reap_stale_running_tasks"), (
         "boot reconcile must run before the stale-task reaper"
-    )
-    assert src.index("reconcile_graph_runs") < src.index("if self._read_only_boot"), (
-        "read-only boot must still reconcile prior-process graph rows"
     )
     assert "boot_graph_reconcile_succeeded = not boot_report.errors" in src
     assert src.index("if boot_graph_reconcile_succeeded") < src.index(
         "reaped = await self._reap_stale_running_tasks()"
     )
+
+
+async def test_read_only_boot_has_no_reconciliation_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from dharma_swarm.swarm import SwarmManager
+
+    state_dir = tmp_path / ".dharma"
+    meta_dir = state_dir / "meta"
+    meta_dir.mkdir(parents=True)
+    (meta_dir / "telos_seeded").write_text("seeded\n", encoding="utf-8")
+    (meta_dir / "gnani_seeded").write_text("seeded\n", encoding="utf-8")
+    runtime = RuntimeStateStore(state_dir / "state" / "runtime.db")
+    runtime.init_db_sync()
+    receipt_json = _bound_receipt(
+        runtime, run_id="run-read-only", claim_id="claim-read-only"
+    )
+    _insert_run(
+        runtime,
+        "run-read-only",
+        status="running",
+        claim_id="claim-read-only",
+        receipt_json=receipt_json,
+    )
+    _insert_claim(runtime, "claim-read-only", status="running")
+    identity = runtime.get_execution_identity_sync("run-read-only")
+    assert identity is not None
+    runtime.record_runtime_receipt_sync(
+        runtime.build_runtime_receipt(
+            identity,
+            receipt_id="rr_read_only_seed",
+            receipt_type="delegation_run",
+            status="running",
+            payload={"proof": "fresh-authority-must-not-be-reconciled"},
+            created_at=NOW,
+        )
+    )
+    before_run = dict(_get_run(runtime, "run-read-only"))
+    before_claim = dict(_get_claim(runtime, "claim-read-only"))
+    before_receipts = [
+        dict(row) for row in _get_runtime_receipts(runtime, "run-read-only")
+    ]
+
+    monkeypatch.setenv("DHARMA_READ_ONLY_BOOT", "1")
+    manager = SwarmManager(state_dir=state_dir)
+
+    async def forbidden_reconcile(*args, **kwargs):
+        pytest.fail("read-only init invoked graph reconciliation")
+
+    monkeypatch.setattr(manager, "reconcile_graph_runs", forbidden_reconcile)
+    await manager.init()
+
+    assert manager._graph_reconciler is None
+    assert dict(_get_run(runtime, "run-read-only")) == before_run
+    assert dict(_get_claim(runtime, "claim-read-only")) == before_claim
+    assert [
+        dict(row) for row in _get_runtime_receipts(runtime, "run-read-only")
+    ] == before_receipts
+
+
+async def test_writable_boot_reconciles_before_board_reaper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from dharma_swarm import ecosystem_bridge, startup_crew
+    from dharma_swarm.swarm import SwarmManager
+
+    state_dir = tmp_path / ".dharma"
+    meta_dir = state_dir / "meta"
+    meta_dir.mkdir(parents=True)
+    (meta_dir / "telos_seeded").write_text("seeded\n", encoding="utf-8")
+    (meta_dir / "gnani_seeded").write_text("seeded\n", encoding="utf-8")
+    monkeypatch.delenv("DHARMA_READ_ONLY_BOOT", raising=False)
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setattr(ecosystem_bridge, "update_manifest", lambda: {})
+
+    async def no_startup_work(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(startup_crew, "spawn_cybernetics_crew", no_startup_work)
+    monkeypatch.setattr(startup_crew, "create_seed_tasks", no_startup_work)
+    manager = SwarmManager(state_dir=state_dir)
+    events: list[str] = []
+
+    async def reconcile(*args, **kwargs):
+        events.append("reconcile")
+        return ReconcileReport()
+
+    async def reap(*args, **kwargs):
+        events.append("reap")
+        return 0
+
+    async def no_deferred_startup():
+        return None
+
+    monkeypatch.setattr(manager, "reconcile_graph_runs", reconcile)
+    monkeypatch.setattr(manager, "_reap_stale_running_tasks", reap)
+    monkeypatch.setattr(manager, "_complete_deferred_startup", no_deferred_startup)
+
+    await manager.init()
+    assert manager._startup_background_task is not None
+    await manager._startup_background_task
+    assert events == ["reconcile", "reap"]
 
 
 def test_tick_reconciles_graph_before_board_orphan_reaper_source_order():

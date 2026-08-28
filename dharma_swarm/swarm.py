@@ -870,10 +870,18 @@ class SwarmManager:
 
         self._running = True
 
-        # Mandatory boot reconciliation applies even to read-only projection
-        # boots: persisted in-flight rows belong to the prior process and may
-        # not remain graph-active merely because optional startup is skipped.
-        # This must also precede the board-level stale-task reaper below.
+        if self._read_only_boot:
+            logger.info(
+                "Read-only boot enabled — skipping graph reconciliation, manifest "
+                "refresh, stale task reaping, startup crews, seed tasks, and "
+                "optional subsystem init"
+            )
+            self._telos_substrate_seeded = False
+            self._refresh_initialized_registry()
+            return
+
+        # Writable boots reconcile graph authority before the board-level
+        # stale-task reaper below.
         boot_graph_reconcile_succeeded = False
         try:
             boot_report = await self.reconcile_graph_runs()
@@ -895,16 +903,6 @@ class SwarmManager:
         except Exception as exc:
             logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
             self._last_boot_reconcile_error = f"{type(exc).__name__}: {exc}"
-
-        if self._read_only_boot:
-            logger.info(
-                "Read-only boot enabled — graph reconciliation attempted; skipping "
-                "manifest refresh, stale task reaping, startup crews, seed tasks, "
-                "and optional subsystem init"
-            )
-            self._telos_substrate_seeded = False
-            self._refresh_initialized_registry()
-            return
 
         # Load ecosystem awareness on every init
         from dharma_swarm.ecosystem_bridge import MANIFEST_PATH, update_manifest
