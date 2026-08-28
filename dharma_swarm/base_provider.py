@@ -21,6 +21,13 @@ from typing import Any
 from dharma_swarm.models import LLMRequest, LLMResponse
 
 
+class ProviderTimeoutError(TimeoutError):
+    """A provider exhausted its wall-clock budget; the lane failed, no response exists."""
+
+    # Matches provider_transport.response_indicates_failure's taxonomy key.
+    failure_kind = "provider_timeout"
+
+
 # ---------------------------------------------------------------------------
 # Provider capabilities declaration
 # ---------------------------------------------------------------------------
