@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,6 +36,10 @@ from dharma_swarm.mission_control_contract import (
     TERMINAL_RECEIPT_TYPE,
     MissionControlError,
     stable_id,
+)
+from dharma_swarm.mission_control_effect_owner_recovery import (
+    ExpiredProposalRecoveryObservation,
+    _ExpiredRecoveryBinding,
 )
 from dharma_swarm.models import TaskStatus
 from dharma_swarm.spine.identity import ExecutionIdentity
@@ -93,7 +98,13 @@ def _observe_candidate(
     observed_at: datetime,
     lease_acked_at: datetime,
     lease_stale_after: datetime,
-) -> ExactProposalStoreObservation:
+    expired_recovery: _ExpiredRecoveryBinding | None = None,
+    expired_owner_transition: str = "",
+    expired_owner_reconciliation: str = "",
+    transition_receipt_id: str = "",
+    transition_receipt_sha256: str = "",
+    successor_attempt_ids: tuple[str, ...] = (),
+) -> ExactProposalStoreObservation | ExpiredProposalRecoveryObservation:
     ref = expected.native_ref
     rows = connection.execute(
         "SELECT * FROM execution_identities WHERE parent_run_id = ?"
@@ -173,6 +184,35 @@ def _observe_candidate(
     if set(evidence) != _PATCH_EVIDENCE_FIELDS or evidence != required:
         raise MissionControlError("exact proposal candidate binding disagrees")
     receipt = records[0].receipt
+    receipt_sha256 = _receipt_digest(receipt)
+    if expired_recovery is not None:
+        if (
+            not observed_at >= lease_stale_after > receipt.created_at >= lease_acked_at
+            or receipt.receipt_id != expired_recovery.proposal_receipt_id
+            or receipt_sha256 != expired_recovery.proposal_receipt_sha256
+        ):
+            raise MissionControlError(
+                "exact proposal does not inhabit the expired historical lease"
+            )
+        return ExpiredProposalRecoveryObservation(
+            mission_id=ref.mission_id,
+            task_id=ref.task_id,
+            mission_attempt_id=attempt_id,
+            mission_claim_id=claim_id,
+            proposal_id=ref.proposal_id,
+            executor_run_id=identity.run_id,
+            executor_process_boot_id=expected.executor_process_boot_id,
+            proposal_receipt_id=receipt.receipt_id,
+            proposal_receipt_sha256=receipt_sha256,
+            lease_acked_at=lease_acked_at,
+            lease_stale_after=lease_stale_after,
+            observed_at=observed_at,
+            owner_transition=expired_owner_transition,
+            owner_reconciliation=expired_owner_reconciliation,
+            transition_receipt_id=transition_receipt_id,
+            transition_receipt_sha256=transition_receipt_sha256,
+            successor_attempt_ids=successor_attempt_ids,
+        )
     if not lease_stale_after > observed_at >= receipt.created_at >= lease_acked_at:
         raise MissionControlError("exact proposal is outside the observed lease window")
     return ExactProposalStoreObservation._mint(
@@ -182,18 +222,20 @@ def _observe_candidate(
         executor_run_id=identity.run_id,
         executor_process_boot_id=expected.executor_process_boot_id,
         proposal_receipt_id=receipt.receipt_id,
-        proposal_receipt_sha256=_receipt_digest(receipt),
+        proposal_receipt_sha256=receipt_sha256,
         observed_at=observed_at,
         lease_stale_after=lease_stale_after,
     )
 
 
-def observe_exact_proposal_store(
+def _observe_exact_proposal_store(
     runtime_database: Path,
     task_database: Path,
     expected: ExactProposalStoreExpectation,
+    *,
+    owner_connection: sqlite3.Connection | None = None,
 ) -> ExactProposalStoreObservation:
-    """Return one internally consistent observation with no effect authority."""
+    """Run the exact owner join through a snapshot or injected transaction."""
 
     require_store_expectation(expected)
     ref = expected.native_ref
@@ -208,8 +250,12 @@ def observe_exact_proposal_store(
     claim_id = stable_id("lease", attempt_id)
     if {attempt_id, claim_id} & {ref.packet_id, ref.delivery_id}:
         raise MissionControlError("transport and Mission Control IDs are aliased")
-
-    with read_only_owner_snapshot(runtime_database, task_database) as connection:
+    context = (
+        read_only_owner_snapshot(runtime_database, task_database)
+        if owner_connection is None
+        else nullcontext(owner_connection)
+    )
+    with context as connection:
         require_owner_schema(connection)
         observed_at = datetime.now(timezone.utc)
         session = one_owner_row(
@@ -390,4 +436,37 @@ def observe_exact_proposal_store(
         )
 
 
-__all__ = ["observe_exact_proposal_store"]
+def observe_exact_proposal_store(
+    runtime_database: Path,
+    task_database: Path,
+    expected: ExactProposalStoreExpectation,
+) -> ExactProposalStoreObservation:
+    """Return one internally consistent snapshot with no effect authority."""
+
+    return _observe_exact_proposal_store(
+        runtime_database,
+        task_database,
+        expected,
+    )
+
+
+def observe_exact_proposal_store_from_connection(
+    connection: sqlite3.Connection,
+    expected: ExactProposalStoreExpectation,
+) -> ExactProposalStoreObservation:
+    """Revalidate the exact owner join inside a caller-owned transaction."""
+
+    if type(connection) is not sqlite3.Connection:
+        raise MissionControlError("exact owner connection is required")
+    return _observe_exact_proposal_store(
+        Path(),
+        Path(),
+        expected,
+        owner_connection=connection,
+    )
+
+
+__all__ = [
+    "observe_exact_proposal_store",
+    "observe_exact_proposal_store_from_connection",
+]

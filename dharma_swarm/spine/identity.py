@@ -8,6 +8,7 @@ durable store layers.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -192,6 +193,7 @@ def require_execution_identity(
 
 
 _PROCESS_BOOT_ID = ""
+_PROCESS_BOOT_PID = 0
 
 
 def process_boot_id() -> str:
@@ -204,7 +206,9 @@ def process_boot_id() -> str:
     (docs/plans/LOOP1_CLOSURE_SPEC_2026-07-11.md, invariant P4). This is the
     single minting site — carriers import it and never mint their own.
     """
-    global _PROCESS_BOOT_ID
-    if not _PROCESS_BOOT_ID:
+    global _PROCESS_BOOT_ID, _PROCESS_BOOT_PID
+    current_pid = os.getpid()
+    if not _PROCESS_BOOT_ID or _PROCESS_BOOT_PID != current_pid:
         _PROCESS_BOOT_ID = f"boot_{uuid4().hex}"
+        _PROCESS_BOOT_PID = current_pid
     return _PROCESS_BOOT_ID

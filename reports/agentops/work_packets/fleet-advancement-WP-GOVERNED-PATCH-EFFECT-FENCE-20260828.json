@@ -1,0 +1,152 @@
+{
+  "allowed_files": [
+    "dharma_swarm/governed_patch_candidate_bundle.py",
+    "dharma_swarm/governed_patch_effect.py",
+    "dharma_swarm/governed_patch_effect_git.py",
+    "dharma_swarm/governed_patch_effect_target.py",
+    "dharma_swarm/mission_control_a2a_owner_readback.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_effect_codec.py",
+    "dharma_swarm/mission_control_effect_evidence.py",
+    "dharma_swarm/mission_control_effect_fence.py",
+    "dharma_swarm/mission_control_effect_fence_store.py",
+    "dharma_swarm/mission_control_effect_owner.py",
+    "dharma_swarm/mission_control_effect_owner_graph.py",
+    "dharma_swarm/mission_control_effect_owner_match.py",
+    "dharma_swarm/mission_control_effect_owner_recovery.py",
+    "dharma_swarm/mission_control_effect_readback.py",
+    "dharma_swarm/mission_control_effect_records.py",
+    "dharma_swarm/mission_control_effect_recovery.py",
+    "dharma_swarm/mission_control_effect_supervisor.py",
+    "dharma_swarm/mission_control_effect_terminal_store.py",
+    "dharma_swarm/mission_control_effect_verification.py",
+    "dharma_swarm/mission_control_effect_warrant.py",
+    "dharma_swarm/mission_control_reconciliation.py",
+    "dharma_swarm/mission_control_recovery.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/runtime_state_effect_fence.py",
+    "dharma_swarm/spine/identity.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-GOVERNED-PATCH-EFFECT-FENCE-20260828.json",
+    "tests/test_governed_patch_evidence.py",
+    "tests/test_governed_patch_effect.py",
+    "tests/test_mission_control_effect_fence.py",
+    "tests/test_runtime_state_effect_fence.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "4b1ed8a4a8fb119c17137bab74a0c0d0503e1b99",
+  "branch": "codex/governed-patch-reflex-effect-fence-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): fence one governed patch effect"
+  },
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/diff_applier.py",
+    "dharma_swarm/forge_lab/worktree.py",
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/mission_control_projection.py",
+    "dharma_swarm/task_board.py",
+    "scripts/runtime/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_mission_control_effect_fence.py tests/test_runtime_state_effect_fence.py tests/test_governed_patch_effect.py tests/test_governed_patch_evidence.py tests/test_mission_control_verification.py tests/test_mission_control_a2a.py tests/test_runtime_state_self_mod_exact.py tests/test_runtime_state_invariants.py tests/test_mission_control.py",
+      "expected_exit": 0,
+      "name": "governed-effect-fence-focused-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/governed_patch_candidate_bundle.py dharma_swarm/governed_patch_effect.py dharma_swarm/governed_patch_effect_git.py dharma_swarm/governed_patch_effect_target.py dharma_swarm/mission_control_a2a_owner_readback.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_effect_codec.py dharma_swarm/mission_control_effect_evidence.py dharma_swarm/mission_control_effect_fence.py dharma_swarm/mission_control_effect_fence_store.py dharma_swarm/mission_control_effect_owner.py dharma_swarm/mission_control_effect_owner_graph.py dharma_swarm/mission_control_effect_owner_match.py dharma_swarm/mission_control_effect_owner_recovery.py dharma_swarm/mission_control_effect_readback.py dharma_swarm/mission_control_effect_records.py dharma_swarm/mission_control_effect_recovery.py dharma_swarm/mission_control_effect_supervisor.py dharma_swarm/mission_control_effect_terminal_store.py dharma_swarm/mission_control_effect_verification.py dharma_swarm/mission_control_effect_warrant.py dharma_swarm/mission_control_reconciliation.py dharma_swarm/mission_control_recovery.py dharma_swarm/runtime_state.py dharma_swarm/runtime_state_effect_fence.py dharma_swarm/spine/identity.py tests/test_governed_patch_evidence.py tests/test_governed_patch_effect.py tests/test_mission_control_effect_fence.py tests/test_runtime_state_effect_fence.py",
+      "expected_exit": 0,
+      "name": "governed-effect-fence-ruff",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "governed-effect-fence-module-budget",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "git diff --check 4b1ed8a4a8fb119c17137bab74a0c0d0503e1b99",
+      "expected_exit": 0,
+      "name": "governed-effect-fence-range-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-GOVERNED-PATCH-EFFECT-FENCE-20260828",
+  "intent": "Add one authority-bearing Governed Patch Reflex segment atop the separately owned Foundry atomic replay primitive. A fresh supervisor transaction must join the exact RUNNING Mission Control attempt and unique live claim, exact semantic-executor proposal, immutable candidate bundle, independently signed positive Foundry and Vibe evidence, and one marked detached scratch worktree at the exact base before it can mint a short-lived nominal EffectWarrant. A dedicated globally unique fence consumes that warrant once, records one exact replacement result and immutable terminal triple, and classifies exact preimage, exact atomic postimage, or ambiguous bytes without applying twice. Process-crash recovery can terminalize only an already-present exact postimage under fresh supervisor authority, using either the expired active owner, one canonical stale-recovery graph, or one exact canonical Mission Control terminal as recovery-only historical context. The effect implementation does not invoke, authorize, ratify, or repair generic Mission Control completion; tests invoke ordinary finish_attempt only to prove effect-record liveness after that independent transition. A later proof-bound evaluator transition must consume the effect result before parent completion can be claimed.",
+  "negative_controls": [
+    {
+      "command": "python3 -c 'import hashlib\nimport json\nimport tempfile\nfrom pathlib import Path\nfrom dharma_swarm.governed_patch_candidate_bundle import build_candidate_bundle\nfrom dharma_swarm.governed_patch_evidence import GOVERNED_PATCH_REQUEST_SCHEMA, GovernedPatchEvidenceError, NativePatchBindings, parse_governed_patch_request\nroot = Path(tempfile.mkdtemp())\nrepo = root / \"repo\"\n(repo / \"pkg\").mkdir(parents=True)\nsource = b\"VALUE = 1\\n\"\n(repo / \"pkg/value.py\").write_bytes(source)\nbindings = NativePatchBindings(mission_id=\"m\", task_id=\"t\", attempt_id=\"p\", lease_id=\"d\" * 24, packet_id=\"p\", correlation_id=\"a2a_send:e:p\", delivery_id=\"d\" * 24, proposal_id=\"q\", base_sha=\"a\" * 40, executor_agent_uid=\"e\", executor_run_id=\"r\", executor_process_boot_id=\"b\")\npayload = {\"schema_version\": GOVERNED_PATCH_REQUEST_SCHEMA, **bindings.to_dict(), \"authorized_source_path\": \"pkg/value.py\", \"oracle_argv\": [\"python3\", \"-m\", \"pytest\"]}\ncontent = json.dumps(payload, sort_keys=True, separators=(\",\", \":\"))\nrequest = parse_governed_patch_request(content, repo_root=repo, expected=bindings, accepted_base_sha=bindings.base_sha, expected_content_sha256=hashlib.sha256(content.encode()).hexdigest())\nnoop = \"--- a/pkg/value.py\\n+++ b/pkg/value.py\\n@@ -1 +1 @@\\n-VALUE = 1\\n+VALUE = 1\\n\"\ntry:\n    build_candidate_bundle(request, noop, bundle_root=root / \"evidence\")\nexcept GovernedPatchEvidenceError:\n    pass\nelse:\n    raise AssertionError(\"no-op candidate was accepted\")\nassert (repo / \"pkg/value.py\").read_bytes() == source\nassert not (root / \"evidence\").exists()'",
+      "expected_exit": 0,
+      "name": "noop-candidate-cannot-inhabit-effect-authority",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "python3 -c 'import os\nfrom dharma_swarm.spine.identity import process_boot_id\nparent = process_boot_id()\nreader, writer = os.pipe()\npid = os.fork()\nif pid == 0:\n    os.close(reader)\n    os.write(writer, process_boot_id().encode())\n    os.close(writer)\n    os._exit(0)\nos.close(writer)\nchild = os.read(reader, 4096).decode()\nos.close(reader)\n_, status = os.waitpid(pid, 0)\nassert status == 0\nassert child and child != parent'",
+      "expected_exit": 0,
+      "name": "forked-process-cannot-inherit-boot-identity",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_a2a_owner_readback.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_reconciliation.py",
+      "dharma_swarm/mission_control_recovery.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/governed_patch_candidate_bundle.py",
+      "dharma_swarm/foundry/patches_atomic.py"
+    ],
+    "collision": {
+      "checked_at_sha": "4b1ed8a4a8fb119c17137bab74a0c0d0503e1b99",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Current admitted Foundry and Vibe process commands deliberately emit only inconclusive or unchecked outcomes; positive production evidence remains a later segment and this packet uses separately signed test-only positive fixtures.",
+      "Python object privacy is not hostile same-process custody. Same-UID or forked code can reconstruct signer material or directly reach the target and owner databases unless production moves supervisor keys and writes behind a non-fork external principal or HSM boundary.",
+      "A same-UID generic RuntimeState writer can poison or synthesize exact Mission Control terminal/recovery rows. Exact validation makes poisoning fail closed and synthesis still cannot create patch bytes or bypass a fresh registered supervisor, but exclusivity of historical owner context is not proven against that admitted principal.",
+      "The existing authorized finish_attempt surface can complete the parent without consuming the governed effect result. Canonical-terminal recovery records already-performed bytes but does not ratify or rewrite that parent completion; a proof-bound finish API is the next required segment.",
+      "Filesystem file-and-directory fsync and SQLite synchronous FULL are requested and post-read, but no hardware power-loss fault rig proves the storage device honors those barriers.",
+      "Two admitted clean-restart positive runs with a real provider remain unproven until production positive verifiers, the proof-bound Mission Control finish path, and the admitted responder composition exist.",
+      "Every stacked PR requires external human approval before merge."
+    ],
+    "interface_mismatches": [
+      "A2A packet and delivery IDs are not Mission Control attempt and claim IDs; all four remain distinct typed bindings.",
+      "ExactProposalStoreObservation and historical owner observations are non-authorizing; neither can be converted implicitly to EffectWarrant.",
+      "Candidate bundle digest identifies immutable patch custody, while the semantic artifact digest identifies the executor reply and cannot substitute for it.",
+      "Verifier signatures prove exact evidence/key possession, while a fresh canonical owner transaction and supervisor bearer nonce supply effect authority; any input alone is insufficient.",
+      "An effect terminal proves one filesystem transition but cannot inhabit parent VerifiedCompletion without a separate evaluator transition.",
+      "Only a marked detached scratch worktree at the exact base is mutable; the admitted release and canonical checkout remain immutable.",
+      "Historical canonical terminal context closes recovery liveness but does not prove that Mission Control completion was effect-bound."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "e6472bff8e144af11f1cb77624c06501b62f44db0d7e71af2c57fc2807c86c02",
+    "rollback": "Revert the effect-fence commit and its packet. The scratch target is disposable and outside the admitted release. Durable effect rows remain historical evidence and are not deleted or reinterpreted by Git rollback.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-GOVERNED-PATCH-EFFECT-FENCE-20260828"
+  },
+  "worktree": "."
+}

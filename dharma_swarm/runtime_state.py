@@ -34,6 +34,14 @@ from dharma_swarm.runtime_state_exact_identity import (
     canonical_finite_json_value as _canonical_finite_json_value,
     record_execution_identity_exact_sync as _record_execution_identity_exact_sync,
 )
+from dharma_swarm.runtime_state_effect_fence import (
+    EFFECT_IDEMPOTENCY_KEY_PREFIX as _EFFECT_IDEMPOTENCY_KEY_PREFIX,
+    EFFECT_KEY_PREFIX as _EFFECT_KEY_PREFIX,
+    EFFECT_RECEIPT_ID_PREFIX as _EFFECT_RECEIPT_ID_PREFIX,
+    EFFECT_RECEIPT_TYPE as _EFFECT_RECEIPT_TYPE,
+    ensure_effect_fence_schema_async,
+    ensure_effect_fence_schema_sync,
+)
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
@@ -417,24 +425,42 @@ def _json_dump(value: Any) -> str:
 
 def _is_reserved_exact_self_mod_slot(
     receipt_type: str = "", side_effect_key: str = "", receipt_id: str = "",
+    idempotency_key: str = "", result_receipt_id: str = "",
 ) -> bool:
-    return type(receipt_type) is not str or type(side_effect_key) is not str or type(receipt_id) is not str or (
+    values = (
+        receipt_type, side_effect_key, receipt_id,
+        idempotency_key, result_receipt_id,
+    )
+    return any(type(value) is not str for value in values) or (
         receipt_id.startswith("rr_self_mod_exact_")
     ) or (
+        receipt_id.startswith(_EFFECT_RECEIPT_ID_PREFIX)
+    ) or (
         receipt_type in EXACT_SELF_MOD_RECEIPT_TYPES
+        or receipt_type == _EFFECT_RECEIPT_TYPE
     ) or (
         side_effect_key.startswith("self_mod:")
         and side_effect_key.endswith((":proposal", ":gate", ":promote"))
+    ) or (
+        side_effect_key.startswith(_EFFECT_KEY_PREFIX)
+    ) or (
+        idempotency_key.startswith(_EFFECT_IDEMPOTENCY_KEY_PREFIX)
+    ) or (
+        result_receipt_id.startswith(_EFFECT_RECEIPT_ID_PREFIX)
     )
 
 
 def _reject_reserved_exact_self_mod_slot(
     surface: str, receipt_type: str = "", side_effect_key: str = "", receipt_id: str = "",
+    idempotency_key: str = "", result_receipt_id: str = "",
 ) -> None:
-    if _is_reserved_exact_self_mod_slot(receipt_type, side_effect_key, receipt_id):
+    if _is_reserved_exact_self_mod_slot(
+        receipt_type, side_effect_key, receipt_id, idempotency_key,
+        result_receipt_id,
+    ):
         raise ValueError(
-            f"{surface} cannot write reserved self-mod proposal/gate/promote evidence; "
-            "use commit_self_mod_receipt_exact"
+            f"{surface} cannot write a reserved self-mod/exact-governance slot; "
+            "use its dedicated exact writer"
         )
 
 
@@ -514,6 +540,7 @@ def ensure_runtime_state_schema_sync(
             pass
     for idx in _INDEXES:
         db.execute(idx)
+    ensure_effect_fence_schema_sync(db)
     if include_memory_plane:
         ensure_memory_plane_schema_sync(db)
     _backfill_episode_outbox_keys_and_commit_sync(db)
@@ -558,6 +585,7 @@ async def ensure_runtime_state_schema_async(
             pass  # column already exists
     for idx in _INDEXES:
         await db.execute(idx)
+    await ensure_effect_fence_schema_async(db)
     if include_memory_plane:
         await ensure_memory_plane_schema_async(db)
     await _backfill_episode_outbox_keys_and_commit_async(db)
@@ -755,6 +783,7 @@ def _validate_runtime_receipt_sink(receipt: RuntimeReceipt, surface: str) -> Non
         raise TypeError(f"{surface} requires an exact RuntimeReceipt")
     _reject_reserved_exact_self_mod_slot(
         surface, receipt.receipt_type, receipt.side_effect_key, receipt.receipt_id,
+        receipt.idempotency_key,
     )
 
 
@@ -2730,6 +2759,7 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         _reject_reserved_exact_self_mod_slot(
             "build_runtime_receipt", receipt_type, side_effect_key, receipt_id,
+            identity.idempotency_key,
         )
         return RuntimeReceipt(
             receipt_id=receipt_id or _new_id("rr"),
@@ -2865,6 +2895,11 @@ class RuntimeStateStore:
         result_receipt_id: str = "",
         payload: dict[str, Any] | None = None,
     ) -> RuntimeReceipt:
+        _reject_reserved_exact_self_mod_slot(
+            "record_side_effect_complete", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
+            result_receipt_id=result_receipt_id,
+        )
         return await self.record_receipt_for_identity(
             identity,
             receipt_type="side_effect_complete",
@@ -2885,6 +2920,11 @@ class RuntimeStateStore:
         result_receipt_id: str = "",
         payload: dict[str, Any] | None = None,
     ) -> RuntimeReceipt:
+        _reject_reserved_exact_self_mod_slot(
+            "record_side_effect_complete_sync", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
+            result_receipt_id=result_receipt_id,
+        )
         return self.record_receipt_for_identity_sync(
             identity,
             receipt_type="side_effect_complete",
@@ -3086,6 +3126,11 @@ class RuntimeStateStore:
         receipt_id = f"rr_self_mod_exact_{hashlib.sha256(slot_json.encode('utf-8')).hexdigest()[:32]}"
         receipt_type = f"self_mod_{stage}"
         side_effect_key = f"self_mod:{proposal_id}:{stage}"
+        _reject_reserved_exact_self_mod_slot(
+            "commit_self_mod_receipt_exact",
+            idempotency_key=identity_fields["idempotency_key"],
+            result_receipt_id=receipt_id,
+        )
         wrapper_without_hash = {
             "schema_version": _EXACT_SELF_MOD_SCHEMA_VERSION,
             "authority_semantics": _EXACT_SELF_MOD_AUTHORITY_SEMANTICS,
@@ -3882,6 +3927,7 @@ class RuntimeStateStore:
             raise ValueError("side_effect_key is required")
         _reject_reserved_exact_self_mod_slot(
             "try_begin_idempotent_side_effect_with_token", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
         )
         await self.init_db()
         now = _next_idempotency_token(None, ownership_time)
@@ -3953,6 +3999,7 @@ class RuntimeStateStore:
             raise ValueError("side_effect_key is required")
         _reject_reserved_exact_self_mod_slot(
             "try_begin_idempotent_side_effect_sync", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
         )
         self.init_db_sync()
         now = _utc_now_iso()
@@ -4015,6 +4062,8 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         _reject_reserved_exact_self_mod_slot(
             "complete_idempotent_side_effect", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
+            result_receipt_id=result_receipt_id,
         )
         await self.init_db()
         existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
@@ -4060,6 +4109,8 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         _reject_reserved_exact_self_mod_slot(
             "complete_idempotent_side_effect_sync", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
+            result_receipt_id=result_receipt_id,
         )
         self.init_db_sync()
         existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
@@ -4107,6 +4158,7 @@ class RuntimeStateStore:
             raise ValueError("side_effect_key is required")
         _reject_reserved_exact_self_mod_slot(
             "try_reclaim_idempotent_side_effect_with_token", side_effect_key=side_effect_key,
+            idempotency_key=identity.idempotency_key,
         )
         await self.init_db()
         now = _next_idempotency_token(expected_updated_at, ownership_time)

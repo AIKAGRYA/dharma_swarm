@@ -306,9 +306,16 @@ def recovery_receipt_matches_contract(
     receipt: RuntimeReceipt,
     identity: ExecutionIdentity,
     mission_id: str,
+    *,
+    expired_stale_after: datetime | None = None,
 ) -> bool:
     """Return whether a recovery receipt is canonical for its exact claim."""
-    return (
+    raw_deadline = receipt.payload.get("expired_stale_after")
+    try:
+        deadline = datetime.fromisoformat(raw_deadline) if type(raw_deadline) is str else None
+    except ValueError:
+        deadline = None
+    return bool(
         receipt_matches_identity(receipt, identity)
         and receipt.receipt_type == RECOVERY_RECEIPT_TYPE
         and receipt.status == "stale_recovered"
@@ -321,6 +328,15 @@ def recovery_receipt_matches_contract(
         and receipt.payload.get("attempt_id") == identity.run_id
         and receipt.payload.get("recovered_claim_id") == identity.claim_id
         and receipt.payload.get("reason") == "expired_lease"
+        and set(receipt.payload) == {
+            "schema_version", "mission_id", "attempt_id", "recovered_claim_id",
+            "reason", "expired_stale_after",
+        }
+        and deadline is not None
+        and deadline.tzinfo is not None
+        and deadline.utcoffset() is not None
+        and deadline <= receipt.created_at
+        and (expired_stale_after is None or deadline == expired_stale_after)
     )
 
 

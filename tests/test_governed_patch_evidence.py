@@ -374,6 +374,28 @@ def test_candidate_rejects_wrong_path_stale_context_and_source_drift(
         build_candidate_bundle(request, DIFF, bundle_root=evidence)
 
 
+def test_candidate_rejects_noop_diff_before_any_effect_or_evidence_write(
+    roots: tuple[Path, Path],
+) -> None:
+    repo, evidence = roots
+    request = _request(repo, _bindings())
+    noop = DIFF.replace('+    return "new"', '+    return "old"')
+    target = repo / SOURCE_PATH
+    before = target.stat()
+
+    with pytest.raises(GovernedPatchEvidenceError, match="change the exact source"):
+        build_candidate_bundle(request, noop, bundle_root=evidence)
+
+    after = target.stat()
+    assert target.read_bytes() == SOURCE.encode("utf-8")
+    assert (after.st_dev, after.st_ino, after.st_ctime_ns) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_ctime_ns,
+    )
+    assert not evidence.exists()
+
+
 def test_candidate_refuses_repository_bundle_root_and_detects_tamper(
     roots: tuple[Path, Path],
 ) -> None:

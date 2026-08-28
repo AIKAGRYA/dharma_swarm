@@ -185,7 +185,16 @@ def build_candidate_bundle(
             raise GovernedPatchEvidenceError(
                 "candidate diff path does not match authorized source"
             )
-        _replay(request.source_bytes.decode("utf-8").splitlines(keepends=True), parsed)
+        postimage = "".join(
+            _replay(
+                request.source_bytes.decode("utf-8").splitlines(keepends=True),
+                parsed,
+            )
+        ).encode("utf-8")
+        if postimage == request.source_bytes:
+            raise GovernedPatchEvidenceError(
+                "candidate diff must change the exact source bytes"
+            )
     except PatchReplayError as exc:
         raise GovernedPatchEvidenceError(
             f"candidate diff is not replayable: {exc}"
@@ -360,7 +369,13 @@ def verify_candidate_bundle(bundle: CandidateBundle) -> CandidateBundle:
             raise GovernedPatchEvidenceError(
                 "candidate diff path does not match authorized source"
             )
-        _replay(source_text.splitlines(keepends=True), parsed_diff)
+        postimage = "".join(
+            _replay(source_text.splitlines(keepends=True), parsed_diff)
+        ).encode("utf-8")
+        if postimage == components["source.utf8"]:
+            raise GovernedPatchEvidenceError(
+                "candidate diff must change the exact source bytes"
+            )
     except PatchReplayError as exc:
         raise GovernedPatchEvidenceError(
             f"candidate diff is not replayable: {exc}"
