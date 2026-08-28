@@ -81,7 +81,7 @@ DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.hermes",
     "dharma.a2a.perplexity",
 )
-DEFAULT_REQUIRED_REVIEWERS = ("codex", "claude")
+DEFAULT_REQUIRED_REVIEWERS = ("codex",)
 # This label selects routing only. It never waives review evidence or creates
 # merge authority; author-controlled metadata cannot inhabit MergeAuthorized.
 BOT_PR_LABEL = "bot-pr"
@@ -96,21 +96,40 @@ MERGE_MASTER_MIKE_NATS_SECRET_NAMES = (
 )
 DEVIN_NATS_SECRET_NAMES = ("DEVIN_NATS_URL", "DEVIN_NATS_USER", "DEVIN_NATS_PW")
 NATS_REQUIRED_SECRET_NAMES = DEVIN_NATS_SECRET_NAMES
+# Canonical source for the referee set is the tier-2 path list in
+# scripts/governance/automerge_tier_policy.json — mirror it, do not widen.
 HOT_PATH_PATTERNS = (
-    ".github/",
-    "api/",
-    "dashboard/",
+    ".github/workflows/",
+    ".github/CODEOWNERS",
+    "scripts/governance/automerge_tier_policy.json",
+    "scripts/governance/check_automerge_tier_policy.py",
+    "scripts/governance/ci_parity_manifest.json",
+    "scripts/governance/check_ci_parity.py",
+    "scripts/governance/check_pr_coherence_delta.py",
+    "scripts/docops/check_docops_integrity.py",
+    "scripts/governance/hygiene/check_hygiene_integrity.py",
+    "scripts/governance/check_track_status.py",
+    "scripts/governance/render_active_track_includes.py",
+    "docs/governance/CI_TRUTH_CONTRACT.json",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/MMM_CHARTER.md",
+    "docs/ops/loop_control/",
+    "docs/ops/OPERATOR_RULING_2026-07-29_AUTO_WITH_DECORRELATED_REVIEW.md",
+    "docs/ops/OPERATOR_RULING_2026-07-30_SARATHI_AUTONOMY_CEILING.md",
+    "docs/sarathi_apex_build/06_PROOF_GATES.md",
+    "scripts/runtime/ci_truth.py",
+    "scripts/runtime/pr_merge_control.py",
+    "scripts/runtime/merge_master_mike_daemon.py",
+    "dharma_swarm/forge_v1/forge_v2/",
+    "dharma_swarm/evolution_safety.py",
     "dharma_swarm/dharma_kernel.py",
     "dharma_swarm/telos_gates.py",
-    "dharma_swarm/orchestrator.py",
-    "dharma_swarm/swarm.py",
-    "dharma_swarm/signal_bus.py",
-    "dharma_swarm/vsm_channels.py",
-    "dharma_swarm/runtime_state.py",
-    "dharma_swarm/operator_core/",
-    "scripts/governance/",
-    "scripts/runtime/",
-    "Makefile",
+    "dharma_swarm/operator_core/reversibility_gate.py",
+    "dharma_swarm/operator_core/autonomy_dial.py",
+    "dharma_swarm/risk_patterns.py",
+    "dharma_swarm/holon_system/observability/proof_gates.py",
+    "dharma_swarm/revenue/",
+    "dharma_swarm/a2a/",
 )
 CLAUDE_REVIEW_DEFAULT_BIN = Path("/Users/dhyana/.npm-global/bin/claude")
 
