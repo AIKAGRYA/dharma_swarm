@@ -76,13 +76,21 @@ def _cmd_promote(args: argparse.Namespace) -> int:
         candidates = list(STAGING_ROOT.rglob(f"{args.path}.md"))
         if candidates:
             path = candidates[0]
-    result = promote(
-        staged_path=path,
-        promoted_by=args.promoted_by,
-        reviewer=args.reviewer,
-        auto_promote=args.auto_promote,
-        confidence_override=args.confidence,
-    )
+    try:
+        result = promote(
+            staged_path=path,
+            promoted_by=args.promoted_by,
+            reviewer=args.reviewer,
+            auto_promote=args.auto_promote,
+            confidence_override=args.confidence,
+        )
+    except FileExistsError as e:
+        # write_trusted() fails closed on a slug collision with a DIFFERENT
+        # atom_id (or an unreadable / legacy page). That is correct behavior,
+        # but it must not reach the operator as an uncaught traceback + exit 1.
+        # Surface it as a clean BLOCK line; renaming the atom title resolves it.
+        print(f"chetana.promote → BLOCK (slug collision): {e}")
+        return 2
     print(f"chetana.promote → {result.decision} ({result.review_status})")
     for note in result.notes:
         print(f"  · {note}")

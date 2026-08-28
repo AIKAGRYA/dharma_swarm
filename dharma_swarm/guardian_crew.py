@@ -14,24 +14,30 @@ The crew has three specialist agents:
         - Parses every Python file for calls to external modules
         - Checks that method signatures match the actual callee definition
         - Detects new mismatches introduced since the last clean commit
-        - Writes findings to ~/.dharma/guardian/interface_audit.md
 
     LOOP_WATCHER: Cybernetic loop health monitor
         - Checks that all 13 loops in orchestrate_live are producing output
         - Reads signal_bus, message_bus, evolution archive for signs of life
         - Detects silent failures (loop running but producing zero events)
-        - Writes findings to ~/.dharma/guardian/loop_health.md
 
     ROUTER_PROBE: Model routing health checker
         - Tests each provider in CANONICAL_SEED_ORDER with a minimal ping
         - Measures p50/p99 latency, error rate, circuit-breaker status
         - Identifies dead providers before they waste agent budgets
-        - Writes findings to ~/.dharma/guardian/router_health.md
 
-Combined output -> ~/.dharma/guardian/GUARDIAN_REPORT.md (overwritten each cycle)
+Output: all three specialists' findings are combined into the SINGLE report
+``~/.dharma/guardian/GUARDIAN_REPORT.md`` (overwritten each cycle). The
+per-specialist ``interface_audit.md`` / ``loop_health.md`` /
+``router_health.md`` files and an ``INTERFACE_MISMATCH_MAP.md`` auto-updater
+described in older revisions are NOT written by this module — verified by
+grep: the only report write site is GUARDIAN_REPORT.md. ``INTERFACE_MISMATCH_MAP.md``
+is a human-maintained doc; do not rely on this crew to refresh it.
 GitHub issue created when severity >= BLOCKER and no open issue exists for that mismatch.
 
-Cycle: every 4 hours (configurable via GUARDIAN_INTERVAL_SECONDS env var).
+Cadence: this module has no internal timer; a cycle runs when its runner is
+invoked (e.g. by a scheduler). The historical "every 4 hours" claim is only
+true if an external launchd/cron job drives it — confirm the producer exists
+before trusting a freshness SLA.
 
 Usage::
 
