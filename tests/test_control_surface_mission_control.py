@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import threading
+import time
 from collections.abc import Callable
 from copy import deepcopy
 from types import SimpleNamespace
@@ -14,6 +16,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from api.routers import control_surface as control_surface_router
 from api.routers.control_surface import control_surface_mission_snapshot, router
 from dharma_swarm.mission_control_contract import (
     RECOVERY_RECEIPT_TYPE,
@@ -319,6 +322,39 @@ def test_provider_projects_only_validated_public_snapshot_fields() -> None:
         "proves_executor_liveness",
     }
     assert "private_provider_field" not in snapshot["tasks"][0]
+
+
+@pytest.mark.parametrize(
+    "non_finite",
+    [
+        pytest.param(float("nan"), id="nan"),
+        pytest.param(float("inf"), id="positive-infinity"),
+        pytest.param(float("-inf"), id="negative-infinity"),
+    ],
+)
+@pytest.mark.parametrize("mapping_path", ["mission-metadata", "receipt-payload"])
+def test_nested_non_finite_public_mapping_fails_closed(
+    non_finite: float,
+    mapping_path: str,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    retained_mapping = (
+        value["mission"]["metadata"]
+        if mapping_path == "mission-metadata"
+        else value["receipts"][0]["payload"]
+    )
+    retained_mapping["nested"] = {"values": [0.0, {"score": non_finite}]}
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
 
 
 @pytest.mark.parametrize("field", ["agents", "needs_action"])
@@ -1267,27 +1303,853 @@ def test_sync_provider_is_offloaded_while_event_loop_remains_live() -> None:
     assert body["data"]["state"] == "observed"
 
 
-def test_async_provider_remains_awaited_on_event_loop() -> None:
+@pytest.mark.parametrize("block_at", ["descriptor", "invocation"])
+def test_sync_provider_read_timeout_is_sanitized_and_worker_finishes(
+    monkeypatch: pytest.MonkeyPatch,
+    block_at: str,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+
+    def blocking_read() -> dict[str, Any]:
+        started.set()
+        try:
+            if not release.wait(timeout=2):
+                raise RuntimeError("test did not release provider")
+            return _snapshot(mission_id)
+        finally:
+            finished.set()
+
+    class BlockingDescriptorProvider:
+        @property
+        def get_snapshot(self) -> Callable[[str], dict[str, Any]]:
+            result = blocking_read()
+            return lambda _mission_id: result
+
+    class BlockingInvocationProvider:
+        def get_snapshot(self, _mission_id: str) -> dict[str, Any]:
+            return blocking_read()
+
+    provider = (
+        BlockingDescriptorProvider()
+        if block_at == "descriptor"
+        else BlockingInvocationProvider()
+    )
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(state=SimpleNamespace(mission_snapshot_provider=provider))
+        request = SimpleNamespace(app=app)
+        route_task = asyncio.create_task(
+            control_surface_mission_snapshot(mission_id, request)
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        body = await asyncio.wait_for(route_task, timeout=1)
+        release.set()
+        assert await asyncio.to_thread(finished.wait, 1)
+        return body
+
+    try:
+        body = asyncio.run(exercise())
+    finally:
+        release.set()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (TimeoutError)"
+
+
+def test_sync_provider_timeout_caps_wedged_bodies_at_four(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    lock = threading.Lock()
+    all_started = threading.Event()
+    release = threading.Event()
+    all_finished = threading.Event()
+    calls = 0
+    finished = 0
+
+    class WedgedSyncProvider:
+        def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            nonlocal calls, finished
+            with lock:
+                calls += 1
+                if calls == 4:
+                    all_started.set()
+            try:
+                if not release.wait(timeout=2):
+                    raise RuntimeError("test did not release provider")
+                return _snapshot(requested_mission_id)
+            finally:
+                with lock:
+                    finished += 1
+                    if finished == 4:
+                        all_finished.set()
+
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+
+    async def exercise() -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        provider = WedgedSyncProvider()
+        app = SimpleNamespace(state=SimpleNamespace(mission_snapshot_provider=provider))
+        request = SimpleNamespace(app=app)
+        first_reads = [
+            asyncio.create_task(control_surface_mission_snapshot(mission_id, request))
+            for _ in range(4)
+        ]
+        assert await asyncio.to_thread(all_started.wait, 1)
+        first_bodies = await asyncio.gather(*first_reads)
+        fifth_body = await asyncio.wait_for(
+            control_surface_mission_snapshot(mission_id, request),
+            timeout=1,
+        )
+        with lock:
+            assert calls == 4
+        release.set()
+        assert await asyncio.to_thread(all_finished.wait, 1)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        return first_bodies, fifth_body
+
+    try:
+        first_bodies, fifth_body = asyncio.run(exercise())
+    finally:
+        release.set()
+    assert all(body["data"]["state"] == "unknown" for body in first_bodies)
+    assert fifth_body["data"]["state"] == "unknown"
+    assert fifth_body["source_errors"][0]["error"] == "read failed (TimeoutError)"
+
+
+def test_thread_start_failure_after_launch_preserves_slot_ownership(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    provider_started = threading.Event()
+    release = threading.Event()
+    provider_finished = threading.Event()
+    calls = 0
+    calls_lock = threading.Lock()
+    slot = threading.BoundedSemaphore(value=1)
+    original_start = threading.Thread.start
+    inject_failure = True
+
+    class BlockingProvider:
+        def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            nonlocal calls
+            with calls_lock:
+                calls += 1
+            provider_started.set()
+            try:
+                if not release.wait(timeout=2):
+                    raise RuntimeError("test did not release provider")
+                return _snapshot(requested_mission_id)
+            finally:
+                provider_finished.set()
+
+    def start_then_raise(thread: threading.Thread) -> None:
+        nonlocal inject_failure
+        original_start(thread)
+        if thread.name == "mission-snapshot-provider" and inject_failure:
+            inject_failure = False
+            assert provider_started.wait(timeout=1)
+            raise RuntimeError("synthetic post-launch start failure")
+
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_READ_SLOTS",
+        slot,
+    )
+    monkeypatch.setattr(threading.Thread, "start", start_then_raise)
+
+    async def exercise() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        provider = BlockingProvider()
+        app = SimpleNamespace(state=SimpleNamespace(mission_snapshot_provider=provider))
+        request = SimpleNamespace(app=app)
+        first_body = await control_surface_mission_snapshot(mission_id, request)
+        second_body = await control_surface_mission_snapshot(mission_id, request)
+        with calls_lock:
+            assert calls == 1
+        release.set()
+        for _ in range(1000):
+            if (
+                provider_finished.is_set()
+                and not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+            ):
+                break
+            await asyncio.sleep(0.001)
+        assert provider_finished.is_set()
+        assert not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+        third_body = await control_surface_mission_snapshot(mission_id, request)
+        return first_body, second_body, third_body
+
+    with caplog.at_level(logging.WARNING):
+        try:
+            first_body, second_body, third_body = asyncio.run(exercise())
+        finally:
+            release.set()
+    assert first_body["data"]["state"] == "unknown"
+    assert second_body["data"]["state"] == "unknown"
+    assert third_body["data"]["state"] == "observed"
+    with calls_lock:
+        assert calls == 2
+    assert slot.acquire(blocking=False)
+    assert not slot.acquire(blocking=False)
+    slot.release()
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
+
+
+@pytest.mark.parametrize("result_kind", ["native", "custom"])
+def test_late_provider_result_is_disposed_after_sync_read_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+    result_kind: str,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    sync_started = threading.Event()
+    release_sync = threading.Event()
+    sync_finished = threading.Event()
+    awaitable_started = threading.Event()
+    custom_closed = threading.Event()
+
+    class CustomAwaitable:
+        def __init__(self, inner: Any) -> None:
+            self.inner = inner
+
+        def __await__(self):  # noqa: ANN204
+            return self.inner.__await__()
+
+        def close(self) -> None:
+            custom_closed.set()
+            self.inner.close()
+
+    class LateAwaitableProvider:
+        def get_snapshot(self, requested_mission_id: str) -> Any:
+            sync_started.set()
+            if not release_sync.wait(timeout=2):
+                raise RuntimeError("test did not release provider")
+            sync_finished.set()
+
+            async def late_result() -> dict[str, Any]:
+                awaitable_started.set()
+                return _snapshot(requested_mission_id)
+
+            result = late_result()
+            return CustomAwaitable(result) if result_kind == "custom" else result
+
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_READ_SLOTS",
+        threading.BoundedSemaphore(value=1),
+    )
+
+    async def exercise() -> tuple[dict[str, Any], dict[str, Any]]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=LateAwaitableProvider())
+        )
+        request = SimpleNamespace(app=app)
+        route_task = asyncio.create_task(
+            control_surface_mission_snapshot(mission_id, request)
+        )
+        assert await asyncio.to_thread(sync_started.wait, 1)
+        timed_out_body = await asyncio.wait_for(route_task, timeout=1)
+        release_sync.set()
+        assert await asyncio.to_thread(sync_finished.wait, 1)
+        for _ in range(100):
+            await asyncio.sleep(0.001)
+            if not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES:
+                break
+        assert not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+        assert not awaitable_started.is_set()
+        recovered_app = SimpleNamespace(
+            state=SimpleNamespace(
+                mission_snapshot_provider=_AsyncProvider(_snapshot(mission_id))
+            )
+        )
+        recovered_request = SimpleNamespace(app=recovered_app)
+        recovered_body = await control_surface_mission_snapshot(
+            mission_id,
+            recovered_request,
+        )
+        return timed_out_body, recovered_body
+
+    try:
+        timed_out_body, recovered_body = asyncio.run(exercise())
+    finally:
+        release_sync.set()
+    assert timed_out_body["data"]["state"] == "unknown"
+    assert recovered_body["data"]["state"] == "observed"
+    assert not awaitable_started.is_set()
+    assert custom_closed.is_set() is (result_kind == "custom")
+
+
+def test_async_provider_read_timeout_is_sanitized_and_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+
+    async def exercise() -> tuple[dict[str, Any], bool]:
+        started = threading.Event()
+        cancelled = threading.Event()
+
+        class BlockingAsyncProvider:
+            async def get_snapshot(self, _mission_id: str) -> dict[str, Any]:
+                started.set()
+                try:
+                    await asyncio.sleep(3600)
+                finally:
+                    cancelled.set()
+
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=BlockingAsyncProvider())
+        )
+        request = SimpleNamespace(app=app)
+        body = await asyncio.wait_for(
+            control_surface_mission_snapshot(mission_id, request),
+            timeout=1,
+        )
+        assert await asyncio.to_thread(cancelled.wait, 1)
+        return body, started.is_set()
+
+    body, started = asyncio.run(exercise())
+    assert started
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (TimeoutError)"
+
+
+def test_blocking_async_provider_cannot_stall_request_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    started = threading.Event()
+    finished = threading.Event()
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+
+    class BlockingAsyncProvider:
+        async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            started.set()
+            try:
+                time.sleep(0.2)
+                return _snapshot(requested_mission_id)
+            finally:
+                finished.set()
+
+    async def exercise() -> tuple[dict[str, Any], float, int]:
+        heartbeats = 0
+        stop = asyncio.Event()
+
+        async def heartbeat() -> None:
+            nonlocal heartbeats
+            while not stop.is_set():
+                heartbeats += 1
+                await asyncio.sleep(0.002)
+
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=BlockingAsyncProvider())
+        )
+        request = SimpleNamespace(app=app)
+        heartbeat_task = asyncio.create_task(heartbeat())
+        loop = asyncio.get_running_loop()
+        began = loop.time()
+        try:
+            body = await control_surface_mission_snapshot(mission_id, request)
+            elapsed = loop.time() - began
+        finally:
+            stop.set()
+            await heartbeat_task
+        assert started.is_set()
+        assert await asyncio.to_thread(finished.wait, 1)
+        await asyncio.sleep(0)
+        return body, elapsed, heartbeats
+
+    body, elapsed, heartbeats = asyncio.run(exercise())
+    assert elapsed < 0.15
+    assert heartbeats > 3
+    assert body["data"]["state"] == "unknown"
+    assert body["source_errors"][0]["error"] == "read failed (TimeoutError)"
+
+
+def test_runtime_projection_mode_descriptor_obeys_provider_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    descriptor_started = threading.Event()
+    release = threading.Event()
+    descriptor_finished = threading.Event()
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+
+    class BlockingModeProvider:
+        def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            return _snapshot(requested_mission_id)
+
+        @property
+        def runtime_projection_mode(self) -> str:
+            descriptor_started.set()
+            try:
+                if not release.wait(timeout=2):
+                    raise RuntimeError("test did not release provider")
+                return "immutable_copy"
+            finally:
+                descriptor_finished.set()
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=BlockingModeProvider())
+        )
+        request = SimpleNamespace(app=app)
+        route_task = asyncio.create_task(
+            control_surface_mission_snapshot(mission_id, request)
+        )
+        assert await asyncio.to_thread(descriptor_started.wait, 1)
+        body = await asyncio.wait_for(route_task, timeout=1)
+        release.set()
+        assert await asyncio.to_thread(descriptor_finished.wait, 1)
+        await asyncio.sleep(0)
+        return body
+
+    try:
+        body = asyncio.run(exercise())
+    finally:
+        release.set()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (TimeoutError)"
+
+
+def test_provider_cancelled_error_is_sanitized_unknown() -> None:
+    mission_id = "fleet-advancement-20260826"
+
+    class SelfCancellingProvider:
+        async def get_snapshot(self, _mission_id: str) -> dict[str, Any]:
+            raise asyncio.CancelledError
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=SelfCancellingProvider())
+        )
+        request = SimpleNamespace(app=app)
+        return await control_surface_mission_snapshot(mission_id, request)
+
+    body = asyncio.run(exercise())
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == (
+        "read failed (ProviderCancelledError)"
+    )
+
+
+def test_quiescent_provider_may_handle_awaited_child_task_failure() -> None:
+    mission_id = "fleet-advancement-20260826"
+
+    class StructuredProvider:
+        async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            async def optional_read() -> None:
+                raise ValueError("handled optional read")
+
+            try:
+                await asyncio.create_task(optional_read())
+            except ValueError:
+                pass
+            return _snapshot(requested_mission_id)
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=StructuredProvider())
+        )
+        request = SimpleNamespace(app=app)
+        return await control_surface_mission_snapshot(mission_id, request)
+
+    body = asyncio.run(exercise())
+    assert body["data"]["state"] == "observed"
+    assert body["data"]["snapshot"]["mission"]["mission_id"] == mission_id
+    assert body["source_errors"] == []
+
+
+@pytest.mark.parametrize("failure_phase", ["before-return", "runner-shutdown"])
+def test_provider_background_task_failure_is_sanitized_without_log_injection(
+    caplog: pytest.LogCaptureFixture,
+    failure_phase: str,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+
+    class BackgroundFailureProvider:
+        async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            if failure_phase == "before-return":
+
+                async def fail_in_background() -> None:
+                    raise RuntimeError("secret provider detail\nFORGED LOG LINE")
+
+                asyncio.create_task(fail_in_background())
+                await asyncio.sleep(0)
+            else:
+                started = asyncio.Event()
+
+                async def fail_during_shutdown() -> None:
+                    try:
+                        started.set()
+                        await asyncio.sleep(3600)
+                    except asyncio.CancelledError as exc:
+                        raise RuntimeError(
+                            "secret shutdown detail\nFORGED SHUTDOWN LINE"
+                        ) from exc
+
+                asyncio.create_task(fail_during_shutdown())
+                await started.wait()
+            return _snapshot(requested_mission_id)
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=BackgroundFailureProvider())
+        )
+        request = SimpleNamespace(app=app)
+        return await control_surface_mission_snapshot(mission_id, request)
+
+    with caplog.at_level(logging.WARNING):
+        body = asyncio.run(exercise())
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (RuntimeError)"
+    assert caplog.messages == [
+        "mission snapshot provider failed (kind=read_failed)"
+    ]
+    assert "secret" not in caplog.text
+    assert "FORGED" not in caplog.text
+    assert "Task exception was never retrieved" not in caplog.text
+
+
+def test_best_effort_cleanup_quiesces_factory_task_generation(
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    child_finalized = threading.Event()
+    child_tasks: list[asyncio.Task[Any]] = []
+
+    class SecondGenerationProvider:
+        async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            background_started = asyncio.Event()
+
+            async def background() -> None:
+                background_started.set()
+                try:
+                    await asyncio.sleep(3600)
+                except asyncio.CancelledError:
+
+                    async def forbidden_child() -> None:
+                        try:
+                            await asyncio.sleep(3600)
+                        finally:
+                            raise RuntimeError(
+                                "secret child detail\nFORGED CHILD LINE"
+                            )
+
+                    child = asyncio.create_task(forbidden_child())
+                    child_tasks.append(child)
+                    child.add_done_callback(lambda _task: child_finalized.set())
+
+            asyncio.create_task(background())
+            await background_started.wait()
+            return _snapshot(requested_mission_id)
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=SecondGenerationProvider())
+        )
+        request = SimpleNamespace(app=app)
+        return await control_surface_mission_snapshot(mission_id, request)
+
+    with caplog.at_level(logging.WARNING):
+        body = asyncio.run(exercise())
+    captured = capsys.readouterr()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (RuntimeError)"
+    assert child_finalized.is_set()
+    assert len(child_tasks) == 1
+    assert child_tasks[0].done()
+    assert not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+    assert caplog.messages == [
+        "mission snapshot provider failed (kind=read_failed)"
+    ]
+    combined_output = f"{caplog.text}\n{captured.err}"
+    assert "secret" not in combined_output
+    assert "FORGED" not in combined_output
+    assert "Exception ignored" not in combined_output
+    assert "Task was destroyed" not in combined_output
+
+
+def test_best_effort_cleanup_drains_retained_async_generator(
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    generator_finalized = threading.Event()
+    child_terminal = threading.Event()
+    child_tasks: list[asyncio.Task[Any]] = []
+    retained_generators: list[Any] = []
+
+    class AsyncGeneratorProvider:
+        async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            async def retained_generator():  # noqa: ANN202
+                try:
+                    yield "retained"
+                finally:
+                    generator_finalized.set()
+
+                    async def forbidden_child() -> None:
+                        try:
+                            await asyncio.sleep(3600)
+                        finally:
+                            raise RuntimeError(
+                                "secret asyncgen child\nFORGED ASYNCGEN LINE"
+                            )
+
+                    child_coro = forbidden_child()
+                    loop = asyncio.get_running_loop()
+                    if "eager_start" in inspect.signature(asyncio.Task).parameters:
+                        child = loop.create_task(child_coro, eager_start=True)
+                    else:
+                        child = loop.create_task(child_coro)
+                    child_tasks.append(child)
+                    child.add_done_callback(lambda _task: child_terminal.set())
+
+            generator = retained_generator()
+            retained_generators.append(generator)
+            assert await anext(generator) == "retained"
+            return _snapshot(requested_mission_id)
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=AsyncGeneratorProvider())
+        )
+        request = SimpleNamespace(app=app)
+        return await control_surface_mission_snapshot(mission_id, request)
+
+    with caplog.at_level(logging.WARNING):
+        body = asyncio.run(exercise())
+    captured = capsys.readouterr()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (RuntimeError)"
+    assert generator_finalized.is_set()
+    assert child_terminal.is_set()
+    assert len(child_tasks) == 1
+    assert child_tasks[0].done()
+    assert len(retained_generators) == 1
+    assert retained_generators[0].ag_frame is None
+    assert not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+    assert caplog.messages == [
+        "mission snapshot provider failed (kind=read_failed)"
+    ]
+    combined_output = f"{caplog.text}\n{captured.err}"
+    assert "secret" not in combined_output
+    assert "FORGED" not in combined_output
+    assert "Exception ignored" not in combined_output
+    assert "Task was destroyed" not in combined_output
+
+
+def test_best_effort_cleanup_drains_pending_direct_task_descendant(
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    child_started = threading.Event()
+    child_terminal = threading.Event()
+    parent_tasks: list[asyncio.Task[Any]] = []
+    child_tasks: list[asyncio.Task[Any]] = []
+
+    class DirectTaskProvider:
+        async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+            async def forbidden_child() -> None:
+                child_started.set()
+                try:
+                    await asyncio.sleep(3600)
+                finally:
+                    child_terminal.set()
+                    raise RuntimeError("secret direct child\nFORGED DIRECT LINE")
+
+            async def direct_parent() -> None:
+                try:
+                    await asyncio.sleep(3600)
+                except asyncio.CancelledError:
+                    child = asyncio.Task(forbidden_child())
+                    child_tasks.append(child)
+                    raise
+
+            parent = asyncio.Task(direct_parent())
+            parent_tasks.append(parent)
+            await asyncio.sleep(0)
+            return _snapshot(requested_mission_id)
+
+    async def exercise() -> dict[str, Any]:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=DirectTaskProvider())
+        )
+        request = SimpleNamespace(app=app)
+        return await control_surface_mission_snapshot(mission_id, request)
+
+    with caplog.at_level(logging.WARNING):
+        body = asyncio.run(exercise())
+    captured = capsys.readouterr()
+    assert body["data"]["state"] == "unknown"
+    assert body["source_errors"][0]["error"] == "read failed (RuntimeError)"
+    assert child_started.is_set()
+    assert child_terminal.is_set()
+    assert len(parent_tasks) == len(child_tasks) == 1
+    assert parent_tasks[0].done()
+    assert child_tasks[0].done()
+    assert not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+    combined_output = f"{caplog.text}\n{captured.err}"
+    assert "secret" not in combined_output
+    assert "FORGED" not in combined_output
+    assert "Exception ignored" not in combined_output
+    assert "Task was destroyed" not in combined_output
+
+
+def test_caller_cancellation_propagates_and_cancels_worker_provider() -> None:
+    mission_id = "fleet-advancement-20260826"
+    started = threading.Event()
+    finished = threading.Event()
+
+    class WaitingProvider:
+        async def get_snapshot(self, _mission_id: str) -> dict[str, Any]:
+            started.set()
+            try:
+                await asyncio.sleep(3600)
+            finally:
+                finished.set()
+
+    async def exercise() -> None:
+        app = SimpleNamespace(
+            state=SimpleNamespace(mission_snapshot_provider=WaitingProvider())
+        )
+        request = SimpleNamespace(app=app)
+        route_task = asyncio.create_task(
+            control_surface_mission_snapshot(mission_id, request)
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        route_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await route_task
+        assert await asyncio.to_thread(finished.wait, 1)
+        for _ in range(100):
+            await asyncio.sleep(0.001)
+            if not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES:
+                break
+        assert not control_surface_router._MISSION_SNAPSHOT_READ_FUTURES
+
+    asyncio.run(exercise())
+
+
+def test_cancel_resistant_async_provider_cannot_extend_outward_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    monkeypatch.setattr(
+        "api.routers.control_surface._MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS",
+        0.05,
+    )
+
+    async def exercise() -> dict[str, Any]:
+        started = threading.Event()
+        cancellation_suppressed = threading.Event()
+        release = threading.Event()
+        finished = threading.Event()
+
+        class CancellationResistantProvider:
+            async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
+                started.set()
+                try:
+                    while not release.is_set():
+                        await asyncio.sleep(0.005)
+                except asyncio.CancelledError:
+                    cancellation_suppressed.set()
+                    while not release.is_set():
+                        await asyncio.sleep(0.005)
+                finally:
+                    finished.set()
+                return _snapshot(requested_mission_id)
+
+        app = SimpleNamespace(
+            state=SimpleNamespace(
+                mission_snapshot_provider=CancellationResistantProvider()
+            )
+        )
+        request = SimpleNamespace(app=app)
+        body = await asyncio.wait_for(
+            control_surface_mission_snapshot(mission_id, request),
+            timeout=1,
+        )
+        assert started.is_set()
+        assert await asyncio.to_thread(cancellation_suppressed.wait, 1)
+        assert not finished.is_set()
+        release.set()
+        assert await asyncio.to_thread(finished.wait, 1)
+        await asyncio.sleep(0)
+        return body
+
+    body = asyncio.run(exercise())
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (TimeoutError)"
+
+
+def test_async_provider_is_offloaded_while_request_loop_remains_live() -> None:
     mission_id = "fleet-advancement-20260826"
     provider_thread: list[int] = []
 
     class TrackingAsyncProvider:
         async def get_snapshot(self, requested_mission_id: str) -> dict[str, Any]:
             provider_thread.append(threading.get_ident())
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.02)
             return _snapshot(requested_mission_id)
 
-    async def exercise() -> tuple[int, dict[str, Any]]:
+    async def exercise() -> tuple[int, int, dict[str, Any]]:
         loop_thread = threading.get_ident()
+        heartbeats = 0
+        stop = asyncio.Event()
+
+        async def heartbeat() -> None:
+            nonlocal heartbeats
+            while not stop.is_set():
+                heartbeats += 1
+                await asyncio.sleep(0)
+
         app = SimpleNamespace(
             state=SimpleNamespace(mission_snapshot_provider=TrackingAsyncProvider())
         )
         request = SimpleNamespace(app=app)
-        body = await control_surface_mission_snapshot(mission_id, request)
-        return loop_thread, body
+        heartbeat_task = asyncio.create_task(heartbeat())
+        try:
+            body = await control_surface_mission_snapshot(mission_id, request)
+        finally:
+            stop.set()
+            await heartbeat_task
+        return loop_thread, heartbeats, body
 
-    loop_thread, body = asyncio.run(exercise())
-    assert provider_thread == [loop_thread]
+    loop_thread, heartbeats, body = asyncio.run(exercise())
+    assert provider_thread and provider_thread[0] != loop_thread
+    assert heartbeats > 1
     assert body["data"]["state"] == "observed"
 
 

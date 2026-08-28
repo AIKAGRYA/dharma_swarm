@@ -24,12 +24,13 @@ import logging
 import re
 import threading
 import uuid
+from concurrent.futures import Future
+from contextvars import Context, copy_context
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from starlette.concurrency import run_in_threadpool
 
 from api.routers.mission_control_snapshot_validation import (
     MISSION_AUTHORITY,
@@ -57,6 +58,399 @@ _A2A_SEND_CARD_LOADER: Any | None = None
 _SEMANTIC_RECEIPT_CARD_LOADER: Any | None = None
 _MISSION_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}")
 _SAFE_ERROR_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,79}")
+_MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS = 1.0
+_MISSION_SNAPSHOT_READ_SLOTS = threading.BoundedSemaphore(value=4)
+_MISSION_SNAPSHOT_READ_FUTURES_LOCK = threading.Lock()
+_MISSION_SNAPSHOT_READ_FUTURES: set[Future[Any]] = set()
+_MISSING_SNAPSHOT_READER = object()
+
+
+class ProviderCancelledError(RuntimeError):
+    """An injected provider cancelled its own read operation."""
+
+
+class _MissionSnapshotProviderResult:
+    __slots__ = ("runtime_projection_mode", "snapshot")
+
+    def __init__(self, snapshot: Any, runtime_projection_mode: str) -> None:
+        self.snapshot = snapshot
+        self.runtime_projection_mode = runtime_projection_mode
+
+
+class _WorkerTaskGuard:
+    """Best-effort cleanup for a trusted quiescent read provider."""
+
+    def __init__(self) -> None:
+        self.failed = False
+        self.cleanup_started = False
+        self.tasks: set[asyncio.Task[Any]] = set()
+        self.root_tasks: set[asyncio.Task[Any]] = set()
+
+    def task_factory(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        coro: Any,
+        **kwargs: Any,
+    ) -> asyncio.Task[Any]:
+        if self.cleanup_started:
+            self.failed = True
+            kwargs.pop("eager_start", None)
+            _discard_unstarted_awaitable(coro)
+
+            async def cancelled_placeholder() -> None:
+                return None
+
+            coro = cancelled_placeholder()
+        task = asyncio.Task(coro, loop=loop, **kwargs)
+        self.tasks.add(task)
+        if self.cleanup_started:
+            task.cancel()
+        return task
+
+    def allow_root(self, task: asyncio.Task[Any]) -> None:
+        self.root_tasks.add(task)
+
+    def observe_task(self, task: asyncio.Task[Any]) -> None:
+        self.tasks.discard(task)
+        if task.cancelled():
+            return
+        unobserved = bool(getattr(task, "_log_traceback", False))
+        try:
+            exception = task.exception()
+        except asyncio.CancelledError:
+            return
+        if exception is not None and task not in self.root_tasks and unobserved:
+            self.failed = True
+
+    async def quiesce(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        current: asyncio.Task[Any],
+    ) -> None:
+        self.cleanup_started = True
+        stable_turns = 0
+        while stable_turns < 2:
+            pending = {
+                task
+                for task in self.tasks | asyncio.all_tasks(loop)
+                if task is not current and not task.done()
+            }
+            if pending:
+                self.failed = True
+                stable_turns = 0
+                for task in pending:
+                    task.cancel()
+                results = await asyncio.gather(*pending, return_exceptions=True)
+                if any(
+                    isinstance(result, BaseException)
+                    and not isinstance(result, asyncio.CancelledError)
+                    for result in results
+                ):
+                    self.failed = True
+            else:
+                stable_turns += 1
+            await asyncio.sleep(0)
+
+    async def drain_async_generators(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        current: asyncio.Task[Any],
+    ) -> None:
+        registry = getattr(loop, "_asyncgens", None)
+        if registry is None:
+            self.failed = True
+            return
+        stable_turns = 0
+        while stable_turns < 2:
+            generators = list(registry)
+            registry.clear()
+            if generators:
+                stable_turns = 0
+                for generator in generators:
+                    try:
+                        await generator.aclose()
+                    except BaseException:
+                        self.failed = True
+                await self.quiesce(loop, current)
+            else:
+                stable_turns += 1
+            await asyncio.sleep(0)
+        setattr(loop, "_asyncgens_shutdown_called", True)
+
+    async def shutdown(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        current: asyncio.Task[Any],
+    ) -> None:
+        """Best-effort reject observed work forbidden by the provider contract."""
+        await self.quiesce(loop, current)
+        await self.drain_async_generators(loop, current)
+        await self.quiesce(loop, current)
+
+    def finalize_registry(self) -> None:
+        for task in tuple(self.tasks):
+            if task.done():
+                self.observe_task(task)
+        if self.tasks:
+            self.failed = True
+
+    def handle_loop_exception(
+        self,
+        _loop: asyncio.AbstractEventLoop,
+        context: dict[str, Any],
+    ) -> None:
+        self.failed = True
+        future = context.get("task") or context.get("future")
+        if isinstance(future, asyncio.Future) and not future.cancelled():
+            try:
+                future.exception()
+            except (asyncio.CancelledError, asyncio.InvalidStateError):
+                pass
+
+
+class _MissionSnapshotReadState:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._abandoned = False
+        self._worker_loop: asyncio.AbstractEventLoop | None = None
+        self._worker_task: asyncio.Task[Any] | None = None
+
+    def is_abandoned(self) -> bool:
+        with self._lock:
+            return self._abandoned
+
+    def install_worker_task(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        candidate: Any,
+    ) -> asyncio.Task[Any] | None:
+        with self._lock:
+            if self._abandoned:
+                return None
+            task = loop.create_task(_await_provider_result(candidate))
+            self._worker_loop = loop
+            self._worker_task = task
+            return task
+
+    def clear_worker_task(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        task: asyncio.Task[Any],
+    ) -> None:
+        with self._lock:
+            if self._worker_loop is loop and self._worker_task is task:
+                self._worker_loop = None
+                self._worker_task = None
+
+    def abandon(self) -> None:
+        with self._lock:
+            self._abandoned = True
+            loop = self._worker_loop
+            task = self._worker_task
+        if loop is not None and task is not None:
+            try:
+                loop.call_soon_threadsafe(task.cancel)
+            except RuntimeError:
+                pass
+
+
+async def _await_provider_result(candidate: Any) -> Any:
+    return await candidate
+
+
+async def _complete_provider_result(
+    candidate: Any,
+    state: _MissionSnapshotReadState,
+    worker_guard: _WorkerTaskGuard,
+) -> Any:
+    worker_loop = asyncio.get_running_loop()
+    current = asyncio.current_task()
+    if current is None:
+        raise RuntimeError("mission snapshot worker task is unavailable")
+    worker_guard.allow_root(current)
+    worker_task: asyncio.Task[Any] | None = None
+    try:
+        worker_task = state.install_worker_task(worker_loop, candidate)
+        if worker_task is None:
+            _discard_unstarted_awaitable(candidate)
+            raise RuntimeError("mission snapshot read was abandoned")
+        worker_guard.allow_root(worker_task)
+        return await worker_task
+    finally:
+        if worker_task is not None:
+            state.clear_worker_task(worker_loop, worker_task)
+        await worker_guard.shutdown(worker_loop, current)
+
+
+def _discard_unstarted_awaitable(candidate: Any) -> None:
+    if inspect.iscoroutine(candidate):
+        candidate.close()
+    elif isinstance(candidate, asyncio.Future):
+        candidate.cancel()
+    elif inspect.isawaitable(candidate):
+        close = getattr(candidate, "close", None)
+        if callable(close):
+            close()
+
+
+def _invoke_mission_snapshot_provider(
+    provider: Any,
+    mission_id: str,
+) -> Any:
+    """Resolve and invoke one provider without consuming Starlette's sync pool."""
+    reader = getattr(provider, "get_snapshot", None)
+    if reader is None and callable(provider):
+        reader = provider
+    if not callable(reader):
+        return _MISSING_SNAPSHOT_READER
+    return reader(mission_id)
+
+
+def _run_mission_snapshot_provider_operation(
+    provider: Any,
+    mission_id: str,
+    state: _MissionSnapshotReadState,
+) -> _MissionSnapshotProviderResult:
+    """Complete the provider-returned operation inside one worker thread."""
+    try:
+        if state.is_abandoned():
+            raise RuntimeError("mission snapshot read was abandoned")
+        candidate = _invoke_mission_snapshot_provider(provider, mission_id)
+        if inspect.isawaitable(candidate) and not inspect.iscoroutine(candidate):
+            _discard_unstarted_awaitable(candidate)
+            raise TypeError(
+                "mission snapshot provider must return a value or native coroutine"
+            )
+        if inspect.iscoroutine(candidate):
+            if state.is_abandoned():
+                _discard_unstarted_awaitable(candidate)
+                raise RuntimeError("mission snapshot read was abandoned")
+            worker_guard = _WorkerTaskGuard()
+            with asyncio.Runner() as runner:
+                worker_loop = runner.get_loop()
+                worker_loop.set_task_factory(worker_guard.task_factory)
+                worker_loop.set_exception_handler(worker_guard.handle_loop_exception)
+                try:
+                    snapshot = runner.run(
+                        _complete_provider_result(candidate, state, worker_guard)
+                    )
+                finally:
+                    worker_loop.set_task_factory(None)
+            worker_guard.finalize_registry()
+            if worker_guard.failed:
+                raise RuntimeError("mission snapshot provider background task failed")
+        else:
+            snapshot = candidate
+        if state.is_abandoned():
+            raise RuntimeError("mission snapshot read was abandoned")
+        if snapshot is _MISSING_SNAPSHOT_READER or snapshot is None:
+            return _MissionSnapshotProviderResult(snapshot, "unavailable")
+        provider_mode = getattr(provider, "runtime_projection_mode", None)
+        runtime_projection_mode = (
+            provider_mode
+            if isinstance(provider_mode, str)
+            and provider_mode in {"immutable_copy", "owner_supplied_read_only"}
+            else "unavailable"
+        )
+        if state.is_abandoned():
+            raise RuntimeError("mission snapshot read was abandoned")
+        return _MissionSnapshotProviderResult(snapshot, runtime_projection_mode)
+    except asyncio.CancelledError as exc:
+        raise ProviderCancelledError("mission snapshot provider cancelled") from exc
+
+
+def _mission_snapshot_worker(
+    result_future: Future[_MissionSnapshotProviderResult],
+    provider: Any,
+    mission_id: str,
+    state: _MissionSnapshotReadState,
+    provider_context: Context,
+) -> None:
+    if not result_future.set_running_or_notify_cancel():
+        return
+    try:
+        result = provider_context.run(
+            _run_mission_snapshot_provider_operation,
+            provider,
+            mission_id,
+            state,
+        )
+    except BaseException as exc:
+        error = exc if isinstance(exc, Exception) else RuntimeError(
+            "mission snapshot provider failed"
+        )
+        result_future.set_exception(error)
+    else:
+        result_future.set_result(result)
+
+
+def _finish_mission_snapshot_read(
+    result_future: Future[_MissionSnapshotProviderResult],
+) -> None:
+    """Consume the raw worker result and release its ownership slot."""
+    try:
+        if not result_future.cancelled():
+            result_future.exception()
+    finally:
+        with _MISSION_SNAPSHOT_READ_FUTURES_LOCK:
+            _MISSION_SNAPSHOT_READ_FUTURES.discard(result_future)
+        _MISSION_SNAPSHOT_READ_SLOTS.release()
+
+
+def _consume_wrapped_provider_result(result: asyncio.Future[Any]) -> None:
+    if not result.cancelled():
+        result.exception()
+
+
+async def _read_mission_snapshot(
+    provider: Any,
+    mission_id: str,
+) -> _MissionSnapshotProviderResult:
+    """Apply a hard outward deadline while capping detached provider reads."""
+    if not _MISSION_SNAPSHOT_READ_SLOTS.acquire(blocking=False):
+        raise TimeoutError("mission snapshot read capacity is exhausted")
+    state = _MissionSnapshotReadState()
+    result_future: Future[_MissionSnapshotProviderResult] = Future()
+    with _MISSION_SNAPSHOT_READ_FUTURES_LOCK:
+        _MISSION_SNAPSHOT_READ_FUTURES.add(result_future)
+    result_future.add_done_callback(_finish_mission_snapshot_read)
+    try:
+        worker = threading.Thread(
+            target=_mission_snapshot_worker,
+            args=(result_future, provider, mission_id, state, copy_context()),
+            name="mission-snapshot-provider",
+            daemon=True,
+        )
+        worker.start()
+    except BaseException:
+        state.abandon()
+        result_future.cancel()
+        raise
+    wrapped_future = asyncio.wrap_future(result_future)
+    wrapped_future.add_done_callback(_consume_wrapped_provider_result)
+    try:
+        done, _ = await asyncio.wait(
+            {wrapped_future},
+            timeout=_MISSION_SNAPSHOT_PROVIDER_TIMEOUT_SECONDS,
+        )
+    except asyncio.CancelledError:
+        state.abandon()
+        wrapped_future.cancel()
+        raise
+    except BaseException:
+        state.abandon()
+        wrapped_future.cancel()
+        raise
+    if wrapped_future in done:
+        try:
+            return wrapped_future.result()
+        except asyncio.CancelledError as exc:
+            raise ProviderCancelledError(
+                "mission snapshot provider cancelled"
+            ) from exc
+    state.abandon()
+    wrapped_future.cancel()
+    raise TimeoutError("mission snapshot provider read timed out")
 
 
 def _get_envelope_types() -> tuple[Any, Any, Any]:
@@ -456,10 +850,9 @@ async def control_surface_mission_snapshot(
         )
 
     try:
-        reader = getattr(provider, "get_snapshot", None)
-        if reader is None and callable(provider):
-            reader = provider
-        if not callable(reader):
+        provider_result = await _read_mission_snapshot(provider, mission_id)
+        snapshot = provider_result.snapshot
+        if snapshot is _MISSING_SNAPSHOT_READER:
             return _build_envelope(
                 _mission_snapshot_projection(mission_id, state="unknown"),
                 [
@@ -471,12 +864,6 @@ async def control_surface_mission_snapshot(
                     }
                 ],
             )
-        candidate = (
-            reader(mission_id)
-            if inspect.iscoroutinefunction(reader)
-            else await run_in_threadpool(reader, mission_id)
-        )
-        snapshot = await candidate if inspect.isawaitable(candidate) else candidate
         if snapshot is None:
             return _build_envelope(
                 _mission_snapshot_projection(mission_id, state="unknown"),
@@ -488,18 +875,12 @@ async def control_surface_mission_snapshot(
                 ],
             )
         projected = project_injected_mission_snapshot(snapshot, mission_id)
-        provider_mode = getattr(provider, "runtime_projection_mode", None)
-        runtime_projection_mode = (
-            provider_mode
-            if provider_mode in {"immutable_copy", "owner_supplied_read_only"}
-            else "unavailable"
-        )
         return _build_envelope(
             _mission_snapshot_projection(
                 mission_id,
                 state="observed",
                 snapshot=projected,
-                runtime_projection_mode=runtime_projection_mode,
+                runtime_projection_mode=provider_result.runtime_projection_mode,
             )
         )
     except Exception as exc:

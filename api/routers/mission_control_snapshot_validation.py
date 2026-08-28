@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from math import isfinite
 from typing import Any
 
 from fastapi.encoders import jsonable_encoder
@@ -52,6 +53,22 @@ _MISSION_SNAPSHOT_FIELDS = frozenset(
 )
 
 
+def _validate_finite_numbers(value: Any, *, field: str) -> None:
+    """Reject JSON values that strict response serialization cannot represent."""
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValueError(f"mission snapshot {field} contains a non-finite number")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _validate_finite_numbers(key, field=field)
+            _validate_finite_numbers(item, field=field)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_finite_numbers(item, field=field)
+
+
 def _validated_iso_timestamp(value: Any, *, field: str) -> datetime:
     if not isinstance(value, str):
         raise TypeError(f"mission snapshot {field} must be an ISO timestamp")
@@ -82,6 +99,7 @@ def _validated_public_view(
     for field in mapping_fields:
         if not isinstance(value.get(field), dict):
             raise TypeError(f"mission snapshot {view_name}.{field} must be an object")
+        _validate_finite_numbers(value[field], field=f"{view_name}.{field}")
     for field in boolean_fields:
         if not isinstance(value.get(field), bool):
             raise TypeError(f"mission snapshot {view_name}.{field} must be a boolean")
