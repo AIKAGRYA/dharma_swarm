@@ -1,0 +1,134 @@
+{
+  "allowed_files": [
+    "dharma_swarm/foundry/shakti_system.py",
+    "dharma_swarm/foundry/shakti_local_world.py",
+    "scripts/foundry/run_shakti_system_mvp.py",
+    "tests/test_foundry_shakti_system.py",
+    "docs/foundry/SHAKTI_SYSTEM_MVP.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/sublimation-forge-WP-SHAKTI-SYSTEM-MVP-DOCOPS-20260829.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "b421129779484b04df2ae0a9d74dce20fc5e0f1a",
+  "branch": "codex/organism-rewire-shakti-os-mvp-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "foundry: prototype the participatory Shakti system loop"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "Makefile",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/dgc_cli.py",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/signal_bus.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/spine/**",
+    "dharma_swarm/operator_core/**",
+    "scripts/governance/**",
+    "scripts/runtime/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_shakti_system.py",
+      "expected_exit": 0,
+      "name": "shakti-system-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/foundry/shakti_system.py dharma_swarm/foundry/shakti_local_world.py scripts/foundry/run_shakti_system_mvp.py tests/test_foundry_shakti_system.py",
+      "expected_exit": 0,
+      "name": "ruff-scoped",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "module-line-budget",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "name": "docops-integrity",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "sublimation-forge-WP-SHAKTI-SYSTEM-MVP-DOCOPS-20260829",
+  "intent": "Build one offline two-cycle kernel plus a preauthorized canned fixture for the proposed human-AI-world operating system. Multiple deterministic agents offer typed proposals; the kernel requires an exact owner grant before a reversible fixture action; observation remains distinct from interpretation; and the same concrete local-world adapter must match the exact issued receipt, require its terminal cycle marker, and re-read its artifact both when proposing a policy delta and when admitting the next cycle. No transferable verified-evidence token, structural proof protocol, mint capability, or tokenless factory is admitted. A separately ratified policy delta must alter cycle two. The canned CLI supplies fixed grants and interpretation only to test the plumbing and does not claim live human choice. Reuse the existing Foundry digest and RuntimeStateStore rather than adding a ledger, scheduler, registry, model route, daemon, API, dashboard, provider, network contact, or autonomous execution path. Refresh only the two mechanically generated DocOps count surfaces required for strict integrity after the new modules, test, and documentation enter the corpus.",
+  "negative_controls": [
+    {
+      "command": "python3 -c \"from dharma_swarm.foundry.shakti_system import ActionSpec,AgentProposal,AuthorityGrant,CycleContext,Deliberation,IntentContract,PolicyState,ShaktiSystem; i=IntentContract('i','owner','purpose','success','question'); c=CycleContext('c','s',i,PolicyState()); p=AgentProposal.create(agent_id='a',context=c,title='t',rationale='r',human_question='q',predicted_signal='p',action=ActionSpec('write_local_artifact','x','x')); d=Deliberation.create(context=c,proposals=(p,),recommended_proposal_id=p.proposal_id); g=AuthorityGrant.approve(d,p.proposal_id,actor_id='owner',typed_confirmation='wrong',reason='r'); A=type('A',(),{}); a=A(); a.agent_id='a'; b=A(); b.agent_id='b'; F=type('F',(),{'begin':lambda *args: (_ for _ in ()).throw(SystemExit(9))}); ShaktiSystem((a,b),None,F()).run_cycle(d,g)\"",
+      "expected_exit": 1,
+      "name": "ungranted-action-remains-blocked",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "sublimation-forge-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/foundry/loop.py",
+      "dharma_swarm/foundry/evaluator.py",
+      "dharma_swarm/foundry/patches.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/spine/identity.py",
+      "dharma_swarm/operator_core/reversibility_gate.py",
+      "docs/docops/AUTO_INVENTORY.md",
+      "docs/governance/SOVEREIGN_MANIFEST.md"
+    ],
+    "collision": {
+      "checked_at_sha": "b421129779484b04df2ae0a9d74dce20fc5e0f1a",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The MVP is an offline local-fixture proof. It does not establish external-world usefulness, divine or cosmic provenance, production readiness, or a live autonomous organism.",
+      "The reference council is deterministic and model-free. Real model adapters, adversarial evaluation, participant identity, and authenticated remote authority remain outside this packet.",
+      "The canned CLI preauthorizes fixed grants, reasons, and interpretation. It demonstrates protocol plumbing, not live human choice or cryptographic authentication.",
+      "Filesystem effect and SQLite closeout are not one transaction. The idempotency record fences a consumed effect, while only the final participatory_cycle receipt marks a committed cycle. If that marker write fails after the fence is completed, retries remain fenced and this MVP does not reconstruct the missing marker.",
+      "The local verifier's exact-receipt issuance registry is process-local test-fixture state, not restart-durable production evidence infrastructure.",
+      "RuntimeStateStore receipts are durable causal records, not cryptographic proofs or independent attestations of external reality.",
+      "The generated DocOps count refresh incorporates pre-existing count drift on the pinned main baseline as well as this packet's corpus additions; it changes no governance rule or authority declaration.",
+      "No live provider, network request, external contact, payment, publication, deployment, service, daemon, participant data access, or production mutation is authorized."
+    ],
+    "interface_mismatches": [
+      "FoundryLoop evolves external code candidates and cannot represent human intentions or observations without semantic misuse; this packet reuses its proof discipline and digest only.",
+      "OntologyRegistry persists a separate ontology.json authority surface and accepts weak approved_by strings; this MVP leaves ontology as a later projection.",
+      "EpisodeLedger has fitting vocabulary but creates a second JSONL store; this MVP records causal events through the existing RuntimeStateStore.",
+      "Existing warrant policy has a closed list of script/action pairs and correctly rejects this new surface; this offline fixture therefore requires an exact direct operator grant and performs no unattended or external action.",
+      "Strict DocOps counts at the pinned base were stale before this packet; the sanctioned generator rewrites only the manifest count tokens and AUTO_INVENTORY generated block to current measured values."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "b3aeea8403cc411d3bb3d3c39a3b042173fbf5c9dd8935265279e732ea41b09e",
+    "rollback": "Revert the packet-scoped commit. Delete only caller-selected local demo artifacts and the caller-selected disposable SQLite file if desired; no service, network resource, provider, deployment, schema migration, or production state is changed. A later sanctioned DocOps reconciliation may supersede the generated count refresh.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-SHAKTI-SYSTEM-MVP-DOCOPS-20260829"
+  },
+  "worktree": "."
+}
