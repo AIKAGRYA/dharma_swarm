@@ -250,8 +250,10 @@ Before the first timer start, verify the physical state root is a non-symlink
 `root:root` directory with no group/world write bits (`0755` is the live
 baseline), create `HALT`, and keep it present through initial activation. This
 prevents `Persistent=true` from launching a missed-calendar catch-up run. Remove
-the latch only after the service is inactive and `NextElapseUSecRealtime` is in
-the future; the exact command sequence is in `RSI_LAB_SYNC.md`.
+the latch only after the service is inactive, a condition-skipped catch-up has
+not advanced `ExecMainStartTimestamp`, and `NextElapseUSecRealtime` identifies
+the next intended daily window rather than a pending catch-up; the exact command
+sequence and bounded trigger/condition-time proof are in `RSI_LAB_SYNC.md`.
 The timer then admits one run daily at `03:35 UTC` with at most `25m` randomized
 delay. The independent provider refresh cron runs hourly at minute `:17`.
 
