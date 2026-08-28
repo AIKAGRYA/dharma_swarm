@@ -66,11 +66,7 @@ def _command(repo_root: Path, *, impact_checked: bool) -> list[str]:
         _python_executable(),
         str(CHECK_SCRIPT),
         "--intent",
-        (
-            "pre-commit staged diff fourfold governance warrant for system telos, "
-            "semantic architecture, bounded change, deterministic evidence, "
-            "exact paths, and verification"
-        ),
+        "pre-commit staged diff fourfold governance warrant",
         "--diff-scope",
         "staged",
         "--no-include-untracked",
@@ -85,10 +81,12 @@ def _command(repo_root: Path, *, impact_checked: bool) -> list[str]:
         "requires_diff_evidence=true",
         "--metadata",
         "enforce_hotpath_ack=true",
+        # Keyword-bag scoring was removed from shakti_warrant; HOLD now means
+        # "little declared evidence" and would fire on nearly every commit.
+        # The guard blocks only on BLOCK (unsafe patterns, unauthorized tools,
+        # hot-path without impact ack).
         "--fail-on",
         "block",
-        "--fail-on",
-        "hold",
     ]
     if impact_checked:
         cmd.extend(["--metadata", "impact_checked=true"])
