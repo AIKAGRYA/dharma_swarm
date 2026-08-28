@@ -98,6 +98,19 @@ def _cmd_agent_runs() -> None:
             pass
 
 
+def _ensure_repo_root_on_path() -> None:
+    # scripts/ is a plain directory at the repo root, so `from scripts...`
+    # only resolves when the repo root is on sys.path. Interactive runs from
+    # the repo root get that for free; the installed `dgc` console script does
+    # not (its sys.path[0] is the venv bin dir), which made every
+    # `dgc agent talk|run` die with ModuleNotFoundError: scripts.
+    from pathlib import Path
+
+    repo_root = str(Path(__file__).resolve().parents[2])
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+
 def _cmd_agent_talk(
     name: str,
     message: str,
@@ -106,6 +119,7 @@ def _cmd_agent_talk(
     max_tokens: int = 400,
 ) -> None:
     """Talk to a registered sovereign holon through the explicit routing mode."""
+    _ensure_repo_root_on_path()
     from scripts.holon_talk import talk
 
     rc = asyncio.run(
@@ -122,6 +136,7 @@ def _cmd_agent_run(
     routing_mode: str = "declared-first",
 ) -> None:
     """Run governed cycles for a registered sovereign holon."""
+    _ensure_repo_root_on_path()
     from scripts.holon_run import run
 
     rc = asyncio.run(run(name, cycles, routing_mode=routing_mode))
