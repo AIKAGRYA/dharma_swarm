@@ -3,7 +3,7 @@
   "base_ref": "fd091613ce16e63a367392cc1200d4fa4b4cdbf6",
   "branch": "codex/organism-rewire-runtime-authority-20260828",
   "worktree": ".",
-  "intent": "Repair the live-release runtime authority boundary after a deterministic split-brain: persisted in-flight claims must not renew their own leases; prior-incarnation rows must reconcile before any fast/read-only boot return; orphan recovery must persist typed terminal receipts when complete execution identity exists; and the dgc health verdict must constrain its process exit code instead of printing failure while authorizing downstream success.",
+  "intent": "Repair the live-release runtime authority boundary after a deterministic split-brain: persisted in-flight claims must not renew their own leases; writable boot must reconcile prior-incarnation rows while projection boot remains non-mutating; orphan recovery must persist typed terminal receipts when complete execution identity exists; and the dgc health verdict must constrain its process exit code instead of printing failure while authorizing downstream success.",
   "allowed_files": [
     "dharma_swarm/swarm.py",
     "dharma_swarm/graph/reconciler.py",
@@ -63,6 +63,18 @@
       "command": "python3 -m pytest -q tests/test_dgc_cli.py -k health_check_exit_code",
       "expected_exit": 0,
       "timeout_seconds": 180
+    },
+    {
+      "name": "projection-boot-cannot-reconcile",
+      "command": "python3 -m pytest -q tests/test_graph_reconciler.py -k read_only_boot_has_no_reconciliation_authority",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "writable-boot-retains-recovery-authority",
+      "command": "python3 -m pytest -q tests/test_graph_reconciler.py -k writable_boot_reconciles_before_board_reaper",
+      "expected_exit": 0,
+      "timeout_seconds": 180
     }
   ],
   "commit": {
@@ -97,7 +109,8 @@
     },
     "interface_mismatches": [
       "RuntimeStateStore persists claims and runs across process boots, while heartbeat authority exists only in the current process and cannot be inferred from an in-flight database status.",
-      "DHARMA_READ_ONLY_BOOT skips initialization writes but the production orchestrate-live loop still mutates TaskBoard and RuntimeStateStore; mandatory prior-incarnation reconciliation must therefore precede that shortcut.",
+      "DHARMA_READ_ONLY_BOOT is used by projection commands that may share a state root with a live writer, so it must carry zero graph-reconciliation and board-reaper authority; writable boot remains the recovery actor.",
+      "SQLite writer serialization prevents simultaneous commits but does not prove that one writable process owns the live run another process may terminalize.",
       "TaskBoard requeue and RuntimeState terminalization are separate projections; recovery receipts must preserve execution identity and remain distinct from process liveness.",
       "HealthStatus is a typed operational verdict, but the CLI currently erases it into exit code zero, allowing downstream automation to promote degraded or critical state into success."
     ],
@@ -111,9 +124,11 @@
       "The immutable live release is repaired in an isolated branch because the canonical feature checkout contains unrelated user changes and is not a safe edit surface.",
       "A terminal recovery receipt proves a bounded local state transition, not successful external work, executor liveness, or semantic task completion.",
       "Legacy rows without a complete ExecutionIdentity cannot receive an authority-bearing terminal receipt; reconciliation must remain fail-closed and report that evidence gap.",
-      "Repository tests do not prove launchd restart health, remote SSH reachability, Slack delivery, or one end-to-end model task; those are separately verified operational steps."
+      "Repository tests do not prove launchd restart health, remote SSH reachability, Slack delivery, or one end-to-end model task; those are separately verified operational steps.",
+      "Process-lifetime singleton authority between two writable swarm boots remains a separate pre-existing capability gap; this packet does not treat a SQLite writer lock as actor ownership.",
+      "DHARMA_READ_ONLY_BOOT still initializes projection schemas and is not a general filesystem read-only sandbox; the bounded claim here is zero graph reconciliation and board-reaper authority."
     ],
     "rollback": "Stop the repaired runtime, restore the checksum-verified runtime/tasks database backups and launch configuration from /Users/dhyana/.dharma/recovery/runtime-authority-20260828T051502Z, and revert the packet-scoped implementation commit. Do not overwrite the dirty canonical checkout.",
-    "packet_digest": "da7f211d195a52a6be2064282b03ffed18fccd6abe8a892c735f5afb105f23f2"
+    "packet_digest": "935ebc710144c92d6f25cb0a2cb734776c1159ece038d9d82628f3b2ccde52d7"
   }
 }
