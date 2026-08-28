@@ -20,8 +20,8 @@ classifiers = [
 dependencies = ["pydantic>=2.0"]
 
 [project.urls]
-Homepage = "https://github.com/AmitabhainArunachala/dharma_swarm"
-Repository = "https://github.com/AmitabhainArunachala/dharma_swarm"
+Homepage = "https://github.com/AIKAGRYA/dharma_swarm"
+Repository = "https://github.com/AIKAGRYA/dharma_swarm"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-asyncio"]
