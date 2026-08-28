@@ -17,7 +17,9 @@ If the status script says `sourcegraph`, `gdrive`, or `postgres` are not globall
 ## Current Truth
 
 - Sourcegraph MCP is not a default individual-user dependency. Sourcegraph's public MCP endpoint exists, but Sourcegraph's current pricing/docs place full MCP/API/CLI access under Enterprise. Do not make dharma_swarm depend on it.
-- Sourcegraph public code search still works through `/Users/dhyana/.local/bin/src search ...`; use it for public repositories only.
+- `make onboard` reports a local Sourcegraph observation only: CLI present/missing, `SRC_ENDPOINT` kind, token presence. It never searches, never claims `dharma_swarm` is indexed, and never prints token values.
+- `make onboard` also reports a local GitNexus observation: CLI vs pin 1.6.9, MCP wiring, index meta vs HEAD. It never runs `analyze` and never claims a live MCP handshake. Host pin is `make gitnexus-ensure`.
+- Sourcegraph public code search still works through `/Users/dhyana/.local/bin/src search ...` against `context:global`. That index does **not** include `AIKAGRYA/dharma_swarm`. Workspace/private search needs Enterprise Starter at `workspaces.sourcegraph.com`, then `SRC_ENDPOINT` pointing at `*.sourcegraph.app` and `src login`.
 - GDrive MCP is individual-accessible, but this machine is missing OAuth client JSON and saved credentials.
 - Postgres MCP is local-infra only, but this machine currently has no configured DSN and no always-on database target.
 - Sourcebot is the realistic self-hosted Sourcegraph-like path. Treat it as optional until a local instance and `SOURCEBOT_API_KEY` are present.
@@ -50,12 +52,13 @@ Use this routing before reaching for paid/external tools:
 
 | Need | Primary path | Fallback |
 |---|---|---|
-| Local code graph, impact, call paths | GitNexus MCP | `npx gitnexus analyze`, then retry |
+| Local code graph, impact, call paths | GitNexus MCP (`make gitnexus-status`) | `make gitnexus-ensure`, then `gitnexus analyze --skip-agents-md` |
 | Semantic repo navigation | Context+ MCP | `rg`, `sed`, targeted file reads |
 | Exact local evidence | `rg` | `find`, `grep` |
 | Repo/PR/issue state | GitHub MCP or `gh` | `git` local state |
 | Library/API docs | Context7 MCP | official web docs |
-| Public-code search | `/Users/dhyana/.local/bin/src search 'context:global ...'` | web search |
+| Public-code search | `/Users/dhyana/.local/bin/src search 'context:global repo:github.com/sourcegraph/src-cli ...'` | sourcegraph.com/search |
+| This repo on Sourcegraph | workspace `SRC_ENDPOINT` + cloned repo | GitNexus + `rg` |
 | Sourcegraph-like local search | Sourcebot when running | GitNexus + Context+ |
 | Google Drive docs | GDrive MCP only after auth | ask operator for files |
 | SQL schema/data | Postgres MCP only after DSN | SQLite/read-only local probes |
@@ -143,9 +146,36 @@ Use this at the start of code-intelligence-heavy sessions:
 Before using MCPs, run `bash scripts/runtime/codex_toolbelt_status.sh` in `~/dharma_swarm`.
 Treat Sourcegraph MCP, GDrive MCP, and Postgres MCP as optional: do not re-add them unless their documented gates in `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` are green.
 For local code intelligence, use GitNexus + Context+ + rg first.
-For public-code search, use `/Users/dhyana/.local/bin/src search`.
+For public-code search, use `/Users/dhyana/.local/bin/src search 'context:global ...'`.
+Do not treat `context:global` as a search of this checkout.
 Never print token values; report only whether required env vars/files are present.
 ```
+
+## Public search (the `context:global` UI)
+
+The Sourcegraph.com search bar with `context:global` searches Sourcegraph's public OSS index. It is not this checkout.
+
+Examples:
+
+```bash
+src search 'context:global repo:^github\.com/sourcegraph/src-cli$ NewArchiveRegistry'
+src search 'context:global lang:python "class SwarmManager"'
+src search 'context:global type:symbol CreateRuntimeProvider'
+```
+
+Same queries work in the web UI. `repo:` must match a repository Sourcegraph already indexed. `AIKAGRYA/dharma_swarm` is not in that index.
+
+After a Starter workspace has cloned the repo, point `src` at the workspace instead of sourcegraph.com:
+
+```bash
+# durable endpoint (not a secret); OAuth stays in macOS keychain
+printf '%s\n' 'SRC_ENDPOINT=https://aikagrya.sourcegraph.app' > ~/.dharma/sourcegraph.env
+export SRC_ENDPOINT=https://aikagrya.sourcegraph.app
+src login https://aikagrya.sourcegraph.app
+src search 'repo:^github\.com/AIKAGRYA/dharma_swarm$ SwarmManager'
+```
+
+`make onboard` reads `~/.dharma/sourcegraph.env` and reports `search_scope: workspace_capable` when the CLI and keychain login exist. It still does not claim the repo is indexed.
 
 ## Failure Pattern To Recognize
 

@@ -63,10 +63,21 @@ def test_onboard_returns_its_truth_and_delegates_to_compact_cli() -> None:
     assert "Authority: none" in result.stdout
     assert "NATS SUBSTRATE — LOCAL OBSERVATION ONLY" in result.stdout
     assert "No JetStream ack or live contact is claimed." in result.stdout
+    assert "SOURCEGRAPH — LOCAL OBSERVATION ONLY" in result.stdout
+    assert "no live search or repo-index claim." in result.stdout
+    assert "GITNEXUS — LOCAL OBSERVATION ONLY" in result.stdout
+    assert "No live MCP handshake or analyze is claimed." in result.stdout
     assert truth["nats_substrate"]["spec_path"] == (
         "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
     )
     assert truth["nats_substrate"]["mirrors_are_live_transport_proof"] is False
+    assert truth["sourcegraph"]["spec_path"] == "docs/ops/CODEX_TOOLBELT_ONBOARDING.md"
+    assert truth["sourcegraph"]["live_search_claimed"] is False
+    assert truth["sourcegraph"]["repo_index_claimed"] is False
+    assert truth["gitnexus"]["spec_path"] == "docs/ops/AGENT_ONBOARDING.md"
+    assert truth["gitnexus"]["live_mcp_claimed"] is False
+    assert truth["gitnexus"]["analyze_claimed"] is False
+    assert truth["gitnexus"]["pinned_version"] == "1.6.9"
 
 
 def test_loader_selects_bootstrap_mode_by_interpreter() -> None:
@@ -155,6 +166,10 @@ def test_onboard_json_emits_machine_projection() -> None:
     assert payload["nats_substrate"]["tcp_port"] == 4222
     assert payload["nats_substrate"]["jetstream_ack_verified"] is False
     assert payload["nats_substrate"]["live_contact_claim"] is False
+    assert payload["sourcegraph"]["live_search_claimed"] is False
+    assert payload["sourcegraph"]["repo_index_claimed"] is False
+    assert payload["gitnexus"]["live_mcp_claimed"] is False
+    assert payload["gitnexus"]["analyze_claimed"] is False
 
 
 def test_onboard_strict_exits_true_exit_code() -> None:
@@ -285,3 +300,26 @@ def test_scrape_tracks_matches_top_level_declarations(tmp_path: Path) -> None:
     scraped = [row["id"] for row in evidence._scrape_tracks(real)]
     assert scraped == declared
     assert len(scraped) == len(set(scraped))
+
+
+def test_legacy_v1_payload_is_render_projection_with_valid_schema() -> None:
+    """The module-size ratchet moved the legacy v1 builder from cli to render;
+    pin its home and its loader-validated shape so the move stays honest."""
+    from dharma_swarm.operator_core.onboarding import render
+    from dharma_swarm.operator_core.onboarding.models import RECEIPT_SCHEMA_V1
+
+    payload = render.legacy_v1_payload(
+        "2026-08-28T00:00:00+00:00",
+        {
+            "repository": {"identity": "AIKAGRYA/dharma_swarm"},
+            "portfolio": {"tracks": 4},
+            "orientation": {"broken_register": {"total": 22}},
+        },
+    )
+    assert payload["schema"] == RECEIPT_SCHEMA_V1
+    assert payload["authority"] == "projection_only"
+    assert payload["repo"] == {"identity": "AIKAGRYA/dharma_swarm"}
+    assert payload["portfolio"] == {"tracks": 4}
+    assert payload["broken_register"] == {"total": 22}
+    assert payload["work_lanes"] == {}
+    assert payload["open_prs"] == []

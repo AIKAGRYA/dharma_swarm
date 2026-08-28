@@ -1,0 +1,14 @@
+# Verified false positives (2026-08-28): anti-leak assertions and
+# redact_secret_text call sites, not credentials. Commit-scoped fingerprints.
+# - 1faf01005 sadhanaOperatorControl.test.ts: test asserts upstream secrets
+#   are NOT forwarded (lines contain placeholder strings under test).
+# - 4ac37e5bd forge_v2 pr_suite_*: redact_secret_text() invocation lines.
+1faf0100550c4ed42b520f3450564c0f7889ebeb:dashboard/src/lib/sadhanaOperatorControl.test.ts:generic-api-key:41
+1faf0100550c4ed42b520f3450564c0f7889ebeb:dashboard/src/lib/sadhanaOperatorControl.test.ts:generic-api-key:62
+1faf0100550c4ed42b520f3450564c0f7889ebeb:dashboard/src/lib/sadhanaOperatorControl.test.ts:generic-api-key:116
+1faf0100550c4ed42b520f3450564c0f7889ebeb:dashboard/src/lib/sadhanaOperatorControl.test.ts:generic-api-key:121
+1faf0100550c4ed42b520f3450564c0f7889ebeb:dashboard/src/lib/sadhanaOperatorControl.test.ts:generic-api-key:285
+1faf0100550c4ed42b520f3450564c0f7889ebeb:dashboard/src/lib/sadhanaOperatorControl.test.ts:generic-api-key:308
+4ac37e5bd7233b67b9628cf1fe1d7b6e45791077:dharma_swarm/forge_v1/forge_v2/pr_suite_execution_profile.py:generic-api-key:317
+4ac37e5bd7233b67b9628cf1fe1d7b6e45791077:dharma_swarm/forge_v1/forge_v2/pr_suite_validator.py:generic-api-key:56
+4ac37e5bd7233b67b9628cf1fe1d7b6e45791077:dharma_swarm/forge_v1/forge_v2/pr_suite_validator.py:generic-api-key:348

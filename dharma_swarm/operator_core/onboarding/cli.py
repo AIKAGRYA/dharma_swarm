@@ -26,8 +26,9 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from . import evidence, nats_status, readiness, render, repository_identity
-from .models import ConfigError, RECEIPT_SCHEMA_V1, RECEIPT_SCHEMA_V2
+from . import evidence, gitnexus_status, nats_status, readiness, render
+from . import repository_identity, sourcegraph_status
+from .models import ConfigError, RECEIPT_SCHEMA_V2
 from .receipt import (
     build_input_manifest,
     cache_key,
@@ -51,6 +52,8 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "dharma_swarm/operator_core/onboarding/cli.py",
         "dharma_swarm/operator_core/onboarding/evidence.py",
         "dharma_swarm/operator_core/onboarding/nats_status.py",
+        "dharma_swarm/operator_core/onboarding/sourcegraph_status.py",
+        "dharma_swarm/operator_core/onboarding/gitnexus_status.py",
         "dharma_swarm/operator_core/onboarding/readiness.py",
         "dharma_swarm/operator_core/onboarding/repository_identity.py",
         "dharma_swarm/operator_core/onboarding/receipt.py",
@@ -280,26 +283,6 @@ def _evaluate_reuse(
     return prior_core, []
 
 
-def _legacy_v1_payload(now: str, stable_core: Mapping[str, Any]) -> dict[str, Any]:
-    """A minimal VALID v1 receipt (loader-validated types; legacy display only)."""
-    repository = stable_core.get("repository", {})
-    return {
-        "schema": RECEIPT_SCHEMA_V1,
-        "observed_at": now,
-        "authority": "projection_only",
-        "repo": dict(repository),
-        "work_lanes": {},
-        "portfolio": dict(stable_core.get("portfolio", {})),
-        "next_items": [],
-        "swarm_bulletins": [],
-        "broken_register": dict(
-            stable_core.get("orientation", {}).get("broken_register", {})
-        ),
-        "open_prs": [],
-        "runtime_truth_packets": [],
-    }
-
-
 def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args, unknown = parser.parse_known_args(argv)
@@ -322,6 +305,8 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
     nats_projection = nats_status.collect_nats_substrate_status()
+    sourcegraph_projection = sourcegraph_status.collect_sourcegraph_status()
+    gitnexus_projection = gitnexus_status.collect_gitnexus_status()
     conditions.extend(_collect_conditions(
         live_state, toolchain, stable_core.get("orientation", {}),
         net=bool(args.net), probe_errors=probe_errors,
@@ -382,13 +367,15 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
                     now, stable_core, live_state, conditions, manifest, key,
                     freshness, previous, toolchain=toolchain,
                     nats_projection=nats_projection,
+                    sourcegraph_projection=sourcegraph_projection,
+                    gitnexus_projection=gitnexus_projection,
                     require_live=bool(args.require_live),
                     cache_hit=cache_hit, miss_reasons=miss_reasons,
                 )
                 write_receipt(draft, repo_root=repo_root, presumed_locked=True)
             else:
                 write_receipt(
-                    _legacy_v1_payload(now, stable_core),
+                    render.legacy_v1_payload(now, stable_core),
                     repo_root=repo_root, presumed_locked=True,
                 )
         persistence_condition = readiness.Condition(
@@ -414,6 +401,8 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         now, stable_core, live_state, conditions, manifest, key,
         freshness, previous, toolchain=toolchain,
         nats_projection=nats_projection,
+        sourcegraph_projection=sourcegraph_projection,
+        gitnexus_projection=gitnexus_projection,
         require_live=bool(args.require_live),
         cache_hit=cache_hit, miss_reasons=miss_reasons,
     )
@@ -440,6 +429,8 @@ def _assemble_v2(
     *,
     toolchain: Mapping[str, str],
     nats_projection: Mapping[str, Any],
+    sourcegraph_projection: Mapping[str, Any],
+    gitnexus_projection: Mapping[str, Any],
     require_live: bool,
     cache_hit: bool = False,
     miss_reasons: Sequence[str] | None = None,
@@ -469,8 +460,12 @@ def _assemble_v2(
             "section_fingerprints": section_fingerprints(manifest),
         },
         "delta": compute_delta(previous, core, condition_rows),
-        "legacy_v1": _legacy_v1_payload(now, core),
-        "extensions": {"nats_substrate": dict(nats_projection)},
+        "legacy_v1": render.legacy_v1_payload(now, core),
+        "extensions": {
+            "nats_substrate": dict(nats_projection),
+            "sourcegraph": dict(sourcegraph_projection),
+            "gitnexus": dict(gitnexus_projection),
+        },
         "stable_digest": compute_stable_digest(core),
     }
 

@@ -3,13 +3,17 @@
 Rendering only — no collection, no policy, no I/O.  The compact human view is
 hard-bounded to 40–70 lines; ``--json`` is a deterministic projection of the
 verdict and stable core plus one explicitly bounded local NATS observation.
-No other volatile receipt field is projected.
+No other volatile receipt field is projected. Sourcegraph and GitNexus
+status are additional bounded local observations and likewise carry no
+admission, handshake, or live-index claim.
 """
 
 from __future__ import annotations
 
 import json
 from typing import Any, Mapping
+
+from .models import RECEIPT_SCHEMA_V1
 
 HUMAN_MIN_LINES = 40
 HUMAN_MAX_LINES = 70
@@ -24,7 +28,29 @@ _JSON_PROJECTION_KEYS = (
     "stable_core",
     "conditions",
     "nats_substrate",
+    "sourcegraph",
+    "gitnexus",
 )
+
+
+def legacy_v1_payload(now: str, stable_core: Mapping[str, Any]) -> dict[str, Any]:
+    """A minimal VALID v1 receipt (loader-validated types; legacy display only)."""
+    repository = stable_core.get("repository", {})
+    return {
+        "schema": RECEIPT_SCHEMA_V1,
+        "observed_at": now,
+        "authority": "projection_only",
+        "repo": dict(repository),
+        "work_lanes": {},
+        "portfolio": dict(stable_core.get("portfolio", {})),
+        "next_items": [],
+        "swarm_bulletins": [],
+        "broken_register": dict(
+            stable_core.get("orientation", {}).get("broken_register", {})
+        ),
+        "open_prs": [],
+        "runtime_truth_packets": [],
+    }
 
 
 def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
@@ -48,6 +74,12 @@ def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
     nats_substrate = receipt.get("extensions", {}).get("nats_substrate", {})
     if not isinstance(nats_substrate, Mapping):
         nats_substrate = {}
+    sourcegraph = receipt.get("extensions", {}).get("sourcegraph", {})
+    if not isinstance(sourcegraph, Mapping):
+        sourcegraph = {}
+    gitnexus = receipt.get("extensions", {}).get("gitnexus", {})
+    if not isinstance(gitnexus, Mapping):
+        gitnexus = {}
     projection = {
         "schema": "dharma_swarm.onboard_json.v1",
         "verdict": str(receipt.get("primary_verdict", "")),
@@ -55,6 +87,8 @@ def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
         "stable_core": stable_core,
         "conditions": sorted(conditions, key=lambda row: row["id"]),
         "nats_substrate": dict(nats_substrate),
+        "sourcegraph": dict(sourcegraph),
+        "gitnexus": dict(gitnexus),
     }
     assert tuple(projection) == _JSON_PROJECTION_KEYS
     return projection
@@ -155,6 +189,52 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
             "  WARNING: compatibility filesystem mirrors are not live-transport proof."
         )
         lines.append("  No JetStream ack or live contact is claimed.")
+
+    sourcegraph = receipt.get("extensions", {}).get("sourcegraph", {})
+    if isinstance(sourcegraph, Mapping) and sourcegraph:
+        cli_state = "present" if sourcegraph.get("src_cli_present") else "missing"
+        if sourcegraph.get("token_present"):
+            token_state = "present"
+        elif sourcegraph.get("keychain_present"):
+            token_state = "keychain"
+        else:
+            token_state = "absent"
+        host = str(sourcegraph.get("endpoint_host") or "")
+        host_note = f" ({host})" if host else ""
+        lines.append("")
+        lines.append("SOURCEGRAPH — LOCAL OBSERVATION ONLY")
+        lines.append(
+            "  CLI: "
+            f"{cli_state} · endpoint: {sourcegraph.get('endpoint_kind', 'unset')}"
+            f"{host_note} · token: {token_state}"
+        )
+        lines.append(
+            "  Scope: "
+            f"{sourcegraph.get('search_scope', 'unconfigured')}; "
+            "no live search or repo-index claim."
+        )
+
+    gitnexus = receipt.get("extensions", {}).get("gitnexus", {})
+    if isinstance(gitnexus, Mapping) and gitnexus:
+        cli_state = "present" if gitnexus.get("cli_present") else "missing"
+        version = str(gitnexus.get("cli_version") or "unknown")
+        pin = str(gitnexus.get("pinned_version") or "?")
+        mcp_state = "wired" if gitnexus.get("mcp_wired") else "unwired"
+        if gitnexus.get("index_present"):
+            match = "head-match" if gitnexus.get("index_matches_head") else "stale"
+            index_state = (
+                f"{match} schema v{gitnexus.get('index_schema_version', '?')} "
+                f"{gitnexus.get('index_node_count', 0)} nodes"
+            )
+        else:
+            index_state = "missing"
+        lines.append("")
+        lines.append("GITNEXUS — LOCAL OBSERVATION ONLY")
+        lines.append(
+            f"  CLI {cli_state} {version} (pin {pin}) · mcp {mcp_state} · "
+            f"index {index_state}"
+        )
+        lines.append("  No live MCP handshake or analyze is claimed.")
 
     lines.append("")
     tracks = core.get("portfolio", {}).get("tracks", [])
