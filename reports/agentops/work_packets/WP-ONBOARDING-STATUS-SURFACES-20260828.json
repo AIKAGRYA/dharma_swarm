@@ -1,0 +1,93 @@
+{
+  "id": "WP-ONBOARDING-STATUS-SURFACES-20260828",
+  "base_ref": "fd091613ce16e63a367392cc1200d4fa4b4cdbf6",
+  "branch": "codex/onboarding-status-surfaces-20260828",
+  "worktree": ".",
+  "intent": "Recovered uncommitted onboarding work from the canonical checkout (13 days of drift, 2026-08-15..28): make onboard observes local GitNexus and Sourcegraph status via new onboarding status modules, gitnexus_ensure.py provides the host pin/repair path behind make gitnexus-status / gitnexus-ensure (never a session gate), agent_onboard.py and render/cli surfaces render the observations, codex_toolbelt_status.sh and both onboarding docs are updated to match. Tests cover the Makefile-not-gating invariant and both status modules.",
+  "allowed_files": [
+    "Makefile",
+    "dharma_swarm/operator_core/onboarding/cli.py",
+    "dharma_swarm/operator_core/onboarding/render.py",
+    "dharma_swarm/operator_core/onboarding/gitnexus_status.py",
+    "dharma_swarm/operator_core/onboarding/sourcegraph_status.py",
+    "docs/ops/AGENT_ONBOARDING.md",
+    "docs/ops/CODEX_TOOLBELT_ONBOARDING.md",
+    "scripts/governance/agent_onboard.py",
+    "scripts/governance/gitnexus_ensure.py",
+    "scripts/runtime/codex_toolbelt_status.sh",
+    "tests/test_agent_onboard.py",
+    "tests/test_onboarding_gitnexus_status.py",
+    "tests/test_onboarding_sourcegraph_status.py",
+    "reports/agentops/work_packets/WP-ONBOARDING-STATUS-SURFACES-20260828.json",
+    ".gitleaksignore",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    ".github/workflows/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/telos_gates.py",
+    "scripts/governance/hygiene/**",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**"
+  ],
+  "gates": [
+    {
+      "name": "onboarding-status-tests",
+      "command": "python3 -m pytest tests/test_agent_onboard.py tests/test_onboarding_gitnexus_status.py tests/test_onboarding_sourcegraph_status.py -q",
+      "expected_exit": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "no-selector-outside-envelope",
+      "command": "python3 -m pytest tests/test_onboarding_gitnexus_status.py -q -k selector_that_matches_nothing",
+      "expected_exit": 5
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(onboarding): gitnexus + sourcegraph status surfaces in make onboard"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-ONBOARDING-STATUS-SURFACES-20260828",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "fd091613ce16e63a367392cc1200d4fa4b4cdbf6",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      "scripts/governance/agent_onboard.py",
+      "dharma_swarm/operator_core/onboarding/render.py"
+    ],
+    "honest_blockers": [
+      "Recovered-from-drift change set: authored by an earlier session, moved verbatim from the canonical checkout; this packet binds scope for landing, not original authorship."
+    ],
+    "rollback": "revert the packet-scoped commit; canonical checkout already restored to HEAD for these paths",
+    "packet_digest": "8568e5715fb68b1a60945e5cdd2309d87169bc112f10fbea70e8581594e16e89"
+  }
+}

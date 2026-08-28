@@ -32,6 +32,8 @@ BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
 # under operator_core/onboarding; this literal keeps governance disconnection
 # checks bound to the public onboarding door.
 NATS_SUBSTRATE_SPEC_PATH = "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+SOURCEGRAPH_SPEC_PATH = "docs/ops/CODEX_TOOLBELT_ONBOARDING.md"
+GITNEXUS_SPEC_PATH = "docs/ops/AGENT_ONBOARDING.md"
 
 
 def _load_broken_register_parser() -> Any:

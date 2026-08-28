@@ -42,10 +42,25 @@ printf 'repo=%s\n' "${ROOT}"
 printf 'config=%s\n\n' "${CODEX_CONFIG}"
 
 printf 'Core local stack\n'
-if server_configured gitnexus; then
-  ok "gitnexus MCP configured"
+if has_cmd gitnexus; then
+  gitnexus_ver="$(gitnexus --version 2>/dev/null | head -1 | tr -d '[:space:]')"
+  if [ "${gitnexus_ver}" = "1.6.9" ]; then
+    ok "gitnexus CLI ${gitnexus_ver} (pinned)"
+  else
+    warn "gitnexus CLI ${gitnexus_ver:-unknown}; pin with make gitnexus-ensure (want 1.6.9)"
+  fi
 else
-  warn "gitnexus MCP missing from Codex config"
+  warn "gitnexus CLI missing; pin with make gitnexus-ensure"
+fi
+if server_configured gitnexus; then
+  ok "gitnexus MCP configured in Codex"
+else
+  warn "gitnexus MCP missing from Codex config; Grok/Claude pins live in ~/.grok/config.toml and ~/.claude.json"
+fi
+if [ -f "${ROOT}/.gitnexus/meta.json" ]; then
+  ok "gitnexus index meta present at ${ROOT}/.gitnexus/meta.json"
+else
+  warn "gitnexus index missing; from repo root run: gitnexus analyze --skip-agents-md"
 fi
 
 if server_configured contextplus; then
@@ -60,10 +75,20 @@ else
   warn "rg missing"
 fi
 
-if [ -x "${HOME}/.local/bin/src" ]; then
-  ok "Sourcegraph src CLI available for public-code search"
+if [ -x "${HOME}/.local/bin/src" ] || has_cmd src; then
+  ok "Sourcegraph src CLI available"
 else
   warn "Sourcegraph src CLI missing; public-code search fallback unavailable"
+fi
+if [ -n "${SRC_ENDPOINT:-}" ]; then
+  info "SRC_ENDPOINT is set (host only; value not printed)"
+else
+  info "SRC_ENDPOINT unset; src defaults to public sourcegraph.com search"
+fi
+if [ -n "${SRC_ACCESS_TOKEN:-}" ]; then
+  info "SRC_ACCESS_TOKEN is present"
+else
+  info "SRC_ACCESS_TOKEN absent; workspace/private search needs src login"
 fi
 
 printf '\nLocal provider key helper, values not printed\n'

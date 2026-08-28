@@ -10,8 +10,11 @@ make onboard
 ```
 
 `make onboard` is read-only session status. It reports the current
-checkout/toolchain verdict and points to the relevant owners; it is not edit
-admission or whole-organism orientation.
+checkout/toolchain verdict and a local GitNexus observation (CLI vs pin
+1.6.9, MCP wiring, index meta vs HEAD). It never runs `analyze`, never
+opens LadybugDB, and never claims a live MCP handshake. It is not edit
+admission or whole-organism orientation. Host pin/repair is
+`make gitnexus-ensure`; reindex is `gitnexus analyze --skip-agents-md`.
 
 For Fable 5 / `fable_5_cursor`, read
 [`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md) only after this
@@ -59,12 +62,13 @@ Use this stack before inventing a new search/indexing path:
 
 | Need | First tool | When blocked |
 |---|---|---|
-| Local code graph, impact, call paths | GitNexus MCP | run `npx gitnexus analyze`, then retry |
+| Local code graph, impact, call paths | GitNexus MCP (`make gitnexus-status`) | `make gitnexus-ensure`, then `gitnexus analyze --skip-agents-md` |
 | Semantic repo navigation | Context+ MCP | use `rg` plus targeted file reads |
 | Exact text/evidence | `rg` | `git grep`, then `find`/`grep` |
 | Repo/PR/issue/CI state | GitHub MCP or `gh` | local `git` if remote is unavailable |
 | Current library/API docs | Context7 MCP | official docs only |
-| Public-code search | `/Users/dhyana/.local/bin/src search 'context:global ...'` | web search |
+| Public-code search | `/Users/dhyana/.local/bin/src search 'context:global ...'` | sourcegraph.com/search |
+| This repo on Sourcegraph | workspace `SRC_ENDPOINT` after Starter clone | GitNexus + `rg` |
 | Sourcegraph-like self-hosted search | Sourcebot, if running | GitNexus + Context+ |
 | Google Drive docs | GDrive MCP, after auth | ask operator for local copies |
 | SQL/schema inspection | Postgres MCP, after DSN | SQLite/read-only local probes |

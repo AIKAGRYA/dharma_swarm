@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check desktop-shell-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean bootstrap install docker-up docker-down gh-auth semgrep semgrep-advisory semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agentops-report-root-check agent-build-preflight agent-build-closeout spine-check onboard gitnexus-status gitnexus-ensure onboarding-macos-compatibility organism-status orient agent-register agent-onboard status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci frontend-check desktop-shell-check terminal-check verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test slop-ratchet slop-baseline
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently. Freeze a
@@ -276,6 +276,8 @@ help:
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Show truthful read-only session status; nonzero means not ready"
+	@echo "  make gitnexus-status  Local GitNexus CLI/MCP/index observation (also in make onboard)"
+	@echo "  make gitnexus-ensure  Pin gitnexus@1.6.9 + MCP wiring (host-side; ARGS=--optional)"
 	@echo "  make onboarding-macos-compatibility  Reproduce the required GNU Make 3.81 + Darwin proof"
 	@echo "  make organism-status Render the whole-organism projection (runtime, agents, liveness)"
 	@echo "  make orient       Compatibility alias for make organism-status"
@@ -767,6 +769,14 @@ spine-check:
 onboard:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
 
+# GitNexus is observed automatically by `make onboard` (extensions.gitnexus).
+# These targets are the host pin/repair path. They are not session gates and
+# must never become prerequisites of onboard, bootstrap, or CI.
+gitnexus-status:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/gitnexus_ensure.py --status $(ARGS)
+
+gitnexus-ensure:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/gitnexus_ensure.py --ensure $(ARGS)
 # Full local reproducer for the required macOS compatibility context. Invoke
 # this target through stock /usr/bin/make so a parser regression fails before
 # any recipe can falsely report success.
