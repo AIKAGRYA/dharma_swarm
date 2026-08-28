@@ -132,17 +132,19 @@ class TestPhase3HonestGates:
     """Verify DOGMA_DRIFT and STEELMAN produce real results."""
 
     def test_dogma_drift_detects_confidence_without_evidence(self):
-        from dharma_swarm.telos_gates import TelosGatekeeper
+        # The keyword-count heuristic wiring was removed from telos_gates
+        # (garbage input); the structured check lives in dogma_gate directly.
+        from dharma_swarm.dogma_gate import DogmaDriftCheck, check_dogma_drift
         from dharma_swarm.models import GateResult
-        gk = TelosGatekeeper()
-        result = gk.check(
-            action="update model",
-            content="This is certainly proven and obviously correct without question",
+        result = check_dogma_drift(
+            DogmaDriftCheck(
+                confidence_before=0.5,
+                confidence_after=0.8,
+                evidence_count_before=5,
+                evidence_count_after=5,
+            )
         )
-        # DOGMA_DRIFT should warn or fail
-        dogma = result.gate_results.get("DOGMA_DRIFT")
-        assert dogma is not None
-        assert dogma[0] in (GateResult.WARN, GateResult.FAIL)
+        assert result.gate_result in (GateResult.WARN, GateResult.FAIL)
 
     def test_steelman_fails_on_proposal_without_counterarguments(self):
         from dharma_swarm.telos_gates import TelosGatekeeper

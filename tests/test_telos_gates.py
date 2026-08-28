@@ -17,7 +17,7 @@ from dharma_swarm.telos_gates import (
 
 def test_safe_action():
     result = check_action("echo hello world")
-    # Safe actions are never blocked. Tier C gates (SVABHAAVA, ANEKANTA)
+    # Safe actions are never blocked. Tier C gates (ANEKANTA, STEELMAN)
     # may flag low epistemological diversity, producing REVIEW advisory.
     assert result.decision in (GateDecision.ALLOW, GateDecision.REVIEW)
     assert result.decision != GateDecision.BLOCK
@@ -77,7 +77,7 @@ def test_irreversible_review():
 def test_all_gates_present(tmp_path):
     gk = TelosGatekeeper(registry=GateRegistry(tmp_path / "gate_proposals.jsonl"))
     result = gk.check("echo test")
-    assert len(result.gate_results) == 11
+    assert len(result.gate_results) == 9
     expected = set(TelosGatekeeper.CORE_GATES)
     assert set(result.gate_results.keys()) == expected
 
@@ -86,10 +86,6 @@ def test_witness_always_passes():
     result = check_action("rm -rf /")  # Even harmful actions witness
     assert result.gate_results["WITNESS"][0].value == "PASS"
 
-
-def test_bhed_gnan_always_passes():
-    result = check_action("any action")
-    assert result.gate_results["BHED_GNAN"][0].value == "PASS"
 
 
 def test_default_gatekeeper_exists():
@@ -134,21 +130,20 @@ def test_steelman_gate_present():
     assert result.gate_results["STEELMAN"][0] == GateResult.PASS
 
 
-def test_svabhaava_now_evaluates_anekanta():
-    """SVABHAAVA no longer just auto-passes; it evaluates via Anekanta."""
-    # Text with only one frame should trigger SVABHAAVA warn/fail
+def test_anekanta_warns_on_single_frame():
+    """ANEKANTA (the surviving diversity gate) warns/fails on one-frame text."""
     result = check_action("just mechanism and circuit and activation")
-    svab = result.gate_results["SVABHAAVA"]
-    # Should not be a plain pass anymore (only has mechanistic frame)
-    assert svab[0] in (GateResult.FAIL, GateResult.WARN)
+    anek = result.gate_results["ANEKANTA"]
+    # Should not be a plain pass (only has mechanistic frame)
+    assert anek[0] in (GateResult.FAIL, GateResult.WARN)
 
 
-def test_svabhaava_passes_with_all_frames():
-    """SVABHAAVA passes when all epistemological frames are present."""
+def test_anekanta_passes_with_all_frames():
+    """ANEKANTA passes when all epistemological frames are present."""
     result = check_action(
         "mechanism circuit layer consciousness awareness observer emergence feedback network"
     )
-    assert result.gate_results["SVABHAAVA"][0] == GateResult.PASS
+    assert result.gate_results["ANEKANTA"][0] == GateResult.PASS
 
 
 def test_anekanta_all_frames():
@@ -159,9 +154,9 @@ def test_anekanta_all_frames():
     assert result.gate_results["ANEKANTA"][0] == GateResult.PASS
 
 
-def test_gate_count_is_eleven():
-    """Exactly 11 core gates in CORE_GATES dict."""
-    assert len(TelosGatekeeper.CORE_GATES) == 11
+def test_gate_count_is_nine():
+    """Exactly 9 core gates in CORE_GATES dict."""
+    assert len(TelosGatekeeper.CORE_GATES) == 9
 
 
 def test_internal_yolo_keeps_bypass_as_advisory(tmp_path):
@@ -590,7 +585,7 @@ class TestCustomGateEvaluation:
         gk = gatekeeper_with_custom
         assert "CRYPTO_MINING" in gk.GATES
         assert gk.GATES["CRYPTO_MINING"] == GateTier.C
-        assert len(gk.GATES) == 12  # 11 core + 1 custom
+        assert len(gk.GATES) == 10  # 9 core + 1 custom
 
     def test_custom_gate_triggers_review(self, gatekeeper_with_custom):
         gk = gatekeeper_with_custom
@@ -652,7 +647,7 @@ class TestCustomGateEvaluation:
 
     def test_core_gates_unchanged(self):
         """CORE_GATES class attr is immutable across instances."""
-        assert len(TelosGatekeeper.CORE_GATES) == 11
+        assert len(TelosGatekeeper.CORE_GATES) == 9
         assert "AHIMSA" in TelosGatekeeper.CORE_GATES
         assert "STEELMAN" in TelosGatekeeper.CORE_GATES
 

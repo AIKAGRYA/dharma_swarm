@@ -233,7 +233,7 @@ class GateRegistry:
 class TelosGatekeeper:
     """Runs dharmic gates against proposed actions.
 
-    Core 11 gates are hardcoded (immutable, kernel-level).
+    Core 9 gates are hardcoded (immutable, kernel-level).
     Custom gates from the Variety Expansion Protocol are loaded at init
     and evaluated alongside the core gates.
 
@@ -249,8 +249,6 @@ class TelosGatekeeper:
         "CONSENT": GateTier.B,
         "VYAVASTHIT": GateTier.C,
         "REVERSIBILITY": GateTier.C,
-        "SVABHAAVA": GateTier.C,
-        "BHED_GNAN": GateTier.C,
         "WITNESS": GateTier.C,
         "ANEKANTA": GateTier.C,
         "DOGMA_DRIFT": GateTier.C,
@@ -410,7 +408,7 @@ class TelosGatekeeper:
         think_phase: str | None = None,
         reflection: str = "",
     ) -> GateCheckResult:
-        """Run all 11 gates against an action and optional content.
+        """Run all 9 gates against an action and optional content.
 
         Args:
             action: The action description (command, file path, etc.).
@@ -522,18 +520,6 @@ class TelosGatekeeper:
         else:
             results["REVERSIBILITY"] = (GateResult.PASS, "")
 
-        # --- SVABHAAVA (Tier C) — telos alignment via Anekanta ---
-        anekanta = evaluate_anekanta(action, content)
-        if anekanta.gate_result == GateResult.FAIL:
-            results["SVABHAAVA"] = (GateResult.FAIL, f"Low epistemological diversity: {anekanta.reason}")
-        elif anekanta.gate_result == GateResult.WARN:
-            results["SVABHAAVA"] = (GateResult.WARN, f"Partial diversity: {anekanta.reason}")
-        else:
-            results["SVABHAAVA"] = (GateResult.PASS, "Epistemological diversity confirmed")
-
-        # --- BHED_GNAN (Tier C) — doer-witness distinction (always passes) ---
-        results["BHED_GNAN"] = (GateResult.PASS, "Doer-witness distinction noted")
-
         # --- WITNESS (Tier C, promoted to blocking for mandatory phases) ---
         phase_key = (think_phase or "").strip().lower()
         if phase_key:
@@ -568,33 +554,27 @@ class TelosGatekeeper:
                 )
                 self._log_witness(phase_key, reflection_text, "WARN", action)
         else:
-            # Use recursive reading awareness for file operations
-            if not hasattr(self, "_witness_gate"):
-                from dharma_swarm.telos_gates_witness_enhancement import (
-                    WitnessGateEnhancement,
-                )
-                self._witness_gate = WitnessGateEnhancement()
-            results["WITNESS"] = self._witness_gate.evaluate(
-                action, content, tool_name,
+            # No think phase: nothing to verify. (The decorative
+            # stigmergy-mark scoring enhancement was removed — it graded
+            # witness quality from ambient marks and proved nothing.)
+            results["WITNESS"] = (
+                GateResult.PASS,
+                "No think phase; witness observation only",
             )
 
-        # --- ANEKANTA (Tier C) — many-sidedness check ---
-        # Reuse the anekanta result computed above for SVABHAAVA
+        # --- ANEKANTA (Tier C) — many-sidedness / epistemic diversity ---
+        anekanta = evaluate_anekanta(action, content)
         results["ANEKANTA"] = (anekanta.gate_result, anekanta.reason)
 
         # --- DOGMA_DRIFT (Tier C) — confidence without evidence check ---
-        dogma_result = GateResult.PASS
-        dogma_reason = "No dogma drift detected"
-        if content:
-            from dharma_swarm.dogma_gate import DogmaDriftCheck, check_dogma_drift
-            confidence_markers = sum(1 for w in ["certainly", "definitely", "obviously", "clearly", "undoubtedly", "without question", "proven", "unquestionable", "absolute"] if w in content_lower)
-            evidence_markers = sum(1 for w in ["data shows", "experiment", "measured", "observed", "tested", "verified", "result:", "p-value", "p=", "evidence", "citation", "reference"] if w in content_lower)
-            if confidence_markers > 0:
-                drift_check = DogmaDriftCheck(confidence_before=0.5, confidence_after=min(1.0, 0.5 + confidence_markers * 0.15), evidence_count_before=0, evidence_count_after=evidence_markers)
-                drift_result = check_dogma_drift(drift_check)
-                dogma_result = drift_result.gate_result
-                dogma_reason = drift_result.reason
-        results["DOGMA_DRIFT"] = (dogma_result, dogma_reason)
+        # Keyword marker-counting was removed: word bags were garbage input to
+        # dogma_gate.check_dogma_drift. Structured confidence-vs-evidence
+        # checks remain available via dharma_swarm.dogma_gate for callers that
+        # actually have before/after confidence and evidence counts.
+        results["DOGMA_DRIFT"] = (
+            GateResult.PASS,
+            "Heuristic removed; use dogma_gate.check_dogma_drift with structured inputs",
+        )
 
         # --- STEELMAN (Tier C) — counterargument requirement ---
         steelman_result = GateResult.PASS
@@ -686,8 +666,10 @@ class TelosGatekeeper:
                 gate_results=results,
             )
 
-        # Tier C failures produce review, not block — UNLESS S4→S3 sensitivity
-        # boost has been applied by internal pressure threat signals.
+        # Tier C failures produce review, not block. The former S4→S3
+        # sensitivity boost escalated Tier-C to BLOCK; that escalation is
+        # removed — Tier-C can never exceed REVIEW. (Self-mod change types are
+        # rejected on REVIEW by the hard rule in evolution.py gate_check.)
         tier_c_fail_gates = [
             g
             for g in self.GATES
@@ -695,7 +677,8 @@ class TelosGatekeeper:
             and results[g][0] in (GateResult.FAIL, GateResult.WARN)
         ]
         if tier_c_fail_gates:
-            # Wire 2: S4→S3 feedback — check sensitivity boost from VSM
+            # Wire 2: S4→S3 feedback — record sensitivity boost as advisory
+            # context only; it never escalates the decision past REVIEW.
             boosted_gates = []
             try:
                 from dharma_swarm.organism import get_organism
@@ -703,23 +686,19 @@ class TelosGatekeeper:
                 if org is not None and hasattr(org, "vsm") and org.vsm is not None:
                     for g in tier_c_fail_gates:
                         boost = org.vsm.gate_patterns.get_sensitivity_boost(g)
-                        if boost >= 0.15:  # Significant boost → escalate to block
+                        if boost >= 0.15:
                             boosted_gates.append(g)
             except Exception:
                 pass
 
             reasons = [results[g][1] for g in tier_c_fail_gates]
+            reason = f"Advisory: {'; '.join(reasons)}"
             if boosted_gates:
-                return GateCheckResult(
-                    decision=GateDecision.BLOCK,
-                    gate=boosted_gates[0],
-                    reason=f"S4→S3 escalated: {'; '.join(reasons)}",
-                    gate_results=results,
-                )
+                reason += f" (S4→S3 sensitivity boost noted for: {', '.join(boosted_gates)})"
             return GateCheckResult(
                 decision=GateDecision.REVIEW,
                 gate=tier_c_fail_gates[0] if tier_c_fail_gates else "",
-                reason=f"Advisory: {'; '.join(reasons)}",
+                reason=reason,
                 gate_results=results,
             )
 
