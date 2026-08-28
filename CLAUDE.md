@@ -116,6 +116,23 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 - **Worktree budget** is enforced by
   `scripts/governance/check_worktree_budget.py` — run it rather than counting
   from prose.
+- **Worktree lifecycle** — the flow that keeps the budget true between
+  cleanups:
+  - Create only against an active track in `docs/governance/ACTIVE_TRACK.yaml`;
+    name the dir `<stem>_YYYYMMDD` and the branch `<author>/<stem>-<YYYYMMDD>`
+    so the budget script can map it. Scratch trees (≤2) live under `/tmp`.
+  - Dispose in the same session the PR merges or the track closes:
+    `git worktree remove <path>`. Removal never deletes branch refs —
+    committed work survives in the canonical object store; cleanup never
+    deletes refs.
+  - Dirty trees: capture `git diff`, staged diff, and untracked files into a
+    custody directory outside the repo *before* any `--force` removal.
+    Detached-HEAD trees get a `custody/<name>-YYYYMMDD` branch pin first —
+    after removal nothing else keeps the commit reachable.
+  - Cadence: `git worktree prune` plus
+    `python3 scripts/governance/check_worktree_budget.py` at session start.
+    Over-budget or unmapped trees are disposed before new work begins, not
+    saved up for a periodic cleanup project.
 
 ## Build & test
 
