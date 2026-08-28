@@ -1,0 +1,130 @@
+{
+  "id": "fleet-advancement-WP-TRUST-HARDENING-IMPLEMENTATION-R4-20260828",
+  "base_ref": "f6946c81c3135a5082cecf8ecae5a4d7900f30fe",
+  "branch": "codex/trust-hardening-routing-auth-20260827",
+  "worktree": ".",
+  "intent": "Close the native dgc chat inference bypass with an explicit canonical policy decision and runtime configuration, then replace status-only operator activity claims with one identity-bound, lease-aware read model that preserves uncertain rows and never claims executor liveness.",
+  "allowed_files": [
+    "dharma_swarm/terminal_commands/surfaces.py",
+    "dharma_swarm/runtime_activity.py",
+    "dharma_swarm/operator_views.py",
+    "dharma_swarm/runtime_graph_views.py",
+    "dharma_swarm/runtime_platform_views.py",
+    "dharma_swarm/runtime_agent_server_views.py",
+    "dharma_swarm/operator_core/adapters.py",
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/tui_helpers.py",
+    "tests/test_terminal_surfaces.py",
+    "tests/test_routing_surface_inventory.py",
+    "tests/test_runtime_activity.py",
+    "tests/test_operator_views.py",
+    "tests/test_runtime_graph_api.py",
+    "tests/test_operator_core_adapters.py",
+    "tests/test_tui_helpers.py",
+    "tests/test_mission_control.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-TRUST-HARDENING-IMPLEMENTATION-R4-20260828.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/mission_control*.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/provider_policy.py",
+    "dharma_swarm/runtime_provider.py",
+    "scripts/**",
+    "terminal/**",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "routing-and-runtime-activity-contracts",
+      "command": "python3 -m pytest -q tests/test_runtime_activity.py tests/test_operator_views.py tests/test_runtime_graph_api.py tests/test_operator_core_adapters.py tests/test_tui_helpers.py tests/test_terminal_surfaces.py tests/test_routing_surface_inventory.py tests/test_runtime_live_cockpit_probe.py tests/test_mission_control.py::test_expired_takeover_terminalizes_prior_lineage_before_reassignment",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "touched-python-ruff",
+      "command": "python3 -m ruff check dharma_swarm/terminal_commands/surfaces.py dharma_swarm/runtime_activity.py dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py dharma_swarm/runtime_platform_views.py dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_core/adapters.py dharma_swarm/terminal_bridge.py dharma_swarm/tui_helpers.py tests/test_terminal_surfaces.py tests/test_routing_surface_inventory.py tests/test_runtime_activity.py tests/test_operator_views.py tests/test_runtime_graph_api.py tests/test_operator_core_adapters.py tests/test_tui_helpers.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "literal-chat-binary-bypass-must-fail",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/terminal_commands/surfaces.py'); t=p.read_text(); a='        os.execvpe(runtime.binary_path, command, env)'; a in t or sys.exit(3); p.write_text(t.replace(a, '        os.execvpe(\\\"claude\\\", command, env)', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_terminal_surfaces.py', '-k', 'chat_uses_resolved_binary']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix: harden routing and runtime activity truth"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-TRUST-HARDENING-IMPLEMENTATION-R4-20260828",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "f6946c81c3135a5082cecf8ecae5a4d7900f30fe",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The Claude Code native UI is interactive while the canonical provider factory is headless; the command must consume policy and runtime configuration directly, then exec only the resolved binary.",
+      "Persisted run status is an observation, not a lease. Current lease requires a matching execution identity, matching claim, acknowledgement, heartbeat, owner-policy-valid lease freshness, and absence of terminal, ambiguous, competing, or superseding evidence.",
+      "Generic orchestration and Mission Control own different expiry rules: Mission Control is bounded by stale_after, while GraphReconciler permits a fresh heartbeat inside the original lease duration after stale_after; the projection must label and apply the owning policy conservatively.",
+      "Acknowledgement and heartbeat timestamps are independent observations emitted by some atomic running transitions and cannot be ordered by microseconds; both must follow the claim and not be future-dated.",
+      "Any strictly newer claim permanently fences an older claim, while equal-timestamp competing maxima are ambiguous and must fail closed rather than produce multiple current leases.",
+      "Legacy payload keys named active remain for compatibility but their values become current-lease aliases; explicit observed_nonterminal and expired_or_unproven counts preserve the discarded uncertainty.",
+      "Topology active_agent and stored session status are owner-provided pointers, not process-liveness evidence, and remain separately labeled from lease-current agents and sessions.",
+      "The native interactive Claude model remains under explicit operator, resumed-session, or native CLI authority; an omitted model must route with no model hint and never inherit a headless provider default.",
+      "The fixed Claude Code CLI lane must remove metered Anthropic credentials and nested Claude session controls before resolution and process replacement while preserving unrelated operator environment settings."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/provider_policy.py",
+      "dharma_swarm/runtime_provider.py",
+      "dharma_swarm/terminal_commands/surfaces.py",
+      "dharma_swarm/operator_views.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/graph/reconciler.py",
+      "dharma_swarm/tui/engine/adapters/claude_cli.py"
+    ],
+    "honest_blockers": [
+      "No generic read model can prove executor process liveness from persisted lease evidence; every new projection must carry proves_executor_liveness=false.",
+      "The effective Claude model and authentication substrate remain unknown before the native CLI starts; this packet proves the selected CLI transport, explicit-model consistency, and child-environment boundary only.",
+      "Legacy rows lacking an execution identity or complete lease evidence will intentionally move from active counts to expired_or_unproven without database mutation or deletion.",
+      "Credential revocation and provider-side rotation remain external operator actions and are not performed by this repository packet.",
+      "This packet does not restart terminals, Mission Control MCP servers, autonomous workers, or dashboards, and does not reconcile live runtime rows."
+    ],
+    "rollback": "Revert the implementation commit. This restores the previous projection behavior and direct chat launch code but does not re-enable the independently quarantined GitHub MCP or mutate any runtime database.",
+    "packet_digest": "867dbcb7a34cc6d240fba9a9feb7758f05527afcfad7a6d5d0a8f48db61d3172"
+  }
+}

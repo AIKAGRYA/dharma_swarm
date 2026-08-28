@@ -1074,6 +1074,16 @@ async def test_expired_takeover_terminalizes_prior_lineage_before_reassignment(
     active_runs = await OperatorViews(mission_control._runtime).active_runs(
         session_id="mission:m-alpha", limit=10
     )
+    assert active_runs == []
+    await mission_control.heartbeat_lease(
+        "m-alpha",
+        task.task_id,
+        "agent-b",
+        attempt_id=second.attempt_id,
+    )
+    active_runs = await OperatorViews(mission_control._runtime).active_runs(
+        session_id="mission:m-alpha", limit=10
+    )
     assert [run.run_id for run in active_runs] == [second.attempt_id]
     with pytest.raises(MissionControlError, match="superseded"):
         await mission_control.finish_attempt(

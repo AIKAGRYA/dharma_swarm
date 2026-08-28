@@ -8,12 +8,33 @@ import shutil
 import subprocess
 import sys
 
-
+from dharma_swarm.models import ProviderType
+from dharma_swarm.provider_policy import (
+    ProviderPolicyRouter,
+    ProviderRouteRequest,
+    ProviderRoutingConfig,
+)
+from dharma_swarm.runtime_provider import (
+    RuntimeProviderConfig,
+    resolve_runtime_provider_config,
+)
 from dharma_swarm.terminal_commands._helpers import (
     DHARMA_STATE,
     DHARMA_SWARM,
     HOME,
 )
+
+
+_CHAT_CHILD_ENV_DENYLIST = frozenset(
+    {
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES",
+    }
+)
+
 
 def cmd_tui() -> None:
     """Launch the interactive TUI dashboard."""
@@ -75,6 +96,63 @@ def _build_chat_context_snapshot() -> str:
     )
 
 
+def _resolve_chat_runtime(
+    *,
+    env: dict[str, str],
+    model: str | None,
+) -> RuntimeProviderConfig:
+    """Resolve and policy-authorize the native interactive Claude runtime."""
+    runtime = resolve_runtime_provider_config(
+        ProviderType.CLAUDE_CODE,
+        model=model,
+        working_dir=os.getcwd(),
+        env=env,
+    )
+    if runtime.provider != ProviderType.CLAUDE_CODE:
+        raise RuntimeError(
+            "dgc chat runtime provider mismatch: "
+            f"expected {ProviderType.CLAUDE_CODE.value}, got {runtime.provider.value}"
+        )
+    if not runtime.available or not runtime.binary_path:
+        raise FileNotFoundError("claude")
+
+    route_context: dict[str, object] = {
+        "preferred_provider": ProviderType.CLAUDE_CODE.value,
+        "requires_tooling": True,
+        "operator_invoked": True,
+    }
+    if model:
+        route_context["preferred_model"] = model
+
+    decision = ProviderPolicyRouter(
+        config=ProviderRoutingConfig(default_model_hints={})
+    ).route(
+        ProviderRouteRequest(
+            action_name="dgc.chat.interactive",
+            risk_score=0.10,
+            uncertainty=0.05,
+            novelty=0.05,
+            urgency=0.50,
+            expected_impact=0.30,
+            context=route_context,
+        ),
+        available_providers=[ProviderType.CLAUDE_CODE],
+    )
+    if decision.selected_provider != ProviderType.CLAUDE_CODE:
+        raise RuntimeError(
+            "dgc chat policy provider mismatch: "
+            f"expected {ProviderType.CLAUDE_CODE.value}, "
+            f"got {decision.selected_provider.value}"
+        )
+    if decision.selected_model_hint != model:
+        raise RuntimeError(
+            "dgc chat policy model mismatch: "
+            f"requested {model or 'native_cli_default'}, "
+            f"selected {decision.selected_model_hint or 'native_cli_default'}"
+        )
+    return runtime
+
+
 def cmd_chat(
     continue_last: bool = False,
     offline: bool = False,
@@ -84,23 +162,34 @@ def cmd_chat(
 ) -> None:
     """Launch native Claude Code interactive UI (full experience)."""
     env = os.environ.copy()
-    env.pop("CLAUDECODE", None)
+    for key in _CHAT_CHILD_ENV_DENYLIST:
+        env.pop(key, None)
     env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
     if offline:
         env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
 
-    cmd = ["claude"]
+    try:
+        runtime = _resolve_chat_runtime(env=env, model=model)
+    except FileNotFoundError:
+        print("claude CLI not found. Install Claude Code first.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to launch Claude Code: {e}")
+        sys.exit(1)
+
+    assert runtime.binary_path is not None  # narrowed by _resolve_chat_runtime
+    command = [runtime.binary_path]
     if continue_last:
-        cmd.append("--continue")
+        command.append("--continue")
     if model:
-        cmd.extend(["--model", model])
+        command.extend(["--model", model])
     if effort:
-        cmd.extend(["--effort", effort])
+        command.extend(["--effort", effort])
 
     if include_context:
         snapshot = _build_chat_context_snapshot()
         if snapshot:
-            cmd.extend(
+            command.extend(
                 [
                     "--append-system-prompt",
                     "DGC mission-control context snapshot. Treat as hints and verify.\n\n"
@@ -109,7 +198,7 @@ def cmd_chat(
             )
 
     try:
-        os.execvpe("claude", cmd, env)
+        os.execvpe(runtime.binary_path, command, env)
     except FileNotFoundError:
         print("claude CLI not found. Install Claude Code first.")
         sys.exit(1)

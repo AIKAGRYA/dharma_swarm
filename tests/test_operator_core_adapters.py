@@ -235,6 +235,40 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(snapshot.health, RuntimeHealth.CRITICAL)
         self.assertEqual(snapshot.warnings[0], "sqlite unavailable")
 
+    def test_runtime_snapshot_uses_current_lease_semantics_when_declared(self) -> None:
+        snapshot = runtime_snapshot_from_operator_snapshot(
+            {
+                "runtime_db": "/tmp/runtime.db",
+                "overview": {
+                    "activity_semantics": "runtime_activity.v1",
+                    "sessions": 4169,
+                    "active_sessions": 1,
+                    "runs": 3,
+                    "active_runs": 1,
+                    "observed_nonterminal_runs": 3,
+                    "expired_or_unproven_runs": 2,
+                    "terminal_evidence_conflicts": 0,
+                    "artifacts": 4,
+                    "context_bundles": 2,
+                },
+                "runs": [],
+                "actions": [],
+            },
+            repo_root="/repo",
+            bridge_status="connected",
+        )
+
+        self.assertEqual(snapshot.active_session_count, 1)
+        self.assertEqual(snapshot.active_run_count, 1)
+        self.assertIn("1 current leases", snapshot.summary or "")
+        self.assertIn("2 nonterminal runs are expired or unproven", snapshot.warnings)
+        self.assertEqual(snapshot.metrics["proves_executor_liveness"], "false")
+        self.assertEqual(
+            snapshot.metadata["activity_semantics"],
+            "runtime_activity.v1",
+        )
+        self.assertFalse(snapshot.metadata["proves_executor_liveness"])
+
     def test_runtime_snapshot_uses_supervisor_preview_for_verification_truth(self) -> None:
         snapshot = runtime_snapshot_from_operator_snapshot(
             {

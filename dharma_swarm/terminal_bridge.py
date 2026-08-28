@@ -1808,8 +1808,7 @@ class TerminalBridge(
         runtime_state = RuntimeStateStore(db_path=DEFAULT_RUNTIME_DB)
         views = OperatorViews(runtime_state)
         try:
-            overview = await views.runtime_overview()
-            runs = await views.active_runs(limit=8)
+            overview, runs = await views.operator_activity_snapshot(limit=8)
             actions = await views.recent_operator_actions(limit=8)
         except Exception as exc:
             return {
@@ -1823,16 +1822,26 @@ class TerminalBridge(
             "runtime_db": str(runtime_state.db_path),
             "overview": {
                 "sessions": overview.sessions,
+                "active_sessions": overview.active_sessions,
                 "claims": overview.claims,
                 "active_claims": overview.active_claims,
+                "current_lease_claims": overview.current_lease_claims,
                 "acknowledged_claims": overview.acknowledged_claims,
+                "observed_nonterminal_claims": overview.observed_nonterminal_claims,
                 "runs": overview.runs,
                 "active_runs": overview.active_runs,
+                "observed_nonterminal_runs": overview.observed_nonterminal_runs,
+                "expired_or_unproven_runs": overview.expired_or_unproven_runs,
+                "terminal_evidence_conflicts": overview.terminal_evidence_conflicts,
+                "activity_semantics": overview.activity_semantics,
+                "activity_observed_at": overview.activity_observed_at,
+                "proves_executor_liveness": overview.proves_executor_liveness,
                 "artifacts": overview.artifacts,
                 "promoted_facts": overview.promoted_facts,
                 "context_bundles": overview.context_bundles,
                 "operator_actions": overview.operator_actions,
             },
+            "runs_truncated": overview.active_runs > len(runs),
             "runs": [
                 {
                     "run_id": run.run_id,
@@ -1842,6 +1851,8 @@ class TerminalBridge(
                     "current_artifact_id": run.current_artifact_id,
                     "failure_code": run.failure_code,
                     "started_at": run.started_at.isoformat(),
+                    "activity_state": "current_lease",
+                    "proves_executor_liveness": False,
                 }
                 for run in runs
             ],
