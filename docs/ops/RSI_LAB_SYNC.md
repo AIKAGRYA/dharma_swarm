@@ -194,7 +194,11 @@ The EXPLORE timer runs once per UTC day at `03:35` with at most `25m` randomized
 delay (`OnCalendar=*-*-* 03:35:00 UTC`, `RandomizedDelaySec=25m`). Sync installs
 the versioned wrapper but never writes `/etc/systemd/system` and never enables a
 timer. First obtain a green doctor, a fresh two-provider receipt, and one
-operator-supervised proof:
+operator-supervised proof. Start that proof immediately after the managed
+minute-`:17` provider refresh completes, with enough time for the 2,700-second
+fuse to finish before the next hourly refresh. A refresh during the child
+re-admission window intentionally invalidates the parent-bound receipt; if the
+window is not clear, do not reserve the run:
 
 ```bash
 /root/rsi-lab/bin/rsi-unattended-explore --timeout-seconds 2700
@@ -450,9 +454,29 @@ The sync activation installs the immutable `rsi-unattended-explore` wrapper,
 but it deliberately does not mutate `/etc/systemd/system` or enable a timer.
 After release activation, legacy-provider retirement, one fresh two-provider
 selftest, and a **successful operator-supervised oneshot**, manually install and
-verify the versioned unit bytes:
+verify the versioned unit bytes. First prove that the physical state root is not
+a symlink, is owned by the service user, and is not group/world writable. The
+known-safe live root is `root:root` mode `0755`; repair a broader mode explicitly
+before any timer activation, then inspect each existing custody ancestor:
 
 ```bash
+test ! -L /root/rsi-lab/state
+test "$(stat -c '%U:%G' /root/rsi-lab/state)" = "root:root"
+chmod 0755 /root/rsi-lab/state
+stat -c '%U:%G %a %n' \
+  /root/rsi-lab/state \
+  /root/rsi-lab/state/.dharma \
+  /root/rsi-lab/state/.dharma/forge_lab \
+  /root/rsi-lab/state/.dharma/evolution_worktrees 2>/dev/null
+```
+
+Install with `HALT` present so the first activation of the persistent timer
+cannot launch a catch-up run. Starting a timer with `Persistent=true` can make a
+missed calendar event immediately eligible:
+
+```bash
+install -o root -g root -m 0600 /dev/null \
+  /root/rsi-lab/state/.dharma/forge_lab/HALT
 install -o root -g root -m 0644 \
   /root/rsi-lab/current/repo/scripts/forge_lab/systemd/rsi-lab-explore.service \
   /etc/systemd/system/rsi-lab-explore.service
@@ -464,7 +488,19 @@ systemd-analyze verify /etc/systemd/system/rsi-lab-explore.service \
   /etc/systemd/system/rsi-lab-explore.timer
 systemctl enable rsi-lab-explore.timer
 systemctl start rsi-lab-explore.timer
+systemctl show rsi-lab-explore.timer --no-pager \
+  --property=ActiveState,LastTriggerUSec,NextElapseUSecRealtime
+systemctl status rsi-lab-explore.service --no-pager
+```
+
+Only after the timer is active, the service is not running, and
+`NextElapseUSecRealtime` is a future time should the operator remove the latch
+and recheck both timer and daily status:
+
+```bash
+unlink /root/rsi-lab/state/.dharma/forge_lab/HALT
 systemctl status rsi-lab-explore.timer --no-pager
+rsi daily status --json
 ```
 
 The service is `Type=oneshot`, drops its capability and ambient-capability
@@ -499,6 +535,23 @@ loader; only the five-field model-safe task projection reaches models, while
 the judge row, gold patch, test patch, and test lists remain outside model and
 receipt payloads. See the authority-chain details in
 [`FORGE_LAB_V0_1_RUNBOOK.md`](FORGE_LAB_V0_1_RUNBOOK.md#bounded-unattended-explore-oneshot).
+The exact task-allocation bridge is permanently typed as EXPLORE and validates
+that the allocator receipts one admitted task from the anchored database. The
+parent rejects a child result unless its standalone scratch clone reports and
+passes guarded cleanup. The parent separately owns a marker-bound per-run
+scratch root and removes it through no-follow directory handles after every
+child outcome, including timeout, HALT, and SIGKILL. Create, child attestation,
+and cleanup bind to the exact directory device/inode and original marker digest,
+and the child holds an exclusive directory lease while live. Each invocation
+audits prior roots under
+the host lock before admission or budget reservation: only roots with an exact
+spec plus durable create receipt are recovered; unknown, substituted, or busy
+roots are preserved and refuse with zero new spend. The physical state root and
+custody ancestors must be owner-controlled and not group/world writable. A
+success receipt therefore requires matching create/attest/cleanup proofs plus
+lexical path absence; root/ancestor/marker substitution, result-shape, special
+files, or cleanup drift fails closed. Ordinary Git repository symlinks are
+inventoried and unlinked by directory handle without following their targets.
 Create the following file to stop new runs without editing code or units:
 
 ```bash
