@@ -5,7 +5,8 @@ import json
 import sqlite3
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from itertools import permutations
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,6 +41,10 @@ from dharma_swarm.mission_control_a2a import (
     A2ANativeExecutionRef,
     A2APatchPromotionEvaluator,
     MissionControlA2AProjection,
+)
+from dharma_swarm.mission_control_a2a_candidate import (
+    ExactProposalStoreExpectation,
+    ExactProposalStoreObservation,
 )
 from dharma_swarm.mission_control_contract import (
     MissionControlError,
@@ -532,6 +537,449 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
         foundry_key=foundry_key,
         vibe_key=vibe_key,
     )
+
+
+async def _proposal_store_context(
+    tmp_path: Path,
+    *,
+    exact_executor_source: bool = True,
+    wrong_parent_lineage: bool = False,
+) -> tuple[_Context, ExactProposalStoreExpectation, str, str]:
+    ctx = await _context(tmp_path, proposal=False)
+    attempt_key = "owner-store-attempt"
+    assigned_by = "owner-store-test"
+    attempt = await ctx.control.start_attempt(
+        ctx.mission_id,
+        ctx.task_id,
+        ctx.expected.executor_agent_uid,
+        attempt_key=attempt_key,
+        assigned_by=assigned_by,
+    )
+    await ctx.control.heartbeat_lease(
+        ctx.mission_id,
+        ctx.task_id,
+        ctx.expected.executor_agent_uid,
+        attempt_id=attempt.attempt_id,
+    )
+    task = await ctx.board.get(ctx.task_id)
+    assert task is not None
+    binding = task.metadata["a2a_binding"]
+    native_ref = A2ANativeExecutionRef(
+        mission_id=ctx.mission_id,
+        task_id=ctx.task_id,
+        agent_uid=ctx.expected.executor_agent_uid,
+        packet_id=ctx.expected.packet_id,
+        correlation_id=ctx.expected.correlation_id,
+        delivery_id=ctx.expected.delivery_id,
+        proposal_id=ctx.expected.proposal_id,
+        content_sha256=binding["content_sha256"],
+    )
+    executor_run_id = "semantic-executor-run-1"
+    executor_process_boot_id = "semantic-executor-boot-1"
+    executor = ExecutionIdentity.new(
+        task_id=ctx.task_id,
+        trace_id="trace-semantic-executor",
+        correlation_id=ctx.expected.correlation_id,
+        parent_run_id=(
+            "attempt_wrong_parent_lineage"
+            if wrong_parent_lineage
+            else attempt.attempt_id
+        ),
+        run_id=executor_run_id,
+        claim_id=attempt.claim_id,
+        idempotency_key="idem-semantic-executor",
+        agent_id=ctx.expected.executor_agent_uid,
+        session_id=f"mission:{ctx.mission_id}",
+        proposal_id=ctx.expected.proposal_id,
+        metadata={
+            "process_boot_id": executor_process_boot_id,
+            "role": "governed_patch_semantic_executor",
+        },
+    )
+    if exact_executor_source:
+        ctx.runtime.record_execution_identity_exact_sync(
+            executor,
+            source="governed_patch_semantic_executor",
+        )
+    else:
+        await ctx.runtime.record_execution_identity(
+            executor,
+            source="governed_patch_semantic_executor",
+        )
+    await ctx.runtime.commit_self_mod_receipt_exact(
+        executor,
+        stage="proposal",
+        proposal_id=ctx.expected.proposal_id,
+        status="proposed",
+        payload={
+            "schema_version": "dharma.a2a.patch_candidate.v1",
+            "mission_id": ctx.mission_id,
+            "task_id": ctx.task_id,
+            "attempt_id": ctx.expected.packet_id,
+            "lease_id": ctx.expected.delivery_id,
+            "packet_id": ctx.expected.packet_id,
+            "correlation_id": ctx.expected.correlation_id,
+            "delivery_id": ctx.expected.delivery_id,
+            "proposal_id": ctx.expected.proposal_id,
+            "candidate_digest": ctx.expected.candidate_digest,
+            "diff_sha256": ctx.expected.diff_sha256,
+            "base_sha": ctx.expected.base_sha,
+            "artifact_sha256": ctx.expected.artifact_sha256,
+            "authorized_source_files": list(
+                ctx.expected.authorized_source_files,
+            ),
+        },
+    )
+    expected = ExactProposalStoreExpectation(
+        native_ref=native_ref,
+        attempt_key=attempt_key,
+        operator_id="system",
+        assigned_by=assigned_by,
+        executor_run_id=executor_run_id,
+        executor_process_boot_id=executor_process_boot_id,
+        candidate_digest=ctx.expected.candidate_digest,
+        diff_sha256=ctx.expected.diff_sha256,
+        base_sha=ctx.expected.base_sha,
+        artifact_sha256=ctx.expected.artifact_sha256,
+        authorized_source_files=ctx.expected.authorized_source_files,
+    )
+    return ctx, expected, attempt.attempt_id, attempt.claim_id
+
+
+def _proposal_store_payload(
+    expected: ExactProposalStoreExpectation,
+) -> dict[str, object]:
+    ref = expected.native_ref
+    return {
+        "schema_version": "dharma.a2a.patch_candidate.v1",
+        "mission_id": ref.mission_id,
+        "task_id": ref.task_id,
+        "attempt_id": ref.packet_id,
+        "lease_id": ref.delivery_id,
+        "packet_id": ref.packet_id,
+        "correlation_id": ref.correlation_id,
+        "delivery_id": ref.delivery_id,
+        "proposal_id": ref.proposal_id,
+        "candidate_digest": expected.candidate_digest,
+        "diff_sha256": expected.diff_sha256,
+        "base_sha": expected.base_sha,
+        "artifact_sha256": expected.artifact_sha256,
+        "authorized_source_files": list(expected.authorized_source_files),
+    }
+
+
+async def _replace_exact_proposal(
+    ctx: _Context,
+    expected: ExactProposalStoreExpectation,
+) -> None:
+    executor = await ctx.runtime.get_execution_identity(expected.executor_run_id)
+    assert executor is not None
+    side_effect_key = f"self_mod:{expected.native_ref.proposal_id}:proposal"
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        db.execute(
+            "DELETE FROM runtime_receipts WHERE side_effect_key = ?",
+            (side_effect_key,),
+        )
+        db.execute(
+            "DELETE FROM idempotency_records WHERE side_effect_key = ?",
+            (side_effect_key,),
+        )
+        db.commit()
+    await ctx.runtime.commit_self_mod_receipt_exact(
+        executor,
+        stage="proposal",
+        proposal_id=expected.native_ref.proposal_id,
+        status="proposed",
+        payload=_proposal_store_payload(expected),
+    )
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_observes_real_owner_lineage_without_authority(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, attempt_id, claim_id = await _proposal_store_context(tmp_path)
+
+    observation = await ctx.projection.observe_exact_proposal_store(expected)
+
+    assert isinstance(observation, ExactProposalStoreObservation)
+    assert observation.mission_attempt_id == attempt_id
+    assert observation.mission_claim_id == claim_id
+    assert observation.mission_attempt_id not in {
+        observation.native_ref.packet_id,
+        observation.native_ref.delivery_id,
+    }
+    assert observation.mission_claim_id not in {
+        observation.native_ref.packet_id,
+        observation.native_ref.delivery_id,
+    }
+    assert observation.canonical_store_custody_unproven is True
+    assert observation.proves_executor_liveness is False
+    assert observation.authorizes_repository_effect is False
+    with pytest.raises(
+        TypeError,
+        match="store observations cannot be used as authority booleans",
+    ):
+        bool(observation)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_generic_executor_source(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, _attempt_id, _claim_id = await _proposal_store_context(
+        tmp_path,
+        exact_executor_source=False,
+    )
+
+    with pytest.raises(MissionControlError, match="semantic executor lineage"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_wrong_executor_parent_lineage(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, _attempt_id, _claim_id = await _proposal_store_context(
+        tmp_path,
+        wrong_parent_lineage=True,
+    )
+
+    with pytest.raises(MissionControlError, match="semantic executor lineage"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_foreign_task_a2a_binding(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, _attempt_id, _claim_id = await _proposal_store_context(tmp_path)
+    with sqlite3.connect(ctx.board._db_path) as db:
+        row = db.execute(
+            "SELECT metadata FROM tasks WHERE id = ?",
+            (ctx.task_id,),
+        ).fetchone()
+        assert row is not None
+        metadata = json.loads(str(row[0]))
+        metadata["a2a_binding"]["proposal_id"] = "foreign-proposal"
+        db.execute(
+            "UPDATE tasks SET metadata = ? WHERE id = ?",
+            (json.dumps(metadata, ensure_ascii=True), ctx.task_id),
+        )
+        db.commit()
+
+    with pytest.raises(MissionControlError, match="task A2A binding"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_missing_parent_execution_identity(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, attempt_id, _claim_id = await _proposal_store_context(tmp_path)
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        db.execute(
+            "DELETE FROM execution_identities WHERE run_id = ?",
+            (attempt_id,),
+        )
+        db.commit()
+
+    with pytest.raises(MissionControlError, match="parent identity"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_older_unexpired_leased_claim(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, _attempt_id, claim_id = await _proposal_store_context(tmp_path)
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        db.row_factory = sqlite3.Row
+        claim = db.execute(
+            "SELECT * FROM task_claims WHERE claim_id = ?",
+            (claim_id,),
+        ).fetchone()
+        assert claim is not None
+        older = (
+            datetime.fromisoformat(str(claim["claimed_at"])) - timedelta(seconds=1)
+        ).isoformat()
+        db.execute(
+            "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id,"
+            " status, claimed_at, acked_at, heartbeat_at, stale_after,"
+            " recovered_at, retry_count, metadata_json, trace_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "foreign-older-open-claim",
+                claim["task_id"],
+                claim["session_id"],
+                "foreign-agent",
+                "leased",
+                older,
+                older,
+                older,
+                claim["stale_after"],
+                None,
+                0,
+                claim["metadata_json"],
+                "foreign-trace",
+            ),
+        )
+        db.commit()
+
+    with pytest.raises(MissionControlError, match="claim fence"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_started_terminal_idempotency_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx, expected, attempt_id, _claim_id = await _proposal_store_context(tmp_path)
+    record_receipt = ctx.runtime.record_receipt_for_identity
+
+    async def crash_before_terminal_receipt(
+        *args: object,
+        **kwargs: object,
+    ) -> object:
+        if kwargs.get("receipt_type") == "mission_attempt_terminal":
+            raise RuntimeError("crash before terminal receipt")
+        return await record_receipt(*args, **kwargs)
+
+    monkeypatch.setattr(
+        ctx.runtime,
+        "record_receipt_for_identity",
+        crash_before_terminal_receipt,
+    )
+    with pytest.raises(RuntimeError, match="crash before terminal receipt"):
+        await ctx.control.finish_attempt(
+            ctx.mission_id,
+            ctx.task_id,
+            ctx.expected.executor_agent_uid,
+            attempt_id=attempt_id,
+            status="succeeded",
+            result="terminal result",
+        )
+
+    side_effect_key = f"mission_control:{attempt_id}:terminal"
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        row = db.execute(
+            "SELECT status, result_receipt_id FROM idempotency_records"
+            " WHERE run_id = ? AND side_effect_key = ?",
+            (attempt_id, side_effect_key),
+        ).fetchone()
+    assert row == ("started", "")
+    with pytest.raises(MissionControlError, match="transitioning terminal"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_refuses_terminal_receipt_projection_crash(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx, expected, attempt_id, _claim_id = await _proposal_store_context(tmp_path)
+
+    async def crash_before_projection(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("crash before terminal projection")
+
+    monkeypatch.setattr(
+        ctx.control,
+        "_project_terminal_lineage",
+        crash_before_projection,
+    )
+    with pytest.raises(RuntimeError, match="crash before terminal projection"):
+        await ctx.control.finish_attempt(
+            ctx.mission_id,
+            ctx.task_id,
+            ctx.expected.executor_agent_uid,
+            attempt_id=attempt_id,
+            status="succeeded",
+            result="terminal result",
+        )
+
+    side_effect_key = f"mission_control:{attempt_id}:terminal"
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        receipt = db.execute(
+            "SELECT receipt_id FROM runtime_receipts"
+            " WHERE run_id = ? AND receipt_type = 'mission_attempt_terminal'",
+            (attempt_id,),
+        ).fetchone()
+        slot = db.execute(
+            "SELECT status, result_receipt_id FROM idempotency_records"
+            " WHERE run_id = ? AND side_effect_key = ?",
+            (attempt_id, side_effect_key),
+        ).fetchone()
+    assert receipt is not None
+    assert slot == ("completed", receipt[0])
+    with pytest.raises(MissionControlError, match="transitioning terminal"):
+        await ctx.projection.observe_exact_proposal_store(expected)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field_name", "malformed_value"),
+    (
+        ("candidate_digest", "not-a-digest"),
+        ("diff_sha256", "also-bad"),
+        ("base_sha", "HEAD"),
+        ("artifact_sha256", ""),
+        ("authorized_source_files", ()),
+        ("authorized_source_files", ("/etc/passwd",)),
+        ("authorized_source_files", ("../escape",)),
+        (
+            "authorized_source_files",
+            ("dharma_swarm/dgm_loop.py", 123),
+        ),
+    ),
+)
+async def test_exact_proposal_store_refuses_malformed_candidate_binding(
+    tmp_path: Path,
+    field_name: str,
+    malformed_value: object,
+) -> None:
+    ctx, expected, _attempt_id, _claim_id = await _proposal_store_context(tmp_path)
+    malformed = replace(expected, **{field_name: malformed_value})
+    await _replace_exact_proposal(ctx, malformed)
+
+    with pytest.raises(MissionControlError):
+        await ctx.projection.observe_exact_proposal_store(malformed)
+
+
+@pytest.mark.asyncio
+async def test_exact_proposal_store_allows_post_proposal_heartbeat_renewal(
+    tmp_path: Path,
+) -> None:
+    ctx, expected, attempt_id, claim_id = await _proposal_store_context(tmp_path)
+
+    await ctx.control.heartbeat_lease(
+        ctx.mission_id,
+        ctx.task_id,
+        ctx.expected.executor_agent_uid,
+        attempt_id=attempt_id,
+        metadata={"post_proposal_renewal": 2},
+    )
+    claim = await ctx.runtime.get_task_claim(claim_id)
+    run = await ctx.runtime.get_delegation_run(attempt_id)
+    assert claim is not None
+    assert run is not None
+    assert claim.metadata["post_proposal_renewal"] == 2
+    assert "post_proposal_renewal" not in run.metadata
+    with sqlite3.connect(ctx.runtime.db_path) as db:
+        row = db.execute(
+            "SELECT created_at FROM runtime_receipts"
+            " WHERE receipt_type = 'self_mod_proposal'",
+        ).fetchone()
+    assert row is not None
+    proposal_created_at = datetime.fromisoformat(str(row[0]))
+    assert claim.acked_at is not None
+    assert claim.heartbeat_at is not None
+    assert claim.acked_at <= proposal_created_at < claim.heartbeat_at
+
+    observation = await ctx.projection.observe_exact_proposal_store(expected)
+
+    assert observation.mission_attempt_id == attempt_id
+    assert observation.mission_claim_id == claim_id
 
 
 async def _record_verifier(

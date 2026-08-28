@@ -15,6 +15,7 @@ from dharma_swarm.mission_control import (
     MissionControlError,
     ReconciliationState,
 )
+from dharma_swarm.mission_control_contract import MAX_LEASE_SECONDS, stable_id
 from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import RuntimeStateStore, TaskClaim
@@ -187,6 +188,62 @@ async def test_attempt_joins_identity_claim_run_and_task_projection(
 
 
 @pytest.mark.asyncio
+async def test_start_attempt_enforces_canonical_max_lease_without_mutation(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    before_task = await mission_control._board.get(task.task_id)
+    rejected_attempt_id = stable_id(
+        "attempt",
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        "lease-too-long",
+    )
+
+    with pytest.raises(MissionControlError, match="between 1 and 900"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_key="lease-too-long",
+            lease_seconds=MAX_LEASE_SECONDS + 1,
+        )
+
+    assert await mission_control._board.get(task.task_id) == before_task
+    assert (
+        await mission_control._runtime.get_execution_identity(rejected_attempt_id)
+        is None
+    )
+    assert (
+        await mission_control._runtime.list_task_claims(
+            task_id=task.task_id,
+            limit=100,
+        )
+        == []
+    )
+    assert (
+        await mission_control._runtime.list_delegation_runs(
+            task_id=task.task_id,
+            limit=100,
+        )
+        == []
+    )
+
+    accepted = await mission_control.start_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_key="lease-at-max",
+        lease_seconds=MAX_LEASE_SECONDS,
+    )
+    claim = await mission_control._runtime.get_task_claim(accepted.claim_id)
+    assert claim is not None
+    assert claim.claimed_at is not None and claim.stale_after is not None
+    assert claim.stale_after - claim.claimed_at == timedelta(seconds=MAX_LEASE_SECONDS)
+
+
+@pytest.mark.asyncio
 async def test_conflicting_active_claim_fails_closed(
     mission_control: MissionControl,
 ) -> None:
@@ -235,6 +292,48 @@ async def test_heartbeat_extends_exact_lease_and_rejects_wrong_agent(
             "agent-b",
             attempt_id=attempt.attempt_id,
         )
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_enforces_canonical_max_lease_without_mutation(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    before_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    before_run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    before_task = await mission_control._board.get(task.task_id)
+    assert before_claim is not None and before_run is not None
+
+    with pytest.raises(MissionControlError, match="between 1 and 900"):
+        await mission_control.heartbeat_lease(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_id=attempt.attempt_id,
+            lease_seconds=MAX_LEASE_SECONDS + 1,
+        )
+
+    assert (
+        await mission_control._runtime.get_task_claim(attempt.claim_id) == before_claim
+    )
+    assert (
+        await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+        == before_run
+    )
+    assert await mission_control._board.get(task.task_id) == before_task
+
+    lease = await mission_control.heartbeat_lease(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        lease_seconds=MAX_LEASE_SECONDS,
+    )
+    assert lease.heartbeat_at is not None and lease.stale_after is not None
+    assert lease.stale_after - lease.heartbeat_at == timedelta(
+        seconds=MAX_LEASE_SECONDS
+    )
 
 
 @pytest.mark.asyncio

@@ -33,6 +33,7 @@ TERMINAL_RECEIPT_TYPE = "mission_attempt_terminal"
 RECOVERY_RECEIPT_TYPE = "mission_attempt_recovery"
 TASK_SCAN_LIMIT = 10_000
 RUNTIME_SCAN_LIMIT = 10_000
+MAX_LEASE_SECONDS = 15 * 60
 TERMINAL_CAS_STALE_AFTER_SECONDS = 30.0
 
 
@@ -384,6 +385,7 @@ __all__ = [
     "ACTIVE_CLAIM_STATUSES",
     "AgentLeaseView",
     "AttemptView",
+    "MAX_LEASE_SECONDS",
     "MissionControlError",
     "MissionSnapshot",
     "MissionView",

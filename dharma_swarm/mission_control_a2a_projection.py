@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from pathlib import Path
@@ -27,6 +28,8 @@ from dharma_swarm.mission_control_a2a_evidence import (
     DELIVERY_SCHEMA,
 )
 from dharma_swarm.mission_control_a2a_candidate import (
+    ExactProposalStoreExpectation,
+    ExactProposalStoreObservation,
     load_exact_proposals,
     unwrap_exact_proposal,
 )
@@ -37,6 +40,9 @@ from dharma_swarm.mission_control_a2a_io import (
     read_task,
     require_mission,
     safe_file,
+)
+from dharma_swarm.mission_control_a2a_owner_readback import (
+    observe_exact_proposal_store as _observe_exact_proposal_store,
 )
 from dharma_swarm.mission_control_contract import MissionControlError
 from dharma_swarm.mission_control_verification import ExpectedPromotionBindings
@@ -129,6 +135,19 @@ class MissionControlA2AProjection:
             f"{_safe_token(ref.agent_uid, 'agent_uid')}.sqlite3",
         )
         return read_semantic_job(path, ref.packet_id, max_bytes=self._max_bytes)
+
+    async def observe_exact_proposal_store(
+        self,
+        expected: ExactProposalStoreExpectation,
+    ) -> ExactProposalStoreObservation:
+        """Join RUNNING Mission Control lineage without minting effect authority."""
+
+        return await asyncio.to_thread(
+            _observe_exact_proposal_store,
+            self._runtime_db,
+            self._board_db,
+            expected,
+        )
 
     async def observe(
         self,
