@@ -357,12 +357,18 @@ active_tracks:
       - scripts/foundry/**
       - tests/test_foundry_*.py
       - docs/foundry/**
+      - dharma_swarm/rudra/**
+      - dharma_swarm/terminal_commands/rudra.py
+      - tests/test_rudra_*.py
+      - tests/fixtures/rudra/**
+      - reports/rudra/**
+      - dharma_swarm/dgc_cli.py
     moves_vital_signs:
       - quality_gates
       - eval_coverage
       - cost_efficiency
     target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion."
+    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion. RUDRA v0 carve-out (amended 2026-08-27, operator RUDRA ASCENT campaign): the RUDRA supervisor's A/B release proof may drive the operator-authenticated Codex app-server executor under its mission contract containment — provider egress to the configured model service only, tool network denied, no external effects; COMPLETE_REPRODUCED grants no push, merge, deploy, publish, or spend authority."
     description: |
       Consolidate the existing foundry into the Sublimation Forge: an
       offline-first, held-out, receipted improvement loop whose candidate
@@ -383,10 +389,15 @@ active_tracks:
     non_goals:
       - Do not use live providers, deploy, mutate a VPS, contact external humans, or promote a candidate without separate authority.
       - Do not let self-score or model consensus substitute for held-out evidence.
+      - "RUDRA v0: no new scheduler, task store, event bus, sandbox framework, or session service; no LLM-as-terminal-verifier or council; no daemonization or dashboard before the local A/B proof; COMPLETE_REPRODUCED grants no external effect; no push/merge/deploy authority; hostile inputs and secret-bearing work stay rejected at admission."
     next_items:
       - id: sublimation-offline-pilot
         what: "Complete the preserved offline pilot packet and land its bounded receipts and kill-switch proof."
         kind: evidence
+        blocker: true
+      - id: rudra-v0-spear
+        what: "Build RUDRA v0 per ~/rudra_build_spec_20260814/ (spec rudra.build.v0.1): frozen mission contract -> private Git workcell -> persistent Codex app-server thread -> independent GoalGate -> fresh-verifier COMPLETE_REPRODUCED. Release proof: 3 RUDRA vs 3 bare-control attempts on one real baseline-red repair (NEW-12-equivalent, revalidated red at merged main 2026-08-27) with matched mid-work kills in both arms and no second-executor / unauthorized-write / stale-green / human-steering failures."
+        kind: code
         blocker: true
 
 # Historical context retained verbatim for later reopening. This key is not an
