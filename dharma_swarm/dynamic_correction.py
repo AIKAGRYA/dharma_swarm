@@ -203,7 +203,14 @@ class DynamicCorrectionEngine:
             for p in (DEFAULT_POLICIES if policies is None else policies)
         }
         self._db_path = db_path
-        self._conn = sqlite3.connect(db_path)
+        # Concurrency hardening (was a bare connect: no WAL, no timeout — the
+        # weakest of the runtime stores). Match graph_store.py:162-168 so a
+        # heartbeat touching this store under concurrent daemon writes waits
+        # then fails fast rather than blocking the async loop indefinitely.
+        self._conn = sqlite3.connect(db_path, timeout=10, check_same_thread=False)
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=10000")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(_CORRECTION_DDL)
         self._conn.commit()
 

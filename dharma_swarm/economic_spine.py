@@ -196,8 +196,12 @@ class EconomicSpine:
 
     def __init__(self, db_path: str = ":memory:") -> None:
         self._db_path = db_path
-        self._conn = sqlite3.connect(db_path)
+        # timeout + busy_timeout so a concurrent writer (e.g. the live
+        # orchestrate-live daemon) makes this connection WAIT-then-fail-fast
+        # instead of blocking indefinitely — matches graph_store.py:162-168.
+        self._conn = sqlite3.connect(db_path, timeout=10, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=10000")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(_DDL)
