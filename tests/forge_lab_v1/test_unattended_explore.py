@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from dharma_swarm.forge_lab import unattended_explore as unattended
+from dharma_swarm.forge_lab import unattended_child_support
 from dharma_swarm.forge_lab import unattended_ledger
+from dharma_swarm.forge_lab import unattended_scratch
 from dharma_swarm.forge_lab import provider_selftest
+from dharma_swarm.forge_lab.experiment import Seams
 
 _CONTEXT_DIGEST = "sha256:" + "d" * 64
 
@@ -193,6 +197,20 @@ def test_admission_rejects_symlinked_state_substrate_before_control_writes(
     assert status["ready"] is False
     assert status["reasons"][0].startswith("STATE_ROOT_UNSAFE:")
     assert list(outside.iterdir()) == []
+
+
+def test_admission_rejects_world_writable_state_before_control_writes(
+    tmp_path: Path,
+) -> None:
+    state = (tmp_path / "state").resolve()
+    state.mkdir(mode=0o777)
+    state.chmod(0o777)
+
+    status = unattended.admission_status(state)
+
+    assert status["ready"] is False
+    assert status["reasons"][0].startswith("STATE_ROOT_UNSAFE:")
+    assert list(state.iterdir()) == []
 
 
 def test_model_evidence_requires_receipt_bound_to_exact_active_roles(
@@ -455,7 +473,13 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
         "source_commit": "b" * 40,
         "state_root": str(state),
         "archive_root": str(state / ".dharma" / "evolution_archive"),
-        "scratch_root": str(state / ".dharma" / "evolution_worktrees"),
+        "scratch_root": str(
+            state
+            / ".dharma"
+            / "evolution_worktrees"
+            / "unattended"
+            / run_id
+        ),
         "result_path": str(result_path),
         "routes": [
             {"provider": "provider-a", "model_id": "model-a"},
@@ -481,7 +505,26 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
     spec_path = run_dir / "child_spec.json"
     spec_path.parent.mkdir(parents=True)
     spec_path.write_text(json.dumps(spec) + "\n")
+    scratch_create = unattended.create_run_scratch(
+        state,
+        run_id,
+        source_commit="b" * 40,
+        spec_digest=spec["spec_digest"],
+        created_at="2026-08-25T00:00:00Z",
+    )
     monkeypatch.setenv("RSI_LAB_UNATTENDED_CHILD_RUN_ID", run_id)
+    monkeypatch.setenv(
+        "RSI_LAB_UNATTENDED_SCRATCH_DEVICE",
+        str(scratch_create["root_identity"]["device"]),
+    )
+    monkeypatch.setenv(
+        "RSI_LAB_UNATTENDED_SCRATCH_INODE",
+        str(scratch_create["root_identity"]["inode"]),
+    )
+    monkeypatch.setenv(
+        "RSI_LAB_UNATTENDED_SCRATCH_MARKER_DIGEST",
+        str(scratch_create["marker_digest"]),
+    )
     fake_secret = "provider-secret-must-never-enter-child-evidence"
     monkeypatch.setenv("OPENAI_API_KEY", fake_secret)
     monkeypatch.setattr(
@@ -511,18 +554,27 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
             "candidate_verifier",
         ):
             counter.consume(label)
-        return object()
+        return Seams(
+            make_worktree=lambda **_kwargs: tmp_path / "unused-scratch",
+            remove_worktree=lambda **_kwargs: None,
+        )
 
     monkeypatch.setattr(unattended, "_bounded_child_seams", fake_seams)
     captured = {}
 
     async def fake_run(cfg, *, seams):
+        captured["runs"] = int(captured.get("runs", 0)) + 1
         captured["cfg"] = cfg
         captured["seams"] = seams
         return {
             "experiment_id": "experiment-1",
             "closeout_state": "inconclusive_low_power",
             "reasons": [f"provider fixture accidentally included {fake_secret}"],
+            "scratch_worktree": {
+                "path": str(Path(spec["scratch_root"]) / "experiment-1" / "repo"),
+                "state": "removed",
+                "removed": True,
+            },
             "stats": {
                 "counters": {"graded": 2, "paired_controls": 1, "blocked": 0}
             },
@@ -558,6 +610,436 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
         unattended.run_child(spec_path)
     assert error.value.code == "CHILD_RESERVATION"
 
+    spec_path.write_text(json.dumps(spec) + "\n")
+    marker_path = Path(spec["scratch_root"]) / unattended_scratch.SCRATCH_MARKER
+    original_marker = marker_path.read_bytes()
+    drifted_marker = json.loads(original_marker)
+    drifted_marker["created_at"] = "2026-08-25T00:00:01Z"
+    drifted_marker["marker_digest"] = unattended.content_digest(
+        {
+            key: value
+            for key, value in drifted_marker.items()
+            if key != "marker_digest"
+        }
+    )
+    marker_path.write_text(json.dumps(drifted_marker) + "\n")
+    os.chmod(marker_path, 0o600)
+    with pytest.raises(unattended.UnattendedError) as marker_error:
+        unattended.run_child(spec_path)
+    assert marker_error.value.code == "SCRATCH_MARKER_MISMATCH"
+    assert captured["runs"] == 1
+    assert unattended._lexists(Path(spec["scratch_root"]))
+    assert marker_path.is_file()
+
+    marker_path.write_bytes(original_marker)
+    os.chmod(marker_path, 0o600)
+    unattended.cleanup_run_scratch(
+        state,
+        run_id,
+        source_commit="b" * 40,
+        spec_digest=spec["spec_digest"],
+        expected_root_identity=scratch_create["root_identity"],
+        expected_marker_digest=scratch_create["marker_digest"],
+    )
+
+
+def test_scratch_custody_cleans_an_aborted_child_clone(tmp_path: Path) -> None:
+    source_repo = tmp_path / "source"
+    archive_path = tmp_path / "archive" / "archive.jsonl"
+    scratch_repo = tmp_path / "scratch" / "experiment-1" / "repo"
+    removals: list[tuple[Path, Path, str]] = []
+
+    def make_worktree(**_kwargs) -> Path:
+        scratch_repo.mkdir(parents=True)
+        return scratch_repo
+
+    def remove_worktree(
+        *, source_repo: Path, repo: Path, experiment_id: str
+    ) -> None:
+        removals.append((source_repo, repo, experiment_id))
+        repo.rmdir()
+        repo.parent.rmdir()
+
+    def abort(seams: Seams) -> None:
+        created = seams.make_worktree(
+            source_repo=source_repo,
+            experiment_id="experiment-1",
+            archive_path=archive_path,
+            category="agent_evolution",
+        )
+        assert created == scratch_repo
+        raise RuntimeError("simulated child failure")
+
+    with pytest.raises(RuntimeError, match="simulated child failure"):
+        unattended._run_with_scratch_custody(
+            Seams(
+                make_worktree=make_worktree,
+                remove_worktree=remove_worktree,
+            ),
+            abort,
+        )
+
+    assert removals == [(source_repo, scratch_repo, "experiment-1")]
+    assert not scratch_repo.parent.exists()
+
+
+def test_scratch_custody_refuses_unconfirmed_cleanup(tmp_path: Path) -> None:
+    scratch_repo = tmp_path / "scratch" / "experiment-1" / "repo"
+
+    def make_worktree(**_kwargs) -> Path:
+        scratch_repo.mkdir(parents=True)
+        return scratch_repo
+
+    def refuse_remove(**_kwargs) -> None:
+        raise RuntimeError("cleanup refused")
+
+    seams, cleanup = unattended_child_support.with_scratch_custody(
+        Seams(
+            make_worktree=make_worktree,
+            remove_worktree=refuse_remove,
+        )
+    )
+    seams.make_worktree(
+        source_repo=tmp_path / "source",
+        experiment_id="experiment-1",
+        archive_path=tmp_path / "archive.jsonl",
+        category="agent_evolution",
+    )
+
+    with pytest.raises(unattended.UnattendedError) as error:
+        cleanup()
+
+    assert error.value.code == "SCRATCH_CLEANUP_FAILED"
+    assert scratch_repo.exists()
+
+
+def test_clone_scratch_rolls_back_when_creation_fails_after_side_effect(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_repo = tmp_path / "source"
+    source_repo.mkdir()
+    scratch_root = tmp_path / "scratch-run"
+    scratch_root.mkdir()
+    monkeypatch.setenv("DHARMA_EVOLUTION_WORKTREE_ROOT", str(scratch_root))
+    monkeypatch.setattr(
+        unattended_child_support,
+        "require_execution_source",
+        lambda _source: {"commit": "d" * 40},
+    )
+    calls = 0
+
+    def fail_after_clone(argv, *, cwd=None, timeout=300):
+        del cwd, timeout
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            Path(argv[-1]).mkdir(parents=True)
+            return
+        raise unattended.UnattendedError("SCRATCH_GIT_FAILED", "checkout failed")
+
+    monkeypatch.setattr(unattended_child_support, "_run_git", fail_after_clone)
+
+    with pytest.raises(unattended.UnattendedError, match="checkout failed"):
+        unattended._clone_scratch(
+            source_repo=source_repo,
+            experiment_id="experiment-1",
+            archive_path=tmp_path / "archive.jsonl",
+            category="agent_evolution",
+        )
+
+    assert not (scratch_root / "experiment-1").exists()
+
+
+def test_parent_cleanup_removes_a_real_clone_left_by_killed_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_repo = tmp_path / "source"
+    source_repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(source_repo)], check=True)
+    (source_repo / "fixture.py").write_text("VALUE = 1\n")
+    subprocess.run(["git", "-C", str(source_repo), "add", "fixture.py"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source_repo),
+            "-c",
+            "user.name=RSI Test",
+            "-c",
+            "user.email=rsi@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "-C", str(source_repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    state = tmp_path / "state"
+    state.mkdir()
+    run_id = "unattended-real-clone"
+    spec_digest = "sha256:" + "e" * 64
+    scratch_create = unattended.create_run_scratch(
+        state,
+        run_id,
+        source_commit=commit,
+        spec_digest=spec_digest,
+        created_at="2026-08-28T00:00:00Z",
+    )
+    root = unattended.unattended_scratch_root(state, run_id)
+    monkeypatch.setenv("DHARMA_EVOLUTION_WORKTREE_ROOT", str(root))
+    monkeypatch.setattr(
+        unattended_child_support,
+        "require_execution_source",
+        lambda _source: {"commit": commit},
+    )
+
+    repo = unattended._clone_scratch(
+        source_repo=source_repo,
+        experiment_id="experiment-1",
+        archive_path=tmp_path / "archive.jsonl",
+        category="agent_evolution",
+    )
+
+    assert (repo / "fixture.py").read_text() == "VALUE = 1\n"
+    proof = unattended.cleanup_run_scratch(
+        state,
+        run_id,
+        source_commit=commit,
+        spec_digest=spec_digest,
+        expected_root_identity=scratch_create["root_identity"],
+        expected_marker_digest=scratch_create["marker_digest"],
+    )
+    assert proof["ok"] is True
+    assert proof["inventory"]["regular_files"] > 10
+    assert not unattended._lexists(root)
+
+
+def test_scratch_custody_detects_dangling_symlink_after_remove(
+    tmp_path: Path,
+) -> None:
+    scratch_repo = tmp_path / "scratch" / "experiment-1" / "repo"
+
+    def make_worktree(**_kwargs) -> Path:
+        scratch_repo.mkdir(parents=True)
+        return scratch_repo
+
+    def leave_dangling_link(**_kwargs) -> None:
+        scratch_repo.rmdir()
+        scratch_repo.symlink_to(tmp_path / "missing", target_is_directory=True)
+
+    seams, _cleanup = unattended_child_support.with_scratch_custody(
+        Seams(
+            make_worktree=make_worktree,
+            remove_worktree=leave_dangling_link,
+        )
+    )
+    repo = seams.make_worktree(
+        source_repo=tmp_path / "source",
+        experiment_id="experiment-1",
+        archive_path=tmp_path / "archive.jsonl",
+        category="agent_evolution",
+    )
+
+    with pytest.raises(unattended.UnattendedError) as error:
+        seams.remove_worktree(
+            source_repo=tmp_path / "source",
+            repo=repo,
+            experiment_id="experiment-1",
+        )
+
+    assert error.value.code == "SCRATCH_REMOVE_UNCONFIRMED"
+    assert repo.exists() is False
+    assert repo.is_symlink() is True
+
+
+def _stale_run_fixture(
+    state: Path,
+    *,
+    run_id: str,
+    receipt: bool,
+) -> tuple[Path, dict[str, object], dict[str, object]]:
+    control = state / ".dharma" / "forge_lab" / "unattended_explore"
+    spec_path = control / "runs" / run_id / "child_spec.json"
+    scratch_root = unattended.unattended_scratch_root(state, run_id)
+    spec: dict[str, object] = {
+        "schema": unattended.RUNNER_SCHEMA,
+        "run_id": run_id,
+        "state_root": str(state),
+        "scratch_root": str(scratch_root),
+        "source_commit": "f" * 40,
+        "positive_rsi_claim": False,
+    }
+    spec["spec_digest"] = unattended.content_digest(spec)
+    unattended.write_json_exclusive(spec_path, spec)
+    created = unattended.create_run_scratch(
+        state,
+        run_id,
+        source_commit=str(spec["source_commit"]),
+        spec_digest=str(spec["spec_digest"]),
+        created_at="2026-08-28T00:00:00Z",
+    )
+    repo = scratch_root / "experiment-stale" / "repo"
+    repo.mkdir(parents=True)
+    (repo / "partial.py").write_text("partial\n")
+    if receipt:
+        unattended.append_chain(
+            control / "receipts.jsonl",
+            {
+                "kind": "run_admitted",
+                "at": "2026-08-28T00:00:00Z",
+                "run_id": run_id,
+                "source_commit": spec["source_commit"],
+                "spec": str(spec_path),
+                "spec_digest": spec["spec_digest"],
+                "scratch_custody_create": created,
+                "positive_rsi_claim": False,
+            },
+            schema=unattended.RECEIPT_SCHEMA,
+            digest_field="receipt_digest",
+        )
+    return control, spec, created
+
+
+def test_stale_marker_bound_root_is_recovered_before_new_spend(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    run_id = "unattended-stale"
+    control, _spec, created = _stale_run_fixture(
+        state,
+        run_id=run_id,
+        receipt=True,
+    )
+
+    recovered = unattended._recover_stale_scratch(state, control)
+
+    assert len(recovered) == 1
+    assert recovered[0]["kind"] == "stale_scratch_recovered"
+    assert recovered[0]["provider_calls"] == 0
+    assert recovered[0]["usd_reserved"] == 0.0
+    assert unattended.validate_parent_scratch_proofs(
+        created,
+        recovered[0]["scratch_custody"]["cleanup"],
+        state_root=state,
+        run_id=run_id,
+    )
+    assert unattended_scratch.list_run_scratch_ids(state) == []
+    assert not (control / "budget_ledger.jsonl").exists()
+
+
+def test_stale_recovery_refuses_recomputed_marker_drift_without_deleting(
+    tmp_path: Path,
+) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    run_id = "unattended-stale-drift"
+    control, _spec, _created = _stale_run_fixture(
+        state,
+        run_id=run_id,
+        receipt=True,
+    )
+    root = unattended.unattended_scratch_root(state, run_id)
+    marker_path = root / unattended_scratch.SCRATCH_MARKER
+    marker = json.loads(marker_path.read_text())
+    marker["created_at"] = "2026-08-28T00:00:01Z"
+    marker["marker_digest"] = unattended.content_digest(
+        {key: value for key, value in marker.items() if key != "marker_digest"}
+    )
+    marker_path.write_text(json.dumps(marker) + "\n")
+    os.chmod(marker_path, 0o600)
+
+    with pytest.raises(unattended.UnattendedError) as error:
+        unattended._recover_stale_scratch(state, control)
+
+    assert error.value.code == "STALE_SCRATCH_REFUSED"
+    assert unattended_scratch.list_run_scratch_ids(state) == [run_id]
+    assert marker_path.is_file()
+    assert not (control / "budget_ledger.jsonl").exists()
+    receipts = unattended.read_chain(
+        control / "receipts.jsonl",
+        schema=unattended.RECEIPT_SCHEMA,
+        digest_field="receipt_digest",
+    )
+    assert receipts[-1]["kind"] == "stale_scratch_refusal"
+    assert receipts[-1]["error_code"] == "SCRATCH_MARKER_MISMATCH"
+
+
+def test_unknown_stale_root_blocks_run_before_admission_or_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    control, _spec, _created = _stale_run_fixture(
+        state,
+        run_id="unattended-unknown",
+        receipt=False,
+    )
+    admission_called = False
+    budget_called = False
+
+    def unexpected_admission(_state):
+        nonlocal admission_called
+        admission_called = True
+        raise AssertionError("stale audit must precede admission")
+
+    def unexpected_budget(*_args, **_kwargs):
+        nonlocal budget_called
+        budget_called = True
+        raise AssertionError("stale audit must precede reservation")
+
+    monkeypatch.setattr(unattended, "admission_status", unexpected_admission)
+    monkeypatch.setattr(unattended, "reserve_budget", unexpected_budget)
+
+    with pytest.raises(unattended.UnattendedError) as error:
+        unattended.run_once(state, timeout_seconds=60)
+
+    assert error.value.code == "STALE_SCRATCH_REFUSED"
+    assert admission_called is False
+    assert budget_called is False
+    assert unattended_scratch.list_run_scratch_ids(state) == ["unattended-unknown"]
+    assert not (control / "budget_ledger.jsonl").exists()
+    receipts = unattended.read_chain(
+        control / "receipts.jsonl",
+        schema=unattended.RECEIPT_SCHEMA,
+        digest_field="receipt_digest",
+    )
+    assert receipts[-1]["kind"] == "stale_scratch_refusal"
+    assert receipts[-1]["error_code"] == "STALE_SCRATCH_AUTHORITY_MISSING"
+
+
+def test_live_orphan_child_lease_blocks_stale_recovery(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    run_id = "unattended-live-child"
+    control, spec, created = _stale_run_fixture(
+        state,
+        run_id=run_id,
+        receipt=True,
+    )
+    lease = unattended.acquire_run_scratch_lease(
+        state,
+        run_id,
+        source_commit=str(spec["source_commit"]),
+        spec_digest=str(spec["spec_digest"]),
+        expected_root_identity=created["root_identity"],
+        expected_marker_digest=created["marker_digest"],
+    )
+    try:
+        with pytest.raises(unattended.UnattendedError) as error:
+            unattended._recover_stale_scratch(state, control)
+        assert error.value.code == "STALE_SCRATCH_REFUSED"
+        assert unattended_scratch.list_run_scratch_ids(state) == [run_id]
+    finally:
+        lease.close()
+
 
 def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
     tmp_path: Path,
@@ -590,11 +1072,28 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
         },
     )
 
-    def fake_child(spec_path, *, run_id, timeout_seconds, log_path, halt_path):
+    def fake_child(
+        spec_path,
+        *,
+        run_id,
+        timeout_seconds,
+        log_path,
+        halt_path,
+        scratch_root_identity,
+        scratch_marker_digest,
+    ):
         del timeout_seconds, halt_path
         spec = json.loads(spec_path.read_text())
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("bounded child fixture\n")
+        attestation = unattended_scratch.attest_run_scratch(
+            state,
+            run_id,
+            source_commit=spec["source_commit"],
+            spec_digest=spec["spec_digest"],
+            expected_root_identity=scratch_root_identity,
+            expected_marker_digest=scratch_marker_digest,
+        )
         child = {
             "schema": unattended.CHILD_SCHEMA,
             "run_id": run_id,
@@ -615,6 +1114,30 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
                 "candidate_verifier": 1,
             },
             "execution_shape_ok": True,
+            "scratch_cleanup_ok": True,
+            "scratch_custody_attestation": attestation,
+            "experiment_closeout": {
+                "schema": "forge_lab.closeout.v0",
+                "experiment_id": "experiment-fixture",
+                "closeout_state": "inconclusive_low_power",
+                "scratch_worktree": {
+                    "path": str(
+                        Path(spec["scratch_root"])
+                        / "experiment-fixture"
+                        / "repo"
+                    ),
+                    "state": "removed",
+                    "removed": True,
+                },
+                "stats": {
+                    "counters": {
+                        "graded": 2,
+                        "paired_controls": 1,
+                        "blocked": 0,
+                    }
+                },
+            },
+            "epistemic_modality": "EXPLORE_ONLY",
             "positive_rsi_claim": False,
         }
         child["result_digest"] = unattended.content_digest(child)
@@ -643,8 +1166,31 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
     assert receipts[-1]["epistemic_modality"] == "EXPLORE_ONLY"
     assert receipts[-1]["positive_rsi_claim"] is False
 
-    def fake_halted(_spec_path, *, run_id, timeout_seconds, log_path, halt_path):
-        del run_id, timeout_seconds, halt_path
+    halted_scratch: list[Path] = []
+
+    def fake_halted(
+        spec_path,
+        *,
+        run_id,
+        timeout_seconds,
+        log_path,
+        halt_path,
+        scratch_root_identity,
+        scratch_marker_digest,
+    ):
+        del (
+            run_id,
+            timeout_seconds,
+            halt_path,
+            scratch_root_identity,
+            scratch_marker_digest,
+        )
+        spec = json.loads(spec_path.read_text())
+        scratch_root = Path(spec["scratch_root"])
+        repo = scratch_root / "killed-experiment" / "repo"
+        repo.mkdir(parents=True)
+        (repo / "partial.py").write_text("partial\n")
+        halted_scratch.append(scratch_root)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("halted child fixture\n")
         return -15, False, True, 2
@@ -653,6 +1199,9 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
     halted = unattended.run_once(state, timeout_seconds=60)
     assert halted["ok"] is False
     assert halted["halted"] is True
+    assert halted["scratch_cleanup_ok"] is True
+    assert len(halted_scratch) == 1
+    assert not unattended._lexists(halted_scratch[0])
     receipts = unattended.read_chain(
         control / "receipts.jsonl",
         schema=unattended.RECEIPT_SCHEMA,
@@ -660,6 +1209,10 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
     )
     assert receipts[-1]["halted"] is True
     assert receipts[-1]["epistemic_modality"] == "InconclusiveOperatorHalt"
+    assert receipts[-1]["scratch_custody"]["cleanup"]["ok"] is True
+    assert receipts[-1]["scratch_custody"]["cleanup"]["inventory"][
+        "regular_files"
+    ] == 2
 
 
 def test_external_watchdog_terminates_the_child_process_group(
@@ -686,18 +1239,24 @@ def test_external_watchdog_terminates_the_child_process_group(
     spec.write_text("{}\n")
 
     monotonic = iter((0.0, 61.0, 61.1))
-    monkeypatch.setattr(unattended.time, "monotonic", lambda: next(monotonic))
+    monkeypatch.setattr(
+        unattended_child_support.time,
+        "monotonic",
+        lambda: next(monotonic),
+    )
     returncode, timed_out, halted, _wall = unattended._run_child_process(
         spec,
         run_id="watchdog",
         timeout_seconds=60,
         log_path=tmp_path / "child.log",
         halt_path=tmp_path / "HALT",
+        scratch_root_identity={"device": 1, "inode": 2},
+        scratch_marker_digest="sha256:" + "a" * 64,
     )
     assert returncode == -15
     assert timed_out is True
     assert halted is False
-    assert signals == [(4242, unattended.signal.SIGTERM)]
+    assert signals == [(4242, unattended_child_support.signal.SIGTERM)]
     assert child_argv == [
         unattended.sys.executable,
         "-m",
@@ -731,11 +1290,13 @@ def test_halt_latch_terminates_running_child_and_is_typed_inconclusive(
         timeout_seconds=60,
         log_path=tmp_path / "halted.log",
         halt_path=halt,
+        scratch_root_identity={"device": 1, "inode": 2},
+        scratch_marker_digest="sha256:" + "a" * 64,
     )
     assert returncode == -15
     assert timed_out is False
     assert halted is True
-    assert signals == [(4343, unattended.signal.SIGTERM)]
+    assert signals == [(4343, unattended_child_support.signal.SIGTERM)]
 
 
 def test_unattended_wrapper_and_systemd_timer_are_bounded() -> None:

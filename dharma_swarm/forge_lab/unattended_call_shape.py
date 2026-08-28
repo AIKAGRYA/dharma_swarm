@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
+
+from dharma_swarm.forge_lab.unattended_scratch import validate_scratch_proof
 
 
 class CallShapeError(RuntimeError):
@@ -40,11 +43,128 @@ EXPECTED_PROVIDER_CALLS = {
     "candidate_verifier": 1,
 }
 
+_TASKBED_ALLOCATION_RECEIPT_SCHEMA = "forge_v2.taskbed_allocation_receipt.v1"
+
+
+def _exact_provider_call_map(value: Any) -> bool:
+    return bool(
+        isinstance(value, dict)
+        and set(value) == set(EXPECTED_PROVIDER_CALLS)
+        and all(
+            type(value.get(role)) is int
+            and value.get(role) == expected
+            for role, expected in EXPECTED_PROVIDER_CALLS.items()
+        )
+    )
+
+
+def _build_state_anchored_explore_allocator(
+    *,
+    admitted_task_id: str,
+    taskbed_db: Path,
+    error_factory: Callable[[str, str], Exception],
+    allocate_task_ids_fn: Callable[..., dict[str, Any]],
+) -> Callable[..., dict[str, Any]]:
+    """Bind the allocate_explore interface to one admitted task and state DB."""
+
+    task_id = str(admitted_task_id or "").strip()
+    anchored_db = taskbed_db.expanduser().resolve(strict=False)
+
+    def state_anchored_allocate(
+        *,
+        count: int,
+        epoch_id: str,
+        lane_id: str,
+        db_path: Path | str = anchored_db,
+        allocation_id: str | None = None,
+        candidate_id: str = "",
+    ) -> dict[str, Any]:
+        # Keep this signature aligned with allocate_explore. Explicit keyword
+        # parameters make additions or split overrides fail at the interface
+        # instead of being silently forwarded to the lower-level allocator.
+        if type(count) is not int or count != 1:
+            raise error_factory(
+                "TASK_SHAPE",
+                "unattended allocation requires exactly one task",
+            )
+        if not task_id:
+            raise error_factory(
+                "TASK_ALLOCATION_INTERFACE",
+                "admitted task id is empty",
+            )
+        if not isinstance(epoch_id, str) or not epoch_id.strip():
+            raise error_factory(
+                "TASK_ALLOCATION_INTERFACE",
+                "allocation epoch id must be a non-empty string",
+            )
+        if not isinstance(lane_id, str) or not lane_id.strip():
+            raise error_factory(
+                "TASK_ALLOCATION_INTERFACE",
+                "allocation lane id must be a non-empty string",
+            )
+        try:
+            requested_db = Path(db_path).expanduser().resolve(strict=False)
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            raise error_factory(
+                "TASK_ALLOCATION_OVERRIDE",
+                "taskbed database override is invalid",
+            ) from exc
+        if requested_db != anchored_db:
+            raise error_factory(
+                "TASK_ALLOCATION_OVERRIDE",
+                "taskbed database cannot change after admission",
+            )
+        if allocation_id is not None or candidate_id != "":
+            raise error_factory(
+                "TASK_ALLOCATION_OVERRIDE",
+                "allocation identity overrides are not admitted",
+            )
+
+        try:
+            receipt = allocate_task_ids_fn(
+                split="explore",
+                task_ids=[task_id],
+                epoch_id=epoch_id,
+                lane_id=lane_id,
+                db_path=anchored_db,
+                allocation_id=None,
+                candidate_id="",
+            )
+        except Exception as exc:
+            raise error_factory(
+                "TASK_ALLOCATION_REFUSED",
+                f"exact explore allocation failed ({type(exc).__name__}): {exc}",
+            ) from exc
+
+        valid_receipt = bool(
+            isinstance(receipt, dict)
+            and receipt.get("schema") == _TASKBED_ALLOCATION_RECEIPT_SCHEMA
+            and receipt.get("split") == "explore"
+            and type(receipt.get("task_count")) is int
+            and receipt.get("task_count") == 1
+            and receipt.get("task_ids") == [task_id]
+            and isinstance(receipt.get("allocation_id"), str)
+            and bool(receipt.get("allocation_id"))
+            and receipt.get("blockers") == []
+        )
+        if not valid_receipt:
+            raise error_factory(
+                "TASK_ALLOCATION_RECEIPT",
+                "allocator did not receipt exactly one admitted EXPLORE task",
+            )
+        return receipt
+
+    return state_anchored_allocate
+
 
 def validated_child_result(
     path: Path,
     *,
     run_id: str,
+    scratch_root: Path,
+    scratch_marker_digest: str,
+    scratch_root_identity: dict[str, int],
+    terminal_success_states: frozenset[str],
     policy: RunnerPolicy,
     safe_json_fn: Callable[[Path], dict[str, Any] | None],
     chain_digest_fn: Callable[[dict[str, Any], str], str],
@@ -58,15 +178,68 @@ def validated_child_result(
         return None
     if payload.get("result_digest") != chain_digest_fn(payload, "result_digest"):
         return None
-    try:
-        used = int(payload.get("logical_provider_calls_used"))
-        limit = int(payload.get("logical_provider_call_limit"))
-    except (TypeError, ValueError):
+    used = payload.get("logical_provider_calls_used")
+    limit = payload.get("logical_provider_call_limit")
+    if type(used) is not int or type(limit) is not int:
         return None
+    closeout = payload.get("experiment_closeout")
+    if not isinstance(closeout, dict):
+        return None
+    experiment_id = payload.get("experiment_id")
+    closeout_state = payload.get("closeout_state")
+    if (
+        not isinstance(experiment_id, str)
+        or not experiment_id
+        or Path(experiment_id).name != experiment_id
+        or experiment_id in {".", ".."}
+        or closeout.get("schema") != "forge_lab.closeout.v0"
+        or closeout.get("experiment_id") != experiment_id
+        or closeout.get("closeout_state") != closeout_state
+        or not isinstance(closeout_state, str)
+        or closeout_state not in terminal_success_states
+    ):
+        return None
+    scratch = closeout.get("scratch_worktree")
+    if not isinstance(scratch, dict):
+        return None
+    expected_root = Path(os.path.abspath(os.path.normpath(os.fspath(scratch_root))))
+    expected_repo = expected_root / experiment_id / "repo"
+    raw_scratch_path = scratch.get("path")
+    if not isinstance(raw_scratch_path, str) or not raw_scratch_path:
+        return None
+    actual_repo = Path(os.path.abspath(os.path.normpath(raw_scratch_path)))
+    stats = closeout.get("stats")
+    counters = stats.get("counters") if isinstance(stats, dict) else None
+    attestation = payload.get("scratch_custody_attestation")
+    attestation_ok = validate_scratch_proof(
+        attestation,
+        operation="attest",
+        scratch_root=expected_root,
+        run_id=run_id,
+        expected_root_identity=scratch_root_identity,
+        expected_marker_digest=scratch_marker_digest,
+    )
     if (
         used != policy.logical_provider_call_slots
         or limit != policy.logical_provider_call_slots
+        or not _exact_provider_call_map(payload.get("logical_provider_calls_by_role"))
+        or not _exact_provider_call_map(payload.get("expected_provider_calls_by_role"))
         or payload.get("execution_shape_ok") is not True
+        or payload.get("scratch_cleanup_ok") is not True
+        or payload.get("epistemic_modality") != "EXPLORE_ONLY"
+        or not attestation_ok
+        or scratch.get("state") != "removed"
+        or scratch.get("removed") is not True
+        or actual_repo != expected_repo
+        or os.path.lexists(os.fspath(actual_repo))
+        or os.path.lexists(os.fspath(expected_root))
+        or not isinstance(counters, dict)
+        or type(counters.get("graded")) is not int
+        or counters.get("graded", 0) < 2
+        or type(counters.get("paired_controls")) is not int
+        or counters.get("paired_controls") != 1
+        or type(counters.get("blocked")) is not int
+        or counters.get("blocked") != 0
     ):
         return None
     return payload
@@ -83,13 +256,17 @@ def validate_child_spec(
     """Bind the hidden child to the parent's reservation and canonical paths."""
 
     run_id = str(spec.get("run_id") or "")
+    if not run_id or Path(run_id).name != run_id or run_id in {".", ".."}:
+        raise CallShapeError("CHILD_RUN_ID", "child run id is not one safe path component")
     state_root = Path(str(spec.get("state_root") or "")).resolve(strict=False)
     control_root = state_root / ".dharma" / "forge_lab" / "unattended_explore"
     expected_run_dir = control_root / "runs" / run_id
     expected_spec = expected_run_dir / "child_spec.json"
     expected_result = expected_run_dir / "child_result.json"
     expected_archive = state_root / ".dharma" / "evolution_archive"
-    expected_scratch = state_root / ".dharma" / "evolution_worktrees"
+    expected_scratch = (
+        state_root / ".dharma" / "evolution_worktrees" / "unattended" / run_id
+    )
     if spec_path.resolve(strict=False) != expected_spec.resolve(strict=False):
         raise CallShapeError("CHILD_SPEC_PATH", "child spec is outside its run directory")
     if Path(str(spec.get("result_path") or "")).resolve(
@@ -267,13 +444,12 @@ def build_bounded_child_seams(
     mutation_completion = PoolCompletion(role_bindings["mutator"]["model_id"])
     taskbed_db = Path(spec["state_root"]) / ".dharma" / "forge_v1" / "taskbed.db"
 
-    def state_anchored_allocate(**kwargs: Any) -> dict[str, Any]:
-        if kwargs.pop("count", None) != 1:
-            raise error_factory(
-                "TASK_SHAPE",
-                "unattended allocation requires one task",
-            )
-        return allocate_task_ids(task_ids=[spec["task_id"]], db_path=taskbed_db, **kwargs)
+    state_anchored_allocate = _build_state_anchored_explore_allocator(
+        admitted_task_id=spec["task_id"],
+        taskbed_db=taskbed_db,
+        error_factory=error_factory,
+        allocate_task_ids_fn=allocate_task_ids,
+    )
 
     def bounded_mutation(prompt: str) -> tuple[str, int]:
         counter.consume("mutation")
@@ -318,9 +494,12 @@ def execution_shape_matches(counter: Any, counters: dict[str, Any], *, slots: in
     return bool(
         counter.used == slots
         and counter.by_label == EXPECTED_PROVIDER_CALLS
-        and int(counters.get("graded") or 0) >= 2
-        and int(counters.get("paired_controls") or 0) == 1
-        and int(counters.get("blocked") or 0) == 0
+        and type(counters.get("graded")) is int
+        and counters.get("graded", 0) >= 2
+        and type(counters.get("paired_controls")) is int
+        and counters.get("paired_controls") == 1
+        and type(counters.get("blocked")) is int
+        and counters.get("blocked") == 0
     )
 
 

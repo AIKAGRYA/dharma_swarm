@@ -19,14 +19,9 @@ import fcntl
 import hashlib
 import json
 import os
-import shutil
-import signal
 import stat
-import subprocess
 import sys
-import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -47,11 +42,20 @@ from dharma_swarm.forge_lab.state_io import (
 from dharma_swarm.forge_lab.unattended_call_shape import (
     EXPECTED_PROVIDER_CALLS,
     CallShapeError,
-    RunnerPolicy,
     build_bounded_child_seams,
     execution_shape_matches,
     validate_child_spec,
     validated_child_result,
+)
+from dharma_swarm.forge_lab.unattended_child_support import (
+    child_scratch_identity as _child_scratch_identity,
+    child_scratch_marker_digest as _child_scratch_marker_digest,
+    clone_scratch as _clone_scratch,
+    lexists as _lexists,
+    redact_secret_values as _redact_secret_values,
+    remove_clone_scratch as _remove_clone_scratch,
+    run_child_process as _run_child_process,
+    run_with_scratch_custody as _run_with_scratch_custody,
 )
 from dharma_swarm.forge_lab.unattended_ledger import (
     BudgetCeilings,
@@ -70,88 +74,43 @@ from dharma_swarm.forge_lab.unattended_model_evidence import (
     ModelEvidenceError,
     selected_model_evidence,
 )
-
-RUNNER_SCHEMA = "rsi_lab.unattended_explore.v1"
-LEDGER_SCHEMA = "rsi_lab.unattended_budget_ledger.v1"
-RECEIPT_SCHEMA = "rsi_lab.unattended_receipt_chain.v1"
-CHILD_SCHEMA = "rsi_lab.unattended_child_result.v1"
-CHILD_MODULE = "dharma_swarm.forge_lab.unattended_explore"
-
-# Fixed live shape and hard policy maxima.  Dollar reservations are accounting
-# ceilings, not vendor billing telemetry; that distinction is repeated in every
-# ledger entry and closeout.
-GENERATIONS = 1
-CHILDREN = 1
-TASKS = 1
-LOGICAL_PROVIDER_CALL_SLOTS = 5
-PER_CALL_TOKENS = 8_000
-PER_CALL_USD = 0.25
-PER_CANDIDATE_TOKENS = 16_000
-PER_CANDIDATE_USD = 0.50
-MAX_EXPERIMENT_TOKENS = 40_000
-RUN_USD_RESERVATION = PER_CALL_USD * LOGICAL_PROVIDER_CALL_SLOTS
-DAILY_USD_CAP = 3.0
-MONTHLY_USD_CAP = 40.0
-DAILY_CALL_CAP = 12
-MONTHLY_CALL_CAP = 120
-DEFAULT_TIMEOUT_SECONDS = 2_700
-MAX_TIMEOUT_SECONDS = 3_000
-PROVIDER_TTL_SECONDS = 3_600
-MODEL_ROLES = ("mutator", "solver", "verifier")
-
-TERMINAL_SUCCESS_STATES = {"inconclusive_low_power", "measured_negative"}
-RUNNER_POLICY = RunnerPolicy(
-    runner_schema=RUNNER_SCHEMA,
-    ledger_schema=LEDGER_SCHEMA,
-    child_schema=CHILD_SCHEMA,
-    generations=GENERATIONS,
-    children=CHILDREN,
-    tasks=TASKS,
-    logical_provider_call_slots=LOGICAL_PROVIDER_CALL_SLOTS,
-    per_call_tokens=PER_CALL_TOKENS,
-    per_candidate_tokens=PER_CANDIDATE_TOKENS,
-    per_candidate_usd=PER_CANDIDATE_USD,
-    max_experiment_tokens=MAX_EXPERIMENT_TOKENS,
-    max_timeout_seconds=MAX_TIMEOUT_SECONDS,
-    run_usd_reservation=RUN_USD_RESERVATION,
+from dharma_swarm.forge_lab.unattended_policy import (
+    CHILDREN,
+    CHILD_SCHEMA,
+    DAILY_CALL_CAP,
+    DAILY_USD_CAP,
+    DEFAULT_TIMEOUT_SECONDS,
+    GENERATIONS,
+    LEDGER_SCHEMA,
+    LOGICAL_PROVIDER_CALL_SLOTS,
+    MAX_EXPERIMENT_TOKENS,
+    MAX_TIMEOUT_SECONDS,
+    MODEL_ROLES,
+    MONTHLY_CALL_CAP,
+    MONTHLY_USD_CAP,
+    PER_CALL_TOKENS,
+    PER_CANDIDATE_TOKENS,
+    PER_CANDIDATE_USD,
+    PROVIDER_TTL_SECONDS,
+    RECEIPT_SCHEMA,
+    RUNNER_POLICY,
+    RUNNER_SCHEMA,
+    RUN_USD_RESERVATION,
+    TASKS,
+    TERMINAL_SUCCESS_STATES,
+    BudgetPolicy,
+    LogicalCallBudget,
+    UnattendedError,
 )
-
-
-class UnattendedError(RuntimeError):
-    """Typed fail-closed runner refusal."""
-
-    def __init__(self, code: str, message: str):
-        super().__init__(message)
-        self.code = code
-
-
-@dataclass(frozen=True)
-class BudgetPolicy:
-    run_usd: float = RUN_USD_RESERVATION
-    run_calls: int = LOGICAL_PROVIDER_CALL_SLOTS
-    daily_usd: float = DAILY_USD_CAP
-    monthly_usd: float = MONTHLY_USD_CAP
-    daily_calls: int = DAILY_CALL_CAP
-    monthly_calls: int = MONTHLY_CALL_CAP
-
-
-@dataclass
-class LogicalCallBudget:
-    """Count admitted logical provider invocations before dispatch."""
-
-    limit: int = LOGICAL_PROVIDER_CALL_SLOTS
-    used: int = 0
-    by_label: dict[str, int] = field(default_factory=dict)
-
-    def consume(self, label: str) -> None:
-        if self.used >= self.limit:
-            raise UnattendedError(
-                "LOGICAL_PROVIDER_CALL_CAP",
-                f"provider call slot refused before {label}: {self.used}/{self.limit}",
-            )
-        self.used += 1
-        self.by_label[label] = self.by_label.get(label, 0) + 1
-
+from dharma_swarm.forge_lab.unattended_recovery import recover_stale_scratch
+from dharma_swarm.forge_lab.unattended_scratch import (
+    ScratchCustodyError,
+    acquire_run_scratch_lease,
+    cleanup_run_scratch,
+    create_run_scratch,
+    run_root as unattended_scratch_root,
+    validate_parent_scratch_proofs,
+)
 
 def _now() -> str:
     return (
@@ -281,9 +240,15 @@ def _validated_state_root(value: Path) -> Path:
             continue
         except OSError as exc:
             raise UnattendedError("STATE_ROOT_UNSAFE", f"cannot inspect {path}") from exc
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        if (
+            stat.S_ISLNK(metadata.st_mode)
+            or not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
             raise UnattendedError(
-                "STATE_ROOT_UNSAFE", f"{label} must be a real directory: {path}"
+                "STATE_ROOT_UNSAFE",
+                f"{label} must be an owner-controlled real directory: {path}",
             )
     try:
         resolved = raw.resolve(strict=True)
@@ -320,7 +285,7 @@ def admission_status(state_root: Path) -> dict[str, Any]:
         }
     sanitize_unattended_docker_env()
     halt = state_root / ".dharma" / "forge_lab" / "HALT"
-    if halt.exists():
+    if _lexists(halt):
         reasons.append(f"HALT_present:{halt}")
     if os.environ.get("RSI_LAB_DEV_SOURCE") == "1":
         reasons.append("development_source_forbidden")
@@ -401,73 +366,6 @@ def admission_status(state_root: Path) -> dict[str, Any]:
     }
 
 
-def _run_child_process(
-    spec_path: Path,
-    *,
-    run_id: str,
-    timeout_seconds: int,
-    log_path: Path,
-    halt_path: Path,
-) -> tuple[int, bool, bool, int]:
-    """Run the experiment in a child process with an external wall-clock fuse."""
-
-    env = os.environ.copy()
-    env.update(
-        {
-            "RSI_LAB_UNATTENDED_CHILD_RUN_ID": run_id,
-            "DHARMA_MODEL_BUDGET_USD": str(RUN_USD_RESERVATION),
-            "DHARMA_EVOLUTION_SHADOW": "1",
-            "DHARMA_SELF_IMPROVE": "0",
-            "DHARMA_ALLOW_LIVE_MUTATION": "0",
-            "PYTHONDONTWRITEBYTECODE": "1",
-        }
-    )
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    started = time.monotonic()
-    deadline = started + timeout_seconds
-    timed_out = False
-    halted = False
-    with os.fdopen(descriptor, "wb") as log_handle:
-        process = subprocess.Popen(
-            [sys.executable, "-m", CHILD_MODULE, "--child-spec", str(spec_path)],
-            stdin=subprocess.DEVNULL,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            env=env,
-            start_new_session=True,
-        )
-        returncode: int | None = None
-        while returncode is None:
-            if halt_path.exists():
-                halted = True
-                break
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                timed_out = True
-                break
-            try:
-                returncode = process.wait(timeout=min(2.0, remaining))
-            except subprocess.TimeoutExpired:
-                continue
-        if returncode is None:
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            try:
-                returncode = process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                returncode = process.wait(timeout=10)
-        log_handle.flush()
-        os.fsync(log_handle.fileno())
-    return returncode, timed_out, halted, round(time.monotonic() - started)
-
-
 def _append_receipt(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return append_chain(
         root / "receipts.jsonl",
@@ -477,10 +375,21 @@ def _append_receipt(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _validated_child_result(path: Path, *, run_id: str) -> dict[str, Any] | None:
+def _validated_child_result(
+    path: Path,
+    *,
+    run_id: str,
+    scratch_root: Path,
+    scratch_marker_digest: str,
+    scratch_root_identity: dict[str, int],
+) -> dict[str, Any] | None:
     return validated_child_result(
         path,
         run_id=run_id,
+        scratch_root=scratch_root,
+        scratch_marker_digest=scratch_marker_digest,
+        scratch_root_identity=scratch_root_identity,
+        terminal_success_states=frozenset(TERMINAL_SUCCESS_STATES),
         policy=RUNNER_POLICY,
         safe_json_fn=safe_json,
         chain_digest_fn=_chain_digest,
@@ -505,6 +414,19 @@ def _validate_child_spec(
         raise UnattendedError(exc.code, str(exc)) from exc
 
 
+def _recover_stale_scratch(
+    state_root: Path,
+    control_root: Path,
+) -> list[dict[str, Any]]:
+    return recover_stale_scratch(
+        state_root,
+        control_root,
+        read_chain_fn=read_chain,
+        append_receipt_fn=_append_receipt,
+        now_fn=_now,
+    )
+
+
 def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Admit and execute one bounded run.  No retry occurs inside this function."""
 
@@ -516,6 +438,7 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     run_id = "unattended-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid4().hex[:12]
     at = _now()
     with host_lock(control_root / "runner.lock"):
+        _recover_stale_scratch(state_root, control_root)
         admission = admission_status(state_root)
         if not admission["ready"]:
             receipt = _append_receipt(
@@ -544,6 +467,7 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
         result_path = run_dir / "child_result.json"
         spec_path = run_dir / "child_spec.json"
         log_path = run_dir / "child.log"
+        scratch_root = unattended_scratch_root(state_root, run_id)
         spec = {
             "schema": RUNNER_SCHEMA,
             "run_id": run_id,
@@ -552,7 +476,7 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             "source_commit": source["commit"],
             "state_root": str(state_root),
             "archive_root": str(state_root / ".dharma" / "evolution_archive"),
-            "scratch_root": str(state_root / ".dharma" / "evolution_worktrees"),
+            "scratch_root": str(scratch_root),
             "result_path": str(result_path),
             "routes": routes,
             "role_bindings": role_bindings,
@@ -576,28 +500,74 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
         }
         spec["spec_digest"] = content_digest(spec)
         write_json_exclusive(spec_path, spec)
-        preflight = _append_receipt(
-            control_root,
-            {
-                "kind": "run_admitted",
-                "at": at,
-                "run_id": run_id,
-                "source_commit": source["commit"],
-                "provider_families": [route["provider"] for route in routes],
-                "model_profile_digest": spec["model_profile_digest"],
-                "role_bindings": role_bindings,
-                "task_id": spec["task_id"],
-                "task_context_binding_digest": spec[
-                    "task_context_binding_digest"
-                ],
-                "shape": spec["shape"],
-                "limits": spec["limits"],
-                "spec": str(spec_path),
-                "spec_digest": spec["spec_digest"],
-                "reservation_digest": reservation["ledger_digest"],
-                "positive_rsi_claim": False,
-            },
-        )
+        try:
+            scratch_create = create_run_scratch(
+                state_root,
+                run_id,
+                source_commit=source["commit"],
+                spec_digest=spec["spec_digest"],
+                created_at=at,
+            )
+        except ScratchCustodyError as exc:
+            failed = _append_receipt(
+                control_root,
+                {
+                    "kind": "run_launch_failed",
+                    "at": _now(),
+                    "run_id": run_id,
+                    "admission_receipt_digest": None,
+                    "reservation_digest": reservation["ledger_digest"],
+                    "error_class": type(exc).__name__,
+                    "error_code": exc.code,
+                    "scratch_custody": {"create": exc.proof, "cleanup": None},
+                    "epistemic_modality": "InconclusiveInfrastructure",
+                    "positive_rsi_claim": False,
+                },
+            )
+            raise UnattendedError(exc.code, str(failed["receipt_digest"])) from exc
+        try:
+            preflight = _append_receipt(
+                control_root,
+                {
+                    "kind": "run_admitted",
+                    "at": at,
+                    "run_id": run_id,
+                    "source_commit": source["commit"],
+                    "provider_families": [route["provider"] for route in routes],
+                    "model_profile_digest": spec["model_profile_digest"],
+                    "role_bindings": role_bindings,
+                    "task_id": spec["task_id"],
+                    "task_context_binding_digest": spec[
+                        "task_context_binding_digest"
+                    ],
+                    "shape": spec["shape"],
+                    "limits": spec["limits"],
+                    "spec": str(spec_path),
+                    "spec_digest": spec["spec_digest"],
+                    "reservation_digest": reservation["ledger_digest"],
+                    "scratch_custody_create": scratch_create,
+                    "positive_rsi_claim": False,
+                },
+            )
+        except Exception as exc:
+            try:
+                cleanup_run_scratch(
+                    state_root,
+                    run_id,
+                    source_commit=source["commit"],
+                    spec_digest=spec["spec_digest"],
+                    expected_root_identity=scratch_create["root_identity"],
+                    expected_marker_digest=str(scratch_create["marker_digest"]),
+                )
+            except ScratchCustodyError as custody_exc:
+                raise UnattendedError(
+                    custody_exc.code,
+                    str(custody_exc.proof["proof_digest"]),
+                ) from exc
+            raise UnattendedError(
+                "ADMISSION_RECEIPT_FAILED",
+                f"{type(exc).__name__}:run admission receipt was not durable",
+            ) from exc
         try:
             returncode, timed_out, halted, wall_seconds = _run_child_process(
                 spec_path,
@@ -605,8 +575,23 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                 timeout_seconds=timeout_seconds,
                 log_path=log_path,
                 halt_path=Path(admission["halt_path"]),
+                scratch_root_identity=scratch_create["root_identity"],
+                scratch_marker_digest=str(scratch_create["marker_digest"]),
             )
         except Exception as exc:
+            try:
+                scratch_cleanup = cleanup_run_scratch(
+                    state_root,
+                    run_id,
+                    source_commit=source["commit"],
+                    spec_digest=spec["spec_digest"],
+                    expected_root_identity=scratch_create["root_identity"],
+                    expected_marker_digest=str(scratch_create["marker_digest"]),
+                )
+                cleanup_error: ScratchCustodyError | None = None
+            except ScratchCustodyError as custody_exc:
+                scratch_cleanup = custody_exc.proof
+                cleanup_error = custody_exc
             failed = _append_receipt(
                 control_root,
                 {
@@ -616,14 +601,60 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                     "admission_receipt_digest": preflight["receipt_digest"],
                     "reservation_digest": reservation["ledger_digest"],
                     "error_class": type(exc).__name__,
+                    "error_code": (
+                        cleanup_error.code
+                        if cleanup_error is not None
+                        else "CHILD_LAUNCH_FAILED"
+                    ),
+                    "scratch_custody": {
+                        "create": scratch_create,
+                        "cleanup": scratch_cleanup,
+                    },
                     "epistemic_modality": "InconclusiveInfrastructure",
                     "positive_rsi_claim": False,
                 },
             )
             raise UnattendedError(
-                "CHILD_LAUNCH_FAILED", str(failed["receipt_digest"])
+                (
+                    cleanup_error.code
+                    if cleanup_error is not None
+                    else "CHILD_LAUNCH_FAILED"
+                ),
+                str(failed["receipt_digest"]),
             ) from exc
-        child = _validated_child_result(result_path, run_id=run_id)
+        try:
+            scratch_cleanup = cleanup_run_scratch(
+                state_root,
+                run_id,
+                source_commit=source["commit"],
+                spec_digest=spec["spec_digest"],
+                expected_root_identity=scratch_create["root_identity"],
+                expected_marker_digest=str(scratch_create["marker_digest"]),
+            )
+            cleanup_error = None
+        except ScratchCustodyError as exc:
+            scratch_cleanup = exc.proof
+            cleanup_error = exc
+        scratch_parent_cleanup_ok = bool(
+            cleanup_error is None
+            and validate_parent_scratch_proofs(
+                scratch_create,
+                scratch_cleanup,
+                state_root=state_root,
+                run_id=run_id,
+            )
+        )
+        child = (
+            _validated_child_result(
+                result_path,
+                run_id=run_id,
+                scratch_root=scratch_root,
+                scratch_marker_digest=str(scratch_create["marker_digest"]),
+                scratch_root_identity=scratch_create["root_identity"],
+            )
+            if scratch_parent_cleanup_ok
+            else None
+        )
         log_digest = "sha256:" + hashlib.sha256(log_path.read_bytes()).hexdigest()
         closeout = _append_receipt(
             control_root,
@@ -642,10 +673,26 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                 "experiment_id": (child or {}).get("experiment_id"),
                 "explore_closeout_state": (child or {}).get("closeout_state"),
                 "logical_provider_calls_used": (child or {}).get("logical_provider_calls_used"),
+                "scratch_custody": {
+                    "create": scratch_create,
+                    "cleanup": scratch_cleanup,
+                },
+                "scratch_cleanup_ok": scratch_parent_cleanup_ok,
                 "log": str(log_path),
                 "log_digest": log_digest,
                 "epistemic_modality": (
-                    "InconclusiveOperatorHalt" if halted else "EXPLORE_ONLY"
+                    "InconclusiveOperatorHalt"
+                    if halted
+                    else (
+                        "InconclusiveInfrastructure"
+                        if (
+                            timed_out
+                            or returncode != 0
+                            or not scratch_parent_cleanup_ok
+                            or child is None
+                        )
+                        else "EXPLORE_ONLY"
+                    )
                 ),
                 "positive_rsi_claim": False,
                 "billing_telemetry": "unavailable_reservation_only",
@@ -655,6 +702,7 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             not timed_out
             and not halted
             and returncode == 0
+            and scratch_parent_cleanup_ok
             and child
             and child.get("closeout_state") in TERMINAL_SUCCESS_STATES
         )
@@ -667,6 +715,7 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             "timed_out": timed_out,
             "halted": halted,
             "returncode": returncode,
+            "scratch_cleanup_ok": scratch_parent_cleanup_ok,
             "positive_rsi_claim": False,
         }
 
@@ -684,108 +733,15 @@ def _bounded_child_seams(spec: dict[str, Any], counter: LogicalCallBudget):
     )
 
 
-def _run_git(argv: list[str], *, cwd: Path | None = None, timeout: int = 300) -> None:
-    result = subprocess.run(
-        argv,
-        cwd=cwd,
-        capture_output=True,
-        check=False,
-        text=True,
-        timeout=timeout,
-        env={
-            "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin",
-            "HOME": os.environ.get("HOME", "/nonexistent"),
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_OPTIONAL_LOCKS": "0",
-        },
-    )
-    if result.returncode != 0:
-        raise UnattendedError("SCRATCH_GIT_FAILED", result.stderr.strip()[:500])
-
-
-def _clone_scratch(
+def _execute_child_experiment(
+    spec: dict[str, Any],
     *,
-    source_repo: Path,
-    experiment_id: str,
-    archive_path: Path,
-    category: str,
-) -> Path:
-    """Clone exact release bytes without writing the immutable source Git dir."""
-
-    from dharma_swarm.evolution_safety import EVOLUTION_MARKER, is_scratch_worktree
-
-    scratch_root = Path(os.environ["DHARMA_EVOLUTION_WORKTREE_ROOT"]).resolve()
-    repo = (scratch_root / experiment_id / "repo").resolve()
-    if scratch_root not in repo.parents or repo.exists():
-        raise UnattendedError("SCRATCH_PATH_UNSAFE", str(repo))
-    commit = str(require_execution_source(source_repo)["commit"])
-    repo.parent.mkdir(parents=True, exist_ok=False)
-    try:
-        _run_git(["git", "clone", "--no-hardlinks", "--no-checkout", "--quiet", str(source_repo), str(repo)])
-        _run_git(["git", "checkout", "--detach", "--quiet", commit], cwd=repo)
-    except Exception:
-        if scratch_root in repo.parent.parents:
-            shutil.rmtree(repo.parent)
-        raise
-    marker = {
-        "experiment_id": experiment_id,
-        "git_base_sha": commit,
-        "created_at": _now(),
-        "archive_path": str(archive_path),
-        "category": category,
-        "standalone_clone": True,
-    }
-    marker_path = repo / EVOLUTION_MARKER
-    write_json_exclusive(marker_path, marker)
-    ok, _payload, reason = is_scratch_worktree(repo)
-    if not ok:
-        raise UnattendedError("SCRATCH_MARKER_REFUSED", str(reason))
-    return repo
-
-
-def _remove_clone_scratch(*, source_repo: Path, repo: Path, experiment_id: str) -> None:
-    del source_repo, experiment_id
-    from dharma_swarm.evolution_safety import EVOLUTION_MARKER, is_scratch_worktree
-
-    scratch_root = Path(os.environ["DHARMA_EVOLUTION_WORKTREE_ROOT"]).resolve()
-    resolved = repo.resolve()
-    ok, _payload, _reason = is_scratch_worktree(resolved)
-    if scratch_root not in resolved.parents or not ok or not (resolved / EVOLUTION_MARKER).is_file():
-        raise UnattendedError("SCRATCH_REMOVE_REFUSED", str(resolved))
-    shutil.rmtree(resolved.parent)
-
-
-def run_child(spec_path: Path) -> int:
-    """Execute the admitted child spec and persist one exclusive result."""
+    run_id: str,
+    scratch_attestation: dict[str, Any],
+) -> int:
+    """Execute one already-attested child while its scratch lease is held."""
 
     from dharma_swarm.forge_lab.experiment import ExperimentConfig, run_experiment
-
-    spec = safe_json(spec_path)
-    if spec is None or spec.get("schema") != RUNNER_SCHEMA:
-        raise UnattendedError("CHILD_SPEC_INVALID", str(spec_path))
-    expected_digest = spec.get("spec_digest")
-    actual_digest = content_digest({key: value for key, value in spec.items() if key != "spec_digest"})
-    if expected_digest != actual_digest:
-        raise UnattendedError("CHILD_SPEC_DIGEST", "child spec digest mismatch")
-    run_id = str(spec.get("run_id") or "")
-    if os.environ.get("RSI_LAB_UNATTENDED_CHILD_RUN_ID") != run_id:
-        raise UnattendedError("CHILD_CUSTODY", "child run id environment mismatch")
-    state_root = Path(spec["state_root"]).resolve()
-    admission = admission_status(state_root)
-    if not admission["ready"]:
-        raise UnattendedError("CHILD_ADMISSION_REFUSED", ",".join(admission["reasons"]))
-    if admission["source"].get("commit") != spec.get("source_commit"):
-        raise UnattendedError("SOURCE_CHANGED", "source commit changed after parent admission")
-    if admission["routes"] != spec.get("routes"):
-        raise UnattendedError("PROVIDER_RECEIPT_CHANGED", "provider routes changed after admission")
-    if admission["role_bindings"] != spec.get("role_bindings"):
-        raise UnattendedError("MODEL_PROFILE_CHANGED", "model roles changed after admission")
-    if admission["model_profile_digest"] != spec.get("model_profile_digest"):
-        raise UnattendedError("MODEL_PROFILE_CHANGED", "model profile changed after admission")
-    if admission["provider_receipt_digest"] != spec.get("provider_receipt_digest"):
-        raise UnattendedError("PROVIDER_RECEIPT_CHANGED", "provider receipt changed after admission")
-    _validate_child_spec(spec, spec_path, admission=admission)
 
     os.environ["DHARMA_EVOLUTION_WORKTREE_ROOT"] = spec["scratch_root"]
     counter = LogicalCallBudget()
@@ -818,11 +774,22 @@ def run_child(spec_path: Path) -> int:
         keep_worktree=False,
         force_single_llm_mutation=True,
     )
-    closeout = asyncio.run(run_experiment(cfg, seams=_bounded_child_seams(spec, counter)))
+    closeout = _run_with_scratch_custody(
+        _bounded_child_seams(spec, counter),
+        lambda seams: asyncio.run(run_experiment(cfg, seams=seams)),
+    )
     closeout = _redact_secret_values(closeout)
     stats = closeout.get("stats") if isinstance(closeout.get("stats"), dict) else {}
     counters = stats.get("counters") if isinstance(stats.get("counters"), dict) else {}
-    execution_shape_ok = execution_shape_matches(
+    scratch = (
+        closeout.get("scratch_worktree")
+        if isinstance(closeout.get("scratch_worktree"), dict)
+        else {}
+    )
+    scratch_cleanup_ok = bool(
+        scratch.get("state") == "removed" and scratch.get("removed") is True
+    )
+    execution_shape_ok = scratch_cleanup_ok and execution_shape_matches(
         counter,
         counters,
         slots=LOGICAL_PROVIDER_CALL_SLOTS,
@@ -842,6 +809,8 @@ def run_child(spec_path: Path) -> int:
         "logical_provider_calls_by_role": counter.by_label,
         "expected_provider_calls_by_role": EXPECTED_PROVIDER_CALLS,
         "execution_shape_ok": execution_shape_ok,
+        "scratch_cleanup_ok": scratch_cleanup_ok,
+        "scratch_custody_attestation": scratch_attestation,
         "experiment_closeout": closeout,
         "epistemic_modality": "EXPLORE_ONLY",
         "positive_rsi_claim": False,
@@ -852,28 +821,55 @@ def run_child(spec_path: Path) -> int:
     return 0 if effective_state in TERMINAL_SUCCESS_STATES else 1
 
 
-def _redact_secret_values(payload: Any) -> Any:
-    """Keep provider credential values out of child evidence recursively."""
+def run_child(spec_path: Path) -> int:
+    """Execute the admitted child spec and persist one exclusive result."""
 
-    from dharma_swarm.api_keys import ALL_API_KEY_ENV_KEYS
-
-    secrets = {
-        value
-        for name in ALL_API_KEY_ENV_KEYS
-        if len(value := os.environ.get(name, "")) >= 8
-    }
-    if isinstance(payload, str):
-        redacted = payload
-        for secret in secrets:
-            redacted = redacted.replace(secret, "[REDACTED_PROVIDER_CREDENTIAL]")
-        return redacted
-    if isinstance(payload, list):
-        return [_redact_secret_values(value) for value in payload]
-    if isinstance(payload, tuple):
-        return tuple(_redact_secret_values(value) for value in payload)
-    if isinstance(payload, dict):
-        return {key: _redact_secret_values(value) for key, value in payload.items()}
-    return payload
+    spec = safe_json(spec_path)
+    if spec is None or spec.get("schema") != RUNNER_SCHEMA:
+        raise UnattendedError("CHILD_SPEC_INVALID", str(spec_path))
+    expected_digest = spec.get("spec_digest")
+    actual_digest = content_digest({key: value for key, value in spec.items() if key != "spec_digest"})
+    if expected_digest != actual_digest:
+        raise UnattendedError("CHILD_SPEC_DIGEST", "child spec digest mismatch")
+    run_id = str(spec.get("run_id") or "")
+    if os.environ.get("RSI_LAB_UNATTENDED_CHILD_RUN_ID") != run_id:
+        raise UnattendedError("CHILD_CUSTODY", "child run id environment mismatch")
+    state_root = Path(spec["state_root"]).resolve()
+    admission = admission_status(state_root)
+    if not admission["ready"]:
+        raise UnattendedError("CHILD_ADMISSION_REFUSED", ",".join(admission["reasons"]))
+    if admission["source"].get("commit") != spec.get("source_commit"):
+        raise UnattendedError("SOURCE_CHANGED", "source commit changed after parent admission")
+    if admission["routes"] != spec.get("routes"):
+        raise UnattendedError("PROVIDER_RECEIPT_CHANGED", "provider routes changed after admission")
+    if admission["role_bindings"] != spec.get("role_bindings"):
+        raise UnattendedError("MODEL_PROFILE_CHANGED", "model roles changed after admission")
+    if admission["model_profile_digest"] != spec.get("model_profile_digest"):
+        raise UnattendedError("MODEL_PROFILE_CHANGED", "model profile changed after admission")
+    if admission["provider_receipt_digest"] != spec.get("provider_receipt_digest"):
+        raise UnattendedError("PROVIDER_RECEIPT_CHANGED", "provider receipt changed after admission")
+    _validate_child_spec(spec, spec_path, admission=admission)
+    root_identity = _child_scratch_identity()
+    marker_digest = _child_scratch_marker_digest()
+    try:
+        scratch_lease = acquire_run_scratch_lease(
+            state_root,
+            run_id,
+            source_commit=str(spec["source_commit"]),
+            spec_digest=str(spec["spec_digest"]),
+            expected_root_identity=root_identity,
+            expected_marker_digest=marker_digest,
+        )
+    except ScratchCustodyError as exc:
+        raise UnattendedError(exc.code, str(exc.proof["proof_digest"])) from exc
+    try:
+        return _execute_child_experiment(
+            spec,
+            run_id=run_id,
+            scratch_attestation=scratch_lease.proof,
+        )
+    finally:
+        scratch_lease.close()
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -246,6 +246,12 @@ rsi daily status --json
 Run `/root/rsi-lab/bin/rsi-unattended-explore --timeout-seconds 2700` only as a
 supervised proof. Install, verify, enable, and start the systemd units manually
 only after that proof succeeds; activation/sync never installs or enables them.
+Before the first timer start, verify the physical state root is a non-symlink
+`root:root` directory with no group/world write bits (`0755` is the live
+baseline), create `HALT`, and keep it present through initial activation. This
+prevents `Persistent=true` from launching a missed-calendar catch-up run. Remove
+the latch only after the service is inactive and `NextElapseUSecRealtime` is in
+the future; the exact command sequence is in `RSI_LAB_SYNC.md`.
 The timer then admits one run daily at `03:35 UTC` with at most `25m` randomized
 delay. The independent provider refresh cron runs hourly at minute `:17`.
 
@@ -466,7 +472,28 @@ the child process group when it appears, recording
 `InconclusiveOperatorHalt`. The parent also applies a 2,700-second subprocess
 timeout; systemd adds a second 2,800-second fuse. Scratch code is a standalone
 exact-commit clone under state, so execution never writes the immutable release
-Git dir. Before reserving spend, the runner binds the selected task row to a
+Git dir. The unattended allocator has the exact `allocate_explore` interface,
+injects `split="explore"` itself, and rejects any database, identity, task, or
+receipt-shape override. A child result is inadmissible unless its scratch clone
+was removed. Each run gets one exact parent-owned root at
+`state/.dharma/evolution_worktrees/unattended/<run_id>` with a `0600` marker
+bound to the run, source commit, and child-spec digest. The child attests that
+marker, including its exact parent-issued digest, and holds an exclusive lease
+on the inode-bound run directory before cloning. After every child
+outcome—including timeout, HALT, and SIGKILL—the
+parent inventories and removes the exact root through no-follow directory
+handles. On restart, the host lock is acquired first and prior roots are audited
+before admission or budget reservation. Recovery is automatic only when the
+exact child spec, durable `run_admitted` receipt, create proof, marker, directory
+identity, and unlocked lease agree; unknown, substituted, or still-live roots
+are preserved and refuse with zero new spend. State and custody ancestors must
+be owned by the service user and not group/world writable. Marker drift,
+root/ancestor substitution, special files, or unconfirmed lexical absence fail
+the run and preserve evidence. Ordinary Git repository symlinks are inventoried
+and unlinked by directory handle without following their targets. Child cleanup
+remains a defense-in-depth path; parent cleanup proof and strict nested child
+evidence are both required for
+success. Before reserving spend, the runner binds the selected task row to a
 release-owned fixture containing its task SHA, full stored-payload digest,
 cached image ID, platform, and source paths. Only the five-field model-safe
 projection (`task_id`, `instance_id`, `repo`, `base_commit`, and
