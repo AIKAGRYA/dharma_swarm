@@ -14,6 +14,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from api.routers.control_surface import control_surface_mission_snapshot, router
+from dharma_swarm.mission_control_contract import (
+    RECOVERY_RECEIPT_TYPE,
+    SCHEMA_VERSION,
+    TERMINAL_RECEIPT_TYPE,
+    stable_id,
+)
 
 
 def _client(provider: Any = None, *, inject: bool = True) -> TestClient:
@@ -33,7 +39,10 @@ def _snapshot(mission_id: str, **overrides: Any) -> dict[str, Any]:
             "goal": "Advance the governed fleet",
             "operator_id": "operator",
             "status": "active",
-            "metadata": {},
+            "metadata": {
+                "schema_version": SCHEMA_VERSION,
+                "mission_id": mission_id,
+            },
             "created_at": "2026-08-26T01:00:00Z",
             "updated_at": "2026-08-26T01:10:00Z",
         },
@@ -164,7 +173,10 @@ def _populated_snapshot(mission_id: str) -> dict[str, Any]:
                 "status": "running",
                 "failure_code": "",
                 "idempotency_key": "attempt-01",
-                "metadata": {},
+                "metadata": {
+                    "schema_version": SCHEMA_VERSION,
+                    "mission_id": mission_id,
+                },
                 "started_at": "2026-08-26T01:01:00Z",
                 "completed_at": None,
             }
@@ -182,7 +194,11 @@ def _populated_snapshot(mission_id: str) -> dict[str, Any]:
                 "expired": False,
                 "heartbeat_at": "2026-08-26T01:09:00Z",
                 "stale_after": None,
-                "metadata": {},
+                "metadata": {
+                    "schema_version": SCHEMA_VERSION,
+                    "mission_id": mission_id,
+                    "attempt_id": "attempt-01",
+                },
             }
         ],
         receipts=[
@@ -200,6 +216,79 @@ def _populated_snapshot(mission_id: str) -> dict[str, Any]:
             }
         ],
     )
+
+
+def _queued_snapshot(mission_id: str) -> dict[str, Any]:
+    value = _populated_snapshot(mission_id)
+    value["tasks"][0]["status"] = "assigned"
+    value["attempts"][0]["status"] = "queued"
+    value["leases"][0].update(
+        status="claimed",
+        active=False,
+        expired=False,
+        heartbeat_at=None,
+        stale_after="2026-08-26T01:20:00Z",
+    )
+    return value
+
+
+def _terminal_snapshot(mission_id: str) -> dict[str, Any]:
+    value = _populated_snapshot(mission_id)
+    value["tasks"][0].update(status="completed", result="Fleet Hub polished")
+    value["attempts"][0].update(
+        status="succeeded", completed_at="2026-08-26T01:09:00Z"
+    )
+    value["leases"][0].update(status="completed", active=False)
+    value["receipts"][0].update(
+        receipt_id=stable_id("receipt", "attempt-01", "succeeded"),
+        receipt_type=TERMINAL_RECEIPT_TYPE,
+        status="succeeded",
+        payload={
+            "schema_version": SCHEMA_VERSION,
+            "mission_id": mission_id,
+            "attempt_id": "attempt-01",
+            "result": "Fleet Hub polished",
+            "failure_code": "",
+            "metadata": {
+                "schema_version": SCHEMA_VERSION,
+                "mission_id": mission_id,
+                "attempt_id": "attempt-01",
+                "attempt_key": "attempt-01",
+            },
+        },
+    )
+    return value
+
+
+def _recovered_snapshot(mission_id: str) -> dict[str, Any]:
+    value = _populated_snapshot(mission_id)
+    value["tasks"][0].update(status="pending", assigned_to="")
+    value["tasks"][0]["metadata"].pop("mission_attempt_id")
+    value["tasks"][0]["metadata"].pop("mission_claim_id")
+    value["attempts"][0].update(
+        status="stale_recovered",
+        failure_code="stale_lease_recovered",
+        completed_at="2026-08-26T01:09:00Z",
+    )
+    value["leases"][0].update(
+        status="stale_recovered",
+        active=False,
+        expired=True,
+        stale_after="2026-08-26T01:05:00Z",
+    )
+    value["receipts"][0].update(
+        receipt_id=stable_id("receipt", "attempt-01", "stale_recovered"),
+        receipt_type=RECOVERY_RECEIPT_TYPE,
+        status="stale_recovered",
+        payload={
+            "schema_version": SCHEMA_VERSION,
+            "mission_id": mission_id,
+            "attempt_id": "attempt-01",
+            "recovered_claim_id": "claim-01",
+            "reason": "expired_lease",
+        },
+    )
+    return value
 
 
 def test_provider_projects_only_validated_public_snapshot_fields() -> None:
@@ -426,6 +515,142 @@ def test_malformed_nested_timestamp_fails_closed(view: str, field: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "factory", [_queued_snapshot, _terminal_snapshot, _recovered_snapshot]
+)
+def test_canonical_closed_graph_variants_are_observed(
+    factory: Callable[[str], dict[str, Any]],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+
+    response = _client(_AsyncProvider(factory(mission_id))).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_errors"] == []
+    assert body["data"]["state"] == "observed"
+    assert body["data"]["snapshot"]["reconciliation"] == "coherent"
+
+
+@pytest.mark.parametrize("reported_expired", [True, False])
+def test_expired_queued_lease_never_promotes_as_coherent(
+    reported_expired: bool,
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _queued_snapshot(mission_id)
+    value["leases"][0].update(
+        expired=reported_expired,
+        stale_after="2026-08-26T01:05:00Z",
+    )
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["receipts"][0].update(receipt_id="forged-receipt"),
+        lambda value: value["receipts"][0].update(payload={}),
+        lambda value: value["receipts"][0]["payload"].update(
+            mission_id="another-mission"
+        ),
+        lambda value: value["receipts"][0]["payload"].update(result=1),
+        lambda value: value["receipts"][0]["payload"].update(metadata={}),
+        lambda value: value["receipts"][0]["payload"]["metadata"].update(
+            attempt_key="another-attempt"
+        ),
+    ],
+)
+def test_forged_terminal_receipt_never_promotes_as_coherent(
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _terminal_snapshot(mission_id)
+    mutate(value)
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["receipts"][0].update(receipt_id="forged-receipt"),
+        lambda value: value["receipts"][0].update(payload={}),
+        lambda value: value["receipts"][0]["payload"].update(
+            recovered_claim_id="another-claim"
+        ),
+        lambda value: value["receipts"][0]["payload"].update(reason="operator"),
+    ],
+)
+def test_forged_recovery_receipt_never_promotes_as_coherent(
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _recovered_snapshot(mission_id)
+    mutate(value)
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["mission"]["metadata"].update(schema_version="v0"),
+        lambda value: value["tasks"][0]["metadata"].update(
+            mission_id="another-mission"
+        ),
+        lambda value: value["attempts"][0]["metadata"].update(
+            schema_version="v0"
+        ),
+        lambda value: value["leases"][0]["metadata"].update(
+            attempt_id="another-attempt"
+        ),
+    ],
+)
+def test_coherent_snapshot_requires_canonical_retained_metadata(
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    mutate(value)
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["state"] == "unknown"
+    assert body["data"]["snapshot"] is None
+    assert body["source_errors"][0]["error"] == "read failed (ValueError)"
+
+
+@pytest.mark.parametrize(
     "mutate",
     [
         lambda value: value["attempts"][0].update(task_id="missing-task"),
@@ -490,6 +715,23 @@ def test_named_noncoherent_snapshot_preserves_orphan_evidence_for_action() -> No
     assert body["data"]["state"] == "observed"
     assert body["data"]["snapshot"]["reconciliation"] == "active_claim_without_run"
     assert body["data"]["snapshot"]["leases"][0]["attempt_id"] == "missing-attempt"
+
+
+def test_foreign_runtime_state_preserves_noncanonical_runtime_metadata() -> None:
+    mission_id = "fleet-advancement-20260826"
+    value = _populated_snapshot(mission_id)
+    value["attempts"][0]["metadata"]["schema_version"] = "foreign.v0"
+    value["reconciliation"] = "foreign_runtime_record"
+
+    response = _client(_AsyncProvider(value)).get(
+        f"/api/control-surface/missions/{mission_id}/snapshot"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_errors"] == []
+    assert body["data"]["state"] == "observed"
+    assert body["data"]["snapshot"]["reconciliation"] == "foreign_runtime_record"
 
 
 def test_sync_provider_is_offloaded_while_event_loop_remains_live() -> None:

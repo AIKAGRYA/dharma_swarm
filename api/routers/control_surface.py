@@ -39,9 +39,11 @@ from dharma_swarm.mission_control_contract import (
     OPEN_CLAIM_STATUSES,
     OWNER_TERMINAL_ATTEMPT_STATUSES,
     RECOVERY_RECEIPT_TYPE,
+    SCHEMA_VERSION,
     TERMINAL_RECEIPT_TYPE,
     ReconciliationState,
     public_attempt_status,
+    stable_id,
 )
 from dharma_swarm.models import TaskPriority, TaskStatus
 
@@ -265,13 +267,8 @@ def _validated_public_view(
             )
         candidate = value.get(field)
         if candidate is not None:
-            _validated_iso_timestamp(
-                candidate,
-                field=f"{view_name}.{field}",
-            )
-    public_fields = (
-        string_fields + mapping_fields + boolean_fields + nullable_string_fields
-    )
+            _validated_iso_timestamp(candidate, field=f"{view_name}.{field}")
+    public_fields = string_fields + mapping_fields + boolean_fields + nullable_string_fields
     return {field: value[field] for field in public_fields}
 
 
@@ -286,7 +283,6 @@ def _validated_public_collection(
     boolean_fields: tuple[str, ...] = (),
     nullable_string_fields: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
-    """Validate every collection member and enforce its mission boundary."""
     values = projected.get(field)
     if not isinstance(values, list):
         raise TypeError(f"mission snapshot field {field!r} must be a list")
@@ -301,27 +297,19 @@ def _validated_public_collection(
             nullable_string_fields=nullable_string_fields,
         )
         if public_view["mission_id"] != mission_id:
-            raise ValueError(
-                f"mission snapshot {field}[{index}] identity does not match the request"
-            )
+            raise ValueError(f"mission snapshot {field}[{index}] has foreign identity")
         if (
             expected_session_id is not None
             and public_view.get("session_id") != expected_session_id
         ):
-            raise ValueError(
-                f"mission snapshot {field}[{index}] session does not match the request"
-            )
+            raise ValueError(f"mission snapshot {field}[{index}] has foreign session")
         result.append(public_view)
     return result
 
 
 def _index_public_views(
-    values: list[dict[str, Any]],
-    *,
-    identity_field: str,
-    view_name: str,
+    values: list[dict[str, Any]], *, identity_field: str, view_name: str
 ) -> dict[str, dict[str, Any]]:
-    """Build one unambiguous canonical identity index for a public collection."""
     result: dict[str, dict[str, Any]] = {}
     for value in values:
         identity = value[identity_field]
@@ -333,6 +321,40 @@ def _index_public_views(
     return result
 
 
+def _has_expected_fields(value: dict[str, Any], **expected: Any) -> bool:
+    return all(value.get(field) == item for field, item in expected.items())
+
+
+def _receipt_matches_projected_contract(receipt: dict[str, Any], attempt: dict[str, Any]) -> bool:
+    payload, status = receipt["payload"], receipt["status"]
+    common = (
+        receipt["receipt_id"] == stable_id("receipt", attempt["attempt_id"], status)
+        and _has_expected_fields(
+            payload, schema_version=SCHEMA_VERSION,
+            mission_id=receipt["mission_id"], attempt_id=attempt["attempt_id"],
+        )
+    )
+    if receipt["receipt_type"] == TERMINAL_RECEIPT_TYPE:
+        metadata = payload.get("metadata")
+        return (
+            common
+            and status in {"succeeded", "failed"}
+            and isinstance(payload.get("result"), str)
+            and isinstance(payload.get("failure_code"), str)
+            and isinstance(metadata, dict)
+            and _has_expected_fields(
+                metadata, schema_version=SCHEMA_VERSION,
+                mission_id=receipt["mission_id"], attempt_id=attempt["attempt_id"],
+                attempt_key=receipt["idempotency_key"],
+            )
+        )
+    return receipt["receipt_type"] != RECOVERY_RECEIPT_TYPE or (
+        common
+        and status == "stale_recovered"
+        and _has_expected_fields(payload, recovered_claim_id=attempt["claim_id"], reason="expired_lease")
+    )
+
+
 def _validate_snapshot_lineage(
     *,
     tasks: list[dict[str, Any]],
@@ -340,17 +362,11 @@ def _validate_snapshot_lineage(
     leases: list[dict[str, Any]],
     receipts: list[dict[str, Any]],
     reconciliation: str,
+    observed_at: datetime,
 ) -> None:
-    """Require a closed joined graph whenever the provider claims coherence."""
-    task_by_id = _index_public_views(
-        tasks, identity_field="task_id", view_name="task"
-    )
-    attempt_by_id = _index_public_views(
-        attempts, identity_field="attempt_id", view_name="attempt"
-    )
-    lease_by_claim = _index_public_views(
-        leases, identity_field="claim_id", view_name="lease"
-    )
+    task_by_id = _index_public_views(tasks, identity_field="task_id", view_name="task")
+    attempt_by_id = _index_public_views(attempts, identity_field="attempt_id", view_name="attempt")
+    lease_by_claim = _index_public_views(leases, identity_field="claim_id", view_name="lease")
     _index_public_views(receipts, identity_field="receipt_id", view_name="receipt")
     if reconciliation != ReconciliationState.COHERENT.value:
         return
@@ -365,19 +381,32 @@ def _validate_snapshot_lineage(
         receipts_by_task.setdefault(receipt["task_id"], []).append(receipt)
     for attempt in attempts:
         lease = lease_by_claim.get(attempt["claim_id"])
+        stale_after = lease["stale_after"] if lease else None
+        lease_is_expired = stale_after is not None and _validated_iso_timestamp(
+            stale_after, field="lease.stale_after"
+        ) <= observed_at
         if (
             attempt["task_id"] not in task_by_id
             or not attempt["assigned_to"]
             or not attempt["idempotency_key"]
+            or not _has_expected_fields(
+                attempt["metadata"], schema_version=SCHEMA_VERSION,
+                mission_id=attempt["mission_id"],
+            )
             or lease is None
             or lease["attempt_id"] != attempt["attempt_id"]
             or lease["task_id"] != attempt["task_id"]
             or lease["agent_id"] != attempt["assigned_to"]
+            or lease["expired"] != lease_is_expired
         ):
             raise ValueError("coherent mission snapshot has orphaned attempt lineage")
         status = attempt["status"]
         if status == "queued":
-            lease_matches_status = lease["status"] == "claimed" and not lease["active"]
+            lease_matches_status = (
+                lease["status"] == "claimed"
+                and not lease["active"]
+                and not lease["expired"]
+            )
         elif status == "running":
             lease_matches_status = (
                 lease["status"] in ACTIVE_CLAIM_STATUSES
@@ -385,9 +414,7 @@ def _validate_snapshot_lineage(
                 and not lease["expired"]
             )
         else:
-            expected_lease_status = (
-                "completed" if status == "succeeded" else status
-            )
+            expected_lease_status = "completed" if status == "succeeded" else status
             lease_matches_status = (
                 lease["status"] == expected_lease_status and not lease["active"]
             )
@@ -416,9 +443,7 @@ def _validate_snapshot_lineage(
     for task in tasks:
         task_attempts = attempts_by_task.get(task["task_id"], [])
         if task["status"] in {"assigned", "running"}:
-            expected_attempt_status = (
-                "queued" if task["status"] == "assigned" else "running"
-            )
+            expected_attempt_status = "queued" if task["status"] == "assigned" else "running"
             matching = [
                 attempt
                 for attempt in task_attempts
@@ -433,9 +458,7 @@ def _validate_snapshot_lineage(
                 for attempt in task_attempts
             )
         elif task["status"] in {"completed", "failed"}:
-            expected_receipt_status = (
-                "succeeded" if task["status"] == "completed" else "failed"
-            )
+            expected_receipt_status = "succeeded" if task["status"] == "completed" else "failed"
             task_is_coherent = (
                 sum(
                     receipt["receipt_type"] == TERMINAL_RECEIPT_TYPE
@@ -464,6 +487,10 @@ def _validate_snapshot_lineage(
             or attempt["claim_id"] != lease["claim_id"]
             or attempt["task_id"] != lease["task_id"]
             or attempt["assigned_to"] != lease["agent_id"]
+            or not _has_expected_fields(
+                lease["metadata"], schema_version=SCHEMA_VERSION,
+                mission_id=lease["mission_id"], attempt_id=lease["attempt_id"],
+            )
         ):
             raise ValueError("coherent mission snapshot has orphaned lease lineage")
     for receipt in receipts:
@@ -477,12 +504,12 @@ def _validate_snapshot_lineage(
             or receipt["task_id"] != attempt["task_id"]
             or receipt["agent_id"] != attempt["assigned_to"]
             or receipt["idempotency_key"] != attempt["idempotency_key"]
+            or not _receipt_matches_projected_contract(receipt, attempt)
         ):
             raise ValueError("coherent mission snapshot has orphaned receipt lineage")
 
 
-def _validated_iso_timestamp(value: Any, *, field: str) -> str:
-    """Require an unambiguous ISO timestamp at a snapshot time boundary."""
+def _validated_iso_timestamp(value: Any, *, field: str) -> datetime:
     if not isinstance(value, str):
         raise TypeError(f"mission snapshot {field} must be an ISO timestamp")
     normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
@@ -492,11 +519,10 @@ def _validated_iso_timestamp(value: Any, *, field: str) -> str:
         raise ValueError(f"mission snapshot {field} must be an ISO timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError(f"mission snapshot {field} must include a timezone")
-    return value
+    return parsed
 
 
 def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]:
-    """Validate a provider result against the public MissionSnapshot shape."""
     projected = jsonable_encoder(snapshot)
     if not isinstance(projected, dict):
         raise TypeError("mission snapshot provider returned a non-object")
@@ -507,12 +533,7 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         projected.get("mission"),
         view_name="mission",
         string_fields=(
-            "mission_id",
-            "session_id",
-            "title",
-            "goal",
-            "operator_id",
-            "status",
+            "mission_id", "session_id", "title", "goal", "operator_id", "status",
         ),
         mapping_fields=("metadata",),
         nullable_string_fields=("created_at", "updated_at"),
@@ -521,19 +542,15 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         raise ValueError("mission snapshot identity does not match the request")
     if mission["session_id"] != expected_session_id:
         raise ValueError("mission snapshot session does not match the request")
+    if not _has_expected_fields(mission["metadata"], schema_version=SCHEMA_VERSION, mission_id=mission_id):
+        raise ValueError("mission snapshot metadata is not canonical")
     tasks = _validated_public_collection(
         projected,
         field="tasks",
         mission_id=mission_id,
         string_fields=(
-            "task_id",
-            "mission_id",
-            "title",
-            "description",
-            "status",
-            "priority",
-            "assigned_to",
-            "result",
+            "task_id", "mission_id", "title", "description",
+            "status", "priority", "assigned_to", "result",
         ),
         mapping_fields=("metadata",),
         nullable_string_fields=("created_at", "updated_at"),
@@ -542,22 +559,21 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         raise ValueError("mission snapshot task status is not canonical")
     if any(task["priority"] not in _TASK_PRIORITIES for task in tasks):
         raise ValueError("mission snapshot task priority is not canonical")
+    if any(
+        not _has_expected_fields(
+            task["metadata"], schema_version=SCHEMA_VERSION, mission_id=mission_id
+        )
+        for task in tasks
+    ):
+        raise ValueError("mission snapshot task metadata is not canonical")
     attempts = _validated_public_collection(
         projected,
         field="attempts",
         mission_id=mission_id,
         expected_session_id=expected_session_id,
         string_fields=(
-            "attempt_id",
-            "mission_id",
-            "session_id",
-            "task_id",
-            "claim_id",
-            "assigned_to",
-            "assigned_by",
-            "status",
-            "failure_code",
-            "idempotency_key",
+            "attempt_id", "mission_id", "session_id", "task_id", "claim_id",
+            "assigned_to", "assigned_by", "status", "failure_code", "idempotency_key",
         ),
         mapping_fields=("metadata",),
         nullable_string_fields=("started_at", "completed_at"),
@@ -570,13 +586,8 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         mission_id=mission_id,
         expected_session_id=expected_session_id,
         string_fields=(
-            "claim_id",
-            "mission_id",
-            "session_id",
-            "task_id",
-            "agent_id",
-            "attempt_id",
-            "status",
+            "claim_id", "mission_id", "session_id", "task_id",
+            "agent_id", "attempt_id", "status",
         ),
         mapping_fields=("metadata",),
         boolean_fields=("active", "expired"),
@@ -589,14 +600,8 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         field="receipts",
         mission_id=mission_id,
         string_fields=(
-            "receipt_id",
-            "mission_id",
-            "task_id",
-            "attempt_id",
-            "agent_id",
-            "receipt_type",
-            "status",
-            "idempotency_key",
+            "receipt_id", "mission_id", "task_id", "attempt_id",
+            "agent_id", "receipt_type", "status", "idempotency_key",
         ),
         mapping_fields=("payload",),
         nullable_string_fields=("created_at",),
@@ -606,16 +611,15 @@ def _project_injected_snapshot(snapshot: Any, mission_id: str) -> dict[str, Any]
         raise TypeError("mission snapshot reconciliation must be a string")
     if reconciliation not in _RECONCILIATION_STATES:
         raise ValueError("mission snapshot reconciliation is not canonical")
+    observed_at = projected["observed_at"]
+    observed_time = _validated_iso_timestamp(observed_at, field="observed_at")
     _validate_snapshot_lineage(
         tasks=tasks,
         attempts=attempts,
         leases=leases,
         receipts=receipts,
         reconciliation=reconciliation,
-    )
-    observed_at = _validated_iso_timestamp(
-        projected.get("observed_at"),
-        field="observed_at",
+        observed_at=observed_time,
     )
     if projected.get("authority") != _MISSION_AUTHORITY:
         raise ValueError("mission snapshot authority is not canonical")
