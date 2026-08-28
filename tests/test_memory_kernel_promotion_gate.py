@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.memory_kernel.promotion_gate import (
-    REQUIRED_PROMOTION_GATES,
     MemoryKernelPromotionReceiptStatus,
     append_promotion_artifacts,
     build_promotion_decision,
@@ -31,9 +30,8 @@ def test_human_gated_promotion_emits_reviewed_canonical_receipt(tmp_path: Path) 
     ).to_json()
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
     canonical = reviewed_canonical_receipt(write_receipt, decision)
     path = tmp_path / "canonical.jsonl"
@@ -64,9 +62,8 @@ def test_rollback_blocks_promotion_receipt(tmp_path: Path) -> None:
     ).to_json()
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
     canonical = reviewed_canonical_receipt(write_receipt, decision, rollback_engaged=True)
     path = tmp_path / "canonical.jsonl"
@@ -97,9 +94,8 @@ def test_promotion_timestamp_is_digest_protected(tmp_path: Path) -> None:
     ).to_json()
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
     canonical = reviewed_canonical_receipt(
         write_receipt,
@@ -136,9 +132,8 @@ def test_promotion_rechecks_protected_target_even_if_receipt_policy_is_forged() 
     write_receipt["request"] = request
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
 
     canonical = reviewed_canonical_receipt(write_receipt, decision)
@@ -163,9 +158,8 @@ def test_promotion_rejects_invalid_source_atom_ids_even_if_policy_is_forged() ->
     write_receipt["request"] = request
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
 
     canonical = reviewed_canonical_receipt(write_receipt, decision)
@@ -187,9 +181,8 @@ def test_promotion_log_rejects_duplicate_id_with_conflicting_digest(tmp_path: Pa
     ).to_json()
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
     first = reviewed_canonical_receipt(
         write_receipt,
@@ -241,9 +234,8 @@ def test_promotion_log_fails_closed_on_malformed_jsonl(tmp_path: Path) -> None:
     ).to_json()
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="all gates reviewed",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
     canonical = reviewed_canonical_receipt(write_receipt, decision)
     path = tmp_path / "canonical.jsonl"
