@@ -64,8 +64,11 @@ def test_stage_pilot_records_full_auditable_chain(tmp_path):
     assert summary["funding_units"] == 1
     assert summary["labor_units"] == 1
     assert summary["offset_units"] == 1
-    assert summary["verification_units"] >= 3
-    assert summary["total_verified_offset"] > 0
+    # Synthetic pilot verdicts are report-only: nothing is recorded to the
+    # ledger as a verification, and the fail-closed mint gate blocks the
+    # internal-only claim packet.
+    assert summary["verification_units"] == 0
+    assert summary["total_verified_offset"] == 0
     assert pilot["fitness"]["weighted_score"] > 0
     assert pilot["recommendation"].strategy.approved is True
 
