@@ -467,14 +467,31 @@ the child process group when it appears, recording
 timeout; systemd adds a second 2,800-second fuse. Scratch code is a standalone
 exact-commit clone under state, so execution never writes the immutable release
 Git dir. Before reserving spend, the runner binds the selected task row to a
-release-owned fixture containing its task SHA, cached image ID, platform, and
-source paths. Context is read from that exact image ID with `--pull=never`, no
-network, and no gold patch. The public benchmark dataset is cache-only during
-official grading. The SWE-bench spec shim skips its otherwise unnecessary
-remote environment-file lookup because the exact prebuilt image is already
-attested. The evaluator script is redirected from the read-only container root
-into its bounded `/tmp` tmpfs, and RSI-created anonymous testbed volumes are
-removed at container closeout.
+release-owned fixture containing its task SHA, full stored-payload digest,
+cached image ID, platform, and source paths. Only the five-field model-safe
+projection (`task_id`, `instance_id`, `repo`, `base_commit`, and
+`problem_statement`) plus bounded source context reaches a model. Context is
+read from that exact image ID with `--pull=never` and no network.
+
+The judge authority is the local-only `princeton-nlp/SWE-bench_Verified`
+snapshot at revision `c104f840cc67f8b6eec6f759ebc8b2693d585d4a`. Before
+the reservation ledger is touched, admission verifies the snapshot Parquet
+digest
+`sha256:a45b1fe4e2f0c8390b2b2938ac83e92ed5979000856808f3679c07812e9e6dcd`
+and the complete selected-row SHA-256
+`939d1c36810a3400bab68d472d01ac5be33d18939f2cc0b96486ef7db997411c`.
+There is no unrevisioned or network fallback. During grading, the isolation
+shim replaces the upstream dataset loader with that pinned local loader and
+revalidates the complete row before SWE-bench spec generation. The full judge
+row, gold-patch body, test-patch body, and test lists are never included in
+model inputs or unattended receipt payloads; receipts retain only digests and
+counts needed to prove the binding. The spec shim skips its otherwise
+unnecessary remote environment-file lookup because the exact prebuilt image is
+already attested. Runtime readiness also binds the executed Hub and PyArrow
+distribution trees under the dedicated, host-owned grader environment. The
+evaluator script is redirected from the read-only
+container root into its bounded `/tmp` tmpfs, and RSI-created anonymous testbed
+volumes are removed at container closeout.
 
 The unattended task/image fixture is deliberately a release authority, not a
 mutable tag trust decision. Adding a new unattended task therefore requires a

@@ -218,13 +218,24 @@ def test_swebench_runtime_is_api_and_import_root_bound(
         path.write_text("", encoding="utf-8")
         return SimpleNamespace(__file__=str(path))
 
-    modules = {name: module(name) for name in ("swebench", "docker", "datasets")}
-    run_evaluation = module("run_evaluation")
+    runtime_names = (
+        "swebench",
+        "docker",
+        "datasets",
+        "huggingface_hub",
+        "pyarrow",
+    )
+    modules = {name: module(name) for name in runtime_names}
+    run_evaluation_path = root / "swebench" / "harness" / "run_evaluation.py"
+    run_evaluation_path.parent.mkdir()
+    run_evaluation_path.write_text("", encoding="utf-8")
+    run_evaluation = SimpleNamespace(__file__=str(run_evaluation_path))
     for name in (
         "build_container",
         "cleanup_container",
         "copy_to_container",
         "exec_run_with_timeout",
+        "load_swebench_dataset",
         "make_test_spec",
         "main",
     ):
@@ -233,12 +244,15 @@ def test_swebench_runtime_is_api_and_import_root_bound(
     distributions: dict[str, SimpleNamespace] = {}
     expected_digests: dict[str, str] = {}
     expected_tree_digests: dict[str, str] = {}
-    for name in ("swebench", "docker", "datasets"):
+    for name in runtime_names:
         dist = root / f"{name}.dist-info"
         dist.mkdir()
         record = dist / "RECORD"
+        record_paths = [f"{name}/__init__.py", f"{name}.dist-info/RECORD"]
+        if name == "swebench":
+            record_paths.append("swebench/harness/run_evaluation.py")
         record.write_text(
-            f"{name}/__init__.py,,\n{name}.dist-info/RECORD,,\n",
+            "".join(f"{path},,\n" for path in record_paths),
             encoding="utf-8",
         )
         distributions[name] = SimpleNamespace(_path=dist)
@@ -246,12 +260,8 @@ def test_swebench_runtime_is_api_and_import_root_bound(
             "sha256:" + hashlib.sha256(record.read_bytes()).hexdigest()
         )
         mapping = {
-            f"{name}/__init__.py": hashlib.sha256(
-                (root / name / "__init__.py").read_bytes()
-            ).hexdigest(),
-            f"{name}.dist-info/RECORD": hashlib.sha256(
-                record.read_bytes()
-            ).hexdigest(),
+            path: hashlib.sha256((root / path).read_bytes()).hexdigest()
+            for path in record_paths
         }
         canonical = json.dumps(
             mapping,
@@ -262,11 +272,13 @@ def test_swebench_runtime_is_api_and_import_root_bound(
             "sha256:" + hashlib.sha256(canonical).hexdigest()
         )
     monkeypatch.setenv("RSI_LAB_SWEBENCH_PYDEPS", str(root))
-    monkeypatch.setattr(
-        grader_runtime.importlib,
-        "import_module",
-        lambda name: modules[name],
-    )
+    import_calls: list[str] = []
+
+    def import_module(name: str) -> SimpleNamespace:
+        import_calls.append(name)
+        return modules[name]
+
+    monkeypatch.setattr(grader_runtime.importlib, "import_module", import_module)
     monkeypatch.setattr(
         grader_runtime.importlib.metadata,
         "version",
@@ -291,19 +303,28 @@ def test_swebench_runtime_is_api_and_import_root_bound(
     ready = operator_views.swebench_runtime_readiness()
     assert ready["ready"] is True
     assert ready["api_compatible"] is True
-    assert set(ready["record_origins"]) == {"swebench", "docker", "datasets"}
-    assert ready["tree_file_counts"] == {
-        "swebench": 2,
-        "docker": 2,
-        "datasets": 2,
-    }
+    assert ready["distribution_custody_verified_before_import"] is True
+    assert ready["module_origins_attested"] is True
+    imported_after_ready = list(import_calls)
+    assert set(ready["record_origins"]) == set(runtime_names)
+    expected_counts = dict.fromkeys(runtime_names, 2)
+    expected_counts["swebench"] = 3
+    assert ready["tree_file_counts"] == expected_counts
 
     docker_module = root / "docker" / "__init__.py"
     docker_module.write_text("tampered\n", encoding="utf-8")
     tampered = operator_views.swebench_runtime_readiness()
     assert tampered["ready"] is False
     assert "swebench_runtime_docker_tree_mismatch" in tampered["reasons"]
+    assert import_calls == imported_after_ready
     docker_module.write_text("", encoding="utf-8")
+
+    pyarrow_origin = modules["pyarrow"].__file__
+    modules["pyarrow"].__file__ = str(tmp_path / "escaped" / "pyarrow.py")
+    escaped = operator_views.swebench_runtime_readiness()
+    assert escaped["ready"] is False
+    assert "swebench_runtime_import_escaped_anchor" in escaped["reasons"]
+    modules["pyarrow"].__file__ = pyarrow_origin
 
     run_evaluation.exec_run_with_timeout = None
     incompatible = operator_views.swebench_runtime_readiness()

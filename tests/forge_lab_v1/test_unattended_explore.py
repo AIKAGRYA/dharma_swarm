@@ -348,6 +348,80 @@ def test_admission_refuses_unreconciled_control_plane_before_spend(
     assert refused["reconciliation"]["findings"][0]["campaign"] == "stale-campaign"
 
 
+def test_judge_cache_refusal_is_receipted_before_budget_or_child_invocation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = (tmp_path / "state").resolve()
+    state.mkdir()
+    monkeypatch.setenv("RSI_LAB_STATE", str(state))
+    monkeypatch.setattr(
+        unattended,
+        "require_execution_source",
+        lambda *_args, **_kwargs: {
+            "ready": True,
+            "repo": str(tmp_path / "release" / "repo"),
+            "commit": "a" * 40,
+        },
+    )
+    monkeypatch.setattr(unattended, "doctor", _ready_doctor)
+    monkeypatch.setattr(
+        unattended,
+        "reconciliation_status",
+        lambda: {"ok": True, "read_only": True, "findings": []},
+    )
+    monkeypatch.setattr(
+        unattended,
+        "_selected_model_evidence",
+        lambda _check: _model_evidence(),
+    )
+
+    def refuse_judge_cache(_task_id: str, *, state_root: Path):
+        del state_root
+        raise unattended.UnattendedContextError(
+            "JUDGE_CACHE_DIGEST_MISMATCH",
+            "release-bound judge cache digest mismatch",
+        )
+
+    budget_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    child_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def unexpected_budget(*args, **kwargs):
+        budget_calls.append((args, kwargs))
+        raise AssertionError("budget reservation must follow admitted context")
+
+    def unexpected_child(*args, **kwargs):
+        child_calls.append((args, kwargs))
+        raise AssertionError("child/provider dispatch must follow admitted context")
+
+    monkeypatch.setattr(unattended, "load_admitted_task_context", refuse_judge_cache)
+    monkeypatch.setattr(unattended, "reserve_budget", unexpected_budget)
+    monkeypatch.setattr(unattended, "_run_child_process", unexpected_child)
+
+    with pytest.raises(unattended.UnattendedError) as error:
+        unattended.run_once(state, timeout_seconds=60)
+
+    assert error.value.code == "ADMISSION_REFUSED"
+    assert budget_calls == []
+    assert child_calls == []
+    control = state / ".dharma" / "forge_lab" / "unattended_explore"
+    assert not (control / "budget_ledger.jsonl").exists()
+    receipts = unattended.read_chain(
+        control / "receipts.jsonl",
+        schema=unattended.RECEIPT_SCHEMA,
+        digest_field="receipt_digest",
+    )
+    assert len(receipts) == 1
+    refusal = receipts[0]
+    assert refusal["kind"] == "admission_refusal"
+    assert refusal["reasons"] == [
+        "JUDGE_CACHE_DIGEST_MISMATCH:release-bound judge cache digest mismatch"
+    ]
+    assert refusal["provider_calls"] == 0
+    assert refusal["usd_reserved"] == 0.0
+    assert refusal["positive_rsi_claim"] is False
+
+
 def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

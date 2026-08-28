@@ -20,7 +20,12 @@ from collections.abc import Callable, Iterator
 from pathlib import PurePosixPath
 from typing import Any
 
-from dharma_swarm.forge_lab.unattended_context import admitted_task_image
+from dharma_swarm.forge_lab.unattended_context import (
+    UnattendedContextError,
+    admitted_task_image,
+    load_admitted_judge_dataset,
+    validate_admitted_judge_instance,
+)
 
 _PATCH_LOCK = threading.Lock()
 ISOLATION_PROOF_SCHEMA = "rsi_lab.grader_isolation_proof.v1"
@@ -29,6 +34,8 @@ SUPPORTED_LINUX_RUNTIME_RECORD_DIGESTS = {
     "swebench": "sha256:e684d666e693675081edd9dc7524709a3f1d4a3e1f2d048a7cb5fe445a88c917",
     "docker": "sha256:c9beb105488ec004823a2b52094168dcccaa6ead6703693d7df7028f35d7d7e8",
     "datasets": "sha256:3787afe735a680d984a0399d866cc511096587225e3d6abfea76c3e259cf793f",
+    "huggingface_hub": "sha256:dcc4254beb2da14662208d9231f520184eb07afd21efe83c717b1f645479b15d",
+    "pyarrow": "sha256:a03283f58c4d742daa152f4b259a62368b58f04e3eaad6e59e1818a0ca996b64",
 }
 PID_LIMIT = 256
 NANO_CPU_LIMIT = 2_000_000_000
@@ -250,14 +257,21 @@ def isolated_swebench_containers() -> Iterator[list[dict[str, Any]]]:
         original_cleanup = run_evaluation.cleanup_container
         original_copy = run_evaluation.copy_to_container
         original_exec = run_evaluation.exec_run_with_timeout
+        original_load_dataset = run_evaluation.load_swebench_dataset
         original_make_spec = run_evaluation.make_test_spec
         proofs: list[dict[str, Any]] = []
 
         class PinnedImageTestSpec:
-            def __init__(self, delegate: Any, fixture: dict[str, Any]) -> None:
+            def __init__(
+                self,
+                delegate: Any,
+                fixture: dict[str, Any],
+                judge_proof: dict[str, Any],
+            ) -> None:
                 self._delegate = delegate
                 self.rsi_admitted_image_id = fixture["image_id"]
                 self.rsi_admitted_image_reference = fixture["image_reference"]
+                self.rsi_admitted_judge_row_sha256 = judge_proof["row_sha256"]
 
             @property
             def instance_image_key(self) -> str:
@@ -274,11 +288,15 @@ def isolated_swebench_containers() -> Iterator[list[dict[str, Any]]]:
                 or (instance.get("instance_id") if isinstance(instance, dict) else "")
             )
             fixture = admitted_task_image(task_id)
-            if not isinstance(instance, dict) or any(
-                instance.get(name) != fixture[name]
-                for name in ("repo", "base_commit")
-            ):
-                raise RuntimeError("swebench_instance_not_release_bound")
+            try:
+                judge_proof = validate_admitted_judge_instance(
+                    instance,
+                    task_id=task_id,
+                )
+            except UnattendedContextError as exc:
+                raise RuntimeError(
+                    f"swebench_instance_not_release_bound:{exc.code}"
+                ) from exc
             module = importlib.import_module(original_make_spec.__module__)
             original_env_builder = module.make_env_script_list
             module.make_env_script_list = lambda *_args, **_kwargs: []
@@ -291,7 +309,21 @@ def isolated_swebench_containers() -> Iterator[list[dict[str, Any]]]:
                 or spec.platform != "linux/x86_64"
             ):
                 raise RuntimeError("swebench_image_reference_not_release_bound")
-            return PinnedImageTestSpec(spec, fixture)
+            return PinnedImageTestSpec(spec, fixture, judge_proof)
+
+        def pinned_load_dataset(
+            name: str,
+            split: str,
+            instance_ids: list[str] | None = None,
+        ) -> Any:
+            if os.environ.get("RSI_LAB_REQUIRE_PINNED_SWEBENCH_IMAGE") != "1":
+                return original_load_dataset(name, split, instance_ids)
+            try:
+                return load_admitted_judge_dataset(name, split, instance_ids)
+            except UnattendedContextError as exc:
+                raise RuntimeError(
+                    f"swebench_dataset_not_release_bound:{exc.code}"
+                ) from exc
 
         def isolated_builder(
             test_spec: Any,
@@ -352,6 +384,7 @@ def isolated_swebench_containers() -> Iterator[list[dict[str, Any]]]:
         run_evaluation.cleanup_container = isolated_cleanup
         run_evaluation.copy_to_container = isolated_copy
         run_evaluation.exec_run_with_timeout = isolated_exec
+        run_evaluation.load_swebench_dataset = pinned_load_dataset
         run_evaluation.make_test_spec = pinned_make_test_spec
         try:
             yield proofs
@@ -360,6 +393,7 @@ def isolated_swebench_containers() -> Iterator[list[dict[str, Any]]]:
             run_evaluation.cleanup_container = original_cleanup
             run_evaluation.copy_to_container = original_copy
             run_evaluation.exec_run_with_timeout = original_exec
+            run_evaluation.load_swebench_dataset = original_load_dataset
             run_evaluation.make_test_spec = original_make_spec
 
 

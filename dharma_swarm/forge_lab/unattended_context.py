@@ -10,13 +10,34 @@ import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from dharma_swarm.forge_lab import unattended_judge as _unattended_judge
 from dharma_swarm.forge_lab.state_io import content_digest
+from dharma_swarm.forge_lab.unattended_judge import (
+    JUDGE_BINDING_SCHEMA,
+    JUDGE_FIELDS,
+)
+from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
 
 CONTEXT_BINDING_SCHEMA = "rsi_lab.unattended_context_binding.v1"
 MAX_CONTEXT_CHARS = 400_000
+PROMPT_TASK_FIELDS = (
+    "task_id",
+    "instance_id",
+    "repo",
+    "base_commit",
+    "problem_statement",
+)
 ADMITTED_TASK_IMAGES: dict[str, dict[str, Any]] = {
     "django__django-12209": {
         "task_sha256": "1367c9eb0b844691ab687e20b74a0ff901a7e33ce81169e177a4fe8afe1ab2a8",
+        "task_sha256_fields": (
+            "FAIL_TO_PASS",
+            "base_commit",
+            "instance_id",
+            "problem_statement",
+            "repo",
+        ),
+        "task_payload_digest": "sha256:b357feb2dfba76ec654c2ad8a4ce8ada2b3e9e0a335be5a2649b6281a4f30eec",
         "repo": "django/django",
         "base_commit": "5a68f024987e6d16c2626a31bf653a2edddea579",
         "source": "official_swebench_search_only",
@@ -27,6 +48,13 @@ ADMITTED_TASK_IMAGES: dict[str, dict[str, Any]] = {
         "os": "linux",
         "architecture": "amd64",
         "target_paths": ("django/db/models/base.py",),
+        "judge_dataset_name": "princeton-nlp/SWE-bench_Verified",
+        "judge_dataset_revision": "c104f840cc67f8b6eec6f759ebc8b2693d585d4a",
+        "judge_dataset_split": "test",
+        "judge_dataset_rows": 500,
+        "judge_fields": JUDGE_FIELDS,
+        "judge_cache_file_digest": "sha256:a45b1fe4e2f0c8390b2b2938ac83e92ed5979000856808f3679c07812e9e6dcd",
+        "judge_row_sha256": "939d1c36810a3400bab68d472d01ac5be33d18939f2cc0b96486ef7db997411c",
     }
 }
 
@@ -40,7 +68,7 @@ class UnattendedContextError(RuntimeError):
 
 
 def sanitize_unattended_docker_env() -> None:
-    """Pin the SDK/CLI to the local daemon after runtime credential bootstrap."""
+    """Pin Docker and the judge cache after runtime credential bootstrap."""
 
     for name in ("DOCKER_API_VERSION", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY"):
         os.environ.pop(name, None)
@@ -48,6 +76,13 @@ def sanitize_unattended_docker_env() -> None:
         os.environ["DOCKER_CONTEXT"] = "default"
         os.environ["FORGE_DOCKER_CONTEXT"] = "default"
         os.environ["DOCKER_HOST"] = "unix:///var/run/docker.sock"
+    home = Path(os.environ.get("HOME", "/nonexistent")).expanduser().resolve()
+    hf_home = home / ".cache" / "huggingface"
+    os.environ["HF_DATASETS_OFFLINE"] = "1"
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["HF_HOME"] = str(hf_home)
+    os.environ["HF_DATASETS_CACHE"] = str(hf_home / "datasets")
+    os.environ["HF_HUB_CACHE"] = str(hf_home / "hub")
     os.environ["RSI_LAB_REQUIRE_PINNED_SWEBENCH_IMAGE"] = "1"
 
 
@@ -65,6 +100,50 @@ def _task_for_id(task_id: str, db_path: Path) -> dict[str, Any]:
     from dharma_swarm.forge_v1.forge_v2.taskbed_allocation import task_for_id
 
     return task_for_id(task_id, db_path=db_path)
+
+
+def _judge_contract() -> _unattended_judge.JudgeReleaseContract:
+    return _unattended_judge.JudgeReleaseContract(
+        fixtures=ADMITTED_TASK_IMAGES,
+        fixture_for_task=admitted_task_image,
+        error_factory=UnattendedContextError,
+    )
+
+
+def validate_admitted_judge_instance(
+    instance: Any,
+    *,
+    task_id: str | None = None,
+) -> dict[str, Any]:
+    """Validate all judge bytes without returning gold fields in the proof."""
+
+    return _unattended_judge.validate_admitted_judge_instance(
+        instance,
+        task_id=task_id,
+        contract=_judge_contract(),
+    )
+
+
+def load_admitted_judge_dataset(
+    name: str,
+    split: str,
+    instance_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Load only release-bound rows from the exact offline judge snapshot."""
+
+    return _unattended_judge.load_admitted_judge_dataset(
+        name,
+        split,
+        instance_ids,
+        contract=_judge_contract(),
+    )
+
+
+def admitted_judge_binding(task_id: str) -> dict[str, Any]:
+    return _unattended_judge.admitted_judge_binding(
+        task_id,
+        contract=_judge_contract(),
+    )
 
 
 def _docker_env() -> dict[str, str]:
@@ -200,11 +279,49 @@ def load_admitted_task_context(
         and task.get("repo") == fixture["repo"]
         and task.get("base_commit") == fixture["base_commit"]
         and str(task.get("problem_statement") or "").strip()
+        and task.get("provenance") == provenance
+        and task.get("sealed_provenance") == provenance
+        and all(field in task for field in fixture["task_sha256_fields"])
+        and all(field in task for field in PROMPT_TASK_FIELDS)
     )
     if not valid_task:
         raise UnattendedContextError(
             "TASK_FIXTURE_MISMATCH",
             "taskbed row does not match the release-bound task fixture",
+        )
+    oracle_payload = {field: task[field] for field in fixture["task_sha256_fields"]}
+    oracle_sha256 = canonical_sha256(oracle_payload)
+    if oracle_sha256 != provenance.get("task_sha256"):
+        raise UnattendedContextError(
+            "TASK_ORACLE_DIGEST_MISMATCH",
+            "task payload no longer reproduces its sealed oracle digest",
+        )
+    task_payload_digest = content_digest(task)
+    if task_payload_digest != fixture["task_payload_digest"]:
+        raise UnattendedContextError(
+            "TASK_PAYLOAD_DIGEST_MISMATCH",
+            "stored task payload differs from the release fixture",
+        )
+    judge_binding = admitted_judge_binding(task_id)
+    prompt_task = {field: task[field] for field in PROMPT_TASK_FIELDS}
+    prompt_task_sha256 = canonical_sha256(prompt_task)
+    task_fail_to_pass = task.get("FAIL_TO_PASS")
+    if isinstance(task_fail_to_pass, str):
+        try:
+            task_fail_to_pass = json.loads(task_fail_to_pass)
+        except json.JSONDecodeError as exc:
+            raise UnattendedContextError(
+                "TASK_TEST_LIST_INVALID",
+                "task FAIL_TO_PASS is not a canonical list",
+            ) from exc
+    judge_row = judge_binding["rows"][task_id]
+    if (
+        not isinstance(task_fail_to_pass, list)
+        or canonical_sha256(task_fail_to_pass) != judge_row["fail_to_pass_sha256"]
+    ):
+        raise UnattendedContextError(
+            "TASK_JUDGE_CROSSLINK_MISMATCH",
+            "task and judge FAIL_TO_PASS evidence disagree",
         )
     _inspect_image(fixture)
     context = {
@@ -215,6 +332,9 @@ def load_admitted_task_context(
         "schema": CONTEXT_BINDING_SCHEMA,
         "task_id": task_id,
         "task_sha256": fixture["task_sha256"],
+        "task_payload_digest": task_payload_digest,
+        "prompt_task_sha256": prompt_task_sha256,
+        "judge_dataset": judge_binding,
         "image_reference": fixture["image_reference"],
         "image_id": fixture["image_id"],
         "repo_digest": fixture["repo_digest"],
@@ -227,17 +347,23 @@ def load_admitted_task_context(
         },
         "pull_allowed": False,
         "container_network_disabled": True,
-        "gold_patch_loaded": False,
+        "judge_row_loaded_for_digest": True,
+        "judge_row_exposed_to_model": False,
+        "gold_patch_exposed_to_model": False,
     }
     binding["binding_digest"] = content_digest(binding)
-    return dict(task), context, binding
+    return prompt_task, context, binding
 
 
 __all__ = [
     "ADMITTED_TASK_IMAGES",
     "CONTEXT_BINDING_SCHEMA",
+    "JUDGE_BINDING_SCHEMA",
     "UnattendedContextError",
+    "admitted_judge_binding",
     "admitted_task_image",
+    "load_admitted_judge_dataset",
     "load_admitted_task_context",
     "sanitize_unattended_docker_env",
+    "validate_admitted_judge_instance",
 ]

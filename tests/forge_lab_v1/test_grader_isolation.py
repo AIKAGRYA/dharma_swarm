@@ -283,11 +283,19 @@ def test_eval_script_is_redirected_to_bounded_tmpfs_and_hooks_are_restored(
     def original_make(instance: object, *_args: object, **_kwargs: object) -> object:
         return instance
 
+    def original_load(
+        _name: str,
+        _split: str,
+        _instance_ids: list[str] | None = None,
+    ) -> list[object]:
+        return [object()]
+
     harness = SimpleNamespace(
         build_container=original_builder,
         cleanup_container=original_cleanup,
         copy_to_container=original_copy,
         exec_run_with_timeout=original_exec,
+        load_swebench_dataset=original_load,
         make_test_spec=original_make,
     )
     monkeypatch.setattr(grader_isolation, "_swebench_run_evaluation", lambda: harness)
@@ -311,6 +319,7 @@ def test_eval_script_is_redirected_to_bounded_tmpfs_and_hooks_are_restored(
     assert harness.cleanup_container is original_cleanup
     assert harness.copy_to_container is original_copy
     assert harness.exec_run_with_timeout is original_exec
+    assert harness.load_swebench_dataset is original_load
     assert harness.make_test_spec is original_make
 
 
@@ -335,11 +344,18 @@ def test_pinned_test_spec_uses_cached_image_id_and_skips_env_network_builder(
             platform="linux/x86_64",
         )
 
+    original_load_calls: list[object] = []
+
+    def original_load(*_args: object, **_kwargs: object) -> list[object]:
+        original_load_calls.append(object())
+        return []
+
     harness = SimpleNamespace(
         build_container=lambda *_args, **_kwargs: None,
         cleanup_container=lambda *_args, **_kwargs: None,
         copy_to_container=lambda *_args, **_kwargs: None,
         exec_run_with_timeout=lambda *_args, **_kwargs: None,
+        load_swebench_dataset=original_load,
         make_test_spec=make_spec,
     )
     monkeypatch.setenv("RSI_LAB_REQUIRE_PINNED_SWEBENCH_IMAGE", "1")
@@ -349,6 +365,22 @@ def test_pinned_test_spec_uses_cached_image_id_and_skips_env_network_builder(
         "import_module",
         lambda _name: spec_module,
     )
+    monkeypatch.setattr(
+        grader_isolation,
+        "validate_admitted_judge_instance",
+        lambda *_args, **_kwargs: {"row_sha256": "sealed-row"},
+    )
+    pinned_load_calls: list[tuple[object, ...]] = []
+
+    def pinned_load(*args: object, **_kwargs: object) -> list[dict[str, str]]:
+        pinned_load_calls.append(args)
+        return [{"instance_id": task_id}]
+
+    monkeypatch.setattr(
+        grader_isolation,
+        "load_admitted_judge_dataset",
+        pinned_load,
+    )
 
     instance = {
         "instance_id": task_id,
@@ -356,9 +388,81 @@ def test_pinned_test_spec_uses_cached_image_id_and_skips_env_network_builder(
         "base_commit": fixture["base_commit"],
     }
     with grader_isolation.isolated_swebench_containers():
+        rows = harness.load_swebench_dataset("dataset", "test", [task_id])
         pinned = harness.make_test_spec(instance)
+        assert rows == [{"instance_id": task_id}]
         assert pinned.instance_image_key == fixture["image_id"]
         assert pinned.rsi_admitted_image_reference == fixture["image_reference"]
+        assert pinned.rsi_admitted_judge_row_sha256 == "sealed-row"
 
     assert harness.make_test_spec is make_spec
+    assert harness.load_swebench_dataset is original_load
     assert spec_module.make_env_script_list is network_builder
+    assert original_load_calls == []
+    assert pinned_load_calls == [("dataset", "test", [task_id])]
+
+
+def test_judge_digest_refusal_precedes_make_spec_and_restores_all_hooks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task_id = "django__django-12209"
+    fixture = grader_isolation.admitted_task_image(task_id)
+    make_calls: list[object] = []
+    env_calls: list[object] = []
+
+    def original_make(*_args: object, **_kwargs: object) -> object:
+        make_calls.append(object())
+        return object()
+
+    def original_load(*_args: object, **_kwargs: object) -> list[object]:
+        return []
+
+    def env_builder(*_args: object, **_kwargs: object) -> list[object]:
+        env_calls.append(object())
+        return []
+
+    spec_module = SimpleNamespace(make_env_script_list=env_builder)
+    harness = SimpleNamespace(
+        build_container=lambda *_args, **_kwargs: None,
+        cleanup_container=lambda *_args, **_kwargs: None,
+        copy_to_container=lambda *_args, **_kwargs: None,
+        exec_run_with_timeout=lambda *_args, **_kwargs: None,
+        load_swebench_dataset=original_load,
+        make_test_spec=original_make,
+    )
+    monkeypatch.setenv("RSI_LAB_REQUIRE_PINNED_SWEBENCH_IMAGE", "1")
+    monkeypatch.setattr(grader_isolation, "_swebench_run_evaluation", lambda: harness)
+    monkeypatch.setattr(
+        grader_isolation.importlib,
+        "import_module",
+        lambda _name: spec_module,
+    )
+
+    def refuse(*_args: object, **_kwargs: object) -> object:
+        raise grader_isolation.UnattendedContextError(
+            "JUDGE_ROW_DIGEST_MISMATCH",
+            "sealed row changed",
+        )
+
+    monkeypatch.setattr(
+        grader_isolation,
+        "validate_admitted_judge_instance",
+        refuse,
+    )
+    instance = {
+        "instance_id": task_id,
+        "repo": fixture["repo"],
+        "base_commit": fixture["base_commit"],
+    }
+    with pytest.raises(
+        RuntimeError,
+        match="swebench_instance_not_release_bound:JUDGE_ROW_DIGEST_MISMATCH",
+    ):
+        with grader_isolation.isolated_swebench_containers():
+            harness.make_test_spec(instance)
+
+    assert make_calls == []
+    assert env_calls == []
+    assert harness.load_swebench_dataset is original_load
+    assert harness.make_test_spec is original_make
+    assert spec_module.make_env_script_list is env_builder

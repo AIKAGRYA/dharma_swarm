@@ -474,7 +474,9 @@ offline file locks, forbids namespace creation, and applies systemd process
 hardening plus an external timeout. Docker remains a daemon-mediated Unix
 socket client; candidate containers never receive that socket. The launcher
 pins SWE-bench 4.1 from the root-owned, non-writable dedicated host runtime and
-refuses a missing, escaped, modified, or API-incompatible evaluator. Verify
+attests the executed SWE-bench, Docker SDK, datasets, Hugging Face Hub, and
+PyArrow distribution trees. It refuses a missing, escaped, modified, or
+API-incompatible evaluator. Verify
 unit syntax and the complete grader runtime
 through `rsi doctor --json` before enabling the timer. The provider refresh is
 independent and runs hourly at minute `:17`.
@@ -486,7 +488,17 @@ The daily launcher also pins the local Docker socket, clears inherited Docker
 TLS/API overrides after credential bootstrap, and requires both CLI and Python
 SDK daemon probes. Its task context and grader use only the release-attested
 cached image ID: no mutable image pull is permitted after admission, and the
-task/image/context binding is rechecked in the child process.
+task/image/context binding is rechecked in the child process. Admission also
+requires the local-only `SWE-bench_Verified` revision
+`c104f840cc67f8b6eec6f759ebc8b2693d585d4a`, Parquet digest
+`sha256:a45b1fe4e2f0c8390b2b2938ac83e92ed5979000856808f3679c07812e9e6dcd`,
+and selected-row SHA-256
+`939d1c36810a3400bab68d472d01ac5be33d18939f2cc0b96486ef7db997411c`
+to match before reservation. The grader substitutes and rechecks that pinned
+loader; only the five-field model-safe task projection reaches models, while
+the judge row, gold patch, test patch, and test lists remain outside model and
+receipt payloads. See the authority-chain details in
+[`FORGE_LAB_V0_1_RUNBOOK.md`](FORGE_LAB_V0_1_RUNBOOK.md#bounded-unattended-explore-oneshot).
 Create the following file to stop new runs without editing code or units:
 
 ```bash
