@@ -3,9 +3,11 @@
   "base_ref": "3498b3e0fb6f608ce55149143e10b076c148e94b",
   "branch": "codex/mission-control-fleet-final-20260827",
   "worktree": ".",
-  "intent": "Render one tactile Linear-v1 Mission Control cockpit at the existing dashboard/cockpit front door and add only a bounded explicit-mission GET projection through an injected read-only provider. Preserve TaskBoard plus RuntimeStateStore as authority, retain source uncertainty, and label simulated prototype data so no projection can be mistaken for executor liveness, runtime proof, or production command authority.",
+  "intent": "Render one tactile Linear-v1 Mission Control cockpit at the existing dashboard/cockpit front door and add only a bounded explicit-mission GET projection through an injected read-only provider. Preserve TaskBoard plus RuntimeStateStore as authority, retain source uncertainty, admit only publicly witnessed reconciliation states over retained fields, and label simulated prototype data so no projection can be mistaken for executor liveness, runtime proof, or production command authority.",
   "allowed_files": [
     "api/routers/control_surface.py",
+    "api/routers/mission_control_reconciliation_validation.py",
+    "api/routers/mission_control_snapshot_validation.py",
     "dashboard/next.config.ts",
     "dashboard/src/app/dashboard/cockpit/page.tsx",
     "dashboard/src/components/cockpit/MissionControlDeck.tsx",
@@ -37,7 +39,7 @@
     },
     {
       "name": "mission-control-api-ruff",
-      "command": "python3 -m ruff check api/routers/control_surface.py tests/test_control_surface_mission_control.py",
+      "command": "python3 -m ruff check api/routers/control_surface.py api/routers/mission_control_reconciliation_validation.py api/routers/mission_control_snapshot_validation.py tests/test_control_surface_mission_control.py",
       "expected_exit": 0,
       "timeout_seconds": 120
     },
@@ -90,6 +92,7 @@
       "Canonical owner reads can initialize or migrate stores, so the HTTP projection accepts only a dependency-injected read-only provider and never constructs owner stores during a request.",
       "There is no canonical unbounded mission-list API; the endpoint and cockpit require one explicit bounded mission identifier.",
       "The existing cockpit report is a broad repository projection while MissionSnapshot is a typed mission projection; the UI must display their provenance separately.",
+      "The HTTP boundary proves only PubliclyWitnessed[State] over retained fields and trusts the injected canonical owner for hidden causal identity; it does not independently re-prove omitted evidence.",
       "The current visual shell predates the locked matte indigo-sumi canon, so this packet scopes the canonical treatment to Mission Control without changing unrelated dashboard routes."
     ],
     "closest_existing_implementation": [
@@ -105,9 +108,10 @@
       "The tactile fixture is explicitly SIMULATION and is excluded from live health, liveness, completion, and production-readiness claims.",
       "Mission Control and TaskBoard remain separate databases without an atomic cross-store lifecycle transaction.",
       "Recorded task, lease, run, heartbeat, acknowledgement, or receipt state never proves an executor process is alive.",
+      "Evidence-scan saturation and hidden-only noncoherent claims are unprovable from the schema-stable public v1 projection and fail closed to unknown.",
       "This packet does not deploy, start or restart a daemon, initialize a state store, discover missions, mutate runtime state, use a live provider, or grant command authority."
     ],
     "rollback": "Revert the packet-scoped Mission Control API and cockpit commit. No canonical owner state, runtime database, transport, daemon, deployment, credential, ACL, or external system is changed.",
-    "packet_digest": "a759e7f5b24d26d00675b70fd7a16083c7c5c9d5e9e93c37d021062bd473c52b"
+    "packet_digest": "60704749cea207b8dbd1d89f18c9f346d9c0c3bf5677752a2822f499ca49d80e"
   }
 }
