@@ -3213,4 +3213,136 @@ Git sync: origin/main | ahead 2 | behind 1
       "Pressure preview authoritative sidebar topology pressure",
     );
   });
+
+  test("propagates runtime_activity.v1 inventory as lease evidence", () => {
+    const controlPreview = {
+      "Runtime DB": "/tmp/runtime.db",
+      "Loop state": "cycle 1 running",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=10 CurrentSessions=1 Claims=3 CurrentClaims=1 AckedClaims=2 Runs=3 CurrentLeases=1 ObservedNonterminalRuns=3 ExpiredOrUnproven=2 ExecutorLiveness=unproven",
+      "Session state": "10 sessions | 3 claims | 1 current lease claims",
+      "Context state": "2 promoted facts | 3 operator actions",
+      "Artifact state": "PromotedFacts=2 OperatorActions=3",
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "unproven",
+    };
+    const tabs: TabSpec[] = [
+      {id: "repo", title: "Repo", kind: "repo", lines: [], preview: {}},
+      {id: "control", title: "Control", kind: "control", lines: [], preview: controlPreview},
+      {id: "agents", title: "Agents", kind: "agents", lines: [], preview: {"Current leases": "1", "Recent actions": "0"}},
+    ];
+
+    const lines = buildContextSidebarLines(
+      tabs,
+      "Control",
+      "codex",
+      "gpt-5.4",
+      "connected",
+      undefined,
+      controlPreview,
+    );
+
+    const leaseInventory = lines.find(
+      (line) => line.startsWith("Inventory 3 claims") && line.includes("1 current lease claims"),
+    );
+    expect(leaseInventory).toBeDefined();
+    expect(leaseInventory).toContain("2 acked claims");
+    expect(lines).toContain("Leases 1 | 0");
+    expect(lines.some((line) => /\bactive claims\b/i.test(line))).toBe(false);
+  });
+
+  test("suppresses stale active inventory and agent fallbacks under unknown semantics", () => {
+    const controlPreview = {
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v2",
+      "Runtime activity": "Sessions=8 Claims=3 ActiveClaims=2 Runs=4 ActiveRuns=2",
+      "Session state": "8 sessions | 3 claims | 2 active claims",
+      "Run state": "4 runs | 2 active runs",
+      "Runtime summary": "/tmp/runtime.db | 2 active claims | 2 active runs",
+    };
+    const tabs: TabSpec[] = [
+      {id: "repo", title: "Repo", kind: "repo", lines: [], preview: {}},
+      {id: "control", title: "Control", kind: "control", lines: [], preview: controlPreview},
+      {id: "agents", title: "Agents", kind: "agents", lines: [], preview: {"Active runs": "7", "Recent actions": "0"}},
+    ];
+
+    const lines = buildContextSidebarLines(
+      tabs,
+      "Control",
+      "codex",
+      "gpt-5.4",
+      "connected",
+      undefined,
+      controlPreview,
+    );
+    const rendered = lines.join("\n");
+
+    expect(rendered).toContain("Runs unclassified | 0");
+    expect(rendered).toContain("runtime_activity.v2");
+    expect(rendered).not.toMatch(/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i);
+    expect(rendered).not.toMatch(/Active(?:Claims|Runs|Sessions)=/);
+  });
+
+  test("fails closed across compact repo/control conflicts and agent run fallbacks", () => {
+    const repoPreview = {
+      "Repo root": REPO_ROOT,
+      Branch: "main",
+      Head: "804d5d1",
+      "Repo/control preview":
+        "fresh | task compact-truth | branch main@804d5d1 | semantics legacy_status_counts | liveness proven | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 ActiveRuns=2 ExecutorLiveness=proven | artifacts Artifacts=3",
+    };
+    const controlPreview = {Authority: "placeholder | awaiting authoritative control refresh"};
+    const tabs: TabSpec[] = [
+      {id: "repo", title: "Repo", kind: "repo", lines: [], preview: repoPreview},
+      {id: "control", title: "Control", kind: "control", lines: [], preview: controlPreview},
+      {id: "agents", title: "Agents", kind: "agents", lines: [], preview: {"Active runs": "7"}},
+    ];
+
+    const rendered = buildContextSidebarLines(
+      tabs,
+      "Repo",
+      "codex",
+      "gpt-5.4",
+      "connected",
+      repoPreview,
+      controlPreview,
+    ).join("\n");
+
+    expect(rendered).toContain("conflicting_activity_semantics");
+    expect(rendered).toContain("lease classification unavailable");
+    expect(rendered).toContain("Runs unclassified");
+    expect(rendered).not.toMatch(/Active(?:Claims|Runs|Sessions)=/);
+    expect(rendered).not.toContain("ExecutorLiveness=proven");
+    expect(rendered).not.toMatch(/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i);
+  });
+
+  test("downgrades compact liveness prose under consistent current semantics", () => {
+    const repoPreview = {
+      "Repo root": REPO_ROOT,
+      Branch: "main",
+      Head: "804d5d1",
+      "Repo/control preview":
+        "fresh | task compact-truth | branch main@804d5d1 | semantics runtime_activity.v1 | executor liveness: proven | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 CurrentLeases=1 | artifacts Artifacts=3",
+    };
+    const controlPreview = {Authority: "placeholder | awaiting authoritative control refresh"};
+    const tabs: TabSpec[] = [
+      {id: "repo", title: "Repo", kind: "repo", lines: [], preview: repoPreview},
+      {id: "control", title: "Control", kind: "control", lines: [], preview: controlPreview},
+    ];
+
+    const rendered = buildContextSidebarLines(
+      tabs,
+      "Repo",
+      "codex",
+      "gpt-5.4",
+      "connected",
+      repoPreview,
+      controlPreview,
+    ).join("\n");
+
+    expect(rendered).toContain("liveness unproven");
+    expect(rendered).not.toMatch(/\bexecutor liveness\s*:\s*proven\b/i);
+    expect(rendered).not.toContain("ExecutorLiveness=proven");
+    expect(rendered).not.toMatch(/warnings 1 \(.*liveness/i);
+  });
 });

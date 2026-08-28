@@ -1,0 +1,116 @@
+{
+  "id": "fleet-advancement-WP-RUNTIME-ACTIVITY-UI-TRUTH-R2-20260828",
+  "base_ref": "ecdfa2c24ac0104edeaa63a0599611c301fd9e51",
+  "branch": "codex/trust-hardening-routing-auth-20260827",
+  "worktree": ".",
+  "intent": "Make every terminal projection and persisted preview render runtime_activity.v1 as current lease evidence, observed nonterminal records, and expired-or-unproven records without implying executor liveness, while preserving explicitly legacy status-count payloads.",
+  "allowed_files": [
+    "terminal/src/protocol.ts",
+    "terminal/src/app.tsx",
+    "terminal/src/repoControlPreview.ts",
+    "terminal/src/persistence.ts",
+    "terminal/src/components/ControlPane.tsx",
+    "terminal/src/components/Sidebar.tsx",
+    "terminal/src/components/RepoPane.tsx",
+    "terminal/tests/protocol.test.ts",
+    "terminal/tests/app.test.ts",
+    "terminal/tests/repoControlPreview.test.ts",
+    "terminal/tests/persistence.test.ts",
+    "terminal/tests/controlPane.test.ts",
+    "terminal/tests/sidebar.test.ts",
+    "terminal/tests/repoPane.test.ts",
+    "reports/agentops/work_packets/fleet-advancement-WP-RUNTIME-ACTIVITY-UI-TRUTH-R2-20260828.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "scripts/**",
+    "terminal/src/types.ts",
+    "terminal/package.json",
+    "terminal/bun.lock",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "runtime-activity-producer-contracts",
+      "command": "python3 -m pytest -q tests/test_runtime_activity.py tests/test_operator_core_adapters.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "lease-semantics-downgrade-must-fail",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('terminal/src/protocol.ts'); t=p.read_text(); a='  return activitySemantics === RUNTIME_ACTIVITY_SEMANTICS;'; a in t or sys.exit(3); p.write_text(t.replace(a, '  return false;', 1)); sys.exit(subprocess.run(['bun', 'test', 'terminal/tests/protocol.test.ts', '--test-name-pattern', 'runtime_activity.v1']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix: label runtime lease evidence truthfully"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RUNTIME-ACTIVITY-UI-TRUTH-R2-20260828",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "ecdfa2c24ac0104edeaa63a0599611c301fd9e51",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Legacy terminal payloads use active_* names for raw status counts, while runtime_activity.v1 keeps those fields only as compatibility aliases for current identity-bound leases.",
+      "CanonicalRuntimeSnapshot.active_session_count and active_run_count become current-lease counts under runtime_activity.v1; total sessions and runs remain in metadata.overview.",
+      "Text fallback output now carries two self-describing metric lines; reading only the first silently discards observed-nonterminal, expired-or-unproven, and liveness qualifications.",
+      "Persisted summaries, compact app rows, repo/control parsers, and component-level inventory parsers can reintroduce false active labels after the protocol boundary unless the semantic marker is preserved and consumed end to end.",
+      "A current lease is bounded persistence evidence and explicitly does not prove a live executor process."
+    ],
+    "closest_existing_implementation": [
+      "terminal/src/protocol.ts",
+      "terminal/src/persistence.ts",
+      "terminal/src/app.tsx",
+      "terminal/src/repoControlPreview.ts",
+      "terminal/src/components/ControlPane.tsx",
+      "terminal/src/components/Sidebar.tsx",
+      "terminal/src/components/RepoPane.tsx"
+    ],
+    "honest_blockers": [
+      "Legacy payloads without activity_semantics must retain their historical active-status labels because the terminal cannot reinterpret their producer semantics safely.",
+      "Any present but unknown activity_semantics must fail closed and must not inherit legacy active labels.",
+      "The UI can present current lease evidence and executor-liveness uncertainty but cannot probe or prove operating-system process liveness.",
+      "Persisted previews created before runtime_activity.v1 may still contain legacy prose; a fresh typed snapshot rebuilds and replaces those activity labels at the protocol boundary.",
+      "The exact work-packet positive-command allowlist does not admit Bun; targeted terminal tests and TypeScript checking run directly and in CI rather than through the packet evaluator."
+    ],
+    "rollback": "Revert the UI truth-label commit. The Python runtime activity classifier remains authoritative, but terminal projections and persisted previews will again display compatibility aliases as active status labels.",
+    "packet_digest": "105df0c2a140ca31e28ace6ae5de2b43b6882cdd0dd2127e55714a8edf20f2d5"
+  }
+}

@@ -14,6 +14,8 @@ import {
   saveSupervisorRepoPreview,
   saveStoredState,
   saveSupervisorControlSummary,
+  runtimePayloadToTruthPreview,
+  runtimePreviewWithDeclaredActivitySemantics,
 } from "./persistence.ts";
 import {Composer} from "./components/Composer.tsx";
 import {buildControlPaneSections, buildRuntimePaneSections} from "./components/ControlPane.tsx";
@@ -32,6 +34,11 @@ import {closestCommand, tourLines, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
+import {
+  executorLivenessFromPreview,
+  runtimeActivitySemanticsFromPreview,
+  runtimeActivitySemanticsState,
+} from "./repoControlPreview.ts";
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
@@ -94,7 +101,6 @@ import {
   outlineFromTabs,
   runtimePreviewToLines,
   runtimePayloadHasAuthoritativeControlSignal,
-  runtimePayloadToPreview,
   runtimeSnapshotPayloadFromEvent,
   runtimeSnapshotToPreview,
   sessionCatalogFromEvent,
@@ -601,12 +607,41 @@ function operatorRuntimeSummary(
   preview: TabPreview | undefined,
   fallbackSessionCount: number,
 ): {value: string; tone: "live" | "warn" | "critical" | "neutral"} {
+  const semanticsState = runtimeActivitySemanticsState(preview);
+  const metrics = parseRuntimeActivityMetrics(previewField(preview, "Runtime activity"));
+  if (semanticsState === "unknown") {
+    const semantics = runtimeActivitySemanticsFromPreview(preview) || "unknown";
+    return {
+      value: `activity semantics ${semantics} unrecognized | lease classification unavailable | executor liveness unproven`,
+      tone: "warn",
+    };
+  }
+  if (semanticsState === "current") {
+    const declaredLiveness = executorLivenessFromPreview(preview);
+    const liveness = declaredLiveness && declaredLiveness !== "unproven"
+      ? "unproven (conflicting claim rejected)"
+      : "unproven";
+    const observedNonterminal = metrics.ObservedNonterminalRuns ?? metrics.ObservedNonterminal;
+    const expiredOrUnprovenValue = metrics.ExpiredOrUnproven ?? metrics.ExpiredOrUnprovenRuns;
+    const fragments = [
+      metrics.Sessions ? `${metrics.Sessions} sessions` : "",
+      metrics.CurrentLeases ? `${metrics.CurrentLeases} current leases` : "lease classification unavailable",
+      observedNonterminal ? `${observedNonterminal} observed nonterminal` : "",
+      expiredOrUnprovenValue ? `${expiredOrUnprovenValue} expired/unproven` : "",
+      `executor liveness ${liveness}`,
+    ].filter((value) => value.length > 0);
+    const expiredOrUnproven = Number.parseInt(expiredOrUnprovenValue ?? "0", 10);
+    return {
+      value: fragments.join(" | "),
+      tone: Number.isFinite(expiredOrUnproven) && expiredOrUnproven > 0 ? "critical" : "warn",
+    };
+  }
+
   const runtimeSummary = previewField(preview, "Runtime summary");
   if (hasPreviewSignal(runtimeSummary)) {
     return {value: runtimeSummary, tone: "live"};
   }
 
-  const metrics = parseRuntimeActivityMetrics(previewField(preview, "Runtime activity"));
   const fragments = [
     metrics.Sessions ? `${metrics.Sessions} sessions` : "",
     metrics.Runs ? `${metrics.Runs} runs` : "",
@@ -625,13 +660,33 @@ function operatorRuntimeSummary(
 
 function mergeOperatorSummaryPreviewSources(...previews: Array<TabPreview | undefined>): TabPreview | undefined {
   const merged: TabPreview = {};
+  const runtimeBoundaryFields = new Set([
+    "Activity semantics",
+    "Executor liveness",
+    "Runtime activity",
+    "Runtime summary",
+    "Session state",
+    "Run state",
+    "Active runs detail",
+    "Current lease runs detail",
+  ]);
   for (const preview of previews) {
     if (!preview) {
       continue;
     }
+    const candidateSemantics = runtimeActivitySemanticsFromPreview(preview);
+    const mergedSemantics = runtimeActivitySemanticsFromPreview(merged);
+    if (candidateSemantics && candidateSemantics !== mergedSemantics) {
+      for (const field of runtimeBoundaryFields) {
+        delete merged[field];
+      }
+    }
     for (const [key, rawValue] of Object.entries(preview)) {
       const candidate = rawValue.trim();
       if (!candidate) {
+        continue;
+      }
+      if (runtimeBoundaryFields.has(key) && mergedSemantics && !candidateSemantics) {
         continue;
       }
       const existing = previewField(merged, key);
@@ -1114,7 +1169,7 @@ export function commandRunSnapshotActionsForBridgeEvent(
 
   if (targetPane === "control" || targetPane === "runtime") {
     if (runtimePayload) {
-      const preview = runtimePayloadToPreview(runtimePayload, supervisor);
+      const preview = runtimePayloadToTruthPreview(runtimePayload, supervisor);
       const synchronizedRepoPreview = synchronizeRepoControlPreviews(liveRepoPreview, preview);
       return [
         {
@@ -1215,9 +1270,12 @@ export function snapshotActionsForBridgeEvent(
     const rawWorkspacePreview = workspacePayload
       ? workspacePayloadToPreview(workspacePayload)
       : asPreviewRecord(typed.workspace_preview) ?? liveRepoPreview;
+    const rawRuntimePreview = asPreviewRecord(typed.runtime_preview) ?? liveControlPreview;
     const runtimePreview = runtimePayload
-      ? runtimePayloadToPreview(runtimePayload)
-      : asPreviewRecord(typed.runtime_preview) ?? liveControlPreview;
+      ? runtimePayloadToTruthPreview(runtimePayload)
+      : rawRuntimePreview
+        ? runtimePreviewWithDeclaredActivitySemantics(rawRuntimePreview)
+        : undefined;
     const workspacePreview = synchronizeRepoControlPreviews(
       rawWorkspacePreview,
       runtimePreview,
@@ -1865,7 +1923,7 @@ export function createBridgeEventHandler({
       }
       const supervisor = loadSupervisorControlState();
       const content = String(typed.content ?? "");
-      const preview = typedPayload ? runtimePayloadToPreview(typedPayload, supervisor) : runtimeSnapshotToPreview(content, supervisor);
+      const preview = typedPayload ? runtimePayloadToTruthPreview(typedPayload, supervisor) : runtimeSnapshotToPreview(content, supervisor);
       const effectivePreview =
         typedPayload && !runtimeIsAuthoritative
           ? preserveDeferredControlPreview(preview, state.liveControlPreview)
@@ -2339,7 +2397,7 @@ export function surfaceRefreshActionsForBridgeEvent(
     if (!typedPayload && !output.trim()) {
       return [];
     }
-    const preview = typedPayload ? runtimePayloadToPreview(typedPayload, supervisor) : runtimeSnapshotToPreview(output, supervisor);
+    const preview = typedPayload ? runtimePayloadToTruthPreview(typedPayload, supervisor) : runtimeSnapshotToPreview(output, supervisor);
     const synchronizedRepoPreview = synchronizeRepoControlPreviews(liveRepoPreview, preview);
     return [
       {

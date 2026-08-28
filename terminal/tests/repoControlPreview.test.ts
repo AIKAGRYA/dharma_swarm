@@ -15,6 +15,9 @@ import {
   parseRepoControlPreview,
   parseRepoTruthPreview,
   parseTrackedUpstream,
+  qualifyRuntimeActivityValue,
+  runtimeActivitySemanticsFromPreview,
+  runtimeActivitySemanticsState,
   splitPreviewPipes,
 } from "../src/repoControlPreview";
 import type {TabPreview} from "../src/types";
@@ -98,6 +101,8 @@ describe("parseRepoControlPreview", () => {
       hotspotDependency: "n/a",
       hotspotInbound: "n/a",
       runtimeDb: "/Users/dhyana/.dharma/state/runtime.db",
+      activitySemantics: "n/a",
+      executorLiveness: "n/a",
       runtimeActivity: "Sessions=18 Runs=0 ActiveRuns=0",
       artifactState: "Artifacts=7 ContextBundles=1",
       runtimeSummary:
@@ -105,9 +110,127 @@ describe("parseRepoControlPreview", () => {
       runtimeSessions: "18",
       runtimeRuns: "0",
       runtimeActiveRuns: "0",
+      runtimeCurrentLeases: "n/a",
+      runtimeObservedNonterminalRuns: "n/a",
+      runtimeExpiredOrUnprovenRuns: "n/a",
       runtimeArtifacts: "7",
       runtimeContextBundles: "1",
     });
+  });
+
+  test("preserves runtime activity semantics and parses current-lease metrics without Active fallbacks", () => {
+    const preview: TabPreview = {
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "unproven",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=18 CurrentSessions=2 Claims=4 CurrentClaims=2 ObservedNonterminalClaims=3 AckedClaims=2 Runs=7 CurrentLeases=1 ObservedNonterminalRuns=2 ExpiredOrUnproven=1 ExecutorLiveness=unproven",
+      "Repo/control preview":
+        "fresh | db /tmp/runtime.db | semantics runtime_activity.v1 | liveness unproven | activity ActivitySemantics=runtime_activity.v1 Sessions=18 CurrentSessions=2 Claims=4 CurrentClaims=2 ObservedNonterminalClaims=3 AckedClaims=2 Runs=7 CurrentLeases=1 ObservedNonterminalRuns=2 ExpiredOrUnproven=1 ExecutorLiveness=unproven",
+    };
+
+    expect(runtimeActivitySemanticsFromPreview(preview)).toBe("runtime_activity.v1");
+    expect(runtimeActivitySemanticsState(preview)).toBe("current");
+    expect(parseRepoControlPreview(preview)).toMatchObject({
+      activitySemantics: "runtime_activity.v1",
+      executorLiveness: "unproven",
+      runtimeRuns: "7",
+      runtimeActiveRuns: "n/a",
+      runtimeCurrentLeases: "1",
+      runtimeObservedNonterminalRuns: "2",
+      runtimeExpiredOrUnprovenRuns: "1",
+    });
+  });
+
+  test("recognizes explicit legacy status counts but fails closed on unknown activity semantics", () => {
+    expect(runtimeActivitySemanticsState(undefined)).toBe("legacy");
+    expect(runtimeActivitySemanticsState({"Activity semantics": "legacy_status_counts"})).toBe("legacy");
+    expect(runtimeActivitySemanticsState({"Activity semantics": "runtime_activity.v2"})).toBe("unknown");
+  });
+
+  test("fails closed when explicit and inline activity semantics conflict", () => {
+    const preview: TabPreview = {
+      "Activity semantics": "runtime_activity.v2",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=8 CurrentSessions=1 Claims=3 CurrentClaims=1 Runs=4 CurrentLeases=1",
+    };
+
+    expect(runtimeActivitySemanticsFromPreview(preview)).toBe("conflicting_activity_semantics");
+    expect(runtimeActivitySemanticsState(preview)).toBe("unknown");
+    expect(runtimeActivitySemanticsState({"Activity semantics": "unknown"})).toBe("unknown");
+    expect(runtimeActivitySemanticsState({
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 CurrentLeases=1 ActivitySemantics=runtime_activity.v2",
+    })).toBe("unknown");
+  });
+
+  test("reconciles every compact semantics marker and rejects stale liveness claims on conflict", () => {
+    const preview: TabPreview = {
+      "Activity semantics": "legacy_status_counts",
+      "Executor liveness": "proven",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 ActiveRuns=2 ExecutorLiveness=proven",
+      "Repo/control preview":
+        "fresh | db /tmp/runtime.db | semantics legacy_status_counts | semantics legacy_status_counts | liveness proven | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 ActiveRuns=2 ExecutorLiveness=proven | artifacts Artifacts=3",
+    };
+
+    const parsed = parseRepoControlPreview(preview);
+    expect(parsed).toMatchObject({
+      activitySemantics: "conflicting_activity_semantics",
+      executorLiveness: "unproven",
+      runtimeActivity:
+        "ActivitySemantics=conflicting_activity_semantics lease classification unavailable",
+      runtimeActiveRuns: "n/a",
+    });
+    expect(parsed?.runtimeSummary).not.toContain("ActiveRuns");
+    expect(parsed?.runtimeSummary).not.toContain("ExecutorLiveness=proven");
+
+    expect(
+      parseRepoControlPreview(
+        "fresh | semantics runtime_activity.v1 | semantics runtime_activity.v2 | activity Sessions=1 Runs=1",
+      )?.activitySemantics,
+    ).toBe("conflicting_activity_semantics");
+  });
+
+  test("downgrades compact liveness tokens under consistent current semantics", () => {
+    const variants = [
+      "liveness proven",
+      "liveness: proven",
+      "liveness=proven",
+      "liveness\tproven",
+      "ExecutorLiveness: proven",
+      "executor liveness=proven",
+      "liveness unknown",
+    ];
+
+    for (const variant of variants) {
+      const qualified = qualifyRuntimeActivityValue(
+        `fresh | semantics runtime_activity.v1 | ${variant} | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 CurrentLeases=1`,
+        "runtime_activity.v1",
+      );
+
+      expect(qualified).toContain("lease-qualified evidence unavailable");
+      expect(qualified).toContain("liveness unproven");
+      expect(qualified).not.toMatch(/\bliveness\s*(?::|=|\s)\s*(?:proven|unknown)\b/i);
+    }
+  });
+
+  test("never infers liveness declarations as topology warnings", () => {
+    const variants = [
+      "ExecutorLiveness: proven",
+      "executor liveness: proven",
+      "ExecutorLiveness: unproven",
+      "liveness unknown",
+    ];
+
+    for (const variant of variants) {
+      const parsed = parseRepoControlPreview(
+        `fresh | semantics runtime_activity.v1 | ${variant} | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 CurrentLeases=1`,
+      );
+
+      expect(parsed?.warning).toBe("n/a");
+      expect(parsed?.topologyWarningMembers).toBe("none");
+      expect(parsed?.topologyWarningCount).toBe("0");
+    }
   });
 
   test("tolerates divergence and detached topology tokens in compact repo/control previews", () => {

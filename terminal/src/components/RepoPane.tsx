@@ -19,6 +19,8 @@ import {
   parseTrackedUpstream,
   parseRepoControlPreview,
   parseRepoTruthPreview,
+  qualifyRuntimeActivityValue,
+  runtimeActivitySemanticsFromPreview,
   splitWarningMembers,
   splitPreviewPipes,
 } from "../repoControlPreview";
@@ -501,6 +503,18 @@ function deriveRuntimeActivity(preview: TabPreview | undefined, lines: Transcrip
   return explicit;
 }
 
+function runtimeSemanticsForPreview(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
+  const explicit = rawPreviewValue(preview, lines, "Activity semantics");
+  return runtimeActivitySemanticsFromPreview({
+    ...(explicit !== "n/a" && explicit !== "none" ? {"Activity semantics": explicit} : {}),
+    "Runtime activity": rawPreviewValue(preview, lines, "Runtime activity"),
+  });
+}
+
+function qualifiedRuntimeValue(value: string, semantics: string): string {
+  return qualifyRuntimeActivityValue(value, semantics);
+}
+
 function deriveArtifactState(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
   const explicit = rawPreviewValue(preview, lines, "Artifact state");
   if (hasPreviewSignal(explicit) && explicit !== "none") {
@@ -540,15 +554,28 @@ function firstRuntimeMetricValue(candidates: string[], patterns: RegExp[]): stri
   return "";
 }
 
-function buildRuntimeInventoryFromCandidates(candidates: string[]): string {
+function buildRuntimeInventoryFromCandidates(candidates: string[], explicitActivitySemantics = ""): string {
   const claims = firstRuntimeMetricValue(candidates, [/\bClaims=(\d+)\b/i, /\b(\d+)\s+claims\b/i]);
+  const activitySemantics = runtimeActivitySemanticsFromPreview({
+    ...(explicitActivitySemantics !== "n/a" && explicitActivitySemantics !== "none"
+      ? {"Activity semantics": explicitActivitySemantics}
+      : {}),
+    "Runtime activity": candidates.join(" "),
+  });
+  const currentClaims = firstRuntimeMetricValue(candidates, [
+    /\bCurrentClaims=(\d+)\b/i,
+    /\b(\d+)\s+current lease claims\b/i,
+  ]);
   const activeClaims = firstRuntimeMetricValue(candidates, [/\bActiveClaims=(\d+)\b/i, /\b(\d+)\s+active claims\b/i]);
   const ackedClaims = firstRuntimeMetricValue(candidates, [/\bAckedClaims=(\d+)\b/i, /\b(\d+)\s+acked claims\b/i]);
   const promotedFacts = firstRuntimeMetricValue(candidates, [/\bPromotedFacts=(\d+)\b/i, /\b(\d+)\s+promoted facts\b/i]);
   const operatorActions = firstRuntimeMetricValue(candidates, [/\bOperatorActions=(\d+)\b/i, /\b(\d+)\s+operator actions\b/i]);
   const parts = [
     claims ? `${claims} claims` : "",
-    activeClaims ? `${activeClaims} active claims` : "",
+    activitySemantics === "runtime_activity.v1" && currentClaims ? `${currentClaims} current lease claims` : "",
+    (!activitySemantics || activitySemantics === "legacy_status_counts") && activeClaims
+      ? `${activeClaims} active claims`
+      : "",
     ackedClaims ? `${ackedClaims} acked claims` : "",
     promotedFacts ? `${promotedFacts} promoted facts` : "",
     operatorActions ? `${operatorActions} operator actions` : "",
@@ -557,13 +584,16 @@ function buildRuntimeInventoryFromCandidates(candidates: string[]): string {
 }
 
 function deriveRuntimeInventoryLabel(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
-  return buildRuntimeInventoryFromCandidates([
-    rawPreviewValue(preview, lines, "Runtime activity"),
-    rawPreviewValue(preview, lines, "Artifact state"),
-    rawPreviewValue(preview, lines, "Session state"),
-    rawPreviewValue(preview, lines, "Context state"),
-    rawPreviewValue(preview, lines, "Runtime summary"),
-  ]);
+  return buildRuntimeInventoryFromCandidates(
+    [
+      rawPreviewValue(preview, lines, "Runtime activity"),
+      rawPreviewValue(preview, lines, "Artifact state"),
+      rawPreviewValue(preview, lines, "Session state"),
+      rawPreviewValue(preview, lines, "Context state"),
+      rawPreviewValue(preview, lines, "Runtime summary"),
+    ],
+    rawPreviewValue(preview, lines, "Activity semantics"),
+  );
 }
 
 function firstPressureSegment(value: string): string {
@@ -1030,7 +1060,17 @@ function previewValue(preview: TabPreview | undefined, lines: TranscriptLine[], 
     case "Untracked":
       return deriveDirtyCountFromRepoTruth(preview, lines, "untracked");
     case "Runtime activity":
-      return deriveRuntimeActivity(preview, lines);
+      return qualifiedRuntimeValue(
+        deriveRuntimeActivity(preview, lines),
+        runtimeSemanticsForPreview(preview, lines),
+      );
+    case "Session state":
+    case "Run state":
+    case "Runtime summary":
+      return qualifiedRuntimeValue(
+        rawPreviewValue(preview, lines, label),
+        runtimeSemanticsForPreview(preview, lines),
+      );
     case "Artifact state":
       return deriveArtifactState(preview, lines);
     case "Result status":
@@ -1153,7 +1193,10 @@ function buildDirtyCountsLabel(preview: TabPreview | undefined, lines: Transcrip
 }
 
 function buildRuntimeActivityLabel(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
-  return `${previewValue(preview, lines, "Runtime activity")} | ${previewValue(preview, lines, "Artifact state")}`;
+  return `${qualifiedRuntimeValue(
+    previewValue(preview, lines, "Runtime activity"),
+    runtimeSemanticsForPreview(preview, lines),
+  )} | ${previewValue(preview, lines, "Artifact state")}`;
 }
 
 function buildRepoHealthLabel(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
@@ -1657,7 +1700,10 @@ function buildFallbackRepoControlRuntimeStateLabel(
   const liveRuntimeParts = hasControlRuntimeStateSignal(controlPreview, controlLines)
     ? [
         rawPreviewValue(controlPreview, controlLines, "Runtime DB"),
-        previewValue(controlPreview, controlLines, "Runtime activity"),
+        qualifiedRuntimeValue(
+          previewValue(controlPreview, controlLines, "Runtime activity"),
+          runtimeSemanticsForPreview(controlPreview, controlLines),
+        ),
         previewValue(controlPreview, controlLines, "Artifact state"),
       ].filter((value) => value !== "n/a" && value !== "none")
     : [];
@@ -1668,7 +1714,9 @@ function buildFallbackRepoControlRuntimeStateLabel(
   if (!parsed) {
     return null;
   }
-  return parsed.runtimeSummary !== "n/a" ? parsed.runtimeSummary : null;
+  return parsed.runtimeSummary !== "n/a"
+    ? qualifiedRuntimeValue(parsed.runtimeSummary, parsed.activitySemantics)
+    : null;
 }
 
 function buildFallbackRepoControlRuntimeSummaryLabel(
@@ -1694,20 +1742,31 @@ function buildFallbackControlSectionRows(
   const runtimeSummary = buildFallbackRepoControlRuntimeSummaryLabel(preview, lines, controlPreview, controlLines);
   const activitySummary = hasControlRuntimeStateSignal(controlPreview, controlLines)
     ? [
-        previewValue(controlPreview, controlLines, "Runtime activity"),
+        qualifiedRuntimeValue(
+          previewValue(controlPreview, controlLines, "Runtime activity"),
+          runtimeSemanticsForPreview(controlPreview, controlLines),
+        ),
         previewValue(controlPreview, controlLines, "Artifact state"),
       ]
         .filter((value) => value !== "n/a" && value !== "none")
         .join(" | ")
-    : [parsed.runtimeActivity, parsed.artifactState].filter((value) => value !== "n/a" && value !== "none").join(" | ");
+    : [qualifiedRuntimeValue(parsed.runtimeActivity, parsed.activitySemantics), parsed.artifactState]
+        .filter((value) => value !== "n/a" && value !== "none")
+        .join(" | ");
   const runtimeDb =
     hasControlRuntimeStateSignal(controlPreview, controlLines) && hasPreviewSignal(rawPreviewValue(controlPreview, controlLines, "Runtime DB"))
       ? rawPreviewValue(controlPreview, controlLines, "Runtime DB")
       : parsed.runtimeDb;
 
   return uniqueRows([
-    ...(buildRuntimeInventoryFromCandidates([runtimeSummary ?? "", parsed.runtimeActivity, parsed.artifactState]) !== "n/a"
-      ? [`Inventory ${buildRuntimeInventoryFromCandidates([runtimeSummary ?? "", parsed.runtimeActivity, parsed.artifactState])}`]
+    ...(buildRuntimeInventoryFromCandidates(
+      [runtimeSummary ?? "", parsed.runtimeActivity, parsed.artifactState],
+      parsed.activitySemantics,
+    ) !== "n/a"
+      ? [`Inventory ${buildRuntimeInventoryFromCandidates(
+          [runtimeSummary ?? "", parsed.runtimeActivity, parsed.artifactState],
+          parsed.activitySemantics,
+        )}`]
       : []),
     ...(parsed.task !== "n/a"
       ? [`Task ${[parsed.task, parsed.taskProgress !== "n/a" ? parsed.taskProgress : ""].filter(Boolean).join(" | ")}`]
@@ -1854,7 +1913,8 @@ function buildRepoControlCorrelationLabel(
 ): string {
   const explicit = repoControlPreviewValue(preview, lines);
   if (!hasControlSnapshotSignal(controlPreview, controlLines) && explicit.length > 0) {
-    return explicit;
+    const parsed = parseRepoControlPreview(explicit);
+    return qualifiedRuntimeValue(explicit, parsed?.activitySemantics ?? "n/a");
   }
   return buildRepoControlCorrelationDetails(preview, lines, controlPreview, controlLines, now);
 }
@@ -1913,7 +1973,10 @@ function buildControlHealthLabel(preview: TabPreview | undefined, lines: Transcr
 function buildRepoRuntimeStateLabel(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
   return [
     previewValue(preview, lines, "Runtime DB"),
-    previewValue(preview, lines, "Runtime activity"),
+    qualifiedRuntimeValue(
+      previewValue(preview, lines, "Runtime activity"),
+      runtimeSemanticsForPreview(preview, lines),
+    ),
     previewValue(preview, lines, "Artifact state"),
   ].join(" | ");
 }
@@ -1974,9 +2037,10 @@ function buildControlFreshnessLabel(
 function buildControlRuntimeSummaryLabel(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
   const explicit = preview?.["Runtime summary"];
   if (typeof explicit === "string" && explicit.length > 0) {
-    return `Runtime summary ${explicit}`;
+    return `Runtime summary ${qualifiedRuntimeValue(explicit, runtimeSemanticsForPreview(preview, lines))}`;
   }
-  return `Runtime summary ${previewValue(preview, lines, "Runtime DB")} | ${previewValue(preview, lines, "Session state")} | ${previewValue(preview, lines, "Run state")} | ${previewValue(preview, lines, "Context state")}`;
+  const derived = `${previewValue(preview, lines, "Runtime DB")} | ${previewValue(preview, lines, "Session state")} | ${previewValue(preview, lines, "Run state")} | ${previewValue(preview, lines, "Context state")}`;
+  return `Runtime summary ${qualifiedRuntimeValue(derived, runtimeSemanticsForPreview(preview, lines))}`;
 }
 
 function buildControlSnapshotRows(

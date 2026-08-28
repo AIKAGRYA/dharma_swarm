@@ -10,7 +10,9 @@ import {
   saveSupervisorControlSummary,
   saveSupervisorRepoPreview,
   terminalPreviewCachePath,
+  runtimePayloadToTruthPreview,
 } from "../src/persistence";
+import type {RuntimeSnapshotPayload} from "../src/types";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 
@@ -687,6 +689,180 @@ describe("supervisor control persistence", () => {
     expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Control truth preview"]).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | cycle 3 running | next Split /runtime and /dashboard control actions into dedicated pane routes.",
     );
+  });
+
+  test("keeps fresh runtime_activity.v1 fields authoritative over a persisted legacy Runtime summary", () => {
+    const stateDir = makeStateDir();
+    process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    const summary = loadSupervisorControlState();
+
+    expect(summary).not.toBeNull();
+    saveSupervisorControlSummary(summary!, {
+      "Runtime DB": "/tmp/runtime.db",
+      "Session state": "18 sessions | 2 active claims",
+      "Run state": "7 runs | 4 active runs",
+      "Active runs detail": "stale-agent (running) task stale-task",
+      "Runtime activity": "Sessions=18 Claims=4 ActiveClaims=2 Runs=7 ActiveRuns=4",
+      "Runtime summary": "/tmp/runtime.db | 18 sessions | 2 active claims | 7 runs | 4 active runs",
+    });
+    saveSupervisorControlSummary(summary!, {
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "unproven",
+      "Current lease runs detail": "lease-holder (claimed) task current-task",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=18 CurrentSessions=2 Claims=4 CurrentClaims=2 ObservedNonterminalClaims=3 AckedClaims=2 Runs=7 CurrentLeases=1 ObservedNonterminalRuns=2 ExpiredOrUnproven=1 ExecutorLiveness=unproven",
+      "Context state": "7 artifacts | 1 context bundles",
+    });
+
+    const preview = loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"));
+    expect(preview).toMatchObject({
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "unproven",
+      "Current lease runs detail": "lease-holder (claimed) task current-task",
+      "Runtime summary":
+        "/tmp/runtime.db | 18 sessions | 2 current lease sessions | 4 claims | 2 current lease claims | 3 observed nonterminal claims | 2 acked claims | 7 runs | 1 current leases | 2 observed nonterminal runs | 1 expired/unproven runs | executor liveness unproven | 7 artifacts | 1 context bundles",
+    });
+    expect(preview?.["Runtime summary"]).not.toContain("active runs");
+    expect(preview?.["Runtime summary"]).not.toContain("active claims");
+    expect(preview?.["Active runs detail"]).toBeUndefined();
+
+    const cache = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
+    expect(cache.preview_Activity_semantics).toBe("runtime_activity.v1");
+    expect(cache.preview_Executor_liveness).toBe("unproven");
+
+    saveSupervisorRepoPreview(summary!, {
+      "Repo root": REPO_ROOT,
+      Branch: "main",
+      Head: "abc1234",
+      "Branch status": "tracking origin/main in sync",
+    });
+    const repoControl = loadSupervisorRepoPreview()?.["Repo/control preview"] ?? "";
+    expect(repoControl).toContain("semantics runtime_activity.v1");
+    expect(repoControl).toContain("liveness unproven");
+    expect(loadSupervisorControlPreview(REPO_ROOT)?.["Activity semantics"]).toBe("runtime_activity.v1");
+    expect(loadSupervisorControlPreview(REPO_ROOT)?.["Executor liveness"]).toBe("unproven");
+  });
+
+  test("fails closed when persisted runtime activity declares unknown semantics", () => {
+    const stateDir = makeStateDir();
+    process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    const summary = loadSupervisorControlState();
+
+    expect(summary).not.toBeNull();
+    saveSupervisorControlSummary(summary!, {
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v2",
+      "Executor liveness": "proven",
+      "Active runs detail": "stale-agent (running) task stale-task",
+      "Current lease runs detail": "untrusted-holder (running) task untrusted-task",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v2 Sessions=18 Claims=4 ActiveClaims=4 Runs=7 ActiveRuns=4 ExecutorLiveness=proven",
+      "Runtime summary": "/tmp/runtime.db | 4 active claims | 4 active runs",
+    });
+
+    const preview = loadSupervisorControlPreview(REPO_ROOT);
+    const runtimeSummary = preview?.["Runtime summary"] ?? "";
+    expect(runtimeSummary).toContain("activity semantics runtime_activity.v2 unrecognized");
+    expect(runtimeSummary).toContain("lease classification unavailable");
+    expect(runtimeSummary).toContain("executor liveness unproven");
+    expect(runtimeSummary).not.toContain("active claims");
+    expect(runtimeSummary).not.toContain("active runs");
+    expect(preview?.["Executor liveness"]).toBe("unproven");
+    expect(preview?.["Active runs detail"]).toBeUndefined();
+    expect(preview?.["Current lease runs detail"]).toBeUndefined();
+  });
+
+  test("retains canonical conflict provenance for contradictory typed payload markers", () => {
+    const payload: RuntimeSnapshotPayload = {
+      version: "v1",
+      domain: "runtime_snapshot",
+      snapshot: {
+        snapshot_id: "conflicting-transition",
+        created_at: "2026-04-03T02:16:08Z",
+        repo_root: REPO_ROOT,
+        runtime_db: "/tmp/runtime.db",
+        health: "degraded",
+        bridge_status: "connected",
+        active_session_count: 2,
+        active_run_count: 1,
+        artifact_count: 0,
+        context_bundle_count: 0,
+        anomaly_count: 1,
+        verification_status: "unknown",
+        warnings: [],
+        metrics: {claims: "2", active_claims: "1"},
+        metadata: {
+          activity_semantics: "runtime_activity.v2",
+          overview: {activity_semantics: "runtime_activity.v1", sessions: 3, runs: 2},
+        },
+      },
+    };
+
+    const preview = runtimePayloadToTruthPreview(payload);
+    expect(preview["Activity semantics"]).toBe("conflicting_activity_semantics");
+    expect(preview["Runtime activity"]).toContain("ActivitySemantics=conflicting_activity_semantics");
+    expect(preview["Runtime activity"]).not.toContain("CurrentLeases");
+    expect(preview.Alerts).toContain("conflicting runtime activity semantics");
+  });
+
+  test("replaces persisted v1 lease authority with explicit legacy_status_counts provenance", () => {
+    const stateDir = makeStateDir();
+    process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    const summary = loadSupervisorControlState();
+
+    expect(summary).not.toBeNull();
+    saveSupervisorControlSummary(summary!, {
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "unproven",
+      "Current lease runs detail": "lease-holder (claimed) task old-task",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=18 CurrentSessions=2 Claims=4 CurrentClaims=2 Runs=7 CurrentLeases=1 ObservedNonterminalRuns=2 ExpiredOrUnproven=1 ExecutorLiveness=unproven",
+      "Runtime summary": "/tmp/runtime.db | 1 current leases | executor liveness unproven",
+    });
+    const legacyPayload: RuntimeSnapshotPayload = {
+      version: "v1",
+      domain: "runtime_snapshot",
+      snapshot: {
+        snapshot_id: "legacy-transition",
+        created_at: "2026-04-03T02:16:08Z",
+        repo_root: REPO_ROOT,
+        runtime_db: "/tmp/runtime.db",
+        health: "healthy",
+        bridge_status: "connected",
+        active_session_count: 3,
+        active_run_count: 1,
+        artifact_count: 0,
+        context_bundle_count: 0,
+        anomaly_count: 0,
+        verification_status: "unknown",
+        warnings: [],
+        metrics: {claims: "2", active_claims: "1", acknowledged_claims: "1"},
+        metadata: {activity_semantics: "legacy_status_counts", overview: {runs: 2}},
+      },
+    };
+    saveSupervisorControlSummary(
+      summary!,
+      {
+        "Runtime DB": "/tmp/runtime.db",
+        "Active runs detail": "legacy-agent (running) task legacy-task",
+        "Runtime activity": "Sessions=3 Claims=2 ActiveClaims=1 AckedClaims=1 Runs=2 ActiveRuns=1",
+      },
+      {runtimePayload: legacyPayload},
+    );
+
+    const preview = loadSupervisorControlPreview(REPO_ROOT);
+    expect(preview?.["Activity semantics"]).toBe("legacy_status_counts");
+    expect(preview?.["Runtime activity"]).toContain("ActivitySemantics=legacy_status_counts");
+    expect(preview?.["Runtime summary"]).toContain("1 active claims");
+    expect(preview?.["Runtime summary"]).toMatch(/\b1 active runs?\b/);
+    expect(preview?.["Runtime summary"]).not.toContain("current lease");
+    expect(preview?.["Executor liveness"]).toBeUndefined();
+    expect(preview?.["Current lease runs detail"]).toBeUndefined();
+    expect(preview?.["Active runs detail"]).toBe("legacy-agent (running) task legacy-task");
+    const cache = JSON.parse(readFileSync(terminalPreviewCachePath(), "utf8")) as Record<string, unknown>;
+    expect(cache.preview_Activity_semantics).toBe("legacy_status_counts");
   });
 
   test("rebuilds stale control truth preview rows from normalized next-task state on load", () => {

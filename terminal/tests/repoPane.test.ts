@@ -533,6 +533,96 @@ Workflows: 1
     expect(rows).toContain("Activity Sessions=18  Runs=0 | Artifacts=7  ContextBundles=1");
   });
 
+  test("labels runtime_activity.v1 inventory as current lease evidence", () => {
+    const sections = buildRepoPaneSections(
+      {"Repo root": REPO_ROOT, Branch: "main", Head: "804d5d1"},
+      [],
+      {
+        "Runtime DB": "/tmp/runtime.db",
+        "Activity semantics": "runtime_activity.v1",
+        "Executor liveness": "unproven",
+        "Runtime activity":
+          "ActivitySemantics=runtime_activity.v1 Sessions=10 CurrentSessions=1 Claims=3 CurrentClaims=1 AckedClaims=2 Runs=3 CurrentLeases=1 ObservedNonterminalRuns=3 ExpiredOrUnproven=2 ExecutorLiveness=unproven",
+        "Session state": "10 sessions | 3 claims | 1 current lease claims",
+        "Run state": "3 runs | 1 current leases | 2 expired/unproven runs | executor liveness unproven",
+        "Artifact state": "PromotedFacts=2 OperatorActions=3",
+        "Context state": "2 promoted facts | 3 operator actions",
+      },
+      [],
+    );
+
+    const rows = sections.flatMap((section) => section.rows);
+    expect(rows).toContain(
+      "Inventory 3 claims | 1 current lease claims | 2 acked claims | 2 promoted facts | 3 operator actions",
+    );
+    expect(rows.some((row) => /\bactive claims\b/i.test(row))).toBe(false);
+  });
+
+  test("does not revive stale active labels beneath explicit unknown semantics", () => {
+    const sections = buildRepoPaneSections(
+      {"Repo root": REPO_ROOT, Branch: "main", Head: "804d5d1"},
+      [],
+      {
+        "Runtime DB": "/tmp/runtime.db",
+        "Activity semantics": "runtime_activity.v2",
+        "Runtime activity": "Sessions=8 Claims=3 ActiveClaims=2 Runs=4 ActiveRuns=2",
+        "Session state": "8 sessions | 3 claims | 2 active claims",
+        "Run state": "4 runs | 2 active runs",
+        "Runtime summary": "/tmp/runtime.db | 2 active claims | 2 active runs",
+      },
+      [],
+    );
+    const rendered = sections.flatMap((section) => section.rows).join("\n");
+
+    expect(rendered).toContain("runtime_activity.v2");
+    expect(rendered).toContain("lease classification unavailable");
+    expect(rendered).not.toMatch(/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i);
+    expect(rendered).not.toMatch(/Active(?:Claims|Runs|Sessions)=/);
+  });
+
+  test("fails closed when compact repo/control semantics conflict with stale activity claims", () => {
+    const sections = buildRepoPaneSections(
+      {
+        "Repo root": REPO_ROOT,
+        Branch: "main",
+        Head: "804d5d1",
+        "Repo/control preview":
+          "fresh | task compact-truth | branch main@804d5d1 | semantics legacy_status_counts | liveness proven | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 ActiveRuns=2 ExecutorLiveness=proven | artifacts Artifacts=3",
+      },
+      [],
+      {Authority: "placeholder | awaiting authoritative control refresh"},
+      [],
+    );
+    const rendered = sections.flatMap((section) => section.rows).join("\n");
+
+    expect(rendered).toContain("conflicting_activity_semantics");
+    expect(rendered).toContain("lease classification unavailable");
+    expect(rendered).not.toMatch(/Active(?:Claims|Runs|Sessions)=/);
+    expect(rendered).not.toContain("ExecutorLiveness=proven");
+    expect(rendered).not.toMatch(/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i);
+  });
+
+  test("downgrades compact liveness prose under consistent current semantics", () => {
+    const sections = buildRepoPaneSections(
+      {
+        "Repo root": REPO_ROOT,
+        Branch: "main",
+        Head: "804d5d1",
+        "Repo/control preview":
+          "fresh | task compact-truth | branch main@804d5d1 | semantics runtime_activity.v1 | ExecutorLiveness: proven | activity ActivitySemantics=runtime_activity.v1 Sessions=8 Runs=4 CurrentLeases=1 | artifacts Artifacts=3",
+      },
+      [],
+      {Authority: "placeholder | awaiting authoritative control refresh"},
+      [],
+    );
+    const rendered = sections.flatMap((section) => section.rows).join("\n");
+
+    expect(rendered).toContain("liveness unproven");
+    expect(rendered).not.toMatch(/\bExecutorLiveness\s*:\s*proven\b/i);
+    expect(rendered).not.toContain("ExecutorLiveness=proven");
+    expect(rendered).not.toMatch(/warnings 1 \(.*liveness/i);
+  });
+
   test("enriches compact repo/control snapshot truth rows with repo facts", () => {
     const sections = buildRepoPaneSections(
       {

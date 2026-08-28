@@ -5,12 +5,20 @@ import {fileURLToPath} from "node:url";
 
 import {freshnessToken, parseControlPulsePreview, parseRuntimeFreshness} from "./freshness";
 import {
+  canonicalRuntimePreviewForRendering,
   runtimePayloadToPreview,
   runtimeSnapshotPayloadFromEvent,
   workspacePayloadToPreview,
   workspaceSnapshotPayloadFromEvent,
 } from "./protocol";
-import {parseRepoControlPreview} from "./repoControlPreview";
+import {
+  executorLivenessFromPreview,
+  LEGACY_RUNTIME_ACTIVITY_SEMANTICS,
+  parseRepoControlPreview,
+  runtimeActivityMetric,
+  runtimeActivitySemanticsFromPreview,
+  runtimeActivitySemanticsState,
+} from "./repoControlPreview";
 import type {AppState, RuntimeSnapshotPayload, SupervisorControlState, TabPreview, WorkspaceSnapshotPayload} from "./types";
 import {
   buildVerificationSummaryRows,
@@ -39,6 +47,8 @@ const CONTROL_PREVIEW_FIELDS = [
   "Alerts",
   "Artifact state",
   "Active runs detail",
+  "Current lease runs detail",
+  "Activity semantics",
   "Control truth preview",
   "Context state",
   "Control pulse preview",
@@ -54,6 +64,7 @@ const CONTROL_PREVIEW_FIELDS = [
   "Runtime freshness",
   "Runtime summary",
   "Runtime activity",
+  "Executor liveness",
   "Run state",
   "Session state",
   "Task progress",
@@ -67,6 +78,16 @@ const CONTROL_PREVIEW_FIELDS = [
   "Verification receipt",
   "Verification summary",
   "Verification updated",
+] as const;
+const RUNTIME_ACTIVITY_BOUNDARY_FIELDS = [
+  "Activity semantics",
+  "Executor liveness",
+  "Runtime activity",
+  "Runtime summary",
+  "Session state",
+  "Run state",
+  "Active runs detail",
+  "Current lease runs detail",
 ] as const;
 const REPO_PREVIEW_FIELDS = [
   "Repo root",
@@ -291,9 +312,23 @@ function mergePreviewSources(...previews: Array<TabPreview | undefined>): TabPre
     if (!preview) {
       continue;
     }
+    const candidateSemantics = runtimeActivitySemanticsFromPreview(preview);
+    const mergedSemantics = runtimeActivitySemanticsFromPreview(merged);
+    if (candidateSemantics && candidateSemantics !== mergedSemantics) {
+      for (const field of RUNTIME_ACTIVITY_BOUNDARY_FIELDS) {
+        delete merged[field];
+      }
+    }
     for (const key of CONTROL_PREVIEW_FIELDS) {
       const candidate = previewField(preview, key);
       if (!candidate) {
+        continue;
+      }
+      if (
+        RUNTIME_ACTIVITY_BOUNDARY_FIELDS.includes(key as (typeof RUNTIME_ACTIVITY_BOUNDARY_FIELDS)[number]) &&
+        mergedSemantics &&
+        !candidateSemantics
+      ) {
         continue;
       }
       const existing = previewField(merged, key);
@@ -461,6 +496,12 @@ function controlPreviewFromRepoControl(preview: TabPreview | undefined): TabPrev
   if (!placeholderPreviewValue(parsed.runtimeDb)) {
     derived["Runtime DB"] = parsed.runtimeDb;
   }
+  if (!placeholderPreviewValue(parsed.activitySemantics)) {
+    derived["Activity semantics"] = parsed.activitySemantics;
+  }
+  if (!placeholderPreviewValue(parsed.executorLiveness)) {
+    derived["Executor liveness"] = parsed.executorLiveness;
+  }
   if (!placeholderPreviewValue(parsed.runtimeActivity)) {
     derived["Runtime activity"] = parsed.runtimeActivity;
   }
@@ -512,9 +553,121 @@ function derivedCompactLastResult(preview: TabPreview | undefined): string {
   return parseControlPulsePreview(previewField(preview, "Control pulse preview")).lastResult ?? "";
 }
 
+type RuntimeTruthBoundary = {
+  semanticsState: "current" | "unknown";
+  sessionState: string;
+  runState: string;
+};
+
+function runtimeTruthBoundary(preview: TabPreview | undefined): RuntimeTruthBoundary | null {
+  const semanticsState = runtimeActivitySemanticsState(preview);
+  if (semanticsState === "legacy") {
+    return null;
+  }
+  const semantics = runtimeActivitySemanticsFromPreview(preview);
+  const runtimeActivity = previewField(preview, "Runtime activity");
+  const metricFragment = (labels: string[], label: string): string => {
+    const value = runtimeActivityMetric(runtimeActivity, ...labels);
+    return value === "n/a" ? "" : `${value} ${label}`;
+  };
+  if (semanticsState === "unknown") {
+    return {
+      semanticsState,
+      sessionState: [
+        metricFragment(["Sessions"], "sessions"),
+        metricFragment(["Claims"], "claims"),
+        `activity semantics ${semantics || "unknown"} unrecognized`,
+      ].filter((value) => value.length > 0).join(" | "),
+      runState: [
+        metricFragment(["Runs"], "runs"),
+        "lease classification unavailable",
+        "executor liveness unproven",
+      ].filter((value) => value.length > 0).join(" | "),
+    };
+  }
+
+  return {
+    semanticsState,
+    sessionState: [
+      metricFragment(["Sessions"], "sessions"),
+      metricFragment(["CurrentSessions", "CurrentLeaseSessions"], "current lease sessions"),
+      metricFragment(["Claims"], "claims"),
+      metricFragment(["CurrentClaims", "CurrentLeaseClaims"], "current lease claims"),
+      metricFragment(["ObservedNonterminalClaims"], "observed nonterminal claims"),
+      metricFragment(["AckedClaims"], "acked claims"),
+    ].filter((value) => value.length > 0).join(" | ") || "lease session/claim classification unavailable",
+    runState: [
+      metricFragment(["Runs"], "runs"),
+      metricFragment(["CurrentLeases"], "current leases"),
+      metricFragment(["ObservedNonterminalRuns", "ObservedNonterminal"], "observed nonterminal runs"),
+      metricFragment(["ExpiredOrUnprovenRuns", "ExpiredOrUnproven"], "expired/unproven runs"),
+      "executor liveness unproven",
+    ].filter((value) => value.length > 0).join(" | "),
+  };
+}
+
+function enforceRuntimeTruthBoundary(preview: TabPreview | undefined): void {
+  if (!preview) {
+    return;
+  }
+  const semantics = runtimeActivitySemanticsFromPreview(preview);
+  if (semantics === LEGACY_RUNTIME_ACTIVITY_SEMANTICS) {
+    preview["Activity semantics"] = LEGACY_RUNTIME_ACTIVITY_SEMANTICS;
+    delete preview["Executor liveness"];
+    delete preview["Current lease runs detail"];
+    const runtimeActivity = previewField(preview, "Runtime activity");
+    const metricFragment = (labels: string[], label: string): string => {
+      const value = runtimeActivityMetric(runtimeActivity, ...labels);
+      return value === "n/a" ? "" : `${value} ${label}`;
+    };
+    preview["Session state"] = previewField(preview, "Session state") || [
+      metricFragment(["Sessions"], "sessions"),
+      metricFragment(["Claims"], "claims"),
+      metricFragment(["ActiveClaims"], "active claims"),
+      metricFragment(["AckedClaims"], "acked claims"),
+    ].filter((value) => value.length > 0).join(" | ") || "none";
+    preview["Run state"] = previewField(preview, "Run state") || [
+      metricFragment(["Runs"], "runs"),
+      metricFragment(["ActiveRuns"], "active runs"),
+    ].filter((value) => value.length > 0).join(" | ") || "none";
+    preview["Runtime summary"] = [
+      previewField(preview, "Runtime DB") || "runtime db not reported",
+      preview["Session state"],
+      preview["Run state"],
+      previewField(preview, "Context state") || "none",
+    ].join(" | ");
+    return;
+  }
+  const boundary = runtimeTruthBoundary(preview);
+  if (!boundary) {
+    return;
+  }
+  preview["Executor liveness"] = "unproven";
+  preview["Session state"] = boundary.sessionState;
+  preview["Run state"] = boundary.runState;
+  delete preview["Active runs detail"];
+  if (boundary.semanticsState === "unknown") {
+    delete preview["Current lease runs detail"];
+  }
+  const canonical = canonicalRuntimePreviewForRendering(preview);
+  RUNTIME_ACTIVITY_BOUNDARY_FIELDS.forEach((key) => {
+    const value = canonical[key];
+    if (value === undefined) {
+      delete preview[key];
+    } else {
+      preview[key] = value;
+    }
+  });
+}
+
 function buildRuntimeSummaryPreview(preview: TabPreview | undefined): string {
   const explicit = previewField(preview, "Runtime summary");
   const runtimeDb = previewField(preview, "Runtime DB") || "runtime db not reported";
+  const boundary = runtimeTruthBoundary(preview);
+  if (boundary) {
+    const contextState = previewField(preview, "Context state") || "none";
+    return [runtimeDb, boundary.sessionState, boundary.runState, contextState].join(" | ");
+  }
   const sessionState = previewField(preview, "Session state") || "none";
   const runState = previewField(preview, "Run state") || "none";
   const contextState = previewField(preview, "Context state") || "none";
@@ -734,7 +887,7 @@ function deriveTopologyWarningSeverity(preview: TabPreview): string {
 }
 
 const REPO_CONTROL_SEGMENT_BOUNDARY =
-  "(?:warn|peers|peer|drift|markers|divergence|detached|hotspot|path|dep|inbound|dirty|unstaged|untracked|cycle\\s+\\d+|updated\\s+|verify\\s+|db\\s+|activity\\s+|artifacts\\s+|next\\s+)";
+  "(?:warn|peers|peer|drift|markers|divergence|detached|hotspot|path|dep|inbound|dirty|unstaged|untracked|cycle\\s+\\d+|updated\\s+|verify\\s+|db\\s+|semantics\\s+|liveness\\s+|activity\\s+|artifacts\\s+|next\\s+)";
 
 function buildRepoControlPreview(
   repoPreview: TabPreview | undefined,
@@ -786,6 +939,8 @@ function buildRepoControlPreview(
   const loopDecision = previewField(controlPreview, "Loop decision");
   const nextTask = previewField(controlPreview, "Next task");
   const runtimeDb = previewField(controlPreview, "Runtime DB");
+  const activitySemantics = runtimeActivitySemanticsFromPreview(controlPreview);
+  const executorLiveness = executorLivenessFromPreview(controlPreview);
   const runtimeActivity = previewField(controlPreview, "Runtime activity");
   const artifactState = previewField(controlPreview, "Artifact state");
   return [
@@ -807,6 +962,8 @@ function buildRepoControlPreview(
     ...(hasPreviewValue(hotspotPreview) ? [`hotspot ${hotspotPreview}`] : []),
     runtimeFreshness,
     ...(hasPreviewValue(runtimeDb) ? [`db ${runtimeDb}`] : []),
+    ...(hasPreviewValue(activitySemantics) ? [`semantics ${activitySemantics}`] : []),
+    ...(hasPreviewValue(executorLiveness) ? [`liveness ${executorLiveness}`] : []),
     ...(hasPreviewValue(runtimeActivity) ? [`activity ${runtimeActivity}`] : []),
     ...(hasPreviewValue(artifactState) ? [`artifacts ${artifactState}`] : []),
     ...(hasPreviewValue(nextTask) && nextTask !== "none" ? [`next ${nextTask}`] : []),
@@ -1492,6 +1649,37 @@ function storedSnapshotPayloadKey(kind: "workspace" | "runtime"): "workspace_pay
   return kind === "workspace" ? "workspace_payload" : "runtime_payload";
 }
 
+export function runtimePreviewWithDeclaredActivitySemantics(
+  preview: TabPreview,
+  payload?: RuntimeSnapshotPayload,
+): TabPreview {
+  const semanticsSource = payload
+    ? runtimePayloadToPreview(payload)
+    : canonicalRuntimePreviewForRendering(preview);
+  const semantics = runtimeActivitySemanticsFromPreview(semanticsSource);
+  if (!semantics) {
+    return preview;
+  }
+  const normalized: TabPreview = {
+    ...preview,
+    "Activity semantics": semantics,
+  };
+  const runtimeActivity = previewField(normalized, "Runtime activity");
+  if (runtimeActivity && !/\bActivitySemantics=/i.test(runtimeActivity)) {
+    normalized["Runtime activity"] = `ActivitySemantics=${semantics} ${runtimeActivity}`;
+  }
+  enforceRuntimeTruthBoundary(normalized);
+  return normalized;
+}
+
+export function runtimePayloadToTruthPreview(
+  payload: RuntimeSnapshotPayload,
+  summary: SupervisorControlState | null = null,
+  now: Date = new Date(),
+): TabPreview {
+  return runtimePreviewWithDeclaredActivitySemantics(runtimePayloadToPreview(payload, summary, now), payload);
+}
+
 function snapshotPayloadFromRecord(
   record: Record<string, unknown>,
   kind: "workspace" | "runtime",
@@ -1563,9 +1751,23 @@ function mergeStoredPreviewFields(
   const mergedPreview: TabPreview = {...storedPreview};
 
   if (preview) {
+    const candidateSemantics = runtimeActivitySemanticsFromPreview(preview);
+    const storedSemantics = runtimeActivitySemanticsFromPreview(storedPreview);
+    if (candidateSemantics && candidateSemantics !== storedSemantics) {
+      for (const field of RUNTIME_ACTIVITY_BOUNDARY_FIELDS) {
+        delete mergedPreview[field];
+      }
+    }
     for (const key of allowedKeys) {
       const value = previewField(preview, key);
       if (value) {
+        if (
+          RUNTIME_ACTIVITY_BOUNDARY_FIELDS.includes(key as (typeof RUNTIME_ACTIVITY_BOUNDARY_FIELDS)[number]) &&
+          storedSemantics &&
+          !candidateSemantics
+        ) {
+          continue;
+        }
         mergedPreview[key] = value;
       }
     }
@@ -1703,10 +1905,10 @@ export function loadSupervisorControlPreview(repoRoot = REPO_ROOT, now: Date = n
   const verificationReceiptPath = defaultVerificationReceiptPath(undefined, summary.stateDir);
   const runtimePayloadPreview = (() => {
     const payload = readStoredDisplaySnapshotPayload(summary, "runtime");
-    return payload ? runtimePayloadToPreview(payload as RuntimeSnapshotPayload, summary, now) : undefined;
+    return payload ? runtimePayloadToTruthPreview(payload as RuntimeSnapshotPayload, summary, now) : undefined;
   })();
   const runRuntimePayloadPreview = runRuntimePayload
-    ? runtimePayloadToPreview(runRuntimePayload as RuntimeSnapshotPayload, summary, now)
+    ? runtimePayloadToTruthPreview(runRuntimePayload as RuntimeSnapshotPayload, summary, now)
     : undefined;
 
   const fallbackPreview: TabPreview = {
@@ -1761,6 +1963,7 @@ export function loadSupervisorControlPreview(repoRoot = REPO_ROOT, now: Date = n
     ) ??
     fallbackPreview;
   hydrateControlPreviewFromRepoControl(effectivePreview);
+  enforceRuntimeTruthBoundary(effectivePreview);
   normalizeVerificationPreview(effectivePreview);
   if (!previewField(effectivePreview, "Verification receipt")) {
     effectivePreview["Verification receipt"] = defaultVerificationReceiptPath(effectivePreview, summary.stateDir);
@@ -1781,8 +1984,10 @@ export function loadSupervisorControlPreview(repoRoot = REPO_ROOT, now: Date = n
       `verify ${normalizedVerificationBundle}`,
     ].join(" | ");
   const explicitRuntimeSummary = previewField(explicitSourcePreview, "Runtime summary");
-  effectivePreview["Runtime summary"] =
-    explicitRuntimeSummary || buildRuntimeSummaryPreview({...effectivePreview, "Runtime summary": ""});
+  effectivePreview["Runtime summary"] = buildRuntimeSummaryPreview({
+    ...effectivePreview,
+    "Runtime summary": explicitRuntimeSummary,
+  });
   effectivePreview["Control pulse preview"] =
     previewField(explicitSourcePreview, "Control pulse preview") ||
     buildControlPulsePreview(
@@ -1865,9 +2070,13 @@ export function saveSupervisorControlSummary(
 ): void {
   const existingPayload = readDisplayCache(summary);
   const persistedAt = new Date().toISOString();
-  const mergedPreview = mergeStoredPreviewFields(summary, CONTROL_PREVIEW_FIELDS, preview);
+  const incomingPreview = options?.runtimePayload
+    ? runtimePreviewWithDeclaredActivitySemantics(preview ?? {}, options.runtimePayload)
+    : preview;
+  const mergedPreview = mergeStoredPreviewFields(summary, CONTROL_PREVIEW_FIELDS, incomingPreview);
   hydrateControlPreviewFromRepoControl(mergedPreview);
-  const incomingPreviewBundleEntries = verificationEntriesFromPreview(preview);
+  enforceRuntimeTruthBoundary(mergedPreview);
+  const incomingPreviewBundleEntries = verificationEntriesFromPreview(incomingPreview);
   const incomingPreviewBundleLabel = incomingPreviewBundleEntries.length > 0 ? verificationBundleLabel(incomingPreviewBundleEntries) : "";
   const incomingPreviewBundleChecks = incomingPreviewBundleEntries
     .map((entry) => `${entry.name} ${entry.ok ? "ok" : "fail"}`)
@@ -1878,7 +2087,7 @@ export function saveSupervisorControlSummary(
   const previewBundleChecks = previewBundleEntries.map((entry) => `${entry.name} ${entry.ok ? "ok" : "fail"}`).join("; ");
   const previewVerificationSummary =
     incomingPreviewBundleLabel &&
-    (!previewField(preview, "Verification summary") || isGenericVerificationLabel(previewField(preview, "Verification summary")))
+    (!previewField(incomingPreview, "Verification summary") || isGenericVerificationLabel(previewField(incomingPreview, "Verification summary")))
       ? incomingPreviewBundleLabel
       : previewBundleLabel &&
           (!previewField(mergedPreview, "Verification summary") ||
@@ -1940,10 +2149,10 @@ export function saveSupervisorControlSummary(
     [summary.lastResultStatus, summary.acceptance].filter((value) => value.length > 0).join(" / ") ||
     "unknown";
   const effectiveRuntimeFreshness =
-    previewField(preview, "Runtime freshness") ||
+    previewField(incomingPreview, "Runtime freshness") ||
     [effectiveLoopState, `updated ${effectiveUpdated}`, `verify ${verificationBundleLabel(effectiveVerificationBundle)}`].join(" | ");
   const effectiveControlPulse =
-    previewField(preview, "Control pulse preview") ||
+    previewField(incomingPreview, "Control pulse preview") ||
     buildControlPulsePreview(effectiveLastResult, effectiveRuntimeFreshness, effectiveUpdated);
   const effectiveControlTruth =
     buildControlTruthPreview({
