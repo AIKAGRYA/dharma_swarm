@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.forge_lab.campaign_control import list_campaigns
+from dharma_swarm.forge_lab.grader_runtime import swebench_runtime_readiness
 from dharma_swarm.forge_lab.provider_selftest import validate_provider_receipt
 from dharma_swarm.forge_lab.source_guard import execution_source_status
 from dharma_swarm.forge_lab.state_io import (
@@ -260,10 +261,18 @@ def grader_readiness() -> dict[str, Any]:
                 daemon_error = "docker_info_failed"
         except (OSError, subprocess.SubprocessError):
             daemon_error = "docker_info_unavailable"
+    runtime = swebench_runtime_readiness()
+    sdk_reachable, sdk_error = (
+        _docker_sdk_status()
+        if mode == "official-swebench-docker"
+        else (False, None)
+    )
     ready = (
         mode == "official-swebench-docker"
         and docker is not None
         and daemon_reachable
+        and sdk_reachable
+        and runtime["ready"]
     )
     reasons: list[str] = []
     if mode != "official-swebench-docker":
@@ -272,17 +281,42 @@ def grader_readiness() -> dict[str, Any]:
         reasons.append("docker_unavailable")
     elif mode == "official-swebench-docker" and not daemon_reachable:
         reasons.append(daemon_error or "docker_daemon_unreachable")
+    if mode == "official-swebench-docker" and not sdk_reachable:
+        reasons.append(sdk_error or "docker_sdk_daemon_unreachable")
+    reasons.extend(runtime["reasons"])
     # PR-suite host pytest is intentionally not accepted as isolated grading.
     return {
         "ready": ready,
         "mode": mode or None,
         "docker": docker,
         "docker_daemon_reachable": daemon_reachable,
+        "docker_sdk_daemon_reachable": sdk_reachable,
+        "docker_sdk_error": sdk_error,
+        "swebench_runtime": runtime,
         "candidate_network_disabled": True,
         "host_environment_forwarded": False,
         "pr_suite_host_grading_allowed": False,
         "reasons": reasons,
     }
+
+
+def _docker_sdk_status() -> tuple[bool, str | None]:
+    """Ping through the same docker.from_env path used by the grader."""
+
+    client: Any | None = None
+    try:
+        import docker as docker_sdk
+
+        client = docker_sdk.from_env(timeout=10)
+        return bool(client.ping()), None
+    except Exception as exc:
+        return False, f"docker_sdk_{type(exc).__name__}"
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
 
 
 def taskbed_readiness() -> dict[str, Any]:
@@ -425,5 +459,6 @@ __all__ = [
     "provider_readiness",
     "reconcile",
     "state_anchor_status",
+    "swebench_runtime_readiness",
     "taskbed_readiness",
 ]

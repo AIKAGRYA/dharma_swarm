@@ -117,6 +117,13 @@ def validate_child_spec(
         raise CallShapeError("CHILD_MODEL_PROFILE", "model profile changed after admission")
     if spec.get("provider_receipt_digest") != admission.get("provider_receipt_digest"):
         raise CallShapeError("CHILD_PROVIDER_RECEIPT", "provider receipt changed after admission")
+    binding = admission.get("task_context_binding")
+    binding_digest = binding.get("binding_digest") if isinstance(binding, dict) else None
+    if not binding_digest or spec.get("task_context_binding_digest") != binding_digest:
+        raise CallShapeError(
+            "CHILD_TASK_CONTEXT",
+            "release-bound task context changed after admission",
+        )
     expected_shape = {
         "generations": policy.generations,
         "children": policy.children,
@@ -172,11 +179,16 @@ def build_bounded_child_seams(
     from dharma_swarm.forge_lab import grade_explore
     from dharma_swarm.forge_lab.experiment import Seams
     from dharma_swarm.forge_v1.forge_v2.arms import VERIFY_TEMPLATE, _is_free_route, _win
-    from dharma_swarm.forge_v1.forge_v2.runner import _pull_task_context
+    from dharma_swarm.forge_lab.unattended_context import (
+        UnattendedContextError,
+        load_admitted_task_context,
+        sanitize_unattended_docker_env,
+    )
     from dharma_swarm.forge_v1.forge_v2.taskbed_ledger import allocate_task_ids
     from dharma_swarm.forge_v1.providers import PoolCompletion
 
     bootstrap_runtime_env()
+    sanitize_unattended_docker_env()
     base = grade_explore.production_seams()
     original_propose = base.propose_slot
 
@@ -277,9 +289,24 @@ def build_bounded_child_seams(
         }
         return json.dumps(child, sort_keys=True), int(tokens)
 
+    def pinned_task_context(task_id: str) -> tuple[dict[str, Any], dict[str, str]]:
+        try:
+            task, context, binding = load_admitted_task_context(
+                task_id,
+                state_root=Path(spec["state_root"]),
+            )
+        except UnattendedContextError as exc:
+            raise error_factory(exc.code, str(exc)) from exc
+        if binding.get("binding_digest") != spec.get("task_context_binding_digest"):
+            raise error_factory(
+                "TASK_CONTEXT_CHANGED",
+                "release-bound task context changed after parent admission",
+            )
+        return task, context
+
     return Seams(
         grade=grade,
-        pull_task_context=_pull_task_context,
+        pull_task_context=pinned_task_context,
         allocate_explore=state_anchored_allocate,
         mutate_complete=bounded_mutation,
         make_worktree=clone_scratch,

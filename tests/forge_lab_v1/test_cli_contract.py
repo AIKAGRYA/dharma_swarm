@@ -242,6 +242,11 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
     assert 'pydeps="${base}/pydeps"' in launcher
     assert 'state="${base}/state"' in launcher
     assert 'export RSI_LAB_PYDEPS="${pydeps}"' in launcher
+    assert 'export RSI_LAB_SWEBENCH_PYDEPS="${swebench_pydeps}"' in launcher
+    assert 'export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="${swebench_required}"' in launcher
+    assert 'export DOCKER_CONTEXT="${docker_context}"' in launcher
+    assert 'export FORGE_DOCKER_CONTEXT="${docker_context}"' in launcher
+    assert 'export DOCKER_HOST="${docker_host}"' in launcher
     assert 'export RSI_LAB_STATE="${state}"' in launcher
     assert 'export DHARMA_HOME="${state}/.dharma"' in launcher
     assert (
@@ -249,7 +254,10 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
         in launcher
     )
     assert 'export RSI_LAB_GRADER_MODE="${grader_mode}"' in launcher
-    assert 'export PYTHONPATH="${repo}:${pydeps}"' in launcher
+    assert (
+        'export PYTHONPATH="${repo}:${pydeps}${swebench_pydeps:+:${swebench_pydeps}}"'
+        in launcher
+    )
     assert "export PYTHONDONTWRITEBYTECODE=1" in launcher
 
     rsilab = (REPO_ROOT / "scripts" / "forge_lab" / "RSILAB").read_text(encoding="utf-8")
@@ -266,7 +274,16 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
         in env_script
     )
     assert 'export RSI_LAB_GRADER_MODE="official-swebench-docker"' in env_script
-    assert 'export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}"' in env_script
+    assert 'export RSI_LAB_SWEBENCH_PYDEPS=""' in env_script
+    assert 'export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="1"' in env_script
+    assert 'export DOCKER_CONTEXT="default"' in env_script
+    assert 'export FORGE_DOCKER_CONTEXT="default"' in env_script
+    assert 'export DOCKER_HOST="unix:///var/run/docker.sock"' in env_script
+    assert (
+        'export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}'
+        '${RSI_LAB_SWEBENCH_PYDEPS:+:${RSI_LAB_SWEBENCH_PYDEPS}}"'
+        in env_script
+    )
 
 
 def test_production_launcher_ignores_inherited_source_state_and_pythonpath(

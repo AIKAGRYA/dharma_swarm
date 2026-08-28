@@ -7,10 +7,12 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 from dharma_swarm.forge_lab import sync_control as sync
+from dharma_swarm.forge_lab import sync_node
 from dharma_swarm.forge_lab import sync_orchestrator as orchestrator
 
 
@@ -432,3 +434,132 @@ def test_arbitrary_remote_and_non_atomic_current_are_rejected(tmp_path: Path) ->
     with pytest.raises(sync.SyncError) as current_error:
         sync._atomic_symlink(tmp_path / "release", current)
     assert current_error.value.code == "CURRENT_NOT_ATOMIC"
+
+
+def test_swebench_runtime_import_root_is_unique_and_venv_owned(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "lab"
+    python_abi = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    site_packages = (
+        root / "runtime" / "swebench-venv" / "lib" / python_abi / "site-packages"
+    )
+    for package in ("swebench", "docker", "datasets"):
+        (site_packages / package).mkdir(parents=True, exist_ok=True)
+
+    runtime_python = root / "runtime" / "swebench-venv" / "bin" / "python"
+    runtime_python.parent.mkdir(parents=True)
+    os.symlink(Path(sys.executable).resolve(), runtime_python)
+    assert sync_node._swebench_import_root(
+        root,
+        release_python=Path(sys.executable),
+    ) == site_packages.resolve()
+
+    other_abi = "python9.99"
+    second = root / "runtime" / "swebench-venv" / "lib" / other_abi / "site-packages"
+    for package in ("swebench", "docker", "datasets"):
+        (second / package).mkdir(parents=True, exist_ok=True)
+    with pytest.raises(sync.SyncError) as duplicate_error:
+        sync_node._swebench_import_root(root, release_python=Path(sys.executable))
+    assert duplicate_error.value.code == "RUNTIME_INCOMPATIBLE"
+
+    for package in ("swebench", "docker", "datasets"):
+        (second / package).rmdir()
+    second.rmdir()
+    outside = tmp_path / "outside-site-packages"
+    for package in ("swebench", "docker", "datasets"):
+        (outside / package).mkdir(parents=True, exist_ok=True)
+    site_packages.rename(site_packages.with_name("site-packages-real"))
+    os.symlink(outside, site_packages, target_is_directory=True)
+    with pytest.raises(sync.SyncError) as escape_error:
+        sync_node._swebench_import_root(root, release_python=Path(sys.executable))
+    assert escape_error.value.code == "RUNTIME_INCOMPATIBLE"
+
+
+def test_offline_verification_sanitizes_imports_and_uses_explicit_smoke_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "lab"
+    release = root / "releases" / ("a" * 40)
+    repo = release / "repo"
+    python = release / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.touch()
+    repo.mkdir(parents=True)
+    (release / "pydeps").mkdir()
+    swebench_root = root / "runtime" / "swebench-venv" / "site-packages"
+    swebench_root.mkdir(parents=True)
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        env = dict(kwargs["env"])
+        calls.append((command, env))
+        if command[1:2] == ["-c"]:
+            return SimpleNamespace(
+                stdout=json.dumps(
+                    {
+                        "ready": True,
+                        "version": "4.1.0",
+                        "record_digests": {},
+                        "tree_digests": {},
+                        "tree_file_counts": {},
+                    }
+                )
+            )
+        return SimpleNamespace(stdout="1 passed\n")
+
+    monkeypatch.setenv("PYTHONPATH", "/untrusted/inherited")
+    monkeypatch.setenv("PYTHONHOME", "/untrusted/home")
+    monkeypatch.setattr(
+        sync_node,
+        "_swebench_import_root",
+        lambda *_args, **_kwargs: swebench_root,
+    )
+    monkeypatch.setattr(sync_node, "_run", run)
+    monkeypatch.setattr(
+        sync_node,
+        "_checkout_identity",
+        lambda _repo: {"repo_clean": True},
+    )
+
+    receipt = sync_node._run_offline_verification(
+        release,
+        root,
+        {"verification_tests": ["tests/forge_lab_v1"]},
+    )
+
+    smoke_command, smoke_env = calls[0]
+    assert "assert result['ready']" not in smoke_command[-1]
+    assert "sys.exit(0 if result['ready'] else 9)" in smoke_command[-1]
+    assert "/untrusted/inherited" not in smoke_env["PYTHONPATH"]
+    assert "PYTHONHOME" not in smoke_env
+    assert smoke_env["HF_DATASETS_OFFLINE"] == "1"
+    assert smoke_env["PYTHONNOUSERSITE"] == "1"
+    assert receipt["swebench_runtime"]["version"] == "4.1.0"
+
+
+def test_canonical_linux_sync_requires_dedicated_swebench_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "canonical-linux"
+    release = root / "release"
+    (release / ".venv" / "bin").mkdir(parents=True)
+    (release / "repo").mkdir()
+    (release / "pydeps").mkdir()
+    monkeypatch.setattr(sync_node.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(sync_node, "DEFAULT_REMOTE_ROOT", root)
+    monkeypatch.setattr(
+        sync_node,
+        "_swebench_import_root",
+        lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(sync.SyncError) as error:
+        sync_node._run_offline_verification(
+            release,
+            root,
+            {"verification_tests": []},
+        )
+    assert error.value.code == "RUNTIME_INCOMPATIBLE"

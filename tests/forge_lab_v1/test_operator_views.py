@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from dharma_swarm.forge_lab import operator_views, provider_selftest
+from dharma_swarm.forge_lab import grader_runtime, operator_views, provider_selftest
 from dharma_swarm.forge_lab.state_io import content_digest
 from dharma_swarm.forge_lab.version import PACKAGE_VERSION, source_commit
 
@@ -200,6 +203,180 @@ def test_state_anchor_refuses_divergent_dharma_home(
     status = operator_views.state_anchor_status()
     assert status["ready"] is False
     assert status["reasons"] == ["DHARMA_HOME_not_anchored_under_RSI_LAB_STATE"]
+
+
+def test_swebench_runtime_is_api_and_import_root_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "venv" / "lib" / "python3.12" / "site-packages"
+    root.mkdir(parents=True)
+
+    def module(name: str) -> SimpleNamespace:
+        path = root / name.replace(".", "_") / "__init__.py"
+        path.parent.mkdir()
+        path.write_text("", encoding="utf-8")
+        return SimpleNamespace(__file__=str(path))
+
+    runtime_names = (
+        "swebench",
+        "docker",
+        "datasets",
+        "huggingface_hub",
+        "pyarrow",
+    )
+    modules = {name: module(name) for name in runtime_names}
+    run_evaluation_path = root / "swebench" / "harness" / "run_evaluation.py"
+    run_evaluation_path.parent.mkdir()
+    run_evaluation_path.write_text("", encoding="utf-8")
+    run_evaluation = SimpleNamespace(__file__=str(run_evaluation_path))
+    for name in (
+        "build_container",
+        "cleanup_container",
+        "copy_to_container",
+        "exec_run_with_timeout",
+        "load_swebench_dataset",
+        "make_test_spec",
+        "main",
+    ):
+        setattr(run_evaluation, name, lambda: None)
+    modules["swebench.harness.run_evaluation"] = run_evaluation
+    distributions: dict[str, SimpleNamespace] = {}
+    expected_digests: dict[str, str] = {}
+    expected_tree_digests: dict[str, str] = {}
+    for name in runtime_names:
+        dist = root / f"{name}.dist-info"
+        dist.mkdir()
+        record = dist / "RECORD"
+        record_paths = [f"{name}/__init__.py", f"{name}.dist-info/RECORD"]
+        if name == "swebench":
+            record_paths.append("swebench/harness/run_evaluation.py")
+        record.write_text(
+            "".join(f"{path},,\n" for path in record_paths),
+            encoding="utf-8",
+        )
+        distributions[name] = SimpleNamespace(_path=dist)
+        expected_digests[name] = (
+            "sha256:" + hashlib.sha256(record.read_bytes()).hexdigest()
+        )
+        mapping = {
+            path: hashlib.sha256((root / path).read_bytes()).hexdigest()
+            for path in record_paths
+        }
+        canonical = json.dumps(
+            mapping,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        expected_tree_digests[name] = (
+            "sha256:" + hashlib.sha256(canonical).hexdigest()
+        )
+    monkeypatch.setenv("RSI_LAB_SWEBENCH_PYDEPS", str(root))
+    import_calls: list[str] = []
+
+    def import_module(name: str) -> SimpleNamespace:
+        import_calls.append(name)
+        return modules[name]
+
+    monkeypatch.setattr(grader_runtime.importlib, "import_module", import_module)
+    monkeypatch.setattr(
+        grader_runtime.importlib.metadata,
+        "version",
+        lambda _name: grader_runtime.SUPPORTED_SWEBENCH_VERSION,
+    )
+    monkeypatch.setattr(
+        grader_runtime.importlib.metadata,
+        "distribution",
+        lambda name: distributions[name],
+    )
+    monkeypatch.setattr(
+        grader_runtime,
+        "SUPPORTED_LINUX_RUNTIME_RECORD_DIGESTS",
+        expected_digests,
+    )
+    monkeypatch.setattr(
+        grader_runtime,
+        "SUPPORTED_LINUX_RUNTIME_TREE_DIGESTS",
+        expected_tree_digests,
+    )
+
+    ready = operator_views.swebench_runtime_readiness()
+    assert ready["ready"] is True
+    assert ready["api_compatible"] is True
+    assert ready["distribution_custody_verified_before_import"] is True
+    assert ready["module_origins_attested"] is True
+    imported_after_ready = list(import_calls)
+    assert set(ready["record_origins"]) == set(runtime_names)
+    expected_counts = dict.fromkeys(runtime_names, 2)
+    expected_counts["swebench"] = 3
+    assert ready["tree_file_counts"] == expected_counts
+
+    docker_module = root / "docker" / "__init__.py"
+    docker_module.write_text("tampered\n", encoding="utf-8")
+    tampered = operator_views.swebench_runtime_readiness()
+    assert tampered["ready"] is False
+    assert "swebench_runtime_docker_tree_mismatch" in tampered["reasons"]
+    assert import_calls == imported_after_ready
+    docker_module.write_text("", encoding="utf-8")
+
+    pyarrow_origin = modules["pyarrow"].__file__
+    modules["pyarrow"].__file__ = str(tmp_path / "escaped" / "pyarrow.py")
+    escaped = operator_views.swebench_runtime_readiness()
+    assert escaped["ready"] is False
+    assert "swebench_runtime_import_escaped_anchor" in escaped["reasons"]
+    modules["pyarrow"].__file__ = pyarrow_origin
+
+    run_evaluation.exec_run_with_timeout = None
+    incompatible = operator_views.swebench_runtime_readiness()
+    assert incompatible["ready"] is False
+    assert "swebench_runtime_api_incompatible" in incompatible["reasons"]
+
+    (root / "docker.dist-info" / "RECORD").chmod(0o666)
+    root.chmod(0o777)
+    writable = operator_views.swebench_runtime_readiness()
+    assert writable["ready"] is False
+    assert "swebench_runtime_anchor_writable" in writable["reasons"]
+
+
+def test_swebench_runtime_refuses_missing_required_dedicated_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RSI_LAB_SWEBENCH_PYDEPS", raising=False)
+    monkeypatch.setenv("RSI_LAB_REQUIRE_SWEBENCH_PYDEPS", "1")
+
+    readiness = operator_views.swebench_runtime_readiness()
+
+    assert readiness["ready"] is False
+    assert "swebench_runtime_dedicated_required" in readiness["reasons"]
+
+
+def test_grader_requires_python_sdk_ping_not_only_docker_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RSI_LAB_GRADER_MODE", "official-swebench-docker")
+    monkeypatch.setattr(operator_views.shutil, "which", lambda _name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        operator_views.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "27.0\n", ""),
+    )
+    monkeypatch.setattr(
+        operator_views,
+        "swebench_runtime_readiness",
+        lambda: {"ready": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        operator_views,
+        "_docker_sdk_status",
+        lambda: (False, "docker_sdk_TLSParameterError"),
+    )
+
+    readiness = operator_views.grader_readiness()
+
+    assert readiness["ready"] is False
+    assert readiness["docker_daemon_reachable"] is True
+    assert readiness["docker_sdk_daemon_reachable"] is False
+    assert "docker_sdk_TLSParameterError" in readiness["reasons"]
 
 
 def test_taskbed_readiness_is_read_only_and_state_anchored(

@@ -34,6 +34,27 @@ else
 fi
 export DHARMA_HOME="${RSI_LAB_STATE}/.dharma"
 export RSI_LAB_PROVIDER_SELFTEST_ROOT="${RSI_LAB_STATE}/.dharma/forge_lab/provider_selftests"
+export RSI_LAB_SWEBENCH_PYDEPS=""
+export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="0"
+if [[ "${_rsi_base}" == /root/rsi-lab/* ]]; then
+    export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="1"
+fi
+if [[ -x /root/rsi-lab/runtime/swebench-venv/bin/python ]]; then
+    _rsi_python_abi="$("${RSI_LAB_PYTHON}" -I -c 'import sys; print(f"python{sys.version_info.major}.{sys.version_info.minor}")')"
+    _rsi_swebench_pydeps="/root/rsi-lab/runtime/swebench-venv/lib/${_rsi_python_abi}/site-packages"
+    if [[ -d "${_rsi_swebench_pydeps}/swebench" && -d "${_rsi_swebench_pydeps}/docker" ]]; then
+        export RSI_LAB_SWEBENCH_PYDEPS="${_rsi_swebench_pydeps}"
+    fi
+fi
+if [[ "$(uname -s)" == "Linux" ]]; then
+    export DOCKER_CONTEXT="default"
+    export FORGE_DOCKER_CONTEXT="default"
+    export DOCKER_HOST="unix:///var/run/docker.sock"
+else
+    export DOCKER_CONTEXT="colima-forge-swebench"
+    export FORGE_DOCKER_CONTEXT="colima-forge-swebench"
+    unset DOCKER_HOST
+fi
 export PYTHONDONTWRITEBYTECODE=1
-export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}"
-unset _rsi_base _rsi_logical_base
+export PYTHONPATH="${RSI_LAB_REPO}:${RSI_LAB_PYDEPS}${RSI_LAB_SWEBENCH_PYDEPS:+:${RSI_LAB_SWEBENCH_PYDEPS}}"
+unset _rsi_base _rsi_logical_base _rsi_python_abi _rsi_swebench_pydeps
