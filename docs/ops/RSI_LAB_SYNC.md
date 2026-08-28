@@ -454,20 +454,30 @@ The sync activation installs the immutable `rsi-unattended-explore` wrapper,
 but it deliberately does not mutate `/etc/systemd/system` or enable a timer.
 After release activation, legacy-provider retirement, one fresh two-provider
 selftest, and a **successful operator-supervised oneshot**, manually install and
-verify the versioned unit bytes. First prove that the physical state root is not
-a symlink, is owned by the service user, and is not group/world writable. The
-known-safe live root is `root:root` mode `0755`; repair a broader mode explicitly
-before any timer activation, then inspect each existing custody ancestor:
+verify the versioned unit bytes. The stable `/root/rsi-lab/state` anchor may be a
+managed symlink, so first resolve it and prove that the physical state root is
+not a symlink, is owned by the service user, and is not group/world writable.
+The known-safe live physical root is `root:root` mode `0755`; repair a broader
+mode explicitly before any timer activation, then inspect each existing custody
+ancestor:
 
 ```bash
-test ! -L /root/rsi-lab/state
-test "$(stat -c '%U:%G' /root/rsi-lab/state)" = "root:root"
-chmod 0755 /root/rsi-lab/state
+rsi_state_root="$(readlink -e /root/rsi-lab/state)"
+test -n "${rsi_state_root}"
+test "${rsi_state_root}" != "/"
+test -d "${rsi_state_root}"
+case "${rsi_state_root}" in
+  /root/rsi-lab/state|/root/rsi-lab/*/state) ;;
+  *) exit 1 ;;
+esac
+test ! -L "${rsi_state_root}"
+test "$(stat -c '%U:%G' "${rsi_state_root}")" = "root:root"
+chmod 0755 "${rsi_state_root}"
 stat -c '%U:%G %a %n' \
-  /root/rsi-lab/state \
-  /root/rsi-lab/state/.dharma \
-  /root/rsi-lab/state/.dharma/forge_lab \
-  /root/rsi-lab/state/.dharma/evolution_worktrees 2>/dev/null
+  "${rsi_state_root}" \
+  "${rsi_state_root}/.dharma" \
+  "${rsi_state_root}/.dharma/forge_lab" \
+  "${rsi_state_root}/.dharma/evolution_worktrees" 2>/dev/null
 ```
 
 Install with `HALT` present so the first activation of the persistent timer
