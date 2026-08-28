@@ -39,10 +39,12 @@ def cmd_spawn(name: str, role: str, model: str) -> None:
     _run(_spawn())
 
 
-def _cmd_agent_wake(name: str, task: str, model: str | None) -> None:
-    """Wake an autonomous agent with a task."""
+def _cmd_agent_wake(
+    name: str, task: str, model: str | None, provider: str | None = None,
+) -> None:
+    """Wake an autonomous agent with a task; process exit code = wake exit code."""
     from dharma_swarm.autonomous_agent import cli_wake
-    asyncio.run(cli_wake(name, task, model=model))
+    sys.exit(asyncio.run(cli_wake(name, task, model=model, provider=provider)))
 
 
 def _cmd_agent_list() -> None:
