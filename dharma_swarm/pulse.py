@@ -1,14 +1,19 @@
-"""DGC Pulse v2 — dharma_swarm daemon wrapping Claude Code headless.
+"""DGC Pulse v2 — heartbeat via the canonical Max-first fallback chain.
 
-The key insight: `claude -p` IS a real agent (tools, file access, bash).
-dharma_swarm API calls are NOT. So we use dharma_swarm for:
+THE ONE WAY: `complete_via_preferred_runtime_providers` with the Anthropic
+lane FIRST (Max plan via the claude_code transport; metered API only under
+DHARMA_FORCE_ANTHROPIC_API), then the funded low-cost lanes in canonical
+order. A dead Max lane must not kill the beat — the chain falls through; if
+every lane fails the pulse FAILED (no bare `claude -p` fallback).
+dharma_swarm still owns:
   - Daemon scheduling (Garden Daemon heartbeat, quiet hours, rate limits)
   - Thread rotation (mechanistic/phenomenological/architectural/alignment/scaling)
   - Circuit breaker (3 failures → pause, downtrend → switch thread)
   - Telos gates (check prompt before sending)
   - Memory persistence (log results to strange loop)
   - Human overrides (.PAUSE, .FOCUS, .INJECT)
-And `claude -p` for actual execution.
+The chain does the actual generation; the returned string prefixes
+(ERROR/TIMEOUT/SKIP/TELOS BLOCK) are the contract `dgc pulse` scores on.
 
 Usage:
   python3 -m dharma_swarm.pulse              # Single pulse
@@ -40,12 +45,18 @@ from dharma_swarm.context import (
     read_trishula_inbox,
 )
 from dharma_swarm.daemon_config import DaemonConfig, THREAD_PROMPTS, V7_BASE_RULES
+from dharma_swarm.model_hierarchy import default_model
+from dharma_swarm.models import ProviderType
 from dharma_swarm.shakti import ShaktiLoop
 from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
 from dharma_swarm.subconscious import SubconsciousStream
 from dharma_swarm.thread_manager import ThreadManager
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 from dharma_swarm.runtime_artifacts import append_pulse_log, freshest_pulse_log_path
+from dharma_swarm.runtime_provider import (
+    PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+    complete_via_preferred_runtime_providers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +68,23 @@ _DREAM_THRESHOLD = 50
 _DREAM_HYSTERESIS = 10
 _SHAKTI_INTERVAL_SECONDS = 900
 _SHAKTI_SALIENCE_THRESHOLD = 0.7
+
+PULSE_PROVIDER_ORDER: tuple[ProviderType, ...] = (
+    ProviderType.ANTHROPIC,
+    *PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+)
+_PULSE_FAILURE_PREFIXES = ("error", "timeout")
+_PULSE_NOT_SUCCESS_PREFIXES = (*_PULSE_FAILURE_PREFIXES, "skip", "telos block")
+
+
+def is_pulse_failure(result: str) -> bool:
+    """True when a pulse result string is a provider/chain failure (breaker scores it)."""
+    return result.lstrip().lower().startswith(_PULSE_FAILURE_PREFIXES)
+
+
+def pulse_exit_code(result: str) -> int:
+    """Process exit code for a pulse result: 1 for ERROR/TIMEOUT/SKIP/TELOS BLOCK."""
+    return 1 if result.lstrip().lower().startswith(_PULSE_NOT_SUCCESS_PREFIXES) else 0
 
 
 def build_prompt(
@@ -147,6 +175,37 @@ def run_claude_headless(
         permission_mode=permission_mode,
         tools=tools,
     )
+
+
+async def _run_pulse_completion(prompt: str, *, anthropic_model: str | None = None) -> str:
+    """Execute one pulse via THE ONE WAY: Max-first, then funded lanes.
+
+    `anthropic_model` overrides the Claude lane only; other lanes keep their
+    model_defaults. Any chain exception is the pulse's failure — returned as
+    'ERROR: ...' so the circuit breaker and `dgc pulse` exit code see it.
+    """
+    try:
+        response, cfg = await complete_via_preferred_runtime_providers(
+            messages=[{"role": "user", "content": prompt}],
+            system=(
+                "You are the dharma_swarm pulse. One concrete next action. "
+                "No theater. Be brief."
+            ),
+            max_tokens=800,
+            provider_order=PULSE_PROVIDER_ORDER,
+            anthropic_model=anthropic_model or default_model(ProviderType.ANTHROPIC),
+            timeout_seconds=60,
+        )
+    except Exception as exc:
+        logger.warning("pulse provider chain failed: %s", exc)
+        return f"ERROR: {type(exc).__name__}: {str(exc)[:300]}"
+    provider = response.provider or getattr(cfg.provider, "value", cfg.provider)
+    model = response.model or cfg.default_model
+    print(f"[pulse] provider={provider} model={model}")
+    text = (response.content or "").strip()
+    if not text:
+        return f"ERROR: empty response from provider={provider} model={model}"
+    return text
 
 
 def _load_living_state() -> dict[str, Any]:
@@ -389,20 +448,17 @@ def pulse(config: DaemonConfig | None = None) -> str:
     if gate.attempts:
         print(f"[pulse] witness reroute applied ({gate.attempts} attempts)")
 
-    # Execute via Claude Code headless.
-    # Use "sonnet" (not opus) for pulse — heartbeat checks don't need
-    # the most expensive model, and opus drains credits fast.
     print(f"[pulse] Thread: {thread} | Executing...")
-    result = run_claude_headless(prompt, model="sonnet")
+    result = asyncio.run(_run_pulse_completion(prompt))
 
     # Record
     tm.record_contribution()
-    if result.startswith("ERROR") or result.startswith("TIMEOUT"):
+    if is_pulse_failure(result):
         tripped = cfg.circuit_breaker.record_failure()
         if tripped:
             print("[pulse] Circuit breaker tripped! Rotating thread.")
             tm.rotate()
-    else:
+    elif not result.lstrip().lower().startswith(_PULSE_NOT_SUCCESS_PREFIXES):
         cfg.circuit_breaker.record_success()
 
     # Store in memory (async)
@@ -546,10 +602,7 @@ def _check_and_run_cron_jobs(cfg: DaemonConfig | None = None) -> None:
             continue
 
         try:
-            result = run_claude_headless(
-                prompt=prompt,
-                model=model,
-            )
+            result = asyncio.run(_run_pulse_completion(prompt, anthropic_model=model))
             print(f"[cron] {job_id}: {result[:150].replace(chr(10), ' ')}")
 
             last_runs[last_run_key] = now.isoformat()

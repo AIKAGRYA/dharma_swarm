@@ -440,11 +440,14 @@ def cmd_ui(surface: str = "list") -> None:
 
 
 def cmd_pulse() -> None:
-    """Run one heartbeat pulse."""
-    from dharma_swarm.pulse import pulse
+    """Run one heartbeat pulse; exit 1 on ERROR/TIMEOUT/SKIP/TELOS BLOCK."""
+    from dharma_swarm.pulse import pulse, pulse_exit_code
 
     response = pulse()
     print(response)
+    code = pulse_exit_code(response)
+    if code:
+        raise SystemExit(code)
 
 
 def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
