@@ -394,10 +394,27 @@ class TestGatePressureFeedback:
             "reason": "high block rate",
             "set_at": time.time(),
             "expires": time.time() + 3600,  # valid for 1 hour
+            "acknowledged_by_operator": True,
         }))
         gk = TelosGatekeeper()
         gk._GATE_PRESSURE_PATH = pressure_file
         assert gk._apply_gate_pressure("internal") == "external_strict"
+
+    def test_unacknowledged_pressure_override_ignored(self, tmp_path):
+        import json
+        import time
+
+        pressure_file = tmp_path / "gate_pressure.json"
+        pressure_file.write_text(json.dumps({
+            "trust_mode_override": "external_strict",
+            "reason": "high block rate",
+            "set_at": time.time(),
+            "expires": time.time() + 3600,
+        }))
+        gk = TelosGatekeeper()
+        gk._GATE_PRESSURE_PATH = pressure_file
+        # Daemon-written override without operator ack must not tighten gates
+        assert gk._apply_gate_pressure("internal") == "internal"
 
     def test_same_mode_no_change(self, tmp_path):
         import json

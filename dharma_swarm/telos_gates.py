@@ -382,8 +382,10 @@ class TelosGatekeeper:
         """Read S4 gate pressure signal and potentially tighten trust mode.
 
         InternalPressureScanner writes gate_pressure.json when it detects high
-        gate block rates. This method reads it and overrides to external_strict if
-        the signal is still valid (not expired).
+        gate block rates. The override is daemon-written, so it only applies
+        when an operator has explicitly acknowledged it
+        (``"acknowledged_by_operator": true`` in the JSON); otherwise a
+        witness note is logged and the current trust mode is kept.
         """
         import time as _time
         try:
@@ -393,8 +395,21 @@ class TelosGatekeeper:
             if data.get("expires", 0) < _time.time():
                 return current_mode  # expired
             override = data.get("trust_mode_override", "").strip().lower()
-            if override and override != current_mode:
+            if not override or override == current_mode:
+                return current_mode
+            if data.get("acknowledged_by_operator") is True:
                 return override
+            logger.warning(
+                "Gate pressure override %r ignored: not acknowledged by operator",
+                override,
+            )
+            self._log_witness(
+                "gate_pressure",
+                f"unacknowledged trust_mode_override={override!r} ignored; "
+                f"kept {current_mode!r}",
+                "IGNORED",
+                "gate_pressure.json",
+            )
         except Exception:
             logger.debug("Gate pressure read failed", exc_info=True)
         return current_mode
