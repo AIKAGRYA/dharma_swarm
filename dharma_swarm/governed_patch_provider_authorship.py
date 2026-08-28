@@ -35,12 +35,11 @@ from dharma_swarm.governed_patch_evidence import (
     _closed_shape,
     _create_owner_only_exclusive,
     _parse_json,
-    _raw_sha256,
-    _read_regular_bounded,
-    _validate_bindings,
-    _validate_token,
+    _raw_sha256, _read_regular_bounded,
+    _validate_bindings, _validate_token,
     canonical_semantic_intent_sha256,
 )
+from dharma_swarm.model_pool import default_for_provider, required_provider_model_id
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.ollama_config import OLLAMA_CLOUD_BASE_URL
 from dharma_swarm.runtime_provider import RuntimeProviderConfig, runtime_provider_transport_identity
@@ -48,10 +47,11 @@ PROVIDER_AUTHORSHIP_SCHEMA: Final[str] = "dharma.governed_patch.provider_authors
 PROVIDER_CALL_LOCATOR_SCHEMA: Final[str] = "dharma.governed_patch.provider_call_locator.v1"
 PROVIDER_CALL_CLAIM_SCHEMA: Final[str] = "dharma.governed_patch.provider_call_claim.v1"
 PROVIDER_RESPONSE_SCHEMA: Final[str] = "dharma.governed_patch.provider_response_snapshot.v1"
-REQUESTED_PROVIDER: Final[str] = "ollama"
-REQUESTED_MODEL: Final[str] = "glm-5.2:cloud"
+REQUESTED_PROVIDER: Final[str] = ProviderType.OLLAMA.value
+REQUESTED_WIRE_MODEL: Final[str] = default_for_provider(ProviderType.ZHIPU)
+REQUESTED_MODEL: Final[str] = required_provider_model_id(REQUESTED_WIRE_MODEL, ProviderType.OLLAMA)
 REQUESTED_TRANSPORT: Final[str] = "cloud_api"
-SERVED_MODELS: Final[frozenset[str]] = frozenset({"glm-5.2", "glm-5.2:cloud"})
+SERVED_MODELS: Final[frozenset[str]] = frozenset((REQUESTED_WIRE_MODEL, REQUESTED_MODEL))
 ACCEPTED_STOP_REASONS: Final[frozenset[str]] = frozenset({"completed", "end_turn", "stop"})
 DEFAULT_PROVIDER_TIMEOUT_SECONDS: Final[float] = 600.0
 MAX_PROVIDER_RESPONSE_BYTES: Final[int] = 2 * 1024 * 1024
@@ -997,4 +997,4 @@ async def author_governed_patch(
         stop_reason=response.stop_reason,
     )
     return ProviderAuthorshipResult(receipt, candidate)
-__all__ = "ACCEPTED_STOP_REASONS DEFAULT_PROVIDER_TIMEOUT_SECONDS PROVIDER_AUTHORSHIP_SCHEMA PROVIDER_CALL_CLAIM_SCHEMA PROVIDER_CALL_LOCATOR_SCHEMA ProviderCallEvidenceState ProviderCallIndeterminateError ProviderAuthorshipReceipt ProviderAuthorshipResult ProviderSession ProviderUsage REQUESTED_MODEL REQUESTED_PROVIDER REQUESTED_TRANSPORT SERVED_MODELS author_governed_patch inspect_provider_call_evidence load_provider_authorship_receipt provider_call_id_for_request recover_provider_authorship_result verify_provider_authorship_receipt".split()
+__all__ = "ACCEPTED_STOP_REASONS DEFAULT_PROVIDER_TIMEOUT_SECONDS PROVIDER_AUTHORSHIP_SCHEMA PROVIDER_CALL_CLAIM_SCHEMA PROVIDER_CALL_LOCATOR_SCHEMA ProviderCallEvidenceState ProviderCallIndeterminateError ProviderAuthorshipReceipt ProviderAuthorshipResult ProviderSession ProviderUsage REQUESTED_MODEL REQUESTED_PROVIDER REQUESTED_TRANSPORT REQUESTED_WIRE_MODEL SERVED_MODELS author_governed_patch inspect_provider_call_evidence load_provider_authorship_receipt provider_call_id_for_request recover_provider_authorship_result verify_provider_authorship_receipt".split()

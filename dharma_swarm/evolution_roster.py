@@ -464,6 +464,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
     ),
     ModelSlot(
         ProviderType.OLLAMA,
+        "glm-5.2:cloud",
+        "GLM 5.2 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "long_context", "synthesis", "multilingual"),
+        1_000_000,
+        "Floor — same GLM-5.2 weights via the keyless Ollama Cloud route",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
         "minimax-m3:cloud",
         "MiniMax M3 (Ollama Cloud)",
         ModelTier.STRONG,

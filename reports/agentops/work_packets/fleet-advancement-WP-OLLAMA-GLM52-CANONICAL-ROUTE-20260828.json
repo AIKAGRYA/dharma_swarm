@@ -1,0 +1,104 @@
+{
+  "allowed_files": [
+    "dharma_swarm/evolution_roster.py",
+    "dharma_swarm/governed_patch_provider_authorship.py",
+    "dharma_swarm/model_pool.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-OLLAMA-GLM52-CANONICAL-ROUTE-20260828.json",
+    "scripts/runtime/governed_patch_provider.py",
+    "tests/test_governed_patch_provider.py",
+    "tests/test_model_pool.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "721f75abfbb5adcb88c09bd34f3a00b37bc9c41d",
+  "branch": "codex/ollama-glm52-canonical-route-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "feat(models): register Ollama GLM 5.2 route"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/governed_patch_responder.py",
+    "scripts/runtime/governed_patch_responder.py",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_model_pool.py tests/test_evolution_roster.py tests/test_governed_patch_provider.py tests/test_model_key_routing_guard.py::test_model_literals_do_not_escape_canonical_registries",
+      "expected_exit": 0,
+      "name": "ollama-glm52-canonical-route-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/evolution_roster.py dharma_swarm/governed_patch_provider_authorship.py dharma_swarm/model_pool.py scripts/runtime/governed_patch_provider.py tests/test_governed_patch_provider.py tests/test_model_pool.py",
+      "expected_exit": 0,
+      "name": "ollama-glm52-canonical-route-ruff",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "git diff --check 721f75abfbb5adcb88c09bd34f3a00b37bc9c41d",
+      "expected_exit": 0,
+      "name": "ollama-glm52-canonical-route-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-OLLAMA-GLM52-CANONICAL-ROUTE-20260828",
+  "intent": "Register the observed Ollama Cloud GLM 5.2 serving route in the canonical evolution roster so it groups with the existing direct Z.ai GLM 5.2 route as one logical model. Promote the existing exact provider-route lookup to a public fail-closed API, required_provider_model_id(logical_id, provider), so downstream governed provider authorship derives the logical, request-route, HTTP-wire, and accepted served model IDs from the model pool rather than duplicating literals. Preserve one source of routing truth and make absent logical entries or provider routes explicit AssertionError failures without changing any provider-wide default.",
+  "negative_controls": [
+    {
+      "command": "python3 -c 'from dharma_swarm.model_pool import required_provider_model_id; from dharma_swarm.models import ProviderType\nfor logical_id, provider in ((\"missing-logical-model\", ProviderType.OLLAMA), (\"glm-5.2\", ProviderType.CODEX)):\n    try:\n        required_provider_model_id(logical_id, provider)\n    except AssertionError:\n        pass\n    else:\n        raise AssertionError((logical_id, provider))'",
+      "expected_exit": 0,
+      "name": "required-provider-route-fails-closed",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/evolution_roster.py",
+      "dharma_swarm/governed_patch_provider_authorship.py",
+      "dharma_swarm/model_pool.py",
+      "scripts/runtime/governed_patch_provider.py",
+      "tests/test_governed_patch_provider.py",
+      "tests/test_model_pool.py"
+    ],
+    "collision": {
+      "checked_at_sha": "721f75abfbb5adcb88c09bd34f3a00b37bc9c41d",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This packet registers and projects one canonical provider route; it does not execute the governed responder or claim a live provider invocation.",
+      "Provider availability remains a runtime fact; roster membership is routing authority, not liveness evidence.",
+      "Merge still requires external human approval."
+    ],
+    "interface_mismatches": [
+      "The logical GLM 5.2 identity and its provider-specific IDs are distinct types in practice; downstream callers must request the exact provider route rather than treating a logical ID as an executable model ID.",
+      "A configured route does not prove that the provider endpoint is currently reachable."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "38020293bdd1b9c5330199c5477c51f7add316e8e67527a5a4f785f839036217",
+    "rollback": "Revert the canonical route/helper commit and this packet together; downstream callers must then stop requesting the removed Ollama route before rollback.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-OLLAMA-GLM52-CANONICAL-ROUTE-20260828"
+  },
+  "worktree": "."
+}

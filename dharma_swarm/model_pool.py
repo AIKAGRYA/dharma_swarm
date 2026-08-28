@@ -291,7 +291,8 @@ def entry_for_model_id(model_id: str) -> ModelEntry | None:
     return None
 
 
-def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
+def required_provider_model_id(logical_id: str, provider: ProviderType) -> str:
+    """Return one exact provider route, failing closed when it is absent."""
     entry = get_entry(logical_id)
     if entry is None:
         raise AssertionError(f"missing model-pool entry for {logical_id!r}")
@@ -303,9 +304,9 @@ def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
 
 FORGE_KIMI_CODE_MODEL_ID = default_for_provider(ProviderType.KIMI_CODE)
 FORGE_KIMI_K3_LOGICAL_ID = "kimi-k3"
-FORGE_KIMI_K3_OPENROUTER_MODEL_ID = _required_provider_route(FORGE_KIMI_K3_LOGICAL_ID, ProviderType.OPENROUTER)
-FORGE_NVIDIA_KIMI_MODEL_ID = _required_provider_route(K2_FLOOR_ID, ProviderType.NVIDIA_NIM)
-FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = _required_provider_route(
+FORGE_KIMI_K3_OPENROUTER_MODEL_ID = required_provider_model_id(FORGE_KIMI_K3_LOGICAL_ID, ProviderType.OPENROUTER)
+FORGE_NVIDIA_KIMI_MODEL_ID = required_provider_model_id(K2_FLOOR_ID, ProviderType.NVIDIA_NIM)
+FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = required_provider_model_id(
     "llama-3.3-70b-instruct",
     ProviderType.NVIDIA_NIM,
 )
@@ -484,6 +485,7 @@ __all__ = [
     "get_entry",
     "entry_for_model_id",
     "default_for_provider",
+    "required_provider_model_id",
     "FORGE_KIMI_CODE_MODEL_ID",
     "FORGE_KIMI_K3_LOGICAL_ID",
     "FORGE_KIMI_K3_OPENROUTER_MODEL_ID",
