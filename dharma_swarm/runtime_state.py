@@ -2071,12 +2071,12 @@ class RuntimeStateStore:
             ).fetchone()
         return _row_to_claim(row) if row is not None else None
 
-    def heartbeat_claim_sync(self, claim_id: str) -> TaskClaim | None:
+    def heartbeat_claim_sync(self, claim_id: str, now: datetime | None = None) -> TaskClaim | None:
         """Update heartbeat_at timestamp for a claim (sync)."""
         existing = self.get_task_claim_sync(claim_id)
         if existing is None:
             return None
-        now = _utc_now()
+        now = now or _utc_now()
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
@@ -4736,3 +4736,360 @@ _INDEXES.extend(
         "ON episode_event_outbox(episode_id, destination_id, acked_at, outbox_id)",
     )
 )
+
+
+class RuntimeReceiptConflictError(ValueError):
+    """A receipt ID is already bound to different immutable proof content."""
+
+
+class TerminalReceiptPersistenceError(RuntimeError):
+    """A terminal row and its typed receipt could not commit atomically."""
+
+
+class TerminalIdentityAuthorityError(RuntimeError):
+    """A row cannot terminalize because durable execution authority is absent."""
+
+
+async def _record_runtime_receipt_in_transaction(
+    db: aiosqlite.Connection,
+    receipt: RuntimeReceipt,
+) -> RuntimeReceipt:
+    """Insert immutable proof on an existing owner transaction."""
+    db.row_factory = aiosqlite.Row
+    row = await (
+        await db.execute(
+            "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, causation_id, parent_run_id, agent_id,"
+            " idempotency_key, side_effect_key, status, payload_json, created_at"
+            " FROM runtime_receipts WHERE receipt_id = ?",
+            (receipt.receipt_id,),
+        )
+    ).fetchone()
+    if row is not None:
+        try:
+            json.loads(str(row["payload_json"]))
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise RuntimeReceiptConflictError(
+                f"runtime receipt {receipt.receipt_id!r} conflicts on: payload"
+            ) from exc
+        existing = _row_to_runtime_receipt(row)
+        if existing == receipt:
+            return existing
+        fields = (
+            "receipt_type", "run_id", "task_id", "trace_id", "correlation_id",
+            "causation_id", "parent_run_id", "agent_id", "idempotency_key",
+            "side_effect_key", "status", "payload", "created_at",
+        )
+        conflicts = [name for name in fields if getattr(existing, name) != getattr(receipt, name)]
+        raise RuntimeReceiptConflictError(
+            f"runtime receipt {receipt.receipt_id!r} conflicts on: "
+            + ", ".join(conflicts)
+        )
+    sql, params = _runtime_receipt_insert(receipt)
+    await db.execute(sql.replace("INSERT OR REPLACE", "INSERT", 1), params)
+    return receipt
+
+
+RuntimeStateStore.record_runtime_receipt_in_transaction = staticmethod(
+    _record_runtime_receipt_in_transaction
+)
+
+
+def _runtime_authority_json(raw: Any) -> dict[str, Any]:
+    value = _json_load(raw, {})
+    return value if isinstance(value, dict) else {}
+
+
+def _runtime_authority_aware(value: datetime | None) -> datetime | None:
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+class RuntimeAuthorityReconcilerMixin:
+    """Authority overlay whose graph-specific policy hooks are injected by swarm."""
+
+    @staticmethod
+    def _record_reconcile_error(report: Any, subject: str, exc: Exception) -> None:
+        if isinstance(exc, TerminalIdentityAuthorityError):
+            report.errors.append(str(exc))
+        elif isinstance(exc, TerminalReceiptPersistenceError):
+            report.errors.append(f"{subject}:TerminalReceiptPersistenceError")
+        else:
+            report.errors.append(f"{subject}:{type(exc).__name__}")
+
+    async def reconcile(
+        self, *, now: datetime | None = None, stale_only: bool = False
+    ) -> Any:
+        return await self._runtime_authority_reconcile_impl(
+            self, now=now, stale_only=stale_only
+        )
+
+    async def _reconcile_run_row(
+        self,
+        db: aiosqlite.Connection,
+        row: aiosqlite.Row,
+        now: datetime,
+        report: Any,
+        *,
+        stale_only: bool = False,
+    ) -> None:
+        await self._runtime_authority_row_impl(
+            self, db, row, now, report, stale_only=stale_only
+        )
+
+    async def _complete_from_receipt(
+        self,
+        db: aiosqlite.Connection,
+        row: aiosqlite.Row,
+        claim_row: aiosqlite.Row | None,
+        receipt: dict[str, Any],
+        now: datetime,
+    ) -> tuple[str, str | None, str]:
+        run_status = "completed" if str(receipt.get("status", "")) == "ok" else "failed"
+        failure_code = (
+            "" if run_status == "completed"
+            else str(receipt.get("error_source") or "execution_error")
+        )
+        metadata = _runtime_authority_json(row["metadata_json"])
+        metadata.update(reconciled_at=now.isoformat(), reconciled_from_receipt=True)
+        await db.execute(
+            "UPDATE delegation_runs SET status = ?, failure_code = ?,"
+            " completed_at = ?, metadata_json = ? WHERE run_id = ?",
+            (run_status, failure_code, now.isoformat(), _json_dump(metadata), str(row["run_id"])),
+        )
+        claim_status = None
+        terminal = frozenset({"completed", "failed", "recovered", "cancelled"})
+        if claim_row is not None and str(claim_row["status"]) not in terminal:
+            metadata = _runtime_authority_json(claim_row["metadata_json"])
+            metadata["reconciled_from_receipt"] = True
+            await db.execute(
+                "UPDATE task_claims SET status = ?, recovered_at = ?,"
+                " metadata_json = ? WHERE claim_id = ?",
+                (run_status, now.isoformat(), _json_dump(metadata), str(claim_row["claim_id"])),
+            )
+            claim_status = run_status
+        return run_status, claim_status, failure_code
+
+    async def _requeue_run(
+        self,
+        db: aiosqlite.Connection,
+        row: aiosqlite.Row,
+        now: datetime,
+        failure_code: str,
+        retry_count: int,
+    ) -> None:
+        metadata = _runtime_authority_json(row["metadata_json"])
+        metadata.update(
+            reconciled_at=now.isoformat(), retry_count=retry_count,
+            last_failure_source=failure_code,
+        )
+        await db.execute(
+            "UPDATE delegation_runs SET status = 'failed', failure_code = ?,"
+            " completed_at = ?, metadata_json = ? WHERE run_id = ?",
+            (failure_code, now.isoformat(), _json_dump(metadata), str(row["run_id"])),
+        )
+
+    async def _fetch_claim(
+        self, db: aiosqlite.Connection, claim_id: str
+    ) -> aiosqlite.Row | None:
+        return await (
+            await db.execute(
+                "SELECT claim_id, session_id, task_id, status, acked_at, heartbeat_at,"
+                " agent_id, claimed_at, stale_after, recovered_at, retry_count,"
+                " metadata_json FROM task_claims WHERE claim_id = ?",
+                (claim_id,),
+            )
+        ).fetchone()
+
+    async def _load_terminal_identity(
+        self,
+        db: aiosqlite.Connection,
+        *,
+        subject: str,
+        run_id: str = "",
+        claim_id: str = "",
+        task_id: str = "",
+        agent_id: str = "",
+        session_id: str = "",
+    ) -> ExecutionIdentity:
+        clean_run_id = str(run_id or "").strip()
+        clean_claim_id = str(claim_id or "").strip()
+        if not clean_run_id and not clean_claim_id:
+            raise TerminalIdentityAuthorityError(
+                f"identity:{subject}:ambiguous:one selector is required"
+            )
+        column = "run_id" if clean_run_id else "claim_id"
+        value = clean_run_id or clean_claim_id
+        rows = await (
+            await db.execute(
+                "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
+                " idempotency_key, causation_id, parent_run_id, agent_id,"
+                " session_id, external_a2a_task_id, message_id, event_id,"
+                " artifact_id, proposal_id, metadata_json"
+                f" FROM execution_identities WHERE {column} = ?"
+                " ORDER BY updated_at DESC LIMIT 2",
+                (value,),
+            )
+        ).fetchall()
+        if len(rows) > 1:
+            raise TerminalIdentityAuthorityError(
+                f"identity:{subject}:ambiguous:multiple durable identities"
+            )
+        if not rows:
+            raise TerminalIdentityAuthorityError(
+                f"identity:{subject}:missing_execution_identity"
+            )
+        identity = _row_to_execution_identity(rows[0])
+        try:
+            identity.require_for_dispatch()
+        except MissingExecutionIdentity as exc:
+            raise TerminalIdentityAuthorityError(
+                f"identity:{subject}:incomplete:{exc}"
+            ) from exc
+        expected = dict(
+            run_id=run_id, claim_id=claim_id, task_id=task_id,
+            agent_id=agent_id, session_id=session_id,
+        )
+        mismatches = [
+            name for name, wanted in expected.items()
+            if wanted and str(getattr(identity, name, "") or "") != wanted
+        ]
+        if mismatches:
+            raise TerminalIdentityAuthorityError(
+                f"identity:{subject}:mismatch:{','.join(sorted(mismatches))}"
+            )
+        return identity
+
+    async def _insert_terminal_receipts(
+        self, db: aiosqlite.Connection, receipts: list[RuntimeReceipt]
+    ) -> None:
+        try:
+            for receipt in receipts:
+                await self._runtime_state.record_runtime_receipt_in_transaction(db, receipt)
+        except (aiosqlite.Error, RuntimeReceiptConflictError) as exc:
+            raise TerminalReceiptPersistenceError(
+                "terminal runtime receipt insert failed"
+            ) from exc
+
+    async def _persist_terminal_receipts(
+        self,
+        db: aiosqlite.Connection,
+        *,
+        row: aiosqlite.Row,
+        claim_row: aiosqlite.Row | None,
+        run_status: str,
+        claim_status: str | None,
+        reason: str,
+        failure_code: str,
+        now: datetime,
+    ) -> None:
+        run_id = str(row["run_id"])
+        claim_id = str(row["claim_id"] or "")
+        identity = await self._load_terminal_identity(
+            db, subject=run_id, run_id=run_id, claim_id=claim_id,
+            task_id=str(row["task_id"] or ""), agent_id=str(row["assigned_to"] or ""),
+            session_id=str(row["session_id"] or ""),
+        )
+        receipts = [self._runtime_state.build_runtime_receipt(
+            identity, receipt_id=f"rr_{identity.run_id}_{run_status}_run",
+            receipt_type="delegation_run", status=run_status,
+            payload={"claim_id": claim_id, "failure_code": failure_code,
+                     "reconciled": True, "reconciliation_reason": reason},
+            created_at=now,
+        )]
+        if claim_row is not None and claim_status is not None:
+            receipts.append(self._runtime_state.build_runtime_receipt(
+                identity, receipt_id=f"rr_{identity.run_id}_{claim_status}_claim",
+                receipt_type="task_claim", status=claim_status,
+                payload={"claim_id": str(claim_row["claim_id"]),
+                         "reconciled": True, "reconciliation_reason": reason},
+                created_at=now,
+            ))
+        await self._insert_terminal_receipts(db, receipts)
+
+    async def _persist_standalone_claim_receipt(
+        self, db: aiosqlite.Connection, *, claim_row: aiosqlite.Row,
+        reason: str, now: datetime,
+    ) -> None:
+        claim_id = str(claim_row["claim_id"])
+        identity = await self._load_terminal_identity(
+            db, subject=claim_id, claim_id=claim_id,
+            task_id=str(claim_row["task_id"] or ""),
+            agent_id=str(claim_row["agent_id"] or ""),
+            session_id=str(claim_row["session_id"] or ""),
+        )
+        receipt = self._runtime_state.build_runtime_receipt(
+            identity, receipt_id=f"rr_{identity.run_id}_recovered_claim",
+            receipt_type="task_claim", status="recovered",
+            payload={"claim_id": claim_id, "reconciled": True,
+                     "reconciliation_reason": reason}, created_at=now,
+        )
+        await self._insert_terminal_receipts(db, [receipt])
+
+    async def _recover_stale_claims(
+        self, db: aiosqlite.Connection, now: datetime, report: Any
+    ) -> None:
+        statuses = ("claimed", "running")
+        placeholders = ",".join("?" for _ in statuses)
+        rows = await (
+            await db.execute(
+                "SELECT tc.claim_id, tc.session_id, tc.task_id, tc.agent_id,"
+                " tc.claimed_at, heartbeat_at, stale_after, retry_count, metadata_json"
+                f" FROM task_claims AS tc WHERE tc.status IN ({placeholders})"
+                " AND tc.recovered_at IS NULL AND tc.stale_after IS NOT NULL"
+                " AND NOT EXISTS (SELECT 1 FROM delegation_runs AS dr"
+                " WHERE dr.claim_id = tc.claim_id"
+                f" AND dr.status IN ({placeholders})"
+                " AND (quarantined_at IS NULL OR quarantined_at = ''))",
+                (*statuses, *statuses),
+            )
+        ).fetchall()
+        for index, row in enumerate(rows):
+            if not self._claim_is_stale(row, now):
+                continue
+            claim_id = str(row["claim_id"])
+            savepoint = f"reconcile_claim_{index}"
+            await db.execute(f"SAVEPOINT {savepoint}")
+            try:
+                await self._stamp_claim_recovered(
+                    db, claim_id, now, retry_count=int(row["retry_count"]) + 1,
+                    recovery_reason="stale_after_expired",
+                )
+                await self._persist_standalone_claim_receipt(
+                    db, claim_row=row, reason="stale_after_expired", now=now
+                )
+                report.recovered_claims.append(claim_id)
+            except (
+                TerminalIdentityAuthorityError, TerminalReceiptPersistenceError,
+                aiosqlite.Error, ValueError,
+            ) as exc:
+                await db.execute(f"ROLLBACK TO {savepoint}")
+                await db.execute(f"RELEASE {savepoint}")
+                self._record_reconcile_error(report, f"claim:{claim_id}", exc)
+            else:
+                await db.execute(f"RELEASE {savepoint}")
+
+    def heartbeat_live_claims(
+        self, live_claim_ids: Any = None, *, now: datetime | None = None
+    ) -> int:
+        now = _runtime_authority_aware(now or _utc_now())
+        authorized = sorted({str(value).strip() for value in live_claim_ids or () if str(value).strip()})
+        beaten = 0
+        for claim_id in authorized:
+            claim = self._runtime_state.get_task_claim_sync(claim_id)
+            if claim is None or claim.status not in {"claimed", "running"} or claim.recovered_at:
+                continue
+            claimed_at = _runtime_authority_aware(claim.claimed_at)
+            stale_after = _runtime_authority_aware(claim.stale_after)
+            heartbeat_at = _runtime_authority_aware(claim.heartbeat_at)
+            window = (
+                max((stale_after - claimed_at).total_seconds() / 3.0, 1.0)
+                if claimed_at is not None and stale_after is not None else self._default_heartbeat_window
+            )
+            last = heartbeat_at or claimed_at
+            if last is not None and (now - last).total_seconds() < window:
+                continue
+            if self._runtime_state.heartbeat_claim_sync(claim_id, now=now) is not None:
+                beaten += 1
+        return beaten

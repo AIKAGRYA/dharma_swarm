@@ -1,0 +1,119 @@
+{
+  "id": "fleet-advancement-WP-RUNTIME-AUTHORITY-RECOVERY-20260828",
+  "base_ref": "fd091613ce16e63a367392cc1200d4fa4b4cdbf6",
+  "branch": "codex/organism-rewire-runtime-authority-20260828",
+  "worktree": ".",
+  "intent": "Repair the live-release runtime authority boundary after a deterministic split-brain: persisted in-flight claims must not renew their own leases; prior-incarnation rows must reconcile before any fast/read-only boot return; orphan recovery must persist typed terminal receipts when complete execution identity exists; and the dgc health verdict must constrain its process exit code instead of printing failure while authorizing downstream success.",
+  "allowed_files": [
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/graph/reconciler.py",
+    "dharma_swarm/graph/reconcile_board.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/terminal_commands/diagnostics.py",
+    "dharma_swarm/dgc_cli.py",
+    "tests/test_graph_reconciler.py",
+    "tests/test_orphan_reaper.py",
+    "tests/test_runtime_state.py",
+    "tests/test_dgc_cli.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-RUNTIME-AUTHORITY-RECOVERY-20260828.json"
+  ],
+  "forbidden_files": [
+    "deploy/sadhana/**",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "dashboard/src/app/dashboard/sadhana/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/forge_lab/**",
+    "tests/forge_lab_v1/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**",
+    "tests/test_foundry_*.py",
+    "docs/foundry/**"
+  ],
+  "gates": [
+    {
+      "name": "runtime-authority-contracts",
+      "command": "python3 -m pytest -q tests/test_graph_reconciler.py tests/test_orphan_reaper.py tests/test_runtime_state.py tests/test_runtime_lifecycle.py tests/test_dgc_cli.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "runtime-authority-ruff",
+      "command": "python3 -m ruff check dharma_swarm/swarm.py dharma_swarm/graph/reconciler.py dharma_swarm/graph/reconcile_board.py dharma_swarm/runtime_state.py dharma_swarm/terminal_commands/diagnostics.py dharma_swarm/dgc_cli.py tests/test_graph_reconciler.py tests/test_orphan_reaper.py tests/test_runtime_state.py tests/test_dgc_cli.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check fd091613ce16e63a367392cc1200d4fa4b4cdbf6...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "persisted-claim-cannot-self-authorize-heartbeat",
+      "command": "python3 -m pytest -q tests/test_graph_reconciler.py -k heartbeat_requires_explicit_live_claim_authority",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "failed-health-cannot-exit-success",
+      "command": "python3 -m pytest -q tests/test_dgc_cli.py -k health_check_exit_code",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(runtime): bind heartbeat and health authority"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-RUNTIME-AUTHORITY-RECOVERY-20260828",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "fd091613ce16e63a367392cc1200d4fa4b4cdbf6",
+      "details": []
+    },
+    "interface_mismatches": [
+      "RuntimeStateStore persists claims and runs across process boots, while heartbeat authority exists only in the current process and cannot be inferred from an in-flight database status.",
+      "DHARMA_READ_ONLY_BOOT skips initialization writes but the production orchestrate-live loop still mutates TaskBoard and RuntimeStateStore; mandatory prior-incarnation reconciliation must therefore precede that shortcut.",
+      "TaskBoard requeue and RuntimeState terminalization are separate projections; recovery receipts must preserve execution identity and remain distinct from process liveness.",
+      "HealthStatus is a typed operational verdict, but the CLI currently erases it into exit code zero, allowing downstream automation to promote degraded or critical state into success."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/graph/reconciler.py:GraphReconciler",
+      "dharma_swarm/runtime_lifecycle.py:RuntimeLifecycle",
+      "dharma_swarm/runtime_state.py:RuntimeStateStore",
+      "dharma_swarm/terminal_commands/diagnostics.py:cmd_health_check"
+    ],
+    "honest_blockers": [
+      "The immutable live release is repaired in an isolated branch because the canonical feature checkout contains unrelated user changes and is not a safe edit surface.",
+      "A terminal recovery receipt proves a bounded local state transition, not successful external work, executor liveness, or semantic task completion.",
+      "Legacy rows without a complete ExecutionIdentity cannot receive an authority-bearing terminal receipt; reconciliation must remain fail-closed and report that evidence gap.",
+      "Repository tests do not prove launchd restart health, remote SSH reachability, Slack delivery, or one end-to-end model task; those are separately verified operational steps."
+    ],
+    "rollback": "Stop the repaired runtime, restore the checksum-verified runtime/tasks database backups and launch configuration from /Users/dhyana/.dharma/recovery/runtime-authority-20260828T051502Z, and revert the packet-scoped implementation commit. Do not overwrite the dirty canonical checkout.",
+    "packet_digest": "da7f211d195a52a6be2064282b03ffed18fccd6abe8a892c735f5afb105f23f2"
+  }
+}

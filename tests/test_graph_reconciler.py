@@ -8,24 +8,112 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 from uuid import uuid4
 
 import aiosqlite
 import pytest
 
+# AgentOps negative controls intentionally run without project site-packages.
+# This file exercises reconciler behavior, not icontract itself, so provide the
+# decorator surface needed by the eagerly imported telos_kernel package when
+# that otherwise-required dependency is absent from the isolated control jail.
+try:
+    import icontract  # noqa: F401
+except ModuleNotFoundError:
+    icontract_stub = ModuleType("icontract")
+
+    def _passthrough_contract(*args, **kwargs):
+        del args, kwargs
+
+        def decorate(function):
+            return function
+
+        return decorate
+
+    icontract_stub.ensure = _passthrough_contract
+    icontract_stub.require = _passthrough_contract
+    sys.modules["icontract"] = icontract_stub
+
 from dharma_swarm.graph.reconciler import (
     FAILURE_CODE_DIED_MID_DISPATCH,
     FAILURE_CODE_NEVER_STARTED,
     QUARANTINE_REASON,
-    GraphReconciler,
     ReconcileReport,
 )
 from dharma_swarm.graph.receipt_authority import has_runtime_completion
-from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.runtime_state import (
+    RuntimeAuthorityReconcilerMixin,
+    RuntimeReceipt,
+    RuntimeStateStore,
+)
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 NOW = datetime(2026, 7, 5, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def GraphReconciler(*args, **kwargs):
+    from dharma_swarm.swarm import build_runtime_authority_reconciler
+
+    return build_runtime_authority_reconciler(*args, **kwargs)
+
+
+def test_runtime_authority_reconciler_factory_precedes_frozen_graph(runtime):
+    from dharma_swarm.graph.reconciler import GraphReconciler as FrozenGraphReconciler
+    from dharma_swarm.swarm import (
+        build_runtime_authority_reconciler,
+        get_runtime_authority_reconciler_type,
+    )
+
+    reconciler_type = get_runtime_authority_reconciler_type()
+    assert get_runtime_authority_reconciler_type() is reconciler_type
+    assert reconciler_type.__bases__ == (
+        RuntimeAuthorityReconcilerMixin,
+        FrozenGraphReconciler,
+    )
+    for method_name in (
+        "reconcile",
+        "_reconcile_run_row",
+        "_complete_from_receipt",
+        "_requeue_run",
+        "_fetch_claim",
+        "_recover_stale_claims",
+        "heartbeat_live_claims",
+    ):
+        assert getattr(reconciler_type, method_name) is getattr(
+            RuntimeAuthorityReconcilerMixin, method_name
+        )
+    reconciler = build_runtime_authority_reconciler(runtime)
+    assert type(reconciler) is reconciler_type
+    assert isinstance(reconciler, FrozenGraphReconciler)
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        "import dharma_swarm.runtime_state; import dharma_swarm.graph.reconciler",
+        "import dharma_swarm.graph.reconciler; import dharma_swarm.runtime_state",
+        "import dharma_swarm.swarm",
+    ),
+)
+def test_runtime_authority_reconciler_import_order_is_cycle_free(imports):
+    code = (
+        f"{imports}; "
+        "from dharma_swarm.swarm import get_runtime_authority_reconciler_type; "
+        "assert get_runtime_authority_reconciler_type() is "
+        "get_runtime_authority_reconciler_type()"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 @pytest.fixture
@@ -33,6 +121,28 @@ def runtime(tmp_path: Path) -> RuntimeStateStore:
     store = RuntimeStateStore(tmp_path / "runtime.db")
     store.init_db_sync()
     return store
+
+
+def _record_identity(
+    store: RuntimeStateStore,
+    *,
+    run_id: str,
+    claim_id: str,
+    task_id: str = "task-1",
+    agent_id: str = "agent-1",
+    session_id: str = "",
+) -> ExecutionIdentity:
+    identity = ExecutionIdentity(
+        trace_id=f"trace-{run_id}",
+        correlation_id=f"corr-{run_id}",
+        task_id=task_id,
+        run_id=run_id,
+        claim_id=claim_id,
+        idempotency_key=f"idem-{run_id}",
+        agent_id=agent_id,
+        session_id=session_id,
+    )
+    return store.record_execution_identity_sync(identity)
 
 
 def _insert_run(
@@ -46,6 +156,7 @@ def _insert_run(
     metadata: dict | None = None,
     quarantined_at: str | None = None,
     assigned_to: str = "agent-1",
+    with_identity: bool = True,
 ) -> None:
     with sqlite3.connect(store.db_path) as db:
         try:
@@ -70,6 +181,18 @@ def _insert_run(
             ),
         )
         db.commit()
+    if (
+        with_identity
+        and claim_id
+        and store.get_execution_identity_sync(run_id) is None
+    ):
+        _record_identity(
+            store,
+            run_id=run_id,
+            claim_id=claim_id,
+            task_id=task_id,
+            agent_id=assigned_to,
+        )
 
 
 def _insert_claim(
@@ -85,6 +208,7 @@ def _insert_claim(
     recovered_at: str | None = None,
     retry_count: int = 0,
     agent_id: str = "agent-1",
+    with_identity: bool = True,
 ) -> None:
     with sqlite3.connect(store.db_path) as db:
         db.execute(
@@ -105,6 +229,20 @@ def _insert_claim(
             ),
         )
         db.commit()
+    if with_identity:
+        with sqlite3.connect(store.db_path) as db:
+            identity_exists = db.execute(
+                "SELECT 1 FROM execution_identities WHERE claim_id = ? LIMIT 1",
+                (claim_id,),
+            ).fetchone()
+        if identity_exists is None:
+            _record_identity(
+                store,
+                run_id=f"run-for-{claim_id}",
+                claim_id=claim_id,
+                task_id=task_id,
+                agent_id=agent_id,
+            )
 
 
 def _bound_receipt(
@@ -171,6 +309,17 @@ def _get_claim(store: RuntimeStateStore, claim_id: str) -> sqlite3.Row:
         ).fetchone()
 
 
+def _get_runtime_receipts(
+    store: RuntimeStateStore, run_id: str
+) -> list[sqlite3.Row]:
+    with sqlite3.connect(store.db_path) as db:
+        db.row_factory = sqlite3.Row
+        return db.execute(
+            "SELECT * FROM runtime_receipts WHERE run_id = ? ORDER BY receipt_id",
+            (run_id,),
+        ).fetchall()
+
+
 # ---------------------------------------------------------------------------
 # Classification
 # ---------------------------------------------------------------------------
@@ -214,6 +363,225 @@ async def test_started_and_died_with_retries_left_requeued(runtime):
     assert claim["recovered_at"] == NOW.isoformat()
 
 
+async def test_recovery_writes_deterministic_typed_terminal_receipts(runtime):
+    _record_identity(runtime, run_id="run-typed", claim_id="claim-typed")
+    _insert_run(runtime, "run-typed", status="running", claim_id="claim-typed")
+    _insert_claim(
+        runtime,
+        "claim-typed",
+        status="running",
+        acked_at=(NOW - timedelta(minutes=9)).isoformat(),
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.errors == []
+    receipts = _get_runtime_receipts(runtime, "run-typed")
+    assert [row["receipt_id"] for row in receipts] == [
+        "rr_run-typed_failed_run",
+        "rr_run-typed_recovered_claim",
+    ]
+    assert [(row["receipt_type"], row["status"]) for row in receipts] == [
+        ("delegation_run", "failed"),
+        ("task_claim", "recovered"),
+    ]
+    assert all(row["trace_id"] == "trace-run-typed" for row in receipts)
+    assert all(row["created_at"] == NOW.isoformat() for row in receipts)
+
+
+async def test_terminal_row_updates_roll_back_if_receipt_insert_fails(
+    runtime, monkeypatch
+):
+    _record_identity(runtime, run_id="run-atomic", claim_id="claim-atomic")
+    _insert_run(runtime, "run-atomic", status="running", claim_id="claim-atomic")
+    _insert_claim(runtime, "claim-atomic", status="running")
+
+    async def fail_receipt_insert(db, receipt):
+        raise aiosqlite.OperationalError("fixture receipt failure")
+
+    monkeypatch.setattr(
+        runtime,
+        "record_runtime_receipt_in_transaction",
+        fail_receipt_insert,
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.requeued_runs == []
+    assert report.recovered_claims == []
+    assert report.errors == ["run:run-atomic:TerminalReceiptPersistenceError"]
+    assert _get_run(runtime, "run-atomic")["status"] == "running"
+    assert _get_claim(runtime, "claim-atomic")["status"] == "running"
+    assert _get_runtime_receipts(runtime, "run-atomic") == []
+
+
+async def test_conflicting_terminal_receipt_is_preserved_and_rolls_back(runtime):
+    identity = _record_identity(
+        runtime,
+        run_id="run-proof-collision",
+        claim_id="claim-proof-collision",
+    )
+    _insert_run(
+        runtime,
+        "run-proof-collision",
+        status="running",
+        claim_id="claim-proof-collision",
+    )
+    _insert_claim(runtime, "claim-proof-collision", status="running")
+    prior_proof = runtime.build_runtime_receipt(
+        identity,
+        receipt_id="rr_run-proof-collision_failed_run",
+        receipt_type="delegation_run",
+        status="completed",
+        side_effect_key="prior-proof",
+        payload={"proof": "must-not-be-replaced"},
+        created_at=NOW,
+    )
+    runtime.record_runtime_receipt_sync(prior_proof)
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.requeued_runs == []
+    assert report.recovered_claims == []
+    assert report.errors == [
+        "run:run-proof-collision:TerminalReceiptPersistenceError"
+    ]
+    assert _get_run(runtime, "run-proof-collision")["status"] == "running"
+    assert _get_claim(runtime, "claim-proof-collision")["status"] == "running"
+    receipts = _get_runtime_receipts(runtime, "run-proof-collision")
+    assert len(receipts) == 1
+    assert receipts[0]["status"] == "completed"
+    assert receipts[0]["side_effect_key"] == "prior-proof"
+    assert json.loads(receipts[0]["payload_json"]) == {
+        "proof": "must-not-be-replaced"
+    }
+
+
+async def test_exact_terminal_receipt_replay_is_idempotent(runtime):
+    identity = _record_identity(
+        runtime,
+        run_id="run-proof-replay",
+        claim_id="claim-proof-replay",
+    )
+    _insert_run(
+        runtime,
+        "run-proof-replay",
+        status="running",
+        claim_id="claim-proof-replay",
+    )
+    _insert_claim(runtime, "claim-proof-replay", status="running")
+    exact_receipts: list[RuntimeReceipt] = [
+        runtime.build_runtime_receipt(
+            identity,
+            receipt_id="rr_run-proof-replay_failed_run",
+            receipt_type="delegation_run",
+            status="failed",
+            payload={
+                "claim_id": "claim-proof-replay",
+                "failure_code": FAILURE_CODE_NEVER_STARTED,
+                "reconciled": True,
+                "reconciliation_reason": FAILURE_CODE_NEVER_STARTED,
+            },
+            created_at=NOW,
+        ),
+        runtime.build_runtime_receipt(
+            identity,
+            receipt_id="rr_run-proof-replay_recovered_claim",
+            receipt_type="task_claim",
+            status="recovered",
+            payload={
+                "claim_id": "claim-proof-replay",
+                "reconciled": True,
+                "reconciliation_reason": FAILURE_CODE_NEVER_STARTED,
+            },
+            created_at=NOW,
+        ),
+    ]
+    for receipt in exact_receipts:
+        runtime.record_runtime_receipt_sync(receipt)
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.errors == []
+    assert report.requeued_runs == ["run-proof-replay"]
+    assert report.recovered_claims == ["claim-proof-replay"]
+    receipts = _get_runtime_receipts(runtime, "run-proof-replay")
+    assert len(receipts) == 2
+    assert {row["receipt_id"] for row in receipts} == {
+        receipt.receipt_id for receipt in exact_receipts
+    }
+
+
+async def test_incomplete_legacy_identity_reports_error_without_receipt(runtime):
+    with sqlite3.connect(runtime.db_path) as db:
+        db.execute(
+            "INSERT INTO execution_identities (run_id, trace_id, correlation_id,"
+            " task_id, claim_id, idempotency_key, agent_id, metadata_json,"
+            " created_at, updated_at) VALUES (?, '', '', ?, ?, '', ?, '{}', ?, ?)",
+            (
+                "run-legacy",
+                "task-1",
+                "claim-legacy",
+                "agent-1",
+                NOW.isoformat(),
+                NOW.isoformat(),
+            ),
+        )
+        db.commit()
+    _insert_run(
+        runtime,
+        "run-legacy",
+        status="running",
+        claim_id="claim-legacy",
+        with_identity=False,
+    )
+    _insert_claim(
+        runtime,
+        "claim-legacy",
+        status="running",
+        with_identity=False,
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.requeued_runs == []
+    assert report.recovered_claims == []
+    assert any(
+        error.startswith("identity:run-legacy:incomplete:")
+        for error in report.errors
+    )
+    assert _get_run(runtime, "run-legacy")["status"] == "running"
+    assert _get_claim(runtime, "claim-legacy")["status"] == "running"
+    assert _get_runtime_receipts(runtime, "run-legacy") == []
+
+
+async def test_missing_execution_identity_rolls_back_and_reports_error(runtime):
+    _insert_run(
+        runtime,
+        "run-missing-identity",
+        status="running",
+        claim_id="claim-missing-identity",
+        with_identity=False,
+    )
+    _insert_claim(
+        runtime,
+        "claim-missing-identity",
+        status="running",
+        with_identity=False,
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.requeued_runs == []
+    assert report.recovered_claims == []
+    assert report.errors == [
+        "identity:run-missing-identity:missing_execution_identity"
+    ]
+    assert _get_run(runtime, "run-missing-identity")["status"] == "running"
+    assert _get_claim(runtime, "claim-missing-identity")["status"] == "running"
+    assert _get_runtime_receipts(runtime, "run-missing-identity") == []
+
+
 async def test_retry_exhausted_orphan_quarantined(runtime):
     _insert_run(runtime, "run-exh", status="running", claim_id="claim-exh")
     _insert_claim(
@@ -242,6 +610,7 @@ async def test_retry_exhausted_orphan_quarantined(runtime):
 
 
 async def test_torn_window_completes_run_and_claim_from_receipt(runtime):
+    _record_identity(runtime, run_id="run-torn", claim_id="claim-torn")
     receipt = _bound_receipt(runtime, run_id="run-torn", claim_id="claim-torn")
     _insert_run(
         runtime,
@@ -267,6 +636,11 @@ async def test_torn_window_completes_run_and_claim_from_receipt(runtime):
     claim = _get_claim(runtime, "claim-torn")
     assert claim["status"] == "completed"
     assert claim["recovered_at"] == NOW.isoformat()
+    typed = _get_runtime_receipts(runtime, "run-torn")
+    assert [(row["receipt_type"], row["status"]) for row in typed] == [
+        ("task_claim", "completed"),
+        ("delegation_run", "completed"),
+    ]
 
 
 async def test_torn_window_failed_receipt_marks_failed(runtime):
@@ -649,6 +1023,59 @@ async def test_stale_claim_with_z_suffix_recovered(runtime):
     assert claim["recovered_at"] == NOW.isoformat()
 
 
+async def test_standalone_stale_claim_rolls_back_if_receipt_insert_fails(
+    runtime, monkeypatch
+):
+    _insert_claim(
+        runtime,
+        "claim-atomic-standalone",
+        status="claimed",
+        stale_after=(NOW - timedelta(minutes=5)).isoformat(),
+    )
+
+    async def fail_receipt_insert(db, receipt):
+        raise aiosqlite.OperationalError("fixture standalone receipt failure")
+
+    monkeypatch.setattr(
+        runtime,
+        "record_runtime_receipt_in_transaction",
+        fail_receipt_insert,
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.recovered_claims == []
+    assert report.errors == [
+        "claim:claim-atomic-standalone:TerminalReceiptPersistenceError"
+    ]
+    claim = _get_claim(runtime, "claim-atomic-standalone")
+    assert claim["status"] == "claimed"
+    assert claim["recovered_at"] is None
+    assert _get_runtime_receipts(runtime, "run-for-claim-atomic-standalone") == []
+
+
+@pytest.mark.parametrize("legacy_status", ["assigned", "active"])
+async def test_legacy_claim_status_is_outside_graph_reconciler(
+    runtime, legacy_status
+):
+    claim_id = f"claim-legacy-{legacy_status}"
+    _insert_claim(
+        runtime,
+        claim_id,
+        status=legacy_status,
+        stale_after=(NOW - timedelta(minutes=5)).isoformat(),
+        with_identity=False,
+    )
+
+    report = await GraphReconciler(runtime).reconcile(now=NOW)
+
+    assert report.recovered_claims == []
+    assert report.errors == []
+    claim = _get_claim(runtime, claim_id)
+    assert claim["status"] == legacy_status
+    assert claim["recovered_at"] is None
+
+
 async def test_unexpired_claim_not_recovered(runtime):
     stale = (NOW + timedelta(minutes=30)).isoformat()
     _insert_claim(runtime, "claim-fresh", status="claimed", stale_after=stale)
@@ -783,6 +1210,54 @@ async def test_requeued_run_requeues_task_on_board(runtime):
     assert board.requeued == ["task-b"]
 
 
+async def test_persisted_heartbeat_cannot_leave_board_pending_graph_active(
+    runtime, tmp_path: Path
+):
+    """Regression for heartbeat -> board requeue -> active-run split brain."""
+    from dharma_swarm.models import TaskStatus
+    from dharma_swarm.task_board import TaskBoard
+
+    board = TaskBoard(tmp_path / "split-tasks.db")
+    await board.init_db()
+    task = await board.create("prior-process orphan")
+    async with board._open() as db:
+        await db.execute(
+            "UPDATE tasks SET status = 'running', assigned_to = 'agent-1',"
+            " updated_at = ? WHERE id = ?",
+            ((NOW - timedelta(hours=1)).isoformat(), task.id),
+        )
+        await db.commit()
+
+    original_heartbeat = (NOW - timedelta(minutes=20)).isoformat()
+    _insert_run(
+        runtime,
+        "run-split",
+        status="running",
+        claim_id="claim-split",
+        task_id=task.id,
+    )
+    _insert_claim(
+        runtime,
+        "claim-split",
+        status="running",
+        task_id=task.id,
+        acked_at=(NOW - timedelta(minutes=20)).isoformat(),
+        heartbeat_at=original_heartbeat,
+        stale_after=(NOW - timedelta(minutes=5)).isoformat(),
+    )
+    reconciler = GraphReconciler(runtime, task_board=board)
+
+    assert reconciler.heartbeat_live_claims(now=NOW) == 0
+    report = await reconciler.reconcile(now=NOW, stale_only=True)
+
+    assert report.requeued_runs == ["run-split"]
+    assert _get_run(runtime, "run-split")["status"] == "failed"
+    assert _get_claim(runtime, "claim-split")["status"] == "recovered"
+    refreshed = await board.get(task.id)
+    assert refreshed is not None
+    assert refreshed.status == TaskStatus.PENDING
+
+
 async def test_terminal_reconciliations_settle_task_board(runtime):
     board = _StubBoard()
     receipt = _bound_receipt(
@@ -842,7 +1317,6 @@ async def test_heartbeated_claim_past_stale_after_not_stale(runtime):
 
 
 def test_heartbeat_live_claims_beats_due_claims(runtime):
-    claimed = NOW - timedelta(minutes=10)
     stale = NOW + timedelta(minutes=20)  # window = 10 min
     _insert_claim(
         runtime,
@@ -866,13 +1340,56 @@ def test_heartbeat_live_claims_beats_due_claims(runtime):
         recovered_at=NOW.isoformat(),
     )
 
-    beaten = GraphReconciler(runtime).heartbeat_live_claims(now=NOW)
+    beaten = GraphReconciler(runtime).heartbeat_live_claims(
+        {"claim-due", "claim-recent", "claim-recovered"},
+        now=NOW,
+    )
 
     assert beaten == 1
     due = _get_claim(runtime, "claim-due")
     assert due["heartbeat_at"] != (NOW - timedelta(minutes=11)).isoformat()
     recent = _get_claim(runtime, "claim-recent")
     assert recent["heartbeat_at"] == (NOW - timedelta(seconds=10)).isoformat()
+
+
+def test_heartbeat_requires_explicit_live_claim_authority(runtime):
+    original_heartbeat = (NOW - timedelta(minutes=11)).isoformat()
+    _insert_claim(
+        runtime,
+        "claim-persisted-only",
+        status="running",
+        stale_after=(NOW + timedelta(minutes=20)).isoformat(),
+        heartbeat_at=original_heartbeat,
+    )
+
+    beaten = GraphReconciler(runtime).heartbeat_live_claims(now=NOW)
+
+    assert beaten == 0
+    assert _get_claim(runtime, "claim-persisted-only")["heartbeat_at"] == original_heartbeat
+
+
+def test_heartbeat_live_claims_updates_only_explicit_live_subset(runtime):
+    original_heartbeat = (NOW - timedelta(minutes=11)).isoformat()
+    for claim_id in ("claim-live-local", "claim-orphan-other-boot"):
+        _insert_claim(
+            runtime,
+            claim_id,
+            status="running",
+            stale_after=(NOW + timedelta(minutes=20)).isoformat(),
+            heartbeat_at=original_heartbeat,
+        )
+
+    beaten = GraphReconciler(runtime).heartbeat_live_claims(
+        {"claim-live-local"},
+        now=NOW,
+    )
+
+    assert beaten == 1
+    assert _get_claim(runtime, "claim-live-local")["heartbeat_at"] == NOW.isoformat()
+    assert (
+        _get_claim(runtime, "claim-orphan-other-boot")["heartbeat_at"]
+        == original_heartbeat
+    )
 
 
 def test_reconcile_report_summary_shape():
@@ -901,6 +1418,51 @@ def test_init_reconciles_before_stale_reaper_source_order():
     assert src.index("reconcile_graph_runs") < src.index("_reap_stale_running_tasks"), (
         "boot reconcile must run before the stale-task reaper"
     )
+    assert src.index("reconcile_graph_runs") < src.index("if self._read_only_boot"), (
+        "read-only boot must still reconcile prior-process graph rows"
+    )
+    assert "boot_graph_reconcile_succeeded = not boot_report.errors" in src
+    assert src.index("if boot_graph_reconcile_succeeded") < src.index(
+        "reaped = await self._reap_stale_running_tasks()"
+    )
+
+
+def test_tick_reconciles_graph_before_board_orphan_reaper_source_order():
+    import inspect
+
+    from dharma_swarm.swarm import SwarmManager
+
+    src = inspect.getsource(SwarmManager.tick)
+    assert src.index("reconcile_graph_runs(stale_only=True)") < src.index(
+        "self.reap_orphaned_tasks()"
+    )
+    assert "graph_reconcile_succeeded = not tick_report.errors" in src
+    assert "graph_reconcile_not_confirmed" in src
+
+
+async def test_live_claim_authority_survives_active_dispatch_cleanup(tmp_path: Path):
+    """A running task retains explicit claim identity during terminal writes."""
+    from dharma_swarm.swarm import SwarmManager
+
+    class StableClaimBoard:
+        async def get(self, task_id):
+            assert task_id == "task-terminal-window"
+            return SimpleNamespace(
+                metadata={"last_claim": {"claim_id": "claim-terminal-window"}}
+            )
+
+    background = SimpleNamespace(done=lambda: False)
+    orchestrator = SimpleNamespace(
+        _running_tasks={"task-terminal-window": background},
+        _active_dispatches={},
+    )
+    manager = SwarmManager(state_dir=tmp_path / ".dharma")
+    manager._task_board = StableClaimBoard()
+    manager._orchestrator = orchestrator
+
+    assert await manager._current_process_live_claim_ids() == {
+        "claim-terminal-window"
+    }
 
 
 async def test_boot_sequence_receipted_crash_task_ends_completed(
