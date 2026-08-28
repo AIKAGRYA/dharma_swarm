@@ -21,7 +21,6 @@ HOTPATH_FILES: frozenset[str] = frozenset({
     "dharma_swarm/agent_runner.py",
     "dharma_swarm/persistent_agent.py",
     "dharma_swarm/providers.py",
-    "dharma_swarm/frontier_council.py",
     "dharma_swarm/dgc_cli.py",
     # Governance / kernel
     "dharma_swarm/dharma_kernel.py",
