@@ -3,8 +3,30 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import sys
+from types import ModuleType
 
 import pytest
+
+# This test exercises runtime reconciliation, not telos-kernel contracts. The
+# isolated AgentOps negative-control jail intentionally omits optional
+# site-packages, so provide only the decorator surface imported by that kernel.
+try:
+    import icontract  # noqa: F401
+except ModuleNotFoundError:
+    icontract_stub = ModuleType("icontract")
+
+    def _passthrough_contract(*args, **kwargs):
+        del args, kwargs
+
+        def decorate(function):
+            return function
+
+        return decorate
+
+    icontract_stub.ensure = _passthrough_contract
+    icontract_stub.require = _passthrough_contract
+    sys.modules["icontract"] = icontract_stub
 
 from dharma_swarm.message_bus import MessageBus
 from dharma_swarm.operator_bridge import OperatorBridge
