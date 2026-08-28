@@ -22,8 +22,6 @@ from typing import Any
 
 import aiosqlite
 
-logger = logging.getLogger(__name__)
-
 from dharma_swarm.message_bus import MessageBus
 from dharma_swarm.models import Message, MessagePriority, _new_id
 from dharma_swarm.runtime_state import (
@@ -35,6 +33,7 @@ from dharma_swarm.runtime_state import (
     TaskClaim,
 )
 from dharma_swarm.session_ledger import SessionLedger
+from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.telemetry_plane import (
     AgentIdentityRecord,
     ExternalOutcomeRecord,
@@ -42,6 +41,8 @@ from dharma_swarm.telemetry_plane import (
     TelemetryPlaneStore,
     WorkflowScoreRecord,
 )
+
+logger = logging.getLogger(__name__)
 
 BRIDGE_STATUS_QUEUED = "queued"
 BRIDGE_STATUS_IN_PROGRESS = "in_progress"
@@ -1094,21 +1095,103 @@ class OperatorBridge:
 
         metadata = dict(task.metadata)
         changed = False
+        try:
+            attempt_retry_count = int(metadata.get("runtime_attempt_retry_count", -1))
+        except (TypeError, ValueError):
+            attempt_retry_count = -1
         claim_id = str(metadata.get("runtime_claim_id", "") or "")
+        run_id = str(metadata.get("runtime_run_id", "") or "")
+        parent_run_id = str(metadata.get("runtime_parent_run_id", "") or "")
+        if (claim_id or run_id) and attempt_retry_count != task.retry_count:
+            parent_run_id = run_id
+            claim_id = ""
+            run_id = ""
+            metadata["runtime_parent_run_id"] = parent_run_id
+            changed = True
         if not claim_id:
             claim_id = self._runtime_state.new_claim_id()
             metadata["runtime_claim_id"] = claim_id
             changed = True
-        run_id = str(metadata.get("runtime_run_id", "") or "")
         if not run_id:
             run_id = self._runtime_state.new_run_id()
             metadata["runtime_run_id"] = run_id
+            changed = True
+        if attempt_retry_count != task.retry_count:
+            metadata["runtime_attempt_retry_count"] = task.retry_count
+            changed = True
+
+        agent_id = task.claimed_by or self.bridge_agent_id
+        identity = await self._runtime_state.get_execution_identity(run_id)
+        if identity is None:
+            metadata_identity = ExecutionIdentity.from_metadata(
+                metadata,
+                task_id=task.id,
+                agent_id=agent_id,
+                session_id=self._ledger.session_id,
+            )
+            if (
+                metadata_identity is not None
+                and metadata_identity.run_id == run_id
+                and metadata_identity.claim_id == claim_id
+                and metadata_identity.agent_id == agent_id
+                and metadata_identity.session_id == self._ledger.session_id
+            ):
+                identity = metadata_identity.require_for_dispatch()
+            else:
+                identity = ExecutionIdentity.new(
+                    task_id=task.id,
+                    agent_id=agent_id,
+                    session_id=self._ledger.session_id,
+                    run_id=run_id,
+                    claim_id=claim_id,
+                    idempotency_key=f"idem_{run_id}",
+                    parent_run_id=parent_run_id,
+                    message_id=task.request_message_id or "",
+                    metadata={
+                        "source": "operator_bridge",
+                        "bridge_task_id": task.id,
+                    },
+                )
+        mismatches = [
+            field_name
+            for field_name, expected in (
+                ("task_id", task.id),
+                ("run_id", run_id),
+                ("claim_id", claim_id),
+                ("agent_id", agent_id),
+                ("session_id", self._ledger.session_id),
+            )
+            if getattr(identity, field_name) != expected
+        ]
+        if mismatches:
+            raise ValueError(
+                "operator bridge execution identity mismatch: "
+                + ", ".join(mismatches)
+            )
+        identity_metadata = {
+            **identity.to_metadata(),
+            "trace_id": identity.trace_id,
+            "correlation_id": identity.correlation_id,
+            "run_id": identity.run_id,
+            "runtime_run_id": identity.run_id,
+            "claim_id": identity.claim_id,
+            "idempotency_key": identity.idempotency_key,
+            "agent_id": identity.agent_id,
+            "session_id": identity.session_id,
+        }
+        if any(metadata.get(key) != value for key, value in identity_metadata.items()):
+            metadata.update(identity_metadata)
             changed = True
         if changed:
             await self._set_metadata(task.id, metadata)
             refreshed = await self.get_task(task.id)
             if refreshed is not None:
                 task = refreshed
+
+        await self._runtime_state.record_execution_identity(
+            identity,
+            source="operator_bridge.claim_task",
+        )
 
         claimed_at = task.claimed_at or _utc_now()
         stale_after = claimed_at + timedelta(seconds=task.claim_timeout_seconds)
@@ -1117,11 +1200,12 @@ class OperatorBridge:
                 claim_id=claim_id,
                 task_id=task.id,
                 session_id=self._ledger.session_id,
-                agent_id=task.claimed_by or self.bridge_agent_id,
+                agent_id=agent_id,
                 status="claimed",
                 claimed_at=claimed_at,
                 stale_after=stale_after,
                 metadata={
+                    **identity_metadata,
                     "bridge_task_id": task.id,
                     "sender": task.sender,
                     "scope": list(task.scope),
@@ -1137,9 +1221,9 @@ class OperatorBridge:
                 session_id=self._ledger.session_id,
                 task_id=task.id,
                 claim_id=claim_id,
-                parent_run_id=existing_run.parent_run_id if existing_run else "",
+                parent_run_id=existing_run.parent_run_id if existing_run else parent_run_id,
                 assigned_by=task.sender,
-                assigned_to=task.claimed_by or self.bridge_agent_id,
+                assigned_to=agent_id,
                 requested_output=list(task.output),
                 current_artifact_id=str(task.metadata.get("current_artifact_id", "") or ""),
                 status="claimed",
@@ -1148,6 +1232,7 @@ class OperatorBridge:
                 failure_code=existing_run.failure_code if existing_run else "",
                 metadata={
                     **(existing_run.metadata if existing_run else {}),
+                    **identity_metadata,
                     "bridge_task_id": task.id,
                     "scope": list(task.scope),
                     "constraints": list(task.constraints),
