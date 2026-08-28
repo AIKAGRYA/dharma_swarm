@@ -23,6 +23,7 @@ from dharma_swarm.governed_patch_provider_authorship import (
     REQUESTED_MODEL,
     REQUESTED_PROVIDER,
     REQUESTED_TRANSPORT,
+    REQUESTED_WIRE_MODEL,
     ProviderSession,
     author_governed_patch,
 )
@@ -58,7 +59,7 @@ class _ExactOllamaCloudClient:
         response = await client.post(
             f"{OLLAMA_CLOUD_BASE_URL}/v1/chat/completions",
             json={
-                "model": "glm-5.2",
+                "model": REQUESTED_WIRE_MODEL,
                 "messages": self._provider._build_messages(request),
                 "max_tokens": max(request.max_tokens, 4096),
                 "temperature": request.temperature,

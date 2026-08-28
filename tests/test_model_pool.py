@@ -24,6 +24,7 @@ from dharma_swarm.model_pool import (
     entry_for_model_id,
     get_entry,
     live_routes,
+    required_provider_model_id,
 )
 
 
@@ -60,15 +61,16 @@ def test_pool_routes_are_exactly_the_roster_literals():
 
 
 def test_pool_collapses_roster_slots_to_logical_entries():
-    """The roster has 46 slots that collapse to 32 logical pool entries.
+    """The roster has 48 slots that collapse to 31 logical pool entries.
     Guards against silent regroup drift.
 
     K3 replaces two active K2.7 logical entries with one provider-typed entry:
     Kimi Code ``k3``, Moonshot ``kimi-k3``, and OpenRouter
     ``moonshotai/kimi-k3`` are three routes for the same model. The roster gains
     one route overall (46 -> 47) while the pool loses one duplicate logical
-    entry (32 -> 31)."""
-    assert len(EVOLUTION_ROSTER) == 47
+    entry (32 -> 31). The additional Ollama GLM 5.2 route raises the roster to
+    48 without creating another logical entry."""
+    assert len(EVOLUTION_ROSTER) == 48
     assert len(MODEL_POOL) == 31
 
 
@@ -140,6 +142,32 @@ def test_kimi_k3_provider_ids_collapse_only_by_explicit_promotion_rule():
     assert entry_for_model_id("k3") is kimi
     assert entry_for_model_id("kimi-k3") is kimi
     assert entry_for_model_id("moonshotai/kimi-k3") is kimi
+
+
+def test_glm52_is_one_entry_with_exact_zhipu_and_ollama_routes():
+    """The governed authoring route is one logical model with two providers."""
+    logical_id = model_pool.default_for_provider(ProviderType.ZHIPU)
+    glm = get_entry(logical_id)
+
+    assert glm is not None and not glm.below_floor
+    assert set(glm.routes) == {
+        Route(ProviderType.ZHIPU, "glm-5.2"),
+        Route(ProviderType.OLLAMA, "glm-5.2:cloud"),
+    }
+    assert glm.routes[0] == Route(ProviderType.OLLAMA, "glm-5.2:cloud")
+    assert required_provider_model_id(logical_id, ProviderType.ZHIPU) == "glm-5.2"
+    assert required_provider_model_id(logical_id, ProviderType.OLLAMA) == "glm-5.2:cloud"
+    assert "glm-5.2:cloud" in model_pool.ollama_cloud_model_ids()
+    assert entry_for_model_id("glm-5.2:cloud") is glm
+    assert len([entry for entry in MODEL_POOL if entry.id == logical_id]) == 1
+
+
+def test_required_provider_model_id_fails_closed():
+    logical_id = model_pool.default_for_provider(ProviderType.ZHIPU)
+    with pytest.raises(AssertionError, match="missing model-pool entry"):
+        required_provider_model_id("missing-logical-model", ProviderType.OLLAMA)
+    with pytest.raises(AssertionError, match="missing 'codex' route"):
+        required_provider_model_id(logical_id, ProviderType.CODEX)
 
 
 # --------------------------------------------------------------------------

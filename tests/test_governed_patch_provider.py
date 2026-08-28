@@ -121,8 +121,8 @@ class FakeProvider:
     ) -> None:
         self.response = response or LLMResponse(
             content=EDIT,
-            model="glm-5.2",
-            provider="ollama",
+            model=authorship_module.REQUESTED_WIRE_MODEL,
+            provider=authorship_module.REQUESTED_PROVIDER,
             usage={
                 "prompt_tokens": 11,
                 "completion_tokens": 7,
@@ -164,6 +164,74 @@ def _inspect(request, evidence: Path) -> ProviderCallEvidenceState:
     )
 
 
+def test_governed_provider_model_ids_are_canonical_pool_projections() -> None:
+    logical_id = authorship_module.default_for_provider(ProviderType.ZHIPU)
+    assert authorship_module.REQUESTED_WIRE_MODEL == logical_id
+    assert authorship_module.REQUESTED_MODEL == (
+        authorship_module.required_provider_model_id(
+            logical_id,
+            ProviderType.OLLAMA,
+        )
+    )
+    assert authorship_module.SERVED_MODELS == frozenset(
+        (authorship_module.REQUESTED_WIRE_MODEL, authorship_module.REQUESTED_MODEL)
+    )
+
+
+@pytest.mark.asyncio
+async def test_exact_ollama_client_uses_canonical_wire_model() -> None:
+    observed: dict[str, object] = {}
+
+    class HttpResponse:
+        status_code = 200
+        text = ""
+
+        @staticmethod
+        def json():
+            return {
+                "model": authorship_module.REQUESTED_WIRE_MODEL,
+                "choices": [
+                    {
+                        "message": {"content": EDIT},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {},
+            }
+
+    class HttpClient:
+        async def post(self, url, *, json, headers):
+            observed.update(url=url, payload=json, headers=headers)
+            return HttpResponse()
+
+    class RuntimeOllama:
+        def _get_client(self):
+            return HttpClient()
+
+        def _headers_or_raise(self):
+            return {"Authorization": "not-recorded"}
+
+        def _build_messages(self, request):
+            return request.messages
+
+        async def close(self):
+            observed["closed"] = True
+
+    client = provider_script._ExactOllamaCloudClient(RuntimeOllama())
+    response = await client.complete(
+        LLMRequest(
+            model=authorship_module.REQUESTED_MODEL,
+            messages=[{"role": "user", "content": "bounded"}],
+            tools=[],
+        )
+    )
+    await client.close()
+
+    assert observed["payload"]["model"] == authorship_module.REQUESTED_WIRE_MODEL
+    assert response.model == authorship_module.REQUESTED_WIRE_MODEL
+    assert observed["closed"] is True
+
+
 def test_canonical_provider_bootstraps_runtime_env_before_resolution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -172,7 +240,7 @@ def test_canonical_provider_bootstraps_runtime_env_before_resolution(
         provider=ProviderType.OLLAMA,
         api_key="not-recorded",
         base_url="https://ollama.com",
-        default_model="glm-5.2:cloud",
+        default_model=authorship_module.REQUESTED_MODEL,
         transport_mode="cloud_api",
         available=True,
     )
@@ -215,7 +283,7 @@ async def test_authorship_is_exact_non_authorizing_and_restart_recoverable(
     assert first.authored is True
     assert first.candidate_bundle is not None
     assert provider.calls == provider.closes == 1
-    assert provider.requests[0].model == "glm-5.2:cloud"
+    assert provider.requests[0].model == authorship_module.REQUESTED_MODEL
     assert provider.requests[0].tools == []
     receipt = first.receipt.to_dict()
     assert receipt["status"] == "authored"
@@ -468,7 +536,7 @@ async def test_terminal_authorship_recovers_after_drift_without_applicability(
         (
             LLMResponse(
                 content=f"prose\n{EDIT}",
-                model="glm-5.2",
+                model=authorship_module.REQUESTED_WIRE_MODEL,
                 provider="ollama",
                 stop_reason="stop",
             ),
@@ -477,7 +545,7 @@ async def test_terminal_authorship_recovers_after_drift_without_applicability(
         (
             LLMResponse(
                 content=EDIT + EDIT,
-                model="glm-5.2",
+                model=authorship_module.REQUESTED_WIRE_MODEL,
                 provider="ollama",
                 stop_reason="stop",
             ),
@@ -486,7 +554,7 @@ async def test_terminal_authorship_recovers_after_drift_without_applicability(
         (
             LLMResponse(
                 content=EDIT.replace(SOURCE_PATH, "pkg/other.py"),
-                model="glm-5.2",
+                model=authorship_module.REQUESTED_WIRE_MODEL,
                 provider="ollama",
                 stop_reason="stop",
             ),
@@ -504,7 +572,7 @@ async def test_terminal_authorship_recovers_after_drift_without_applicability(
         (
             LLMResponse(
                 content=EDIT,
-                model="glm-5.2",
+                model=authorship_module.REQUESTED_WIRE_MODEL,
                 provider="ollama",
                 stop_reason="length",
             ),
@@ -513,7 +581,7 @@ async def test_terminal_authorship_recovers_after_drift_without_applicability(
         (
             LLMResponse(
                 content=EDIT,
-                model="glm-5.2",
+                model=authorship_module.REQUESTED_WIRE_MODEL,
                 provider="ollama",
                 stop_reason="stop",
                 tool_calls=[{"id": "tool-1", "name": "write", "parameters": {}}],
@@ -566,7 +634,7 @@ async def test_unique_nonempty_non_noop_search_is_required(
     provider = FakeProvider(
         LLMResponse(
             content=ambiguous,
-            model="glm-5.2",
+            model=authorship_module.REQUESTED_WIRE_MODEL,
             provider="ollama",
             stop_reason="stop",
         )
@@ -589,7 +657,7 @@ async def test_unique_nonempty_non_noop_search_is_required(
             FakeProvider(
                 LLMResponse(
                     content=noop,
-                    model="glm-5.2",
+                    model=authorship_module.REQUESTED_WIRE_MODEL,
                     provider="ollama",
                     stop_reason="stop",
                 )
@@ -621,7 +689,7 @@ async def test_overlapping_search_occurrences_are_ambiguous(
             FakeProvider(
                 LLMResponse(
                     content=overlapping,
-                    model="glm-5.2",
+                    model=authorship_module.REQUESTED_WIRE_MODEL,
                     provider="ollama",
                     stop_reason="stop",
                 )
@@ -663,7 +731,7 @@ async def test_anthropic_provider_forgery_is_persisted_as_refusal(
     provider = FakeProvider(
         LLMResponse(
             content=EDIT,
-            model="glm-5.2",
+            model=authorship_module.REQUESTED_WIRE_MODEL,
             provider="anthropic",
             stop_reason="stop",
         )
