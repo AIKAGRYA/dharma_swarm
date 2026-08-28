@@ -261,7 +261,7 @@ def _initialize_fleet_mission_snapshot_provider(
     try:
         from dharma_swarm.mission_control import MissionControl
         from dharma_swarm.mission_control_contract import public_mission_identifier
-        from dharma_swarm.mission_control_projection import (
+        from dharma_swarm.mission_control_snapshot_provider import (
             ConfiguredMissionSnapshotProvider,
         )
         from dharma_swarm.runtime_state import RuntimeStateStore

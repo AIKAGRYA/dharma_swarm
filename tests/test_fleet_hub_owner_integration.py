@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from api.routers.control_surface import router
 from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_contract import MissionControlError
-from dharma_swarm.mission_control_projection import (
+from dharma_swarm.mission_control_snapshot_provider import (
     ConfiguredMissionSnapshotProvider,
 )
 from dharma_swarm.runtime_state import RuntimeStateStore
