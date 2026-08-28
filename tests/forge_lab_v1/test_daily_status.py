@@ -23,6 +23,9 @@ def _systemctl(command, **_kwargs) -> subprocess.CompletedProcess[str]:
             "LastTriggerUSec=Thu 2026-08-27 03:35:00 UTC\n"
         )
     else:
+        assert "ExecMainStartTimestamp" in command[-1]
+        assert "ConditionResult" in command[-1]
+        assert "ConditionTimestamp" in command[-1]
         stdout = (
             "LoadState=loaded\n"
             "ActiveState=inactive\n"
@@ -33,6 +36,9 @@ def _systemctl(command, **_kwargs) -> subprocess.CompletedProcess[str]:
             "Result=success\n"
             "ExecMainCode=1\n"
             "ExecMainStatus=0\n"
+            "ExecMainStartTimestamp=Thu 2026-08-27 03:35:01 UTC\n"
+            "ConditionResult=yes\n"
+            "ConditionTimestamp=Thu 2026-08-27 03:35:00 UTC\n"
         )
     return subprocess.CompletedProcess(
         args=["systemctl"],
@@ -156,7 +162,86 @@ def test_scheduler_status_fails_closed_when_systemd_is_unavailable(tmp_path: Pat
     assert status["error"] == "FileNotFoundError"
 
 
-def test_latest_attempt_must_be_fresh_success_and_cover_last_trigger(tmp_path: Path) -> None:
+def test_scheduler_status_validates_service_execution_timestamp(tmp_path: Path) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    unit_root = tmp_path / "systemd"
+    unit_root.mkdir()
+    for name in (daily.TIMER_UNIT, daily.SERVICE_UNIT):
+        shutil.copyfile(repo / "scripts" / "forge_lab" / "systemd" / name, unit_root / name)
+
+    def service_timestamp(value: str | None):
+        def run(command, **_kwargs):
+            global command_root
+            command_root = unit_root.resolve()
+            result = _systemctl(command)
+            if daily.SERVICE_UNIT in command:
+                line = "ExecMainStartTimestamp=Thu 2026-08-27 03:35:01 UTC\n"
+                replacement = "" if value is None else f"ExecMainStartTimestamp={value}\n"
+                result.stdout = result.stdout.replace(line, replacement)
+            return result
+
+        return run
+
+    for invalid in (None, "not-a-timestamp"):
+        status = daily.scheduler_status(
+            repo_root=repo,
+            unit_root=unit_root,
+            runner=service_timestamp(invalid),
+        )
+        assert status["ready"] is False
+        assert status["effective_service_ok"] is False
+        assert status["service_execution_timestamp_valid"] is False
+
+    for never_executed in ("", "n/a"):
+        status = daily.scheduler_status(
+            repo_root=repo,
+            unit_root=unit_root,
+            runner=service_timestamp(never_executed),
+        )
+        assert status["ready"] is True
+        assert status["effective_service_ok"] is True
+        assert status["service_execution_timestamp_valid"] is True
+        assert status["last_service_execution"] is None
+
+
+def test_scheduler_status_validates_last_trigger_timestamp(tmp_path: Path) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    unit_root = tmp_path / "systemd"
+    unit_root.mkdir()
+    for name in (daily.TIMER_UNIT, daily.SERVICE_UNIT):
+        shutil.copyfile(repo / "scripts" / "forge_lab" / "systemd" / name, unit_root / name)
+
+    def timer_timestamp(value: str | None):
+        def run(command, **_kwargs):
+            global command_root
+            command_root = unit_root.resolve()
+            result = _systemctl(command)
+            if daily.TIMER_UNIT in command:
+                line = "LastTriggerUSec=Thu 2026-08-27 03:35:00 UTC\n"
+                replacement = "" if value is None else f"LastTriggerUSec={value}\n"
+                result.stdout = result.stdout.replace(line, replacement)
+            return result
+
+        return run
+
+    for value, expected in (
+        (None, False),
+        ("not-a-timestamp", False),
+        ("", True),
+        ("n/a", True),
+    ):
+        status = daily.scheduler_status(
+            repo_root=repo,
+            unit_root=unit_root,
+            runner=timer_timestamp(value),
+        )
+        assert status["ready"] is expected
+        assert status["last_trigger_timestamp_valid"] is expected
+
+
+def test_latest_attempt_must_be_fresh_success_and_cover_last_service_execution(
+    tmp_path: Path,
+) -> None:
     forge_root = tmp_path / "state" / ".dharma" / "forge_lab"
     run_id = "unattended-fixture"
     run_dir = forge_root / "unattended_explore" / "runs" / run_id
@@ -305,7 +390,12 @@ def test_latest_attempt_must_be_fresh_success_and_cover_last_trigger(tmp_path: P
         "positive_rsi_claim": False,
     }
     projection = {"valid_chain": True, "attempt": closeout}
-    scheduler = {"systemd": {"LastTriggerUSec": "Thu 2026-08-27 03:35:00 UTC"}}
+    scheduler = {
+        "systemd": {"LastTriggerUSec": "Thu 2026-08-27 03:35:00 UTC"},
+        "service_systemd": {
+            "ExecMainStartTimestamp": "Thu 2026-08-27 03:35:01 UTC"
+        },
+    }
 
     unanchored, details = daily._last_attempt_ready(
         projection,
@@ -326,6 +416,142 @@ def test_latest_attempt_must_be_fresh_success_and_cover_last_trigger(tmp_path: P
     )
     assert ready is True
     assert details["terminal_success"] is True
+    assert details["covers_last_service_execution"] is True
+    assert details["last_service_execution"] == "2026-08-27T03:35:01+00:00"
+
+    for invalid_timer_evidence in ({}, {"LastTriggerUSec": "not-a-timestamp"}):
+        scheduler["systemd"] = invalid_timer_evidence
+        invalid_trigger_ready, invalid_trigger_details = daily._last_attempt_ready(
+            projection,
+            scheduler,
+            now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+            forge_root=forge_root,
+        )
+        assert invalid_trigger_ready is False
+        assert invalid_trigger_details["last_trigger_timestamp_valid"] is False
+
+    for never_triggered in ("", "n/a"):
+        scheduler["systemd"] = {"LastTriggerUSec": never_triggered}
+        never_triggered_ready, never_triggered_details = daily._last_attempt_ready(
+            projection,
+            scheduler,
+            now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+            forge_root=forge_root,
+        )
+        assert never_triggered_ready is True
+        assert never_triggered_details["last_trigger_timestamp_valid"] is True
+        assert never_triggered_details["last_systemd_trigger"] is None
+
+    scheduler["systemd"] = {"LastTriggerUSec": "Thu 2026-08-27 04:30:00 UTC"}
+    scheduler["service_systemd"].update(
+        {
+            "ConditionResult": "no",
+            "ConditionTimestamp": "Thu 2026-08-27 04:30:00 UTC",
+        }
+    )
+    ready_after_skipped_trigger, skipped_details = daily._last_attempt_ready(
+        projection,
+        scheduler,
+        now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+        forge_root=forge_root,
+    )
+    assert ready_after_skipped_trigger is True
+    assert skipped_details["covers_last_systemd_trigger"] is False
+    assert skipped_details["covers_last_service_execution"] is True
+
+    for never_executed in ("", "n/a"):
+        scheduler["service_systemd"]["ExecMainStartTimestamp"] = never_executed
+        ready_without_prior_execution, never_executed_details = (
+            daily._last_attempt_ready(
+                projection,
+                scheduler,
+                now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+                forge_root=forge_root,
+            )
+        )
+        assert ready_without_prior_execution is True
+        assert never_executed_details["covers_last_service_execution"] is True
+        assert never_executed_details["last_service_execution"] is None
+        assert never_executed_details["newer_trigger_condition_skip_valid"] is True
+
+    invalid_skip_evidence = (
+        {
+            "ConditionResult": "yes",
+            "ConditionTimestamp": "Thu 2026-08-27 04:30:00 UTC",
+        },
+        {},
+        {"ConditionTimestamp": "Thu 2026-08-27 04:30:00 UTC"},
+        {"ConditionResult": "no"},
+        {
+            "ConditionResult": "no",
+            "ConditionTimestamp": "not-a-timestamp",
+        },
+        {
+            "ConditionResult": "no",
+            "ConditionTimestamp": "Thu 2026-08-27 04:29:59 UTC",
+        },
+        {
+            "ConditionResult": "no",
+            "ConditionTimestamp": "Thu 2026-08-27 04:35:01 UTC",
+        },
+    )
+    for never_executed in ("", "n/a"):
+        for condition_evidence in invalid_skip_evidence:
+            scheduler["service_systemd"] = {
+                "ExecMainStartTimestamp": never_executed,
+                **condition_evidence,
+            }
+            unproven_skip, unproven_skip_details = daily._last_attempt_ready(
+                projection,
+                scheduler,
+                now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+                forge_root=forge_root,
+            )
+            assert unproven_skip is False
+            assert unproven_skip_details["covers_last_service_execution"] is True
+            assert unproven_skip_details["newer_trigger_condition_skip_valid"] is False
+
+    for invalid_service_evidence in (
+        {},
+        {"ExecMainStartTimestamp": "not-a-timestamp"},
+    ):
+        scheduler["service_systemd"] = invalid_service_evidence
+        invalid_service_ready, invalid_service_details = daily._last_attempt_ready(
+            projection,
+            scheduler,
+            now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+            forge_root=forge_root,
+        )
+        assert invalid_service_ready is False
+        assert invalid_service_details["service_execution_timestamp_valid"] is False
+
+    scheduler["service_systemd"] = {
+        "ExecMainStartTimestamp": "Thu 2026-08-27 04:30:00 UTC",
+        "ConditionResult": "no",
+        "ConditionTimestamp": "Thu 2026-08-27 04:30:00 UTC",
+    }
+
+    invalidated_by_new_execution, newer_execution_details = daily._last_attempt_ready(
+        projection,
+        scheduler,
+        now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+        forge_root=forge_root,
+    )
+    assert invalidated_by_new_execution is False
+    assert newer_execution_details["covers_last_service_execution"] is False
+
+    scheduler["service_systemd"]["ExecMainStartTimestamp"] = (
+        "Thu 2026-08-27 03:35:01 UTC"
+    )
+    ready_after_prior_execution, prior_execution_details = daily._last_attempt_ready(
+        projection,
+        scheduler,
+        now=datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc),
+        forge_root=forge_root,
+    )
+    assert ready_after_prior_execution is True
+    assert prior_execution_details["covers_last_service_execution"] is True
+    assert prior_execution_details["newer_trigger_condition_skip_valid"] is True
 
     for field, mismatched in (
         ("receipt_digest", "sha256:" + "9" * 64),

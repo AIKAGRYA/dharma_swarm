@@ -500,12 +500,27 @@ systemctl enable rsi-lab-explore.timer
 systemctl start rsi-lab-explore.timer
 systemctl show rsi-lab-explore.timer --no-pager \
   --property=ActiveState,LastTriggerUSec,NextElapseUSecRealtime
-systemctl status rsi-lab-explore.service --no-pager
+systemctl show rsi-lab-explore.service --no-pager \
+  --property=ActiveState,ConditionResult,ConditionTimestamp,ExecMainStartTimestamp,Result,ExecMainStatus
 ```
 
-Only after the timer is active, the service is not running, and
-`NextElapseUSecRealtime` is a future time should the operator remove the latch
-and recheck both timer and daily status:
+On first activation, `Persistent=true` may schedule a missed daily event after
+the configured randomized delay. Keep `HALT` present until that catch-up has
+been condition-skipped and `NextElapseUSecRealtime` identifies the next intended
+daily `03:35`-to-`04:00 UTC` window, not merely any future catch-up time. A
+condition-skipped timer event may advance `LastTriggerUSec`; it must not advance
+`ExecMainStartTimestamp`. Daily health therefore uses the latter as evidence
+that the service process actually started and retains the raw timer trigger as
+activation evidence that must be accounted for, never as proof that the service
+process started. When a trigger is newer than the last closeout, the
+skip is accepted only if `ConditionResult=no` and `ConditionTimestamp` falls
+between that trigger and five minutes after it; missing, malformed, stale, or
+successful condition evidence fails closed.
+
+Only after the timer is active, the service is not running, no unaccounted
+service execution is newer than the supervised closeout, and the next elapse is
+the intended daily window should the operator remove the latch and recheck both
+timer and daily status:
 
 ```bash
 unlink /root/rsi-lab/state/.dharma/forge_lab/HALT

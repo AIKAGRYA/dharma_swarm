@@ -34,6 +34,7 @@ SCHEDULER_SCHEMA = "rsi_lab.scheduler_status.v1"
 TIMER_UNIT = "rsi-lab-explore.timer"
 SERVICE_UNIT = "rsi-lab-explore.service"
 MAX_LAST_ATTEMPT_AGE_SECONDS = 36 * 60 * 60
+MAX_CONDITION_TRIGGER_SKEW_SECONDS = 5 * 60
 
 
 def _sha256(path: Path) -> str | None:
@@ -106,7 +107,8 @@ def scheduler_status(
                 SERVICE_UNIT,
                 "--no-pager",
                 "--property=LoadState,ActiveState,FragmentPath,DropInPaths,ExecStart,"
-                "Result,ExecMainCode,ExecMainStatus",
+                "Result,ExecMainCode,ExecMainStatus,ExecMainStartTimestamp,"
+                "ConditionResult,ConditionTimestamp",
             ],
             capture_output=True,
             check=False,
@@ -144,6 +146,26 @@ def scheduler_status(
     )
     expected_timer_fragment = str((unit_root / TIMER_UNIT).resolve(strict=False))
     expected_service_fragment = str((unit_root / SERVICE_UNIT).resolve(strict=False))
+    last_trigger_present = "LastTriggerUSec" in timer_fields
+    last_trigger_text = timer_fields.get("LastTriggerUSec", "").strip()
+    timer_never_triggered = bool(
+        last_trigger_present and last_trigger_text.casefold() in {"", "n/a"}
+    )
+    last_systemd_trigger = _parse_utc(last_trigger_text)
+    last_trigger_timestamp_valid = bool(
+        last_trigger_present
+        and (timer_never_triggered or last_systemd_trigger is not None)
+    )
+    service_start_present = "ExecMainStartTimestamp" in service_fields
+    service_start_text = service_fields.get("ExecMainStartTimestamp", "").strip()
+    service_never_executed = bool(
+        service_start_present and service_start_text.casefold() in {"", "n/a"}
+    )
+    last_service_execution = _parse_utc(service_start_text)
+    service_execution_timestamp_valid = bool(
+        service_start_present
+        and (service_never_executed or last_service_execution is not None)
+    )
     timer_effective = bool(
         timer_fields.get("LoadState") == "loaded"
         and timer_fields.get("ActiveState") == "active"
@@ -154,6 +176,7 @@ def scheduler_status(
         and calendar in timer_fields.get("TimersCalendar", "")
         and timer_fields.get("NextElapseUSecRealtime", "").strip().casefold()
         not in {"", "n/a"}
+        and last_trigger_timestamp_valid
     )
     service_effective = bool(
         service_fields.get("LoadState") == "loaded"
@@ -163,6 +186,7 @@ def scheduler_status(
         in service_fields.get("ExecStart", "")
         and service_fields.get("Result") in {"", "success"}
         and service_fields.get("ExecMainStatus") in {"", "0"}
+        and service_execution_timestamp_valid
     )
     ready = bool(
         all(row["bytes_match"] for row in units.values())
@@ -181,6 +205,14 @@ def scheduler_status(
         "service_systemd": service_fields,
         "effective_timer_ok": timer_effective,
         "effective_service_ok": service_effective,
+        "last_trigger_timestamp_valid": last_trigger_timestamp_valid,
+        "last_systemd_trigger": (
+            last_systemd_trigger.isoformat() if last_systemd_trigger else None
+        ),
+        "service_execution_timestamp_valid": service_execution_timestamp_valid,
+        "last_service_execution": (
+            last_service_execution.isoformat() if last_service_execution else None
+        ),
         "units": units,
         "error": error,
     }
@@ -256,9 +288,68 @@ def _last_attempt_ready(
     attempt_at = _parse_utc(attempt.get("at"))
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     age_seconds = (current - attempt_at).total_seconds() if attempt_at else None
-    last_trigger = _parse_utc((scheduler.get("systemd") or {}).get("LastTriggerUSec"))
+    timer_systemd = (
+        scheduler.get("systemd")
+        if isinstance(scheduler.get("systemd"), dict)
+        else {}
+    )
+    last_trigger_present = "LastTriggerUSec" in timer_systemd
+    last_trigger_text = str(timer_systemd.get("LastTriggerUSec") or "").strip()
+    timer_never_triggered = bool(
+        last_trigger_present and last_trigger_text.casefold() in {"", "n/a"}
+    )
+    last_trigger = _parse_utc(last_trigger_text)
+    last_trigger_timestamp_valid = bool(
+        last_trigger_present
+        and (timer_never_triggered or last_trigger is not None)
+    )
     covers_last_trigger = bool(
-        attempt_at is not None and (last_trigger is None or attempt_at >= last_trigger)
+        attempt_at is not None
+        and last_trigger_timestamp_valid
+        and (last_trigger is None or attempt_at >= last_trigger)
+    )
+    service_systemd = (
+        scheduler.get("service_systemd")
+        if isinstance(scheduler.get("service_systemd"), dict)
+        else {}
+    )
+    service_start_present = "ExecMainStartTimestamp" in service_systemd
+    service_start_text = str(
+        service_systemd.get("ExecMainStartTimestamp") or ""
+    ).strip()
+    service_never_executed = bool(
+        service_start_present and service_start_text.casefold() in {"", "n/a"}
+    )
+    last_service_execution = _parse_utc(service_start_text)
+    service_execution_timestamp_valid = bool(
+        service_start_present
+        and (service_never_executed or last_service_execution is not None)
+    )
+    covers_last_service_execution = bool(
+        attempt_at is not None
+        and service_execution_timestamp_valid
+        and (
+            last_service_execution is None
+            or attempt_at >= last_service_execution
+        )
+    )
+    condition_result = service_systemd.get("ConditionResult")
+    condition_timestamp = _parse_utc(service_systemd.get("ConditionTimestamp"))
+    condition_trigger_skew_seconds = (
+        (condition_timestamp - last_trigger).total_seconds()
+        if condition_timestamp is not None and last_trigger is not None
+        else None
+    )
+    newer_trigger_condition_skip_valid = bool(
+        attempt_at is not None
+        and last_trigger is not None
+        and last_trigger > attempt_at
+        and condition_result == "no"
+        and condition_trigger_skew_seconds is not None
+        and 0 <= condition_trigger_skew_seconds <= MAX_CONDITION_TRIGGER_SKEW_SECONDS
+    )
+    latest_trigger_accounted_for = bool(
+        covers_last_trigger or newer_trigger_condition_skip_valid
     )
     run_id = str(attempt.get("run_id") or "")
     artifact_root = (forge_root or forge_state_root()) / "unattended_explore" / "runs"
@@ -419,6 +510,19 @@ def _last_attempt_ready(
         "age_seconds": age_seconds,
         "covers_last_systemd_trigger": covers_last_trigger,
         "last_systemd_trigger": last_trigger.isoformat() if last_trigger else None,
+        "last_trigger_timestamp_valid": last_trigger_timestamp_valid,
+        "covers_last_service_execution": covers_last_service_execution,
+        "last_service_execution": (
+            last_service_execution.isoformat() if last_service_execution else None
+        ),
+        "service_execution_timestamp_valid": service_execution_timestamp_valid,
+        "condition_result": condition_result,
+        "condition_timestamp": (
+            condition_timestamp.isoformat() if condition_timestamp else None
+        ),
+        "condition_trigger_skew_seconds": condition_trigger_skew_seconds,
+        "newer_trigger_condition_skip_valid": newer_trigger_condition_skip_valid,
+        "latest_trigger_accounted_for": latest_trigger_accounted_for,
         "child_artifact_valid": child_artifact_valid,
         "attempt_child_binding_valid": attempt_child_binding_valid,
         "log_artifact_valid": log_artifact_valid,
@@ -426,7 +530,11 @@ def _last_attempt_ready(
         "admission_authority_valid": admission_authority_valid,
     }
     return bool(
-        projection.get("valid_chain") and terminal_success and fresh and covers_last_trigger
+        projection.get("valid_chain")
+        and terminal_success
+        and fresh
+        and covers_last_service_execution
+        and latest_trigger_accounted_for
     ), details
 
 
