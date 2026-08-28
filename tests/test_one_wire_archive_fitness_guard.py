@@ -40,36 +40,16 @@ def _fitness_entry(**kwargs) -> ArchiveEntry:
     return ArchiveEntry(**base)
 
 
-def _write_guardian(
-    state: Path,
-    *,
-    confirmed: int,
-    domains: int,
-    eligible: bool,
-    authority: bool,
-    required_confirmed: int = 5,
-    required_domains: int = 3,
-) -> Path:
+def _write_guardian(state: Path, *, approved: bool = True) -> Path:
+    """Write a guardian receipt carrying the explicit operator flag."""
     path = state / ONE_WIRE_GUARDIAN_RECEIPT
     path.parent.mkdir(parents=True)
     path.write_text(
         json.dumps(
             {
                 "schema_version": "test.one_wire_guardian.v1",
-                "authority_result": {
-                    "confirmed_receipt_count": confirmed,
-                    "domain_count": domains,
-                    "eligible_to_set_archive_fitness": eligible,
-                    "archive_fitness_changed": False,
-                    "fitness_authority_granted": authority,
-                },
-                "threshold_guard": {
-                    "required_confirmed_receipts": required_confirmed,
-                    "observed_confirmed_receipts": confirmed,
-                    "required_distinct_domains": required_domains,
-                    "observed_distinct_domains": domains,
-                    "observed_domains": [f"domain-{idx}" for idx in range(domains)],
-                },
+                "operator_approved": approved,
+                "archive_fitness_changed": False,
             }
         )
         + "\n",
@@ -98,36 +78,12 @@ async def test_missing_guardian_receipt_blocks_archive_fitness(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_under_n_quorum_blocks_archive_fitness(tmp_path):
+async def test_receipt_without_operator_approval_blocks_archive_fitness(tmp_path):
     state = _state(tmp_path)
-    _write_guardian(state, confirmed=4, domains=3, eligible=True, authority=True)
+    _write_guardian(state, approved=False)
     archive = _archive(state)
 
-    with pytest.raises(OneWireFitnessAuthorityError, match="N=4/5, M=3/3"):
-        await archive.add_entry(_fitness_entry())
-
-    _assert_no_archive_side_effects(state)
-
-
-@pytest.mark.asyncio
-async def test_under_domain_quorum_blocks_archive_fitness(tmp_path):
-    state = _state(tmp_path)
-    _write_guardian(state, confirmed=5, domains=2, eligible=True, authority=True)
-    archive = _archive(state)
-
-    with pytest.raises(OneWireFitnessAuthorityError, match="N=5/5, M=2/3"):
-        await archive.add_entry(_fitness_entry())
-
-    _assert_no_archive_side_effects(state)
-
-
-@pytest.mark.asyncio
-async def test_missing_fitness_authority_flag_blocks_archive_fitness(tmp_path):
-    state = _state(tmp_path)
-    _write_guardian(state, confirmed=5, domains=3, eligible=True, authority=False)
-    archive = _archive(state)
-
-    with pytest.raises(OneWireFitnessAuthorityError, match="authority flags missing"):
+    with pytest.raises(OneWireFitnessAuthorityError, match="operator_approved"):
         await archive.add_entry(_fitness_entry())
 
     _assert_no_archive_side_effects(state)
@@ -137,7 +93,7 @@ async def test_missing_fitness_authority_flag_blocks_archive_fitness(tmp_path):
 @pytest.mark.asyncio
 async def test_internal_only_artifact_cannot_self_grant_fitness_authority(tmp_path):
     state = _state(tmp_path)
-    _write_guardian(state, confirmed=3, domains=1, eligible=False, authority=False)
+    _write_guardian(state, approved=False)
     archive = _archive(state)
 
     entry = _fitness_entry(
@@ -145,60 +101,28 @@ async def test_internal_only_artifact_cannot_self_grant_fitness_authority(tmp_pa
             "source": "internal_agent_report",
             "external_confirmed": True,
             "one_wire": "claimed_by_entry_not_guardian",
-            "quorum": {"confirmed": 99, "domains": 99},
-            "fitness_authority_granted": True,
+            "operator_approved": True,
         }
     )
-    with pytest.raises(OneWireFitnessAuthorityError, match="N=3/5, M=1/3"):
+    with pytest.raises(OneWireFitnessAuthorityError, match="operator_approved"):
         await archive.add_entry(entry)
 
     _assert_no_archive_side_effects(state)
 
 
 @pytest.mark.asyncio
-async def test_guardian_cannot_lower_required_quorum_thresholds(tmp_path):
+async def test_operator_approved_must_be_literal_boolean_true(tmp_path):
     state = _state(tmp_path)
-    _write_guardian(
-        state,
-        confirmed=1,
-        domains=1,
-        eligible=True,
-        authority=True,
-        required_confirmed=0,
-        required_domains=0,
-    )
-    archive = _archive(state)
-
-    authority = read_one_wire_fitness_authority(state)
-    assert authority.required_confirmed == 5
-    assert authority.required_domains == 3
-    with pytest.raises(OneWireFitnessAuthorityError, match="N=1/5, M=1/3"):
-        await archive.add_entry(_fitness_entry())
-
-    _assert_no_archive_side_effects(state)
-
-
-@pytest.mark.asyncio
-async def test_guardian_authority_flags_must_be_literal_booleans(tmp_path):
-    state = _state(tmp_path)
-    path = _write_guardian(
-        state,
-        confirmed=5,
-        domains=3,
-        eligible=True,
-        authority=True,
-    )
+    path = _write_guardian(state, approved=True)
     payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["authority_result"]["eligible_to_set_archive_fitness"] = "false"
-    payload["authority_result"]["fitness_authority_granted"] = "false"
+    payload["operator_approved"] = "true"  # string, not boolean
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     archive = _archive(state)
 
     authority = read_one_wire_fitness_authority(state)
     assert authority.allowed is False
-    assert authority.eligible_to_set_archive_fitness is False
-    assert authority.fitness_authority_granted is False
-    with pytest.raises(OneWireFitnessAuthorityError, match="authority flags missing"):
+    assert authority.operator_approved is False
+    with pytest.raises(OneWireFitnessAuthorityError, match="operator_approved"):
         await archive.add_entry(_fitness_entry())
 
     _assert_no_archive_side_effects(state)
@@ -229,9 +153,9 @@ async def test_out_of_range_neutral_weighted_fitness_requires_one_wire_authority
 
 
 @pytest.mark.asyncio
-async def test_fully_eligible_synthetic_guardian_allows_temp_archive_fitness(tmp_path):
+async def test_operator_approved_guardian_allows_temp_archive_fitness(tmp_path):
     state = _state(tmp_path)
-    _write_guardian(state, confirmed=5, domains=3, eligible=True, authority=True)
+    _write_guardian(state, approved=True)
     archive = _archive(state)
 
     entry_id = await archive.add_entry(_fitness_entry())
@@ -421,7 +345,7 @@ async def test_compact_from_legacy_positive_fitness_row_is_guarded(tmp_path):
     ]
     assert [row["status"] for row in rows] == ["proposed", "applied"]
 
-    _write_guardian(state, confirmed=5, domains=3, eligible=True, authority=True)
+    _write_guardian(state, approved=True)
     assert await archive.compact(min_age_entries=1, fitness_percentile=0.0) == 1
     assert (await archive.get_entry(legacy.id)).status == "composted"
 

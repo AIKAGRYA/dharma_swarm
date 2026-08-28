@@ -866,13 +866,8 @@ def read_one_wire_summary(state_dir: Path) -> dict[str, Any]:
     out: dict[str, Any] = {
         "guardian_receipt": str(authority.receipt_path),
         "exists": authority.exists,
-        "required_confirmed": authority.required_confirmed,
-        "required_domains": authority.required_domains,
-        "confirmed": authority.confirmed,
-        "domains": authority.domains,
+        "operator_approved": authority.operator_approved,
         "eligible": authority.allowed,
-        "eligible_to_set_archive_fitness": authority.eligible_to_set_archive_fitness,
-        "fitness_authority_granted": authority.fitness_authority_granted,
         "archive_fitness_changed": authority.archive_fitness_changed,
     }
     if authority.blocker:
@@ -1249,7 +1244,7 @@ def build_loop_statuses(
             evidence = ["one_wire.guardian_receipt", "evolution_archive"]
             if not one_wire_eligible:
                 status = "BLOCKED"
-                blocker = str(one_wire.get("blocker") or "One Wire quorum not eligible")
+                blocker = str(one_wire.get("blocker") or "One Wire operator approval not granted")
             elif archive_risk:
                 status = "BLOCKED"
                 blocker = f"archive has {archive_risk} positive internal-fitness risk rows"
