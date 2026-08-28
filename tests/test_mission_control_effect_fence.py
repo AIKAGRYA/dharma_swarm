@@ -67,6 +67,7 @@ from dharma_swarm.mission_control_effect_warrant import (
     IndependentPatchVerification,
 )
 from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
     RECOVERY_RECEIPT_TYPE,
     TERMINAL_RECEIPT_TYPE,
     MissionControlError,
@@ -334,7 +335,13 @@ async def effect_harness(
     correlation_id = f"a2a_send:{agent}:{packet_id}"
     proposal_id = "proposal-1"
     await control.create_mission(mission_id, title="Governed effect test")
-    task = await control.create_task(mission_id, title="Apply one exact patch")
+    task = await control.create_task(
+        mission_id,
+        title="Apply one exact patch",
+        metadata={
+            "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
+        },
+    )
 
     source_repo = tmp_path / "canonical-source"
     (source_repo / "pkg").mkdir(parents=True)
@@ -655,6 +662,34 @@ def test_public_issuance_refuses_malformed_target_without_leaking_runtime_error(
     target = harness.scratch / SOURCE_PATH
     target.unlink()
     target.mkdir()
+
+    result = harness.fence.issue_effect_warrant(
+        harness.runtime_path,
+        harness.task_path,
+        harness.expected,
+        harness.candidate,
+        harness.verification,
+        authority,
+    )
+
+    assert result == EffectRefusal(("canonical_effect_issuance_refused",))
+    assert read_effect_fence(harness.runtime_path, harness.binding.effect_key) is None
+
+
+@pytest.mark.asyncio
+async def test_public_issuance_refuses_task_without_completion_contract(
+    effect_harness: EffectHarness,
+) -> None:
+    harness = effect_harness
+    task = await harness.board.get(harness.binding.task_id)
+    assert task is not None
+    metadata = dict(task.metadata)
+    assert metadata.pop("completion_contract") == (
+        GOVERNED_PATCH_COMPLETION_CONTRACT
+    )
+    await harness.board.update_task(task.id, metadata=metadata)
+    owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
+    authority = harness.issuer.issue(harness.binding, owners, ttl_seconds=20)
 
     result = harness.fence.issue_effect_warrant(
         harness.runtime_path,
@@ -1417,46 +1452,27 @@ async def test_two_public_takeovers_preserve_old_effect_recovery_graph(
 
 
 @pytest.mark.asyncio
-async def test_exact_postimage_recovers_after_original_attempt_finishes_normally(
+async def test_governed_attempt_refuses_parent_finish_before_effect_terminal(
     effect_harness: EffectHarness,
 ) -> None:
     harness = effect_harness
-    warrant = _issue(harness, ttl_seconds=1)
-    mutation = effect_impl._perform_prevalidated_effect(
-        warrant.binding, harness.candidate
-    )
-    assert mutation.postimage_sha256 == warrant.binding.scratch.postimage_sha256
+    _issue(harness)
 
-    parent_receipt = await harness.control.finish_attempt(
-        harness.binding.mission_id,
-        harness.binding.task_id,
-        harness.binding.executor_agent_uid,
-        attempt_id=harness.binding.mission_attempt_id,
-        status="succeeded",
-        result="ordinary parent completion",
-    )
-    assert parent_receipt.status == "succeeded"
-    _wait_until_expired(warrant)
+    with pytest.raises(
+        MissionControlError,
+        match="finish_attempt_from_patch_effect",
+    ):
+        await harness.control.finish_attempt(
+            harness.binding.mission_id,
+            harness.binding.task_id,
+            harness.binding.executor_agent_uid,
+            attempt_id=harness.binding.mission_attempt_id,
+            status="succeeded",
+            result="ordinary parent completion",
+        )
 
-    terminal = harness.fence.recover_effect_slot(
-        harness.runtime_path,
-        harness.task_path,
-        harness.expected,
-        harness.binding.effect_key,
-        harness.candidate,
-        _fresh_recovery_authority(harness),
-        claimed_by="effect-supervisor",
-    )
-
-    assert isinstance(terminal, EffectTerminalRecord)
-    assert terminal.recovery_finalized is True
-    assert terminal.recovery_owner_basis == "canonical_terminal"
-    assert len(terminal.recovery_owner_observation_sha256) == 64
-    assert all(
-        character in "0123456789abcdef"
-        for character in terminal.recovery_owner_observation_sha256
-    )
-    _assert_one_effect_terminal(harness)
+    durable = read_effect_fence(harness.runtime_path, harness.binding.effect_key)
+    assert durable is not None and durable.state == "issued"
     task = await harness.board.get(harness.binding.task_id)
     run = await harness.runtime.get_delegation_run(harness.binding.mission_attempt_id)
     claim = await harness.runtime.get_task_claim(harness.binding.mission_claim_id)
@@ -1464,32 +1480,27 @@ async def test_exact_postimage_recovers_after_original_attempt_finishes_normally
         run_id=harness.binding.mission_attempt_id,
         receipt_type=TERMINAL_RECEIPT_TYPE,
     )
-    assert task is not None and task.status == TaskStatus.COMPLETED
-    assert task.result == "ordinary parent completion"
-    assert run is not None and run.status == "completed"
-    assert claim is not None and claim.status == "completed"
-    assert [receipt.receipt_id for receipt in parent_terminals] == [
-        parent_receipt.receipt_id
-    ]
+    assert task is not None and task.status == TaskStatus.RUNNING
+    assert run is not None and run.status == "running"
+    assert claim is not None and claim.status == "active"
+    assert parent_terminals == []
 
 
 @pytest.mark.asyncio
-async def test_exact_postimage_recovers_from_terminal_task_projection_crash(
+async def test_generic_finish_refuses_before_governed_task_projection(
     effect_harness: EffectHarness,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     harness = effect_harness
-    warrant = _issue(harness, ttl_seconds=1)
-    mutation = effect_impl._perform_prevalidated_effect(
-        warrant.binding, harness.candidate
-    )
-    assert mutation.postimage_sha256 == warrant.binding.scratch.postimage_sha256
+    projection_called = False
 
     async def crash_before_task_projection(*args: Any, **kwargs: Any) -> None:
+        nonlocal projection_called
+        projection_called = True
         raise TaskBoardError("simulated terminal task projection crash")
 
     monkeypatch.setattr(harness.board, "complete", crash_before_task_projection)
-    with pytest.raises(MissionControlError, match="terminal task projection crash"):
+    with pytest.raises(MissionControlError, match="finish_attempt_from_patch_effect"):
         await harness.control.finish_attempt(
             harness.binding.mission_id,
             harness.binding.task_id,
@@ -1499,6 +1510,7 @@ async def test_exact_postimage_recovers_from_terminal_task_projection_crash(
             result="durable parent result",
         )
 
+    assert projection_called is False
     parent_terminals = await harness.runtime.list_runtime_receipts(
         run_id=harness.binding.mission_attempt_id,
         receipt_type=TERMINAL_RECEIPT_TYPE,
@@ -1506,58 +1518,10 @@ async def test_exact_postimage_recovers_from_terminal_task_projection_crash(
     task = await harness.board.get(harness.binding.task_id)
     run = await harness.runtime.get_delegation_run(harness.binding.mission_attempt_id)
     claim = await harness.runtime.get_task_claim(harness.binding.mission_claim_id)
-    assert len(parent_terminals) == 1
+    assert parent_terminals == []
     assert task is not None and task.status == TaskStatus.RUNNING
-    assert run is not None and run.status == "completed"
+    assert run is not None and run.status == "running"
     assert claim is not None and claim.status == "active"
-
-    from dharma_swarm.mission_control_effect_owner import owner_transaction
-    from dharma_swarm.mission_control_effect_owner_recovery import (
-        observe_expired_proposal_for_effect_recovery_from_connection,
-    )
-
-    owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
-    with owner_transaction(owners) as database:
-        owner_observation = (
-            observe_expired_proposal_for_effect_recovery_from_connection(
-                database,
-                harness.expected,
-                mission_attempt_id=harness.binding.mission_attempt_id,
-                mission_claim_id=harness.binding.mission_claim_id,
-                proposal_receipt_id=harness.binding.proposal_receipt_id,
-                proposal_receipt_sha256=harness.binding.proposal_receipt_sha256,
-            )
-        )
-        database.rollback()
-    assert owner_observation.owner_transition == "canonical_terminal"
-    assert owner_observation.owner_reconciliation == "needs_task_projection"
-    assert owner_observation.successor_attempt_ids == ()
-
-    _wait_until_expired(warrant)
-    terminal = harness.fence.recover_effect_slot(
-        harness.runtime_path,
-        harness.task_path,
-        harness.expected,
-        harness.binding.effect_key,
-        harness.candidate,
-        _fresh_recovery_authority(harness),
-        claimed_by="effect-supervisor",
-    )
-
-    assert isinstance(terminal, EffectTerminalRecord)
-    assert terminal.recovery_finalized is True
-    assert terminal.recovery_owner_basis == "canonical_terminal"
-    _assert_one_effect_terminal(harness)
-    task = await harness.board.get(harness.binding.task_id)
-    run = await harness.runtime.get_delegation_run(harness.binding.mission_attempt_id)
-    claim = await harness.runtime.get_task_claim(harness.binding.mission_claim_id)
-    assert task is not None and task.status == TaskStatus.RUNNING
-    assert run is not None and run.status == "completed"
-    assert claim is not None and claim.status == "active"
-    assert await harness.runtime.list_runtime_receipts(
-        run_id=harness.binding.mission_attempt_id,
-        receipt_type=TERMINAL_RECEIPT_TYPE,
-    ) == parent_terminals
 
 
 @pytest.mark.asyncio

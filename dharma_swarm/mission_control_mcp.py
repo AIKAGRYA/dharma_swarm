@@ -32,6 +32,9 @@ from dharma_swarm.mission_control_mcp_mutations import (
     MISSION_FINISH_ATTEMPT as MISSION_FINISH_ATTEMPT,
 )
 from dharma_swarm.mission_control_mcp_mutations import (
+    MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT as MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT,
+)
+from dharma_swarm.mission_control_mcp_mutations import (
     MISSION_HEARTBEAT_LEASE as MISSION_HEARTBEAT_LEASE,
 )
 from dharma_swarm.mission_control_mcp_mutations import (
@@ -313,6 +316,7 @@ for _public_method_name in (
     "start_attempt",
     "heartbeat_lease",
     "finish_attempt",
+    "finish_attempt_from_patch_effect",
 ):
     _public_method = getattr(MissionControlMCPService, _public_method_name)
     _public_method.__module__ = __name__
@@ -447,6 +451,13 @@ def create_mission_control_mcp(
             service.finish_attempt,
             MISSION_FINISH_ATTEMPT,
             "Record a terminal receipt then project task state; requires authorization.",
+            mutation,
+        ),
+        (
+            service.finish_attempt_from_patch_effect,
+            MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT,
+            "Promote one exact consumed governed patch effect to task success; "
+            "requires injected authorization.",
             mutation,
         ),
     )

@@ -20,12 +20,15 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import sqlite3
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
     RUNTIME_SCAN_LIMIT,
     SCHEMA_VERSION,
     TASK_SCAN_LIMIT,
+    TERMINAL_RECEIPT_TYPE,
     AgentLeaseView,
     AttemptView,
     MissionControlError,
@@ -35,10 +38,14 @@ from dharma_swarm.mission_control_contract import (
     ReconciliationState,
     TaskView,
     clean_identifier,
+    completion_contract_from_metadata,
     session_id as mission_session_id,
     utc_now,
 )
 from dharma_swarm.mission_control_lifecycle import MissionControlLifecycleMixin
+from dharma_swarm.mission_control_effect_completion import (
+    MissionControlEffectCompletionMixin,
+)
 from dharma_swarm.mission_control_projection import (
     MissionControlProjectionMixin,
     lease_view,
@@ -79,6 +86,7 @@ def _operation_hash(label: str, payload: dict[str, Any]) -> str:
 class MissionControl(
     MissionControlLifecycleMixin,
     MissionControlRecoveryMixin,
+    MissionControlEffectCompletionMixin,
     MissionControlProjectionMixin,
 ):
     """Join and mutate canonical owner records without creating new storage."""
@@ -202,8 +210,10 @@ class MissionControl(
                     f"mission {mission_id!r}"
                 )
         key = str(idempotency_key or "").strip()
+        requested_task_metadata = dict(metadata or {})
+        completion_contract_from_metadata(requested_task_metadata)
         task_metadata = {
-            **dict(metadata or {}),
+            **requested_task_metadata,
             "schema_version": SCHEMA_VERSION,
             "mission_id": mission_id,
         }
@@ -317,9 +327,52 @@ class MissionControl(
             scan_saturated = scan_saturated or len(run_receipts) > receipt_budget
             receipts.extend(run_receipts[:receipt_budget])
             receipt_budget = max(0, receipt_budget - len(run_receipts))
+        governed_proof_conflict = False
+        if not scan_saturated:
+            for receipt in receipts:
+                if receipt.receipt_type != TERMINAL_RECEIPT_TYPE:
+                    continue
+                identity = identities.get(receipt.run_id)
+                try:
+                    governed = identity is not None and (
+                        completion_contract_from_metadata(identity.metadata)
+                        == GOVERNED_PATCH_COMPLETION_CONTRACT
+                    )
+                    if not governed:
+                        continue
+                    metadata = receipt.payload.get("metadata")
+                    effect_key = (
+                        metadata.get("effect_key")
+                        if type(metadata) is dict
+                        else None
+                    )
+                    if type(effect_key) is not str or not effect_key:
+                        raise MissionControlError(
+                            "governed parent receipt lacks an effect key"
+                        )
+                    self._validate_patch_effect_completion_readback(
+                        receipt,
+                        mission_id=mission_id,
+                        task_id=identity.task_id,
+                        agent_id=identity.agent_id,
+                        attempt_id=identity.run_id,
+                        effect_key=effect_key,
+                    )
+                except (
+                    MissionControlError,
+                    OSError,
+                    RuntimeError,
+                    sqlite3.Error,
+                    TypeError,
+                    ValueError,
+                ):
+                    governed_proof_conflict = True
+                    break
         state = (
             ReconciliationState.EVIDENCE_SCAN_SATURATED
             if scan_saturated
+            else ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
+            if governed_proof_conflict
             else reconciliation(
                 mission_id, tasks, runs, claims, receipts, identities, now
             )
@@ -425,7 +478,12 @@ class MissionControl(
 
 
 # Preserve pre-split callable provenance for introspection and function pickles.
-for _public_method_name in ("start_attempt", "heartbeat_lease", "finish_attempt"):
+for _public_method_name in (
+    "start_attempt",
+    "heartbeat_lease",
+    "finish_attempt",
+    "finish_attempt_from_patch_effect",
+):
     _public_method = getattr(MissionControl, _public_method_name)
     _public_method.__module__ = __name__
     _public_method.__qualname__ = f"MissionControl.{_public_method_name}"

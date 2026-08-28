@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,10 +16,16 @@ from dharma_swarm.mission_control import (
     MissionControlError,
     ReconciliationState,
 )
-from dharma_swarm.mission_control_contract import MAX_LEASE_SECONDS, stable_id
+from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
+    MAX_LEASE_SECONDS,
+    completion_contract_from_metadata,
+    stable_id,
+)
 from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import RuntimeStateStore, TaskClaim
+from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.task_board import TaskBoard, TaskBoardError
 
 
@@ -66,6 +73,208 @@ async def _active_attempt(
         attempt_id=attempt.attempt_id,
     )
     return attempt
+
+
+def _expired_stale_after(claim: TaskClaim) -> datetime:
+    """Return an already-expired deadline without corrupting lease chronology."""
+
+    last_owner_event = claim.heartbeat_at or claim.acked_at or claim.claimed_at
+    return last_owner_event + timedelta(microseconds=1)
+
+
+async def _governed_patch_task(control: MissionControl):
+    await control.create_mission(
+        "m-governed",
+        title="Governed patch",
+        goal="Require exact repository-effect proof",
+    )
+    return await control.create_task(
+        "m-governed",
+        title="Apply governed patch",
+        idempotency_key="task-governed-patch",
+        metadata={
+            "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
+        },
+    )
+
+
+def test_governed_patch_completion_contract_rejects_aliases() -> None:
+    assert GOVERNED_PATCH_COMPLETION_CONTRACT == "governed_patch_effect_v1"
+    assert completion_contract_from_metadata({}) == ""
+    assert (
+        completion_contract_from_metadata(
+            {"completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT}
+        )
+        == GOVERNED_PATCH_COMPLETION_CONTRACT
+    )
+    for alias in ("governed_patch_effect", "GOVERNED_PATCH_EFFECT_V1", True, 1):
+        with pytest.raises(MissionControlError):
+            completion_contract_from_metadata({"completion_contract": alias})
+
+
+@pytest.mark.asyncio
+async def test_governed_patch_contract_propagates_without_retry_downgrade(
+    mission_control: MissionControl,
+) -> None:
+    task = await _governed_patch_task(mission_control)
+    attempt = await mission_control.start_attempt(
+        "m-governed",
+        task.task_id,
+        "agent-patch",
+        attempt_key="governed-attempt",
+        metadata={"caller_hint": "not parent authority"},
+    )
+
+    identity = await mission_control._runtime.get_execution_identity(
+        attempt.attempt_id
+    )
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    stored_task = await mission_control._board.get(task.task_id)
+    assert identity is not None and run is not None and claim is not None
+    assert stored_task is not None
+    assert identity.metadata == {
+        "schema_version": "dharma.mission_control.v1",
+        "mission_id": "m-governed",
+        "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
+    }
+    assert run.metadata["caller_hint"] == "not parent authority"
+    assert claim.metadata["caller_hint"] == "not parent authority"
+    for metadata in (
+        stored_task.metadata,
+        identity.metadata,
+        run.metadata,
+        claim.metadata,
+    ):
+        assert (
+            completion_contract_from_metadata(metadata)
+            == GOVERNED_PATCH_COMPLETION_CONTRACT
+        )
+
+    for operation in (
+        mission_control.start_attempt(
+            "m-governed",
+            task.task_id,
+            "agent-patch",
+            attempt_key="governed-attempt",
+            metadata={"completion_contract": ""},
+        ),
+        mission_control.heartbeat_lease(
+            "m-governed",
+            task.task_id,
+            "agent-patch",
+            attempt_id=attempt.attempt_id,
+            metadata={"completion_contract": ""},
+        ),
+    ):
+        with pytest.raises(MissionControlError):
+            await operation
+
+    unchanged_run = await mission_control._runtime.get_delegation_run(
+        attempt.attempt_id
+    )
+    unchanged_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert unchanged_run is not None and unchanged_claim is not None
+    assert (
+        completion_contract_from_metadata(unchanged_run.metadata)
+        == GOVERNED_PATCH_COMPLETION_CONTRACT
+    )
+    assert (
+        completion_contract_from_metadata(unchanged_claim.metadata)
+        == GOVERNED_PATCH_COMPLETION_CONTRACT
+    )
+
+
+@pytest.mark.asyncio
+async def test_generic_task_lifecycle_remains_generic(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control, mission_id="m-generic")
+    attempt = await _active_attempt(
+        mission_control,
+        task.task_id,
+        mission_id="m-generic",
+        attempt_key="generic-attempt",
+    )
+    identity = await mission_control._runtime.get_execution_identity(
+        attempt.attempt_id
+    )
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    stored_task = await mission_control._board.get(task.task_id)
+    assert identity is not None and run is not None and claim is not None
+    assert stored_task is not None
+    assert all(
+        completion_contract_from_metadata(metadata) == ""
+        for metadata in (
+            stored_task.metadata,
+            identity.metadata,
+            run.metadata,
+            claim.metadata,
+        )
+    )
+
+    receipt = await mission_control.finish_attempt(
+        "m-generic",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        status="succeeded",
+        result="ordinary completion",
+    )
+    assert receipt.status == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_generic_finish_refuses_governed_patch_before_any_mutation(
+    mission_control: MissionControl,
+) -> None:
+    task = await _governed_patch_task(mission_control)
+    attempt = await mission_control.start_attempt(
+        "m-governed",
+        task.task_id,
+        "agent-patch",
+        attempt_key="governed-finish-refusal",
+    )
+    await mission_control.heartbeat_lease(
+        "m-governed",
+        task.task_id,
+        "agent-patch",
+        attempt_id=attempt.attempt_id,
+    )
+    before_task = await mission_control._board.get(task.task_id)
+    before_run = await mission_control._runtime.get_delegation_run(
+        attempt.attempt_id
+    )
+    before_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+
+    with pytest.raises(MissionControlError):
+        await mission_control.finish_attempt(
+            "m-governed",
+            task.task_id,
+            "agent-patch",
+            attempt_id=attempt.attempt_id,
+            status="succeeded",
+            result="caller assertion is not effect proof",
+        )
+
+    assert await mission_control._board.get(task.task_id) == before_task
+    assert (
+        await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+        == before_run
+    )
+    assert await mission_control._runtime.get_task_claim(attempt.claim_id) == before_claim
+    assert await mission_control._runtime.list_runtime_receipts(
+        run_id=attempt.attempt_id,
+        receipt_type="mission_attempt_terminal",
+    ) == []
+    assert (
+        await mission_control._runtime.get_idempotency_record(
+            "governed-finish-refusal",
+            f"mission_control:{attempt.attempt_id}:terminal",
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -345,7 +554,7 @@ async def test_expired_lease_cannot_be_resurrected_by_heartbeat(
     claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
     assert claim is not None
     await mission_control._runtime.record_task_claim(
-        replace(claim, stale_after=datetime.now(timezone.utc) - timedelta(seconds=1))
+        replace(claim, stale_after=_expired_stale_after(claim))
     )
 
     with pytest.raises(MissionControlError, match="expired"):
@@ -549,7 +758,7 @@ async def test_snapshot_reports_expired_lease(mission_control: MissionControl) -
     claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
     assert claim is not None
     await mission_control._runtime.record_task_claim(
-        replace(claim, stale_after=datetime.now(timezone.utc) - timedelta(seconds=1))
+        replace(claim, stale_after=_expired_stale_after(claim))
     )
 
     snapshot = await mission_control.get_snapshot("m-alpha")
@@ -612,7 +821,7 @@ async def test_finish_requires_acknowledged_unexpired_lease(
     claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
     assert claim is not None
     await mission_control._runtime.record_task_claim(
-        replace(claim, stale_after=datetime.now(timezone.utc) - timedelta(seconds=1))
+        replace(claim, stale_after=_expired_stale_after(claim))
     )
 
     with pytest.raises(MissionControlError, match="expired"):
@@ -647,7 +856,7 @@ async def test_new_claim_fences_stale_prior_finisher(
     await mission_control._runtime.record_task_claim(
         replace(
             first_claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(first_claim),
         )
     )
 
@@ -817,7 +1026,7 @@ async def test_attempt_resolution_without_id_rejects_ambiguity(
     await mission_control._runtime.record_task_claim(
         replace(
             first_claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(first_claim),
         )
     )
     second = await mission_control.start_attempt(
@@ -1148,7 +1357,7 @@ async def test_expired_takeover_terminalizes_prior_lineage_before_reassignment(
     await mission_control._runtime.record_task_claim(
         replace(
             first_claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(first_claim),
         )
     )
 
@@ -1209,6 +1418,61 @@ async def test_snapshot_reports_foreign_runtime_receipt_identity(
     await mission_control._runtime.record_runtime_receipt(
         replace(terminal[0], trace_id="foreign-trace")
     )
+
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert snapshot.reconciliation == ReconciliationState.FOREIGN_RUNTIME_RECORD
+
+
+@pytest.mark.asyncio
+async def test_snapshot_does_not_hide_effect_receipt_on_generic_lineage(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    await mission_control.finish_attempt(
+        "m-alpha",
+        task.task_id,
+        "agent-a",
+        attempt_id=attempt.attempt_id,
+        status="succeeded",
+    )
+    terminal = await mission_control._runtime.list_runtime_receipts(
+        run_id=attempt.attempt_id,
+        receipt_type="mission_attempt_terminal",
+        limit=100,
+    )
+    assert len(terminal) == 1
+    foreign = replace(
+        terminal[0],
+        receipt_id="rr_foreign_effect",
+        receipt_type=EFFECT_RECEIPT_TYPE,
+        status="consumed",
+        agent_id="effect-supervisor",
+        side_effect_key="foreign-effect",
+        payload={},
+    )
+    with sqlite3.connect(mission_control._runtime.db_path) as database:
+        database.execute(
+            "INSERT INTO runtime_receipts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                foreign.receipt_id,
+                foreign.receipt_type,
+                foreign.run_id,
+                foreign.task_id,
+                foreign.trace_id,
+                foreign.correlation_id,
+                foreign.causation_id,
+                foreign.parent_run_id,
+                foreign.agent_id,
+                foreign.idempotency_key,
+                foreign.side_effect_key,
+                foreign.status,
+                "{}",
+                foreign.created_at.isoformat(),
+            ),
+        )
+        database.commit()
 
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
@@ -1292,7 +1556,7 @@ async def test_expired_takeover_repairs_durable_terminal_without_new_attempt(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
 
@@ -1323,6 +1587,68 @@ async def test_expired_takeover_repairs_durable_terminal_without_new_attempt(
     assert projected is not None and projected.status == TaskStatus.COMPLETED
     assert recoveries == []
     assert [run.run_id for run in runs] == [attempt.attempt_id]
+
+
+@pytest.mark.asyncio
+async def test_terminal_recovery_cannot_launder_foreign_run_state(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(mission_control, task.task_id)
+    original_record_run = mission_control._runtime.record_delegation_run
+
+    async def crash_before_terminal_run_projection(run):
+        if run.run_id == attempt.attempt_id and run.status == "completed":
+            raise RuntimeError("simulated terminal owner crash")
+        return await original_record_run(run)
+
+    monkeypatch.setattr(
+        mission_control._runtime,
+        "record_delegation_run",
+        crash_before_terminal_run_projection,
+    )
+    with pytest.raises(RuntimeError, match="terminal owner crash"):
+        await mission_control.finish_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-a",
+            attempt_id=attempt.attempt_id,
+            status="succeeded",
+            result="durable-result",
+        )
+    monkeypatch.setattr(
+        mission_control._runtime,
+        "record_delegation_run",
+        original_record_run,
+    )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    assert claim is not None and run is not None
+    claim = await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=_expired_stale_after(claim))
+    )
+    forged_completed_at = run.started_at - timedelta(seconds=1)
+    await mission_control._runtime.record_delegation_run(
+        replace(run, status="mystery", completed_at=forged_completed_at)
+    )
+
+    with pytest.raises(MissionControlError, match="conflicting terminal evidence"):
+        await mission_control._recover_expired_claim(
+            "m-alpha",
+            claim,
+            recovered_at=datetime.now(timezone.utc),
+        )
+
+    unchanged_task = await mission_control._board.get(task.task_id)
+    unchanged_run = await mission_control._runtime.get_delegation_run(
+        attempt.attempt_id
+    )
+    unchanged_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert unchanged_task is not None and unchanged_task.status == TaskStatus.RUNNING
+    assert unchanged_run is not None and unchanged_run.status == "mystery"
+    assert unchanged_run.completed_at == forged_completed_at
+    assert unchanged_claim is not None and unchanged_claim.status == "active"
 
 
 @pytest.mark.asyncio
@@ -1426,7 +1752,7 @@ async def test_snapshot_rejects_terminal_claim_outcome_mismatch(
 
 
 @pytest.mark.asyncio
-async def test_recovery_claim_close_crash_is_projection_drift_and_retry_repairs(
+async def test_recovery_transition_is_atomic_before_replacement_claim(
     mission_control: MissionControl,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1442,36 +1768,23 @@ async def test_recovery_claim_close_crash_is_projection_drift_and_retry_repairs(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
     original_record_claim = mission_control._runtime.record_task_claim
+    stale_projection_calls = 0
 
-    async def crash_before_recovery_claim_close(candidate):
+    async def reject_obsolete_partial_claim_projection(candidate):
+        nonlocal stale_projection_calls
         if candidate.claim_id == first.claim_id and candidate.status == "stale_recovered":
-            raise RuntimeError("simulated recovery-before-claim crash")
+            stale_projection_calls += 1
+            raise RuntimeError("obsolete partial recovery write")
         return await original_record_claim(candidate)
 
     monkeypatch.setattr(
         mission_control._runtime,
         "record_task_claim",
-        crash_before_recovery_claim_close,
-    )
-    with pytest.raises(RuntimeError, match="recovery-before-claim"):
-        await mission_control.start_attempt(
-            "m-alpha",
-            task.task_id,
-            "agent-b",
-            attempt_key="recovery-crash-two",
-        )
-    snapshot = await mission_control.get_snapshot("m-alpha")
-    assert snapshot is not None
-    assert snapshot.attempts[0].status == "stale_recovered"
-    assert snapshot.leases[0].status == "active"
-    assert snapshot.reconciliation == ReconciliationState.NEEDS_TASK_PROJECTION
-
-    monkeypatch.setattr(
-        mission_control._runtime, "record_task_claim", original_record_claim
+        reject_obsolete_partial_claim_projection,
     )
     second = await mission_control.start_attempt(
         "m-alpha",
@@ -1479,6 +1792,16 @@ async def test_recovery_claim_close_crash_is_projection_drift_and_retry_repairs(
         "agent-b",
         attempt_key="recovery-crash-two",
     )
+    snapshot = await mission_control.get_snapshot("m-alpha")
+    assert snapshot is not None
+    assert {
+        attempt.attempt_id: attempt.status for attempt in snapshot.attempts
+    }[first.attempt_id] == "stale_recovered"
+    assert {
+        lease.claim_id: lease.status for lease in snapshot.leases
+    }[first.claim_id] == "stale_recovered"
+    assert snapshot.reconciliation == ReconciliationState.COHERENT
+    assert stale_projection_calls == 0
     repaired = await mission_control._runtime.get_task_claim(first.claim_id)
     assert repaired is not None and repaired.status == "stale_recovered"
     assert second.status == "queued"
@@ -1535,7 +1858,7 @@ async def test_snapshot_receipt_budget_is_global_across_attempts(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
     second = await mission_control.start_attempt(
@@ -1634,7 +1957,7 @@ async def test_post_recovery_pre_replacement_crash_is_projection_drift(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
     original_recover = mission_control._recover_expired_claim
@@ -1694,7 +2017,7 @@ async def test_recovery_evidence_cannot_authorize_terminal_task(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
     await mission_control._recover_expired_claim(
@@ -1725,7 +2048,7 @@ async def test_recovered_attempt_then_replacement_success_is_coherent(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
     second = await mission_control.start_attempt(
@@ -1785,6 +2108,138 @@ async def test_unknown_owner_lifecycle_status_is_foreign_runtime_state(
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
     assert snapshot.reconciliation == ReconciliationState.FOREIGN_RUNTIME_RECORD
+
+
+@pytest.mark.asyncio
+async def test_expired_recovery_cannot_launder_unknown_owner_status(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(
+        mission_control,
+        task.task_id,
+        attempt_key="unknown-recovery-status",
+    )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    assert claim is not None and run is not None
+    await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=_expired_stale_after(claim))
+    )
+    await mission_control._runtime.record_delegation_run(
+        replace(run, status="mystery")
+    )
+
+    with pytest.raises(MissionControlError, match="recovery CAS was lost"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-b",
+            attempt_key="must-not-replace-foreign-lineage",
+        )
+
+    unchanged_run = await mission_control._runtime.get_delegation_run(
+        attempt.attempt_id
+    )
+    unchanged_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    recoveries = await mission_control._runtime.list_runtime_receipts(
+        run_id=attempt.attempt_id,
+        receipt_type="mission_attempt_recovery",
+        limit=10,
+    )
+    runs = await mission_control._runtime.list_delegation_runs(
+        task_id=task.task_id,
+        limit=10,
+    )
+    assert unchanged_run is not None and unchanged_run.status == "mystery"
+    assert unchanged_claim is not None and unchanged_claim.status == "active"
+    assert recoveries == []
+    assert [candidate.run_id for candidate in runs] == [attempt.attempt_id]
+
+
+@pytest.mark.asyncio
+async def test_expired_recovery_rejects_impossible_lease_chronology(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(
+        mission_control,
+        task.task_id,
+        attempt_key="malformed-recovery-timeline",
+    )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert claim is not None and claim.heartbeat_at is not None
+    await mission_control._runtime.record_task_claim(
+        replace(
+            claim,
+            stale_after=claim.heartbeat_at - timedelta(microseconds=1),
+        )
+    )
+
+    with pytest.raises(MissionControlError, match="recovery CAS was lost"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-b",
+            attempt_key="must-not-replace-malformed-lineage",
+        )
+
+    unchanged_run = await mission_control._runtime.get_delegation_run(
+        attempt.attempt_id
+    )
+    unchanged_claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    recoveries = await mission_control._runtime.list_runtime_receipts(
+        run_id=attempt.attempt_id,
+        receipt_type="mission_attempt_recovery",
+        limit=10,
+    )
+    assert unchanged_run is not None and unchanged_run.status == "running"
+    assert unchanged_claim is not None and unchanged_claim.status == "active"
+    assert recoveries == []
+
+
+@pytest.mark.asyncio
+async def test_expired_recovery_rejects_foreign_run_attempt_binding(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    attempt = await _active_attempt(
+        mission_control,
+        task.task_id,
+        attempt_key="foreign-recovery-attempt-binding",
+    )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    run = await mission_control._runtime.get_delegation_run(attempt.attempt_id)
+    assert claim is not None and run is not None
+    await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=_expired_stale_after(claim))
+    )
+    await mission_control._runtime.record_delegation_run(
+        replace(
+            run,
+            metadata={**run.metadata, "attempt_id": "foreign-attempt"},
+        )
+    )
+
+    with pytest.raises(MissionControlError, match="foreign identity"):
+        await mission_control.start_attempt(
+            "m-alpha",
+            task.task_id,
+            "agent-b",
+            attempt_key="must-not-replace-foreign-binding",
+        )
+
+    recoveries = await mission_control._runtime.list_runtime_receipts(
+        run_id=attempt.attempt_id,
+        receipt_type="mission_attempt_recovery",
+        limit=10,
+    )
+    runs = await mission_control._runtime.list_delegation_runs(
+        task_id=task.task_id,
+        limit=10,
+    )
+    assert recoveries == []
+    assert [candidate.run_id for candidate in runs] == [attempt.attempt_id]
 
 
 @pytest.mark.asyncio
@@ -1913,7 +2368,7 @@ async def test_snapshot_rejects_forged_recovery_receipt_contract(
     await mission_control._runtime.record_task_claim(
         replace(
             claim,
-            stale_after=datetime.now(timezone.utc) - timedelta(seconds=1),
+            stale_after=_expired_stale_after(claim),
         )
     )
     await mission_control.start_attempt(

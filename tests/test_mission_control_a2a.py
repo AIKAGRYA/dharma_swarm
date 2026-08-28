@@ -47,8 +47,10 @@ from dharma_swarm.mission_control_a2a_candidate import (
     ExactProposalStoreObservation,
 )
 from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
     MissionControlError,
     ReconciliationState,
+    stable_id,
 )
 from dharma_swarm.mission_control_verification import (
     FOUNDRY_PATCH_VERIFICATION_SCHEMA,
@@ -262,6 +264,7 @@ async def _context(tmp_path: Path, *, proposal: bool) -> _Context:
         title="Patch candidate",
         metadata={
             "preserved": "yes",
+            "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
             "a2a_binding": {
                 "schema_version": A2A_BINDING_SCHEMA,
                 "agent_uid": agent,
@@ -833,35 +836,18 @@ async def test_exact_proposal_store_refuses_older_unexpired_leased_claim(
 @pytest.mark.asyncio
 async def test_exact_proposal_store_refuses_started_terminal_idempotency_window(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ctx, expected, attempt_id, _claim_id = await _proposal_store_context(tmp_path)
-    record_receipt = ctx.runtime.record_receipt_for_identity
-
-    async def crash_before_terminal_receipt(
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        if kwargs.get("receipt_type") == "mission_attempt_terminal":
-            raise RuntimeError("crash before terminal receipt")
-        return await record_receipt(*args, **kwargs)
-
-    monkeypatch.setattr(
-        ctx.runtime,
-        "record_receipt_for_identity",
-        crash_before_terminal_receipt,
-    )
-    with pytest.raises(RuntimeError, match="crash before terminal receipt"):
-        await ctx.control.finish_attempt(
-            ctx.mission_id,
-            ctx.task_id,
-            ctx.expected.executor_agent_uid,
-            attempt_id=attempt_id,
-            status="succeeded",
-            result="terminal result",
-        )
-
+    identity = await ctx.runtime.get_execution_identity(attempt_id)
+    assert identity is not None
     side_effect_key = f"mission_control:{attempt_id}:terminal"
+    ownership = await ctx.runtime.try_begin_idempotent_side_effect_with_token(
+        identity,
+        side_effect_key,
+        metadata={"simulated_crash": "before_terminal_receipt"},
+    )
+    assert ownership is not None
+
     with sqlite3.connect(ctx.runtime.db_path) as db:
         row = db.execute(
             "SELECT status, result_receipt_id FROM idempotency_records"
@@ -876,29 +862,33 @@ async def test_exact_proposal_store_refuses_started_terminal_idempotency_window(
 @pytest.mark.asyncio
 async def test_exact_proposal_store_refuses_terminal_receipt_projection_crash(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ctx, expected, attempt_id, _claim_id = await _proposal_store_context(tmp_path)
-
-    async def crash_before_projection(*_args: object, **_kwargs: object) -> None:
-        raise RuntimeError("crash before terminal projection")
-
-    monkeypatch.setattr(
-        ctx.control,
-        "_project_terminal_lineage",
-        crash_before_projection,
-    )
-    with pytest.raises(RuntimeError, match="crash before terminal projection"):
-        await ctx.control.finish_attempt(
-            ctx.mission_id,
-            ctx.task_id,
-            ctx.expected.executor_agent_uid,
-            attempt_id=attempt_id,
-            status="succeeded",
-            result="terminal result",
-        )
-
+    identity = await ctx.runtime.get_execution_identity(attempt_id)
+    assert identity is not None
     side_effect_key = f"mission_control:{attempt_id}:terminal"
+    ownership = await ctx.runtime.try_begin_idempotent_side_effect_with_token(
+        identity,
+        side_effect_key,
+        metadata={"simulated_crash": "before_terminal_projection"},
+    )
+    assert ownership is not None
+    receipt = await ctx.runtime.record_receipt_for_identity(
+        identity,
+        receipt_type="mission_attempt_terminal",
+        status="succeeded",
+        side_effect_key=side_effect_key,
+        receipt_id=stable_id("receipt", attempt_id, "succeeded"),
+        payload={"simulated_crash": "before_terminal_projection"},
+    )
+    await ctx.runtime.complete_idempotent_side_effect(
+        identity,
+        side_effect_key,
+        result_receipt_id=receipt.receipt_id,
+        metadata={"simulated_crash": "before_terminal_projection"},
+        expected_updated_at=ownership,
+    )
+
     with sqlite3.connect(ctx.runtime.db_path) as db:
         receipt = db.execute(
             "SELECT receipt_id FROM runtime_receipts"

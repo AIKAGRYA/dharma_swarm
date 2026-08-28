@@ -18,6 +18,8 @@ from dharma_swarm.mission_control_contract import (
     ReconciliationState,
     TaskView,
 )
+from dharma_swarm.mission_control_effect_fence_store import row_binding
+from dharma_swarm.mission_control_effect_terminal_store import existing_terminal
 from dharma_swarm.mission_control_reconciliation import reconciliation
 from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.runtime_state import (
@@ -25,6 +27,10 @@ from dharma_swarm.runtime_state import (
     _row_to_execution_identity,
     _row_to_run,
     _row_to_runtime_receipt,
+)
+from dharma_swarm.runtime_state_effect_fence import (
+    EFFECT_FENCE_TABLE,
+    EFFECT_RECEIPT_TYPE,
 )
 
 _SCAN_LIMIT = 10_000
@@ -62,20 +68,61 @@ def _validate_runtime_rows(
     for row in identity_rows:
         owner_object(row["metadata_json"], "Mission Control identity")
     for row in receipt_rows:
+        receipt_type = owner_text(row, "receipt_type")
         raw_payload = owner_text(row, "payload_json")
         payload = owner_object(raw_payload, "Mission Control receipt")
-        if json.dumps(payload, sort_keys=True, ensure_ascii=True) != raw_payload:
+        separators = (",", ":") if receipt_type == EFFECT_RECEIPT_TYPE else None
+        if json.dumps(
+            payload, sort_keys=True, ensure_ascii=True, separators=separators
+        ) != raw_payload:
             raise MissionControlError("Mission Control receipt is noncanonical")
         owner_time(row, "created_at")
-        receipt_type = owner_text(row, "receipt_type")
         run_id = owner_text(row, "run_id")
         side_effect_key = owner_text(row, "side_effect_key")
         expected_key = {
             TERMINAL_RECEIPT_TYPE: f"mission_control:{run_id}:terminal",
             RECOVERY_RECEIPT_TYPE: f"mission_control:{run_id}:stale_recovery",
         }.get(receipt_type)
-        if expected_key is None or side_effect_key != expected_key:
+        if receipt_type == EFFECT_RECEIPT_TYPE:
+            if not side_effect_key:
+                raise MissionControlError("effect receipt key is empty")
+        elif expected_key is None or side_effect_key != expected_key:
             raise MissionControlError("Mission Control transition slot is aliased")
+
+
+def _validate_effect_owner_triples(
+    connection: sqlite3.Connection,
+    receipt_rows: list[sqlite3.Row],
+) -> None:
+    for row in receipt_rows:
+        if owner_text(row, "receipt_type") != EFFECT_RECEIPT_TYPE:
+            continue
+        effect_key = owner_text(row, "side_effect_key")
+        fences = connection.execute(
+            f"SELECT * FROM {EFFECT_FENCE_TABLE} WHERE effect_key=? LIMIT 2",
+            (effect_key,),
+        ).fetchall()
+        if len(fences) != 1:
+            raise MissionControlError("exact effect owner fence is not unique")
+        binding = row_binding(fences[0])
+        terminal = existing_terminal(connection, fences[0])
+        expected = _row_to_runtime_receipt(row)
+        if (
+            expected.receipt_id != terminal.terminal_receipt_id
+            or expected.run_id != binding.mission_attempt_id
+            or expected.task_id != binding.task_id
+            or expected.trace_id != ""
+            or expected.correlation_id != binding.correlation_id
+            or expected.causation_id != binding.proposal_receipt_id
+            or expected.parent_run_id != binding.executor_run_id
+            or expected.agent_id != terminal.claimed_by
+            or expected.idempotency_key != "idem_" + terminal.terminal_receipt_id
+            or expected.side_effect_key != terminal.effect_key
+            or expected.status != "consumed"
+            or expected.payload != terminal.to_dict()
+            or expected.created_at != terminal.consumed_at
+        ):
+            raise MissionControlError("exact effect owner triple disagrees")
 
 
 def observe_recovery_owner_graph(
@@ -126,14 +173,21 @@ def observe_recovery_owner_graph(
     key_placeholders = ",".join("?" for _ in side_effect_keys)
     receipt_rows = _bounded(
         connection,
-        f"SELECT * FROM runtime_receipts WHERE receipt_type IN (?, ?)"
+        f"SELECT * FROM runtime_receipts WHERE receipt_type IN (?, ?, ?)"
         f" AND (run_id IN ({placeholders})"
         f" OR side_effect_key IN ({key_placeholders}))"
         " ORDER BY created_at LIMIT 10001",
-        (TERMINAL_RECEIPT_TYPE, RECOVERY_RECEIPT_TYPE, *run_ids, *side_effect_keys),
+        (
+            TERMINAL_RECEIPT_TYPE,
+            RECOVERY_RECEIPT_TYPE,
+            EFFECT_RECEIPT_TYPE,
+            *run_ids,
+            *side_effect_keys,
+        ),
         "Mission Control receipt",
     )
     _validate_runtime_rows(run_rows, claim_rows, identity_rows, receipt_rows)
+    _validate_effect_owner_triples(connection, receipt_rows)
     runs = [_row_to_run(row) for row in run_rows]
     claims = [_row_to_claim(row) for row in claim_rows]
     receipts = [_row_to_runtime_receipt(row) for row in receipt_rows]
