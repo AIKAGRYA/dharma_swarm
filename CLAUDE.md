@@ -101,6 +101,9 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
   Uncited claims carry zero weight regardless of fluency. Prefer uncharmable
   mechanical checks (ratcheted baselines, import provenance, DocOps counts)
   over reviewer vigilance.
+- **Claim locus:** receipts, reviews, audits, and measured claims carry
+  commit + host + branch (`docs/governance/CLAIM_LOCUS_CONVENTION.md`); a
+  claim without locus is a rumor.
 - **Runtime receipts never enter git.** `reports/a2a/*_receipts/`,
   `reports/model_*/e2e/`, and `reports/model_pool/` are loop-generated and
   gitignored; write runtime receipts under `~/.dharma/`.
