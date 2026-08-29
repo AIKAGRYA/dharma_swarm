@@ -528,12 +528,6 @@ class NVIDIANIMProvider(LLMProvider):
             self._client = httpx.AsyncClient(timeout=120.0)
         return self._client
 
-    async def close(self) -> None:
-        """Close the persistent HTTP client."""
-        if self._client is not None and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
-
     @staticmethod
     def _retry_after_seconds(resp: httpx.Response) -> float | None:
         raw = resp.headers.get("Retry-After")
@@ -1026,12 +1020,6 @@ class OllamaProvider(LLMProvider):
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(timeout=120.0)
         return self._client
-
-    async def close(self) -> None:
-        """Close the persistent HTTP client."""
-        if self._client is not None and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
 
     @staticmethod
     def _build_messages(request: LLMRequest) -> list[dict[str, str]]:

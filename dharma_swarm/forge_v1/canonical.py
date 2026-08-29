@@ -42,7 +42,7 @@ bootstrap_runtime_env()
 from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.forge_v1.autoloop import grade, pull_context, _safe, window_context  # noqa: E402
 from dharma_swarm.forge_v1.harness import BudgetExhausted, TokenBroker  # noqa: E402
-from dharma_swarm.forge_v1.providers import _usage_tokens  # noqa: E402
+from dharma_swarm.forge_v1.providers import _complete_and_close, _usage_tokens  # noqa: E402
 from dharma_swarm.forge_v1.run_real import (  # noqa: E402
     _rate_limit_wait_s,
     apply_edit_blocks,
@@ -103,7 +103,7 @@ def _call(provider, wire: str, prompt_or_messages, *, max_tokens: int, temperatu
     req = LLMRequest(model=wire, messages=messages, max_tokens=max_tokens, temperature=temperature)
 
     async def _c():
-        return await asyncio.wait_for(provider.complete(req), timeout=timeout_s)
+        return await _complete_and_close(provider, req, timeout_s=timeout_s)
 
     for attempt in range(4):
         try:

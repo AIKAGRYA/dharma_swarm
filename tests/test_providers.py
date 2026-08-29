@@ -96,6 +96,24 @@ async def test_kimi_code_stream_forwards_tools():
     assert captured["tools"] == tools
 
 
+@pytest.mark.asyncio
+async def test_kimi_code_close_resets_cached_client():
+    class _Client:
+        closed = False
+
+        async def close(self):
+            self.closed = True
+
+    client = _Client()
+    provider = KimiCodeProvider(api_key="test-key")
+    provider._client = client
+
+    await provider.close()
+
+    assert client.closed is True
+    assert provider._client is None
+
+
 def test_model_router_missing():
     router = ModelRouter({})
     with pytest.raises(KeyError, match="No provider"):

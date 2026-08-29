@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,6 +59,8 @@ class ExperimentConfig:
     seed_genome: dict[str, Any] | None = None
     budget_cap_tokens: int = 120_000  # per candidate-grade
     budget_cap_usd: float = 2.0
+    soft_token_cap: bool = True
+    require_valid_seed: bool = True
     max_experiment_tokens: int = 600_000
     propose_timeout_s: int = 240
     grade_timeout_s: int = 600
@@ -67,6 +70,11 @@ class ExperimentConfig:
     benchmark: str = "taskbed-explore-fresh-pr-suite"
     dry_run: bool = False
     keep_worktree: bool = False
+    # The bounded unattended lane owns a fixed logical-call proof and therefore
+    # cannot allow the RNG to silently replace its one mutation-model call with
+    # a parametric or crossover operator. Interactive EXPLORE keeps the wild
+    # stochastic policy by default.
+    force_single_llm_mutation: bool = False
     source_repo: Path = field(default_factory=lambda: Path.home() / "dharma_swarm")
     state_root: Path = field(default_factory=lambda: Path.home() / ".dharma" / "evolution_archive")
 
@@ -114,9 +122,10 @@ class Seams:
 
 
 def _cost_estimate(cfg: ExperimentConfig) -> dict[str, Any]:
-    observations = (1 + cfg.children * cfg.generations) * cfg.tasks_per_generation
+    candidate_grades = 1 + (cfg.children + 1) * cfg.generations
+    observations = candidate_grades * cfg.tasks_per_generation
     return {
-        "planned_candidate_grades": 1 + cfg.children * cfg.generations,
+        "planned_candidate_grades": candidate_grades,
         "planned_observations": observations,
         "est_llm_calls_min": observations + cfg.children * cfg.generations,
         "est_wall_minutes_rough": round(observations * 1.5, 1),
@@ -129,7 +138,8 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     started_mono = time.monotonic()
     rng = random.Random(cfg.rng_seed)
     seams = (seams or Seams()).resolved(cfg)
-    base_sha = "dryrun" if cfg.dry_run else _git_sha(cfg.source_repo)
+    git_identity = _git_identity(cfg.source_repo, dry_run=cfg.dry_run)
+    base_sha = git_identity["head_sha"]
     exp_id = ids.experiment_id(
         category=cfg.category, benchmark=cfg.benchmark, started_at=started_at, base_sha=base_sha
     )
@@ -172,8 +182,9 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         if not (decision.allowed and decision.effective_shadow):
             raise RuntimeError(f"membrane refused scratch worktree: {decision.denial_reason}")
         membrane["marked_scratch_worktree"] = True
-        # host-pytest grading runs in isolated temp checkouts of PINNED repos;
-        # recorded honestly as the sandbox-equivalence claim (U2's posture).
+        # Production seams admit official SWE-bench Docker grading only.  PR
+        # suite tasks are recorded InconclusiveInfrastructure until their
+        # brokerless container grader exists; host pytest is never executed.
         membrane["container_or_equivalent_sandbox"] = True
 
     estimate = _cost_estimate(cfg)
@@ -182,7 +193,10 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         "experiment_id": exp_id,
         "category": cfg.category,
         "benchmark": cfg.benchmark,
+        # Historical field retained for readers; it is now the actual source
+        # HEAD used to run the experiment, not origin/main.
         "git_base_sha": base_sha,
+        "git_identity": git_identity,
         "mode": "shadow",
         "dry_run": cfg.dry_run,
         "started_at": started_at,
@@ -195,7 +209,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         "archive_fitness_authority": "one_wire_disabled_explicit_lab_shadow",
         "cost_estimate": estimate,
         "caveats": [
-            "explore-fast tier: host-pytest on pinned repos (no Docker)",
+            "explore grading: official SWE-bench Docker; host PR-suite grading is refused as infrastructure-inconclusive",
             "fuel is single-repo (pallets/click) until harvest scales — fitness is click-domain",
             "explore closeouts can never be positive_lift_candidate",
         ],
@@ -206,8 +220,21 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     store = CandidateStore(archive_path, experiment_id=exp_id, category=cfg.category)
     await store.load()
 
-    counters = {"graded": 0, "blocked": 0, "errored": 0, "duplicate": 0}
+    counters = {
+        "graded": 0,
+        "blocked": 0,
+        "errored": 0,
+        "duplicate": 0,
+        "paired_controls": 0,
+        "inconclusive_infrastructure": 0,
+        "inconclusive_generation": 0,
+        "inconclusive_budget": 0,
+    }
     tokens_spent_total = 0
+    comparable_observations_total = 0
+    infrastructure_observations_total = 0
+    generation_observations_total = 0
+    budget_observations_total = 0
     stopped_early = ""
 
     async def _tasks_for_generation(gen: int) -> dict[str, tuple[dict, dict]]:
@@ -225,8 +252,14 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     async def _grade_and_archive(
         genome: dict[str, Any], *, cid: str, parent_id: str | None, generation: int,
         loop_iteration: int, role: str, contexts: dict, notes: str, raw: str, op: str,
+        comparison_block_id: str | None = None,
+        control_pass_rate: float | None = None,
     ) -> dict[str, Any]:
         nonlocal tokens_spent_total
+        nonlocal comparable_observations_total
+        nonlocal infrastructure_observations_total
+        nonlocal generation_observations_total
+        nonlocal budget_observations_total
         checked = check_genome(genome)
         if not checked.executable:
             await store.append_blocked(
@@ -256,13 +289,41 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             budget_cap_usd=cfg.budget_cap_usd,
             propose_timeout_s=cfg.propose_timeout_s,
             grade_timeout_s=cfg.grade_timeout_s,
+            soft_token_cap=cfg.soft_token_cap,
         )
         tokens_spent_total += outcome.tokens_used
+        comparable_observations_total += outcome.comparable_observations
+        infrastructure_count = sum(
+            row.get("evidence_class") == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
+            for row in outcome.per_task
+        )
+        infrastructure_observations_total += infrastructure_count
+        generation_count = sum(
+            row.get("evidence_class") == grade_explore.INCONCLUSIVE_GENERATION
+            for row in outcome.per_task
+        )
+        budget_count = sum(
+            row.get("evidence_class") == grade_explore.INCONCLUSIVE_BUDGET
+            for row in outcome.per_task
+        )
+        generation_observations_total += generation_count
+        budget_observations_total += budget_count
+        if infrastructure_count:
+            counters["inconclusive_infrastructure"] += 1
+        if generation_count:
+            counters["inconclusive_generation"] += 1
+        if budget_count:
+            counters["inconclusive_budget"] += 1
         envelope = FreeformExploreEnvelope(
             candidate_id=cid, parent_id=parent_id, experiment_id=exp_id,
             category=cfg.category, raw_output=raw, notes=notes,
             artifacts={"operator": op},
-            benchmark_receipt={"tier": outcome.tier, "pass_rate": outcome.pass_rate},
+            benchmark_receipt={
+                "tier": outcome.tier,
+                "pass_rate": outcome.pass_rate,
+                "evidence_class": outcome.evidence_class,
+                "comparable_observations": outcome.comparable_observations,
+            },
             membrane=membrane,
         )
         issues = validate_freeform_explore_envelope(envelope)
@@ -291,6 +352,75 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                 pass_rate=outcome.pass_rate,
                 per_task=outcome.per_task,
                 budget=outcome.budget,
+                evidence_class=outcome.evidence_class,
+                comparable_observations=outcome.comparable_observations,
+                comparison_block_id=comparison_block_id,
+                control_candidate_id=seed_cid if comparison_block_id else None,
+                control_pass_rate=control_pass_rate,
+            ),
+        )
+
+    async def _grade_paired_control(
+        generation: int, contexts: dict[str, tuple[dict, dict]]
+    ) -> dict[str, Any]:
+        nonlocal tokens_spent_total
+        nonlocal comparable_observations_total
+        nonlocal infrastructure_observations_total
+        nonlocal generation_observations_total
+        nonlocal budget_observations_total
+        outcome = await asyncio.to_thread(
+            grade_explore.grade_genome_explore,
+            seed,
+            contexts,
+            seams=seams.grade,
+            budget_cap_tokens=cfg.budget_cap_tokens,
+            budget_cap_usd=cfg.budget_cap_usd,
+            propose_timeout_s=cfg.propose_timeout_s,
+            grade_timeout_s=cfg.grade_timeout_s,
+            soft_token_cap=cfg.soft_token_cap,
+        )
+        tokens_spent_total += outcome.tokens_used
+        comparable_observations_total += outcome.comparable_observations
+        infrastructure_count = sum(
+            row.get("evidence_class") == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
+            for row in outcome.per_task
+        )
+        infrastructure_observations_total += infrastructure_count
+        generation_count = sum(
+            row.get("evidence_class") == grade_explore.INCONCLUSIVE_GENERATION
+            for row in outcome.per_task
+        )
+        budget_count = sum(
+            row.get("evidence_class") == grade_explore.INCONCLUSIVE_BUDGET
+            for row in outcome.per_task
+        )
+        generation_observations_total += generation_count
+        budget_observations_total += budget_count
+        counters["paired_controls"] += 1
+        if infrastructure_count:
+            counters["inconclusive_infrastructure"] += 1
+        if generation_count:
+            counters["inconclusive_generation"] += 1
+        if budget_count:
+            counters["inconclusive_budget"] += 1
+        return _append_result_row(
+            results_path,
+            _result_row(
+                exp_id=exp_id,
+                candidate_id=seed_cid,
+                parent_id=None,
+                state="graded",
+                role="paired_control",
+                op="seed_control",
+                generation=generation,
+                pass_rate=outcome.pass_rate,
+                per_task=outcome.per_task,
+                budget=outcome.budget,
+                evidence_class=outcome.evidence_class,
+                comparable_observations=outcome.comparable_observations,
+                comparison_block_id=f"{exp_id}:generation:{generation}",
+                control_candidate_id=seed_cid,
+                control_pass_rate=outcome.pass_rate,
             ),
         )
 
@@ -306,13 +436,26 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         seed, cid=seed_cid, parent_id=None, generation=0, loop_iteration=0,
         role="seed_baseline", contexts=contexts, notes="seed", raw="", op="seed",
     )
+    graded_after_seed = await store.graded_entries()
+    seed_row = next(
+        (CandidateStore._row(e) for e in graded_after_seed if CandidateStore._row(e).get("role") == "seed_baseline"),
+        {},
+    )
+    seed_budget = seed_row.get("budget") if isinstance(seed_row.get("budget"), dict) else {}
+    if cfg.require_valid_seed and seed_budget.get("hard_invalid"):
+        stopped_early = f"seed_baseline_hard_invalid:{seed_budget.get('hard_invalid_reason')}"
+    seed_soft_cap_exceeded = bool(seed_budget.get("soft_token_cap_exceeded"))
 
     # ---- generations ---------------------------------------------------------
     for gen in range(1, cfg.generations + 1):
+        if stopped_early:
+            break
         if tokens_spent_total >= cfg.max_experiment_tokens:
             stopped_early = f"token_ceiling_reached:{tokens_spent_total}"
             break
         contexts = await _tasks_for_generation(gen)
+        comparison_block_id = f"{exp_id}:generation:{gen}"
+        control_row = await _grade_paired_control(gen, contexts)
         graded = await store.graded_entries()
         counts = store.n_children_map()
         gen_children: list[dict[str, Any]] = []
@@ -332,9 +475,13 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             ]
             # operator draw: wild by default
             roll = rng.random()
-            if cfg.dry_run or roll < 0.2:
+            if cfg.dry_run or (not cfg.force_single_llm_mutation and roll < 0.2):
                 result = mutation.parametric_mutation(parent_genome, rng=rng)
-            elif roll < 0.4 and len(graded) >= 2:
+            elif (
+                not cfg.force_single_llm_mutation
+                and roll < 0.4
+                and len(graded) >= 2
+            ):
                 other = rng.choice([e for e in graded if e.id != parent.id] or graded)
                 result = await asyncio.to_thread(
                     mutation.llm_propose_genome, parent_genome,
@@ -404,11 +551,28 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                 child, cid=cid, parent_id=parent.id, generation=gen, loop_iteration=gen,
                 role="candidate", contexts=contexts,
                 notes=result.notes or f"op:{result.operator}", raw=result.raw_output, op=result.operator,
+                comparison_block_id=comparison_block_id,
+                control_pass_rate=control_row.get("pass_rate"),
             )
-            gen_children.append(_result_summary(row))
+            summary = _result_summary(row)
+            if (
+                int(summary.get("comparable_observations") or 0) > 0
+                and int(summary.get("comparable_observations") or 0)
+                == int(control_row.get("comparable_observations") or 0)
+                and summary.get("pass_rate") is not None
+                and control_row.get("pass_rate") is not None
+            ):
+                summary["paired_delta"] = round(
+                    float(summary["pass_rate"]) - float(control_row["pass_rate"]), 6
+                )
+            else:
+                summary["paired_delta"] = None
+            gen_children.append(summary)
         _write_json(exp_dir / "receipts" / f"generation_{gen:03}.json", {
             "schema": GENERATION_RECEIPT_SCHEMA,
             "generation": gen, "rng_seed": cfg.rng_seed, "task_ids": list(contexts),
+            "comparison_block_id": comparison_block_id,
+            "paired_control": _result_summary(control_row),
             "children": gen_children, "observations": gen_children, "counters": dict(counters),
             "tokens_spent_total": tokens_spent_total, "at": _now(),
         })
@@ -420,7 +584,13 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     best_rate = max((r.get("pass_rate", 0.0) for r in rows), default=0.0)
     if counters["graded"] == 0:
         state = "blocked_with_evidence"
-    elif best_rate <= seed_rate and best_rate == 0.0:
+    elif infrastructure_observations_total:
+        state = "inconclusive_infrastructure"
+    elif comparable_observations_total == 0 and budget_observations_total:
+        state = "inconclusive_budget"
+    elif comparable_observations_total == 0 and generation_observations_total:
+        state = "inconclusive_generation"
+    elif comparable_observations_total > 0 and best_rate <= seed_rate and best_rate == 0.0:
         state = "measured_negative"
     else:
         state = "inconclusive_low_power"  # explore can never claim positive lift
@@ -452,7 +622,14 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             "seed_pass_rate": seed_rate,
             "best_pass_rate": best_rate,
             "tokens_spent_total": tokens_spent_total,
+            "comparable_observations_total": comparable_observations_total,
+            "infrastructure_observations_total": infrastructure_observations_total,
+            "generation_observations_total": generation_observations_total,
+            "budget_observations_total": budget_observations_total,
             "n_tasks_per_generation": cfg.tasks_per_generation,
+            "seed_soft_token_cap_exceeded": seed_soft_cap_exceeded,
+            "soft_token_cap": cfg.soft_token_cap,
+            "require_valid_seed": cfg.require_valid_seed,
             "note": "n is far below any powered claim; ranking signal only",
         },
         merkle_root={"verified": bool(chain_ok), "info": str(chain_info)},
@@ -462,14 +639,49 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     return closeout
 
 
-def _git_sha(repo: Path) -> str:
-    import subprocess
-
+def _git(repo: Path, *args: str) -> str:
     proc = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "origin/main"],
-        capture_output=True, text=True, timeout=60,
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
-    return proc.stdout.strip() or "unknown"
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _git_identity(repo: Path, *, dry_run: bool = False) -> dict[str, Any]:
+    """Source-code identity for run receipts.
+
+    This is evidence metadata, not promotion authority.  Earlier forge_lab runs
+    recorded ``origin/main`` as ``git_base_sha`` even when the operator was
+    executing branch code via PYTHONPATH.  That made later receipts ambiguous.
+    Record the actual source HEAD first, plus origin/main only as comparison.
+    """
+
+    if dry_run:
+        return {
+            "repo": str(repo),
+            "head_sha": "dryrun",
+            "branch": "dryrun",
+            "dirty": False,
+            "dirty_short": "",
+            "origin_main_sha": "",
+        }
+    dirty_short = _git(repo, "status", "--short")
+    return {
+        "repo": str(repo),
+        "head_sha": _git(repo, "rev-parse", "HEAD") or "unknown",
+        "branch": _git(repo, "branch", "--show-current") or "detached",
+        "dirty": bool(dirty_short.strip()),
+        "dirty_short": dirty_short,
+        "origin_main_sha": _git(repo, "rev-parse", "origin/main"),
+    }
+
+
+def _git_sha(repo: Path) -> str:
+    """Compatibility wrapper: return the actual source HEAD used for the run."""
+
+    return str(_git_identity(repo).get("head_sha") or "unknown")
 
 
 __all__ = [

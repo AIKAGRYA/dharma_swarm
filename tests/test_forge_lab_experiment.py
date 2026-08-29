@@ -37,6 +37,33 @@ class _FakeBudget:
         return {"cap_tokens": self.cap_tokens, "spent_tokens": self.spent, "invalid": self.invalid}
 
 
+class _OverTokenBudget(_FakeBudget):
+    def charge(self, component, tokens, **kw):
+        self.spent += tokens
+        if self.spent > self.cap_tokens:
+            self.invalid = True
+            self.invalid_reason = f"over token cap: {self.spent}/{self.cap_tokens}"
+        return self.spent
+
+    def to_dict(self):
+        d = super().to_dict()
+        d["invalid_reason"] = self.invalid_reason
+        return d
+
+
+class _HardDollarBudget(_FakeBudget):
+    def charge(self, component, tokens, **kw):
+        self.spent += tokens
+        self.invalid = True
+        self.invalid_reason = "over $ cap: 10/1"
+        return self.spent
+
+    def to_dict(self):
+        d = super().to_dict()
+        d["invalid_reason"] = self.invalid_reason
+        return d
+
+
 def _seams(tmp_path: Path) -> Seams:
     grade = grade_explore.GradeSeams(
         slot_for_id=lambda mid: object() if mid else None,
@@ -52,6 +79,26 @@ def _seams(tmp_path: Path) -> Seams:
         pull_task_context=lambda tid: ({"instance_id": tid}, {"f.py": "code"}),
         allocate_explore=lambda **kw: {"task_ids": ["pr::demo#1", "pr::demo#2"]},
         mutate_complete=lambda prompt: ("{}", 1),  # unused in dry_run (parametric only)
+        make_worktree=lambda **kw: tmp_path / "fake_worktree",
+        remove_worktree=lambda **kw: None,
+    )
+
+
+def _seams_with_budget(tmp_path: Path, budget_factory, *, resolves: bool = True) -> Seams:
+    grade = grade_explore.GradeSeams(
+        slot_for_id=lambda mid: object() if mid else None,
+        propose_slot=lambda slot, inst, ctx, **kw: {"patch": "diff --git a/x b/x", "tokens": 150},
+        self_moa_arm=lambda *a, **kw: {"final_patch": "diff --git a/x b/x"},
+        verify_chain_arm=lambda *a, **kw: {"final_patch": "diff --git a/x b/x"},
+        mixed_moa_arm=lambda *a, **kw: {"final_patch": "diff --git a/x b/x"},
+        grade_task=lambda inst, p, timeout: (resolves, 0.1, None),
+        budget_factory=budget_factory,
+    )
+    return Seams(
+        grade=grade,
+        pull_task_context=lambda tid: ({"instance_id": tid}, {"f.py": "code"}),
+        allocate_explore=lambda **kw: {"task_ids": ["pr::demo#1"]},
+        mutate_complete=lambda prompt: ("{}", 1),
         make_worktree=lambda **kw: tmp_path / "fake_worktree",
         remove_worktree=lambda **kw: None,
     )
@@ -80,6 +127,10 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
 
     manifest = json.loads((exp_dir / "run_manifest.json").read_text())
     assert manifest["mode"] == "shadow"
+    assert manifest["git_base_sha"] == "dryrun"
+    assert manifest["git_identity"]["head_sha"] == "dryrun"
+    assert manifest["git_identity"]["branch"] == "dryrun"
+    assert manifest["git_identity"]["dirty"] is False
     assert manifest["archive_fitness_authority"] == "one_wire_disabled_explicit_lab_shadow"
     assert all(manifest["membrane"].values()), "membrane must be fully recorded"
     assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + 3 * 2
@@ -192,3 +243,45 @@ def test_result_row_schema_is_uniform_for_blocked_observations() -> None:
     assert row["per_task"] == []
     assert row["budget"] == {}
     assert row["reasons"] == ["no_json_object_found"]
+
+
+def test_explore_open_token_overage_is_measured_not_invalid(tmp_path):
+    outcome = grade_explore.grade_genome_explore(
+        {"arm_kind": "freeform_single", "generator_model": "fake-model"},
+        {"pr::demo#1": ({"instance_id": "pr::demo#1"}, {"f.py": "code"})},
+        seams=_seams_with_budget(tmp_path, _OverTokenBudget, resolves=True).grade,
+        budget_cap_tokens=100,
+        budget_cap_usd=999.0,
+        soft_token_cap=True,
+    )
+
+    assert outcome.pass_rate == 1.0
+    assert outcome.budget["invalid"] is False
+    assert outcome.budget["soft_token_cap_exceeded"] is True
+    assert outcome.budget["token_invalid_ignored_for_explore"] is True
+    assert outcome.budget["pass_rate_per_100k_tokens"]
+
+
+def test_hard_budget_invalid_still_short_circuits(tmp_path):
+    outcome = grade_explore.grade_genome_explore(
+        {"arm_kind": "freeform_single", "generator_model": "fake-model"},
+        {
+            "pr::demo#1": ({"instance_id": "pr::demo#1"}, {"f.py": "code"}),
+            "pr::demo#2": ({"instance_id": "pr::demo#2"}, {"f.py": "code"}),
+        },
+        seams=_seams_with_budget(tmp_path, _HardDollarBudget, resolves=True).grade,
+        budget_cap_tokens=100,
+        budget_cap_usd=1.0,
+        soft_token_cap=True,
+    )
+
+    assert outcome.budget["hard_invalid"] is True
+    assert outcome.budget["invalid"] is True
+    assert outcome.per_task[1]["error"] == "budget_invalid:over $ cap: 10/1"
+
+
+def test_experiment_config_defaults_seed_preflight_and_soft_token_cap() -> None:
+    cfg = ExperimentConfig()
+
+    assert cfg.soft_token_cap is True
+    assert cfg.require_valid_seed is True
