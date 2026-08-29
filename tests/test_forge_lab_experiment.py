@@ -153,6 +153,61 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
     assert "EXPLORE closeouts cannot claim positive lift" in notes_md
 
 
+async def test_grader_exception_closes_out_blocked_with_evidence(cfg, tmp_path, monkeypatch):
+    """NAMED VERIFIER (mission D6): a throwing grader must not kill the run silently.
+
+    The run must still leave a closeout.json (state blocked_with_evidence),
+    after_run_notes that name the exception, an incremented errored counter,
+    and an errored candidate row in the archive — then re-raise (fail-closed).
+    """
+
+    def _explode(*a, **kw):
+        raise RuntimeError("verifier-injected grader failure")
+
+    monkeypatch.setattr(grade_explore, "grade_genome_explore", _explode)
+
+    with pytest.raises(RuntimeError, match="verifier-injected grader failure"):
+        await run_experiment(cfg, seams=_seams(tmp_path))
+
+    exp_dirs = [d for d in (cfg.state_root / cfg.category).iterdir() if d.is_dir()]
+    assert len(exp_dirs) == 1
+    exp_dir = exp_dirs[0]
+
+    closeout = json.loads((exp_dir / "closeout.json").read_text())
+    assert closeout["closeout_state"] == "blocked_with_evidence"
+    assert closeout["stats"]["counters"]["errored"] >= 1
+    assert closeout["stats"]["exception"]["type"] == "RuntimeError"
+    assert "verifier-injected grader failure" in closeout["stats"]["exception"]["message"]
+
+    notes = json.loads((exp_dir / "after_run_notes.json").read_text())
+    assert notes["schema"] == AFTER_RUN_NOTES_SCHEMA
+    assert notes["closeout_state"] == "blocked_with_evidence"
+    assert notes["counters"]["errored"] >= 1
+    assert "RuntimeError" in json.dumps(notes)
+    assert "verifier-injected grader failure" in json.dumps(notes)
+    notes_md = (exp_dir / "after_run_notes.md").read_text()
+    assert "RuntimeError" in notes_md
+
+    # append_errored was exercised: the failed candidate is archived, not lost
+    archive_rows = [json.loads(line) for line in (exp_dir / "archive.jsonl").read_text().splitlines()]
+    states = [r["test_results"]["forge_lab"]["state"] for r in archive_rows]
+    assert "errored" in states
+    results = [json.loads(line) for line in (exp_dir / "results.jsonl").read_text().splitlines()]
+    assert any(r["state"] == "errored" for r in results)
+
+
+async def test_normal_run_still_closes_out_with_normal_state(cfg, tmp_path):
+    """Control (mission D6): an uneventful small run closes out normally."""
+    closeout = await run_experiment(cfg, seams=_seams(tmp_path))
+
+    assert closeout["closeout_state"] == "measured_negative"  # fakes resolve nothing
+    assert closeout["stats"]["counters"]["errored"] == 0
+    assert "exception" not in closeout["stats"]
+    exp_dir = cfg.state_root / cfg.category / closeout["experiment_id"]
+    assert (exp_dir / "closeout.json").exists()
+    assert (exp_dir / "after_run_notes.json").exists()
+
+
 async def test_dry_loop_dedups_identical_children(cfg, tmp_path):
     # parametric mutation under a fixed seed will eventually re-reach a genome;
     # force it by making mutation deterministic to one outcome via rng_seed sweep

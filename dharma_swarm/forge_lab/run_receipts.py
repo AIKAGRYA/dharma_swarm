@@ -119,6 +119,8 @@ def _after_run_notes_payload(exp_dir: Path, closeout: dict[str, Any]) -> dict[st
         "experiment_id": closeout.get("experiment_id"),
         "generated_at": _now(),
         "closeout_state": closeout.get("closeout_state"),
+        "reasons": list(closeout.get("reasons") or []),
+        "exception": stats.get("exception"),
         "claim_boundary": "explore_only_no_positive_lift_claim",
         "honesty_rule": {
             "sample": "n_tasks_per_generation",
@@ -151,6 +153,7 @@ def _render_after_run_notes(notes: dict[str, Any]) -> str:
     scratch = notes.get("scratch_worktree") or {}
     artifacts = notes.get("artifacts") or {}
     receipts = notes.get("generation_receipts") or []
+    reasons = notes.get("reasons") or []
     lines = [
         "# Forge Lab After-Run Notes",
         "",
@@ -158,6 +161,7 @@ def _render_after_run_notes(notes: dict[str, Any]) -> str:
         f"- experiment_id: {notes.get('experiment_id')}",
         f"- closeout_state: {notes.get('closeout_state')}",
         f"- claim_boundary: {notes.get('claim_boundary')}",
+        f"- reasons: {', '.join(str(r) for r in reasons) if reasons else 'none'}",
         f"- counters: graded={counters.get('graded', 0)} blocked={counters.get('blocked', 0)} errored={counters.get('errored', 0)} duplicate={counters.get('duplicate', 0)}",
         f"- seed_pass_rate: {notes.get('seed_pass_rate')}",
         f"- best_pass_rate: {notes.get('best_pass_rate')}",
@@ -166,9 +170,27 @@ def _render_after_run_notes(notes: dict[str, Any]) -> str:
         f"- scratch_worktree: state={scratch.get('state')} removed={scratch.get('removed')} path={scratch.get('path')}",
         f"- result_rows: {(notes.get('artifact_counts') or {}).get('result_rows', 0)}",
         f"- generation_receipts: {', '.join(receipts) if receipts else 'none'}",
-        "",
-        "## Artifacts",
     ]
+    exception = notes.get("exception")
+    if isinstance(exception, dict):
+        lines.extend(
+            [
+                "",
+                "## Exception",
+                f"- type: {exception.get('type')}",
+                f"- message: {exception.get('message')}",
+                "",
+                "```",
+                str(exception.get("traceback_summary") or ""),
+                "```",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Artifacts",
+        ]
+    )
     for key in sorted(artifacts):
         lines.append(f"- {key}: {artifacts[key]}")
     lines.extend(

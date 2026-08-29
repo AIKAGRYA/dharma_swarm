@@ -67,7 +67,13 @@ def main(argv: list[str] | None = None) -> int:
         source_repo=Path(args.source_repo),
         keep_worktree=args.keep_worktree,
     )
-    closeout = asyncio.run(run_experiment(cfg))
+    try:
+        closeout = asyncio.run(run_experiment(cfg))
+    except Exception as exc:
+        # run_experiment already wrote closeout.json (blocked_with_evidence) and
+        # after_run_notes before re-raising; surface the failure and exit non-zero.
+        print(f"forge_lab run aborted: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
     print(json.dumps(closeout, indent=2, default=str))
     return 0 if closeout.get("closeout_state") in ("inconclusive_low_power", "measured_negative") else 1
 
