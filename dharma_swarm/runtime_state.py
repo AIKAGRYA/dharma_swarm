@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import re
 import sqlite3
 from collections.abc import Mapping
@@ -26,6 +25,14 @@ from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
+)
+from dharma_swarm.runtime_state_exact_identity import (
+    EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX as _EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX,
+    EXECUTION_IDENTITY_CONFLICT_FIELDS as _EXECUTION_IDENTITY_CONFLICT_FIELDS,
+    canonical_finite_json_dump as _canonical_finite_json_dump,
+    canonical_finite_json_load as _canonical_finite_json_load,
+    canonical_finite_json_value as _canonical_finite_json_value,
+    record_execution_identity_exact_sync as _record_execution_identity_exact_sync,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
@@ -396,117 +403,16 @@ SELF_MOD_RECEIPT_TYPES = frozenset(
     }
 )
 
-EXACT_SELF_MOD_RECEIPT_TYPES = frozenset({"self_mod_gate", "self_mod_promote"})
+EXACT_SELF_MOD_RECEIPT_TYPES = frozenset(
+    {"self_mod_proposal", "self_mod_gate", "self_mod_promote"}
+)
 
 _EXACT_SELF_MOD_SCHEMA_VERSION = "dharma.runtime.self_mod_exact.v1"
 _EXACT_SELF_MOD_AUTHORITY_SEMANTICS = "attestation_only"
 
-_EXECUTION_IDENTITY_CONFLICT_FIELDS = (
-    "trace_id",
-    "correlation_id",
-    "task_id",
-    "claim_id",
-    "idempotency_key",
-    "causation_id",
-    "parent_run_id",
-    "agent_id",
-    "session_id",
-    "external_a2a_task_id",
-    "message_id",
-    "event_id",
-    "artifact_id",
-    "proposal_id",
-)
-
 
 def _json_dump(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=True)
-
-
-def _canonical_finite_json_value(value: Any, *, surface: str) -> Any:
-    """Return the one JSON value accepted by exact evidence writers.
-
-    Object keys stay strings instead of being silently coerced by ``json``;
-    tuples intentionally normalize to arrays.  This keeps hashes stable and
-    makes inputs such as ``{1: "x", "1": "y"}`` fail closed rather than
-    collapsing into duplicate JSON keys.
-    """
-
-    active_containers: set[int] = set()
-
-    def normalize(inner: Any, path: str) -> Any:
-        if inner is None or type(inner) in (bool, str, int):
-            return inner
-        if type(inner) is float:
-            if not math.isfinite(inner):
-                raise ValueError(f"{surface} contains a non-finite number at {path}")
-            return inner
-        if isinstance(inner, Mapping):
-            marker = id(inner)
-            if marker in active_containers:
-                raise ValueError(f"{surface} contains a recursive object at {path}")
-            active_containers.add(marker)
-            try:
-                normalized: dict[str, Any] = {}
-                for key, child in inner.items():
-                    if type(key) is not str:
-                        raise ValueError(
-                            f"{surface} requires string object keys at {path}"
-                        )
-                    if key in normalized:
-                        raise ValueError(f"{surface} contains duplicate key {key!r} at {path}")
-                    normalized[key] = normalize(child, f"{path}.{key}")
-                return normalized
-            finally:
-                active_containers.remove(marker)
-        if isinstance(inner, (list, tuple)):
-            marker = id(inner)
-            if marker in active_containers:
-                raise ValueError(f"{surface} contains a recursive array at {path}")
-            active_containers.add(marker)
-            try:
-                return [normalize(child, f"{path}[{index}]") for index, child in enumerate(inner)]
-            finally:
-                active_containers.remove(marker)
-        raise ValueError(
-            f"{surface} contains a non-JSON value {type(inner).__name__} at {path}"
-        )
-
-    return normalize(value, "$")
-
-
-def _canonical_finite_json_dump(value: Any, *, surface: str) -> str:
-    normalized = _canonical_finite_json_value(value, surface=surface)
-    return json.dumps(
-        normalized,
-        sort_keys=True,
-        ensure_ascii=True,
-        allow_nan=False,
-        separators=(",", ":"),
-    )
-
-
-def _canonical_finite_json_load(raw: str, *, surface: str) -> Any:
-    def reject_constant(constant: str) -> None:
-        raise ValueError(f"{surface} contains non-finite JSON constant {constant}")
-
-    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        value: dict[str, Any] = {}
-        for key, child in pairs:
-            if key in value:
-                raise ValueError(f"{surface} contains duplicate JSON key {key!r}")
-            value[key] = child
-        return value
-
-    try:
-        value = json.loads(
-            raw,
-            parse_constant=reject_constant,
-            object_pairs_hook=reject_duplicate_keys,
-        )
-    except (TypeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"{surface} is malformed JSON") from exc
-    return _canonical_finite_json_value(value, surface=surface)
 
 
 def _is_reserved_exact_self_mod_slot(
@@ -518,7 +424,7 @@ def _is_reserved_exact_self_mod_slot(
         receipt_type in EXACT_SELF_MOD_RECEIPT_TYPES
     ) or (
         side_effect_key.startswith("self_mod:")
-        and side_effect_key.endswith((":gate", ":promote"))
+        and side_effect_key.endswith((":proposal", ":gate", ":promote"))
     )
 
 
@@ -527,7 +433,7 @@ def _reject_reserved_exact_self_mod_slot(
 ) -> None:
     if _is_reserved_exact_self_mod_slot(receipt_type, side_effect_key, receipt_id):
         raise ValueError(
-            f"{surface} cannot write reserved self-mod gate/promote evidence; "
+            f"{surface} cannot write reserved self-mod proposal/gate/promote evidence; "
             "use commit_self_mod_receipt_exact"
         )
 
@@ -1342,13 +1248,17 @@ class RuntimeStateStore:
         self.db_path = Path(db_path or DEFAULT_RUNTIME_DB)
         self.include_memory_plane = include_memory_plane
 
+    def _connect_sync(self, *, timeout: float = 5.0) -> sqlite3.Connection:
+        """Return the shared sync SQLite connection seam for atomic writers."""
+        return sqlite3.connect(self.db_path, timeout=timeout)
+
     def _connect_async(self) -> aiosqlite.Connection:
         """Return the shared async SQLite connection seam for atomic writers."""
         return aiosqlite.connect(self.db_path)
 
     def init_db_sync(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.db_path) as db:
+        with self._connect_sync() as db:
             ensure_runtime_state_schema_sync(
                 db,
                 include_memory_plane=self.include_memory_plane,
@@ -2670,6 +2580,7 @@ class RuntimeStateStore:
             " source = excluded.source,"
             " metadata_json = excluded.metadata_json,"
             " updated_at = excluded.updated_at"
+            " WHERE execution_identities.source NOT LIKE 'exact:%'"
         )
 
     async def record_execution_identity(
@@ -2680,16 +2591,22 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
+        if source.startswith(_EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX):
+            raise ValueError("generic execution identity source uses a reserved marker")
         await self.init_db()
         existing = await self.get_execution_identity(identity.run_id)
         _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         async with aiosqlite.connect(self.db_path) as db:
             await _apply_connection_pragmas_async(db)
-            await db.execute(
+            cursor = await db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(identity, source=source, now=now, metadata=metadata),
             )
+            if int(cursor.rowcount or 0) != 1:
+                raise ValueError(
+                    "execution identity is reserved by the exact writer"
+                )
             await db.commit()
         loaded = await self.get_execution_identity(identity.run_id)
         assert loaded is not None
@@ -2703,18 +2620,49 @@ class RuntimeStateStore:
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
+        if source.startswith(_EXACT_EXECUTION_IDENTITY_SOURCE_PREFIX):
+            raise ValueError("generic execution identity source uses a reserved marker")
         self.init_db_sync()
         existing = self.get_execution_identity_sync(identity.run_id)
         _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
-            db.execute(
+            cursor = db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(identity, source=source, now=now, metadata=metadata),
             )
+            if int(cursor.rowcount or 0) != 1:
+                raise ValueError(
+                    "execution identity is reserved by the exact writer"
+                )
             db.commit()
         return self.get_execution_identity_sync(identity.run_id) or identity
+
+    def record_execution_identity_exact_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        source: str,
+    ) -> ExecutionIdentity:
+        """Insert or exactly replay one immutable execution-identity assertion.
+
+        Unlike the compatibility upsert above, this path never merges or
+        overwrites a durable row.  A reused ``run_id`` is replayable only when
+        every identity field, canonical metadata value, and ``source`` match.
+        The immediate transaction serializes competing verifier processes.
+        """
+
+        return _record_execution_identity_exact_sync(
+            identity,
+            source=source,
+            init_db_sync=self.init_db_sync,
+            connect_sync=self._connect_sync,
+            apply_connection_pragmas_sync=_apply_connection_pragmas_sync,
+            row_to_execution_identity=_row_to_execution_identity,
+            now_iso=lambda: _utc_now().isoformat(),
+            busy_timeout_seconds=_BUSY_TIMEOUT_MS / 1000,
+        )
 
     async def get_execution_identity(self, run_id: str) -> ExecutionIdentity | None:
         await self.init_db()
@@ -3067,12 +3015,12 @@ class RuntimeStateStore:
         self,
         identity: ExecutionIdentity,
         *,
-        stage: Literal["gate", "promote"],
+        stage: Literal["proposal", "gate", "promote"],
         proposal_id: str,
         status: str,
         payload: Mapping[str, Any],
     ) -> RuntimeReceipt:
-        """Atomically attest one exact self-mod gate or promotion result.
+        """Atomically attest one exact self-mod proposal, gate, or promotion.
 
         The receipt and its completed idempotency row are one indivisible
         pair.  Existing state is replayable only when it is the single exact
@@ -3089,8 +3037,10 @@ class RuntimeStateStore:
             for field_name in identity_field_names
         }
         identity_metadata = identity.metadata
-        if type(stage) is not str or stage not in ("gate", "promote"):
-            raise ValueError("exact self-mod stage must be 'gate' or 'promote'")
+        if type(stage) is not str or stage not in ("proposal", "gate", "promote"):
+            raise ValueError(
+                "exact self-mod stage must be 'proposal', 'gate', or 'promote'"
+            )
         if type(proposal_id) is not str or not proposal_id.strip():
             raise ValueError("proposal_id is required for exact self-mod evidence")
         if proposal_id != proposal_id.strip():

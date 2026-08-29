@@ -33,8 +33,10 @@ def _fake_release(tmp_path: Path) -> tuple[Path, Path]:
     python.write_text(
         "#!/usr/bin/env bash\n"
         'printf \'%s\\n\' "$*" >> "$(dirname "$0")/../runner_calls.log"\n'
-        "printf 'github=%s runtime=%s\\n' \"${GITHUB_TOKEN-<unset>}\" "
-        '"${TEST_RUNTIME_ENV_LOADED-<unset>}" >> '
+        "printf 'github=%s runtime=%s foundry=%s vibe=%s\\n' "
+        '"${GITHUB_TOKEN-<unset>}" "${TEST_RUNTIME_ENV_LOADED-<unset>}" '
+        '"${DHARMA_FOUNDRY_VERIFIER_KEY_FILE-<unset>}" '
+        '"${DHARMA_VIBE_VERIFIER_KEY_FILE-<unset>}" >> '
         '"$(dirname "$0")/../runner_env.log"\n',
         encoding="utf-8",
     )
@@ -43,7 +45,8 @@ def _fake_release(tmp_path: Path) -> tuple[Path, Path]:
         'if [[ -n "${TEST_RUNTIME_LOADER_LOG-}" ]]; then\n'
         "    printf 'loaded\\n' >> \"${TEST_RUNTIME_LOADER_LOG}\"\n"
         "fi\n"
-        "export TEST_RUNTIME_ENV_LOADED=1\n",
+        "export TEST_RUNTIME_ENV_LOADED=1\n"
+        "export GITHUB_TOKEN=provider-loaded-after-admission\n",
         encoding="utf-8",
     )
     admission.write_text("# fake admission target\n", encoding="utf-8")
@@ -77,8 +80,13 @@ def test_release_runner_uses_pinned_release_interpreter_and_guard() -> None:
     assert text.index("dharma_swarm/runtime_admission.py") < text.index(
         "dharma_swarm.runtime_release_entrypoint orchestrate-live"
     )
+    assert text.index("compgen -e") < text.index("dharma_swarm/runtime_admission.py")
     assert "a2a-inbox-bridge" in text
     assert "codex-composer-semantic-responder" in text
+    assert "governed-patch-foundry-verifier" in text
+    assert "governed-patch-vibe-verifier" in text
+    assert "DHARMA_FOUNDRY_VERIFIER_KEY_FILE" in text
+    assert "DHARMA_VIBE_VERIFIER_KEY_FILE" in text
     assert "bridge_env=(" in text
     assert "env -i" in text
     assert '"PYTHONUNBUFFERED=1"' in text
@@ -177,8 +185,8 @@ def test_release_runner_dispatches_bridge_through_the_same_interpreter(
         ),
     ]
     assert env_log.read_text(encoding="utf-8").splitlines() == [
-        "github=must-not-reach-bridge runtime=<unset>",
-        "github=<unset> runtime=<unset>",
+        "github=<unset> runtime=<unset> foundry=<unset> vibe=<unset>",
+        "github=<unset> runtime=<unset> foundry=<unset> vibe=<unset>",
     ]
 
 
@@ -228,10 +236,58 @@ def test_release_runner_dispatches_semantic_responder_after_admission(
         ),
     ]
     assert env_log.read_text(encoding="utf-8").splitlines() == [
-        "github=provider-visible-to-responder runtime=<unset>",
-        "github=provider-visible-to-responder runtime=1",
+        "github=<unset> runtime=<unset> foundry=<unset> vibe=<unset>",
+        "github=provider-loaded-after-admission runtime=1 foundry=<unset> vibe=<unset>",
     ]
     assert loader_log.read_text(encoding="utf-8").splitlines() == ["loaded"]
+
+
+def test_release_runner_separates_verifier_keys_and_provider_environment(
+    tmp_path: Path,
+) -> None:
+    for command, visible_key in (
+        ("governed-patch-foundry-verifier", "foundry-key"),
+        ("governed-patch-vibe-verifier", "vibe-key"),
+    ):
+        role_root = tmp_path / command
+        role_root.mkdir()
+        release, _python = _fake_release(role_root)
+        call_log = release / ".venv" / "runner_calls.log"
+        env_log = release / ".venv" / "runner_env.log"
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "DHARMA_RELEASE_ROOT": str(release),
+                "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+                "DHARMA_FOUNDRY_VERIFIER_KEY_FILE": "foundry-key",
+                "DHARMA_VIBE_VERIFIER_KEY_FILE": "vibe-key",
+                "GITHUB_TOKEN": "must-not-reach-verifier",
+            }
+        )
+
+        result = subprocess.run(
+            ["/bin/bash", str(RUNNER), command, "--once", "bundle.json"],
+            capture_output=True,
+            text=True,
+            env=environment,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert call_log.read_text(encoding="utf-8").splitlines()[-1] == (
+            "-B -I -m dharma_swarm.runtime_release_entrypoint "
+            f"{command} --once bundle.json"
+        )
+        environment_lines = env_log.read_text(encoding="utf-8").splitlines()
+        assert environment_lines[0] == (
+            "github=<unset> runtime=<unset> foundry=<unset> vibe=<unset>"
+        )
+        runtime_line = environment_lines[-1]
+        assert "github=<unset> runtime=<unset>" in runtime_line
+        if command == "governed-patch-foundry-verifier":
+            assert f"foundry={visible_key} vibe=<unset>" in runtime_line
+        else:
+            assert f"foundry=<unset> vibe={visible_key}" in runtime_line
 
 
 def test_release_runner_rejects_dirty_release_before_responder_env_or_dispatch(

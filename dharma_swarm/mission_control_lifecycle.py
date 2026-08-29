@@ -9,6 +9,7 @@ from functools import wraps
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
+    MAX_LEASE_SECONDS,
     OPEN_CLAIM_STATUSES,
     OWNER_TERMINAL_ATTEMPT_STATUSES,
     SCHEMA_VERSION,
@@ -63,8 +64,10 @@ class MissionControlLifecycleMixin:
         task_id = clean_identifier(task_id, "task_id")
         agent_id = clean_identifier(agent_id, "agent_id")
         task = await self._require_task(mission_id, task_id)
-        if lease_seconds < 1:
-            raise MissionControlError("lease_seconds must be positive")
+        if not 1 <= lease_seconds <= MAX_LEASE_SECONDS:
+            raise MissionControlError(
+                f"lease_seconds must be between 1 and {MAX_LEASE_SECONDS}"
+            )
 
         key = str(attempt_key or "").strip() or stable_id(
             "attempt_key", mission_id, task_id, agent_id
@@ -289,8 +292,10 @@ class MissionControlLifecycleMixin:
         run = await self._resolve_attempt(
             mission_id, task_id, agent_id, attempt_id=attempt_id
         )
-        if lease_seconds < 1:
-            raise MissionControlError("lease_seconds must be positive")
+        if not 1 <= lease_seconds <= MAX_LEASE_SECONDS:
+            raise MissionControlError(
+                f"lease_seconds must be between 1 and {MAX_LEASE_SECONDS}"
+            )
         if run.status not in {"queued", "running"}:
             raise MissionControlError(
                 f"attempt {run.run_id!r} cannot heartbeat from {run.status!r}"

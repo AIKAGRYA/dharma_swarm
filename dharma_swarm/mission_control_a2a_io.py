@@ -24,6 +24,16 @@ _MAX_DATABASE_BYTES = 128 * 1024 * 1024
 _MAX_WAL_BYTES = 64 * 1024 * 1024
 
 
+def _file_state(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
 class _IncompleteEvidence(Exception):
     """Absent/partial evidence proves no execution but is not corruption."""
 
@@ -82,12 +92,7 @@ def read_bytes(path: Path, *, limit: int) -> bytes:
             chunks.append(chunk)
             remaining -= len(chunk)
         after = os.fstat(fd)
-        if (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) != (
-            info.st_dev,
-            info.st_ino,
-            info.st_size,
-            info.st_mtime_ns,
-        ):
+        if _file_state(after) != _file_state(info):
             raise MissionControlError(
                 f"trusted evidence changed while read: {path.name}",
             )
@@ -159,7 +164,10 @@ def _trusted_link(value: object, roots: tuple[Path, ...], label: str) -> Path:
 
 
 def _field(
-    mapping: Mapping[str, Any], key: str, expected: Any, label: str,
+    mapping: Mapping[str, Any],
+    key: str,
+    expected: Any,
+    label: str,
 ) -> None:
     if key not in mapping:
         raise _IncompleteEvidence(f"{label}.{key}")
@@ -192,15 +200,20 @@ def _exact_json_equal(left: Any, right: Any) -> bool:
 
 
 def _successful_send_statuses(agent_uid: str) -> frozenset[str]:
-    label = "".join(
-        char.upper() if char.isalnum() else "_" for char in agent_uid
-    ).strip("_") or "AGENT"
-    return frozenset({
-        "PUBLISH_ACKED",
-        "PUBLISH_DEDUPED",
-        f"{label}_CONSUMED",
-        f"{label}_REPLIED",
-    })
+    label = (
+        "".join(char.upper() if char.isalnum() else "_" for char in agent_uid).strip(
+            "_"
+        )
+        or "AGENT"
+    )
+    return frozenset(
+        {
+            "PUBLISH_ACKED",
+            "PUBLISH_DEDUPED",
+            f"{label}_CONSUMED",
+            f"{label}_REPLIED",
+        }
+    )
 
 
 def _existing_db(path: Path, label: str) -> Path:
@@ -214,7 +227,7 @@ def _existing_db(path: Path, label: str) -> Path:
     return candidate.resolve(strict=True)
 
 
-def _regular_state(path: Path, label: str) -> tuple[int, int, int, int] | None:
+def _regular_state(path: Path, label: str) -> tuple[int, int, int, int, int] | None:
     try:
         info = path.lstat()
     except FileNotFoundError:
@@ -223,7 +236,7 @@ def _regular_state(path: Path, label: str) -> tuple[int, int, int, int] | None:
         raise MissionControlError(f"{label} database snapshot is unavailable") from exc
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
         raise MissionControlError(f"{label} database snapshot is not regular")
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+    return _file_state(info)
 
 
 def _snapshot_database(database: Path, destination: Path, label: str) -> None:
@@ -233,7 +246,9 @@ def _snapshot_database(database: Path, destination: Path, label: str) -> None:
     if database_before is None:
         raise MissionControlError(f"{label} database disappeared before snapshot")
     database_bytes = read_bytes(database, limit=_MAX_DATABASE_BYTES)
-    wal_bytes = read_bytes(wal, limit=_MAX_WAL_BYTES) if wal_before is not None else None
+    wal_bytes = (
+        read_bytes(wal, limit=_MAX_WAL_BYTES) if wal_before is not None else None
+    )
     if (
         _regular_state(database, label) != database_before
         or _regular_state(wal, label) != wal_before
@@ -337,7 +352,9 @@ def read_semantic_job(path: Path, event_id: str, *, max_bytes: int) -> dict[str,
             (event_id,),
         ).fetchall()
     if len(rows) != 1:
-        raise MissionControlError("expected exactly one semantic job for the A2A packet")
+        raise MissionControlError(
+            "expected exactly one semantic job for the A2A packet"
+        )
     if int(rows[0]["envelope_length"] or 0) > max_bytes:
         raise MissionControlError("semantic job envelope exceeds its read bound")
     try:

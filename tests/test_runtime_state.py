@@ -790,7 +790,14 @@ async def test_runtime_state_receipt_helpers_cover_saturation_types(tmp_path) ->
         side_effect_key="child:run-parent:run-saturation",
         payload={"child_run_id": identity.run_id},
     )
-    for stage in ("proposal", "apply", "verify", "revert"):
+    await store.commit_self_mod_receipt_exact(
+        identity,
+        stage="proposal",
+        status="recorded",
+        proposal_id="proposal-saturation",
+        payload={"source": "test-saturation"},
+    )
+    for stage in ("apply", "verify", "revert"):
         await store.record_self_mod_receipt(
             identity,
             stage=stage,
