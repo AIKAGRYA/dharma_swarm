@@ -21,8 +21,17 @@ from typing import Any, Final
 from dharma_swarm.foundry.patches import scoped_regular_file
 
 GOVERNED_PATCH_REQUEST_SCHEMA: Final[str] = "dharma.a2a.governed_patch_request.v1"
+GOVERNED_PATCH_REQUEST_V2_SCHEMA: Final[str] = (
+    "dharma.a2a.governed_patch_request.v2"
+)
+GOVERNED_PATCH_TASK_SNAPSHOT_SCHEMA: Final[str] = (
+    "dharma.mission_control.governed_patch_task_snapshot.v2"
+)
 CANDIDATE_BUNDLE_SCHEMA: Final[str] = (
     "dharma.governed_patch.candidate_no_effect_bundle.v1"
+)
+CANDIDATE_BUNDLE_V2_SCHEMA: Final[str] = (
+    "dharma.governed_patch.candidate_no_effect_bundle.v2"
 )
 NO_EFFECT_RESULT_SCHEMA: Final[str] = "dharma.governed_patch.no_effect_result.v1"
 GOVERNED_PATCH_TARGET_ID: Final[str] = "dharma_swarm"
@@ -31,6 +40,9 @@ _REQUEST_KEYS = frozenset(
     correlation_id delivery_id proposal_id base_sha executor_agent_uid
     executor_run_id executor_process_boot_id authorized_source_path
     oracle_argv""".split()
+)
+_REQUEST_V2_KEYS = _REQUEST_KEYS | frozenset(
+    {"semantic_intent", "semantic_intent_sha256", "task_snapshot_sha256"}
 )
 _BINDING_FIELDS = (
     "mission_id",
@@ -53,6 +65,9 @@ _RAW_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 _FOUNDRY_SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MAX_CONTENT_BYTES = 128 * 1024
 _MAX_DIFF_BYTES = 2 * 1024 * 1024
+_MAX_SEMANTIC_INTENT_BYTES = 32 * 1024
+_MAX_TASK_TITLE_BYTES = 4 * 1024
+_MAX_TASK_DESCRIPTION_BYTES = 64 * 1024
 MAX_SOURCE_BYTES: Final[int] = 2 * 1024 * 1024
 MAX_VERIFIER_EVIDENCE_BYTES: Final[int] = 512 * 1024
 _SHELL_EXECUTABLES = frozenset(
@@ -62,6 +77,10 @@ _SHELL_EXECUTABLES = frozenset(
 
 class GovernedPatchEvidenceError(ValueError):
     """An input or immutable evidence bundle is malformed, stale, or unsafe."""
+
+
+class ExclusiveEvidenceWriteIndeterminateError(GovernedPatchEvidenceError):
+    """An exclusive evidence marker may exist after a durability failure."""
 
 
 class NoEffectOutcome(str, Enum):
@@ -108,6 +127,10 @@ class GovernedPatchRequest:
     repo_root: Path
     request_bytes: bytes
     source_bytes: bytes
+    schema_version: str = GOVERNED_PATCH_REQUEST_SCHEMA
+    semantic_intent: str | None = None
+    semantic_intent_sha256: str | None = None
+    task_snapshot_sha256: str | None = None
 
 
 def _raw_sha256(data: bytes) -> str:
@@ -147,6 +170,78 @@ def _read_regular_bounded(
         return data
     finally:
         os.close(descriptor)
+
+
+def _create_owner_only_exclusive(root: Path, relative: str, data: bytes) -> bool:
+    """Durably create one 0600 marker; return false if its name already exists."""
+
+    path = PurePosixPath(relative)
+    if (
+        not relative
+        or relative.startswith("/")
+        or "\\" in relative
+        or "\x00" in relative
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise GovernedPatchEvidenceError("unsafe exclusive evidence path")
+    directory_flags = (
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        directory_fd = os.open(root, directory_flags)
+    except OSError as exc:
+        raise GovernedPatchEvidenceError(
+            "exclusive evidence root is unsafe or unavailable"
+        ) from exc
+    created = False
+    try:
+        for part in path.parts[:-1]:
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=directory_fd)
+            except FileExistsError:
+                pass
+            try:
+                next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
+            except OSError as exc:
+                raise GovernedPatchEvidenceError(
+                    "exclusive evidence parent is unsafe"
+                ) from exc
+            metadata = os.fstat(next_fd)
+            if metadata.st_uid != os.getuid() or stat.S_IMODE(metadata.st_mode) & 0o077:
+                os.close(next_fd)
+                raise GovernedPatchEvidenceError(
+                    "exclusive evidence parent is not owner-only"
+                )
+            os.close(directory_fd)
+            directory_fd = next_fd
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
+        except FileExistsError:
+            return False
+        created = True
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.fsync(directory_fd)
+    except OSError as exc:
+        if created:
+            raise ExclusiveEvidenceWriteIndeterminateError(
+                "exclusive evidence durability is indeterminate"
+            ) from exc
+        raise GovernedPatchEvidenceError(
+            "exclusive evidence write failed before creation"
+        ) from exc
+    finally:
+        os.close(directory_fd)
+    return True
 
 
 def _strict_json_value(value: Any, *, surface: str) -> Any:
@@ -219,6 +314,104 @@ def _canonical_json_bytes(value: Any, *, surface: str) -> bytes:
         ensure_ascii=True,
         allow_nan=False,
     ).encode("utf-8")
+
+
+def _bounded_exact_text(
+    value: Any,
+    *,
+    field: str,
+    max_bytes: int,
+    allow_empty: bool = False,
+) -> str:
+    if type(value) is not str or "\x00" in value:
+        raise GovernedPatchEvidenceError(f"invalid {field}")
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise GovernedPatchEvidenceError(f"invalid {field}") from exc
+    if len(encoded) > max_bytes or (not allow_empty and not value.strip()):
+        raise GovernedPatchEvidenceError(f"invalid {field}")
+    return value
+
+
+def canonical_semantic_intent_sha256(intent: str) -> str:
+    """Hash one exact, bounded semantic intent through a closed JSON shape."""
+
+    exact = _bounded_exact_text(
+        intent,
+        field="semantic_intent",
+        max_bytes=_MAX_SEMANTIC_INTENT_BYTES,
+    )
+    return _raw_sha256(
+        _canonical_json_bytes(
+            {
+                "schema_version": "dharma.governed_patch.semantic_intent.v1",
+                "semantic_intent": exact,
+            },
+            surface="governed patch semantic intent",
+        )
+    )
+
+
+def governed_patch_task_snapshot_sha256(
+    *,
+    mission_id: str,
+    task_id: str,
+    title: str,
+    description: str,
+    mission_task_creation_hash: str,
+    completion_contract: str,
+    status: str,
+    assigned_to: Any,
+    result: Any,
+) -> str:
+    """Hash the reconstructible pending/unclaimed task authority used by v2."""
+
+    mission = _validate_token(mission_id, "mission_id")
+    task = _validate_token(task_id, "task_id")
+    exact_title = _bounded_exact_text(
+        title,
+        field="task title",
+        max_bytes=_MAX_TASK_TITLE_BYTES,
+        allow_empty=True,
+    )
+    exact_description = _bounded_exact_text(
+        description,
+        field="task description",
+        max_bytes=_MAX_TASK_DESCRIPTION_BYTES,
+        allow_empty=True,
+    )
+    if (
+        type(mission_task_creation_hash) is not str
+        or _RAW_SHA_RE.fullmatch(mission_task_creation_hash) is None
+    ):
+        raise GovernedPatchEvidenceError("invalid mission_task_creation_hash")
+    contract = _bounded_exact_text(
+        completion_contract,
+        field="completion_contract",
+        max_bytes=256,
+    )
+    if status != "pending" or assigned_to is not None or result is not None:
+        raise GovernedPatchEvidenceError(
+            "task snapshot lacks pending unassigned no-result authority"
+        )
+    return _raw_sha256(
+        _canonical_json_bytes(
+            {
+                "schema_version": GOVERNED_PATCH_TASK_SNAPSHOT_SCHEMA,
+                "mission_id": mission,
+                "task_id": task,
+                "title": exact_title,
+                "description": exact_description,
+                "mission_task_creation_hash": mission_task_creation_hash,
+                "completion_contract": contract,
+                "status": status,
+                "assigned_to": assigned_to,
+                "result": result,
+            },
+            surface="governed patch task snapshot",
+        )
+    )
 
 
 def _parse_json(raw: str, *, surface: str) -> Any:
@@ -336,6 +529,7 @@ def _validate_source_path(value: Any) -> str:
         value.startswith("/")
         or "\\" in value
         or "\x00" in value
+        or any(character.isspace() or character == "`" for character in value)
         or any(part in {"", ".", ".."} for part in path.parts)
     ):
         raise GovernedPatchEvidenceError("unsafe authorized_source_path")
@@ -364,6 +558,49 @@ def _validate_oracle_argv(value: Any) -> tuple[str, ...]:
     return tuple(argv)
 
 
+def build_governed_patch_request_v2_content(
+    bindings: NativePatchBindings,
+    *,
+    authorized_source_path: str,
+    oracle_argv: list[str] | tuple[str, ...],
+    semantic_intent: str,
+    task_snapshot_sha256: str,
+) -> str:
+    """Construct canonical local v2 evidence after delivery IDs are observed.
+
+    This is deliberately not the raw A2A envelope: a delivery ID can depend on
+    the envelope digest. The responder first observes that transport identity,
+    then constructs this non-circular evidence request from the bound intent.
+    """
+
+    _validate_bindings(bindings)
+    source_path = _validate_source_path(authorized_source_path)
+    argv = _validate_oracle_argv(list(oracle_argv))
+    intent = _bounded_exact_text(
+        semantic_intent,
+        field="semantic_intent",
+        max_bytes=_MAX_SEMANTIC_INTENT_BYTES,
+    )
+    if (
+        type(task_snapshot_sha256) is not str
+        or _RAW_SHA_RE.fullmatch(task_snapshot_sha256) is None
+    ):
+        raise GovernedPatchEvidenceError("invalid task_snapshot_sha256")
+    payload = {
+        "schema_version": GOVERNED_PATCH_REQUEST_V2_SCHEMA,
+        **bindings.to_dict(),
+        "authorized_source_path": source_path,
+        "oracle_argv": list(argv),
+        "semantic_intent": intent,
+        "semantic_intent_sha256": canonical_semantic_intent_sha256(intent),
+        "task_snapshot_sha256": task_snapshot_sha256,
+    }
+    return _canonical_json_bytes(
+        payload,
+        surface="governed patch request v2",
+    ).decode("utf-8")
+
+
 def parse_governed_patch_request(
     content: str,
     *,
@@ -371,15 +608,73 @@ def parse_governed_patch_request(
     expected: NativePatchBindings,
     accepted_base_sha: str,
     expected_content_sha256: str | None = None,
+    expected_semantic_intent: str | None = None,
+    expected_task_snapshot_sha256: str | None = None,
 ) -> GovernedPatchRequest:
-    """Parse and bind one closed A2A content object without executing anything."""
+    """Parse one closed local request object after delivery IDs are observed."""
 
     payload = _parse_json(content, surface="governed patch request")
     if type(payload) is not dict:
         raise GovernedPatchEvidenceError("governed patch request must be a JSON object")
-    _closed_shape(payload, _REQUEST_KEYS, "governed patch request")
-    if payload["schema_version"] != GOVERNED_PATCH_REQUEST_SCHEMA:
+    schema_version = payload.get("schema_version")
+    if schema_version == GOVERNED_PATCH_REQUEST_SCHEMA:
+        request_keys = _REQUEST_KEYS
+    elif schema_version == GOVERNED_PATCH_REQUEST_V2_SCHEMA:
+        request_keys = _REQUEST_V2_KEYS
+    else:
         raise GovernedPatchEvidenceError("unsupported governed patch request schema")
+    _closed_shape(payload, request_keys, "governed patch request")
+    semantic_intent: str | None = None
+    semantic_intent_sha256: str | None = None
+    task_snapshot_sha256: str | None = None
+    if schema_version == GOVERNED_PATCH_REQUEST_SCHEMA:
+        if (
+            expected_semantic_intent is not None
+            or expected_task_snapshot_sha256 is not None
+        ):
+            raise GovernedPatchEvidenceError(
+                "v1 governed patch request cannot bind semantic intent/task snapshot"
+            )
+    else:
+        if (
+            expected_semantic_intent is None
+            or expected_task_snapshot_sha256 is None
+        ):
+            raise GovernedPatchEvidenceError(
+                "v2 governed patch request requires expected intent/task snapshot"
+            )
+        semantic_intent = _bounded_exact_text(
+            payload["semantic_intent"],
+            field="semantic_intent",
+            max_bytes=_MAX_SEMANTIC_INTENT_BYTES,
+        )
+        expected_intent = _bounded_exact_text(
+            expected_semantic_intent,
+            field="expected_semantic_intent",
+            max_bytes=_MAX_SEMANTIC_INTENT_BYTES,
+        )
+        semantic_intent_sha256 = payload["semantic_intent_sha256"]
+        if (
+            type(semantic_intent_sha256) is not str
+            or _RAW_SHA_RE.fullmatch(semantic_intent_sha256) is None
+            or semantic_intent_sha256
+            != canonical_semantic_intent_sha256(semantic_intent)
+            or semantic_intent != expected_intent
+        ):
+            raise GovernedPatchEvidenceError(
+                "request semantic intent binding mismatch"
+            )
+        task_snapshot_sha256 = payload["task_snapshot_sha256"]
+        if (
+            type(expected_task_snapshot_sha256) is not str
+            or _RAW_SHA_RE.fullmatch(expected_task_snapshot_sha256) is None
+            or type(task_snapshot_sha256) is not str
+            or _RAW_SHA_RE.fullmatch(task_snapshot_sha256) is None
+            or task_snapshot_sha256 != expected_task_snapshot_sha256
+        ):
+            raise GovernedPatchEvidenceError(
+                "request task snapshot binding mismatch"
+            )
     bindings = _bindings_from_payload(payload)
     _validate_bindings(expected)
     if bindings != expected:
@@ -430,14 +725,18 @@ def parse_governed_patch_request(
             "authorized source is not strict UTF-8"
         ) from exc
     return GovernedPatchRequest(
-        bindings,
-        source_path,
-        argv,
-        request_sha,
-        _raw_sha256(source_bytes),
-        repo,
-        request_bytes,
-        source_bytes,
+        bindings=bindings,
+        authorized_source_path=source_path,
+        oracle_argv=argv,
+        request_content_sha256=request_sha,
+        source_sha256=_raw_sha256(source_bytes),
+        repo_root=repo,
+        request_bytes=request_bytes,
+        source_bytes=source_bytes,
+        schema_version=schema_version,
+        semantic_intent=semantic_intent,
+        semantic_intent_sha256=semantic_intent_sha256,
+        task_snapshot_sha256=task_snapshot_sha256,
     )
 
 
@@ -480,13 +779,19 @@ def verify_no_effect_bundle(*args: Any, **kwargs: Any) -> Any:
 
 __all__ = [
     "CANDIDATE_BUNDLE_SCHEMA",
+    "CANDIDATE_BUNDLE_V2_SCHEMA",
     "GOVERNED_PATCH_REQUEST_SCHEMA",
+    "GOVERNED_PATCH_REQUEST_V2_SCHEMA",
+    "GOVERNED_PATCH_TASK_SNAPSHOT_SCHEMA",
     "NO_EFFECT_RESULT_SCHEMA",
     "GovernedPatchEvidenceError",
     "GovernedPatchRequest",
     "NativePatchBindings",
     "NoEffectOutcome",
     "build_candidate_bundle",
+    "build_governed_patch_request_v2_content",
+    "canonical_semantic_intent_sha256",
+    "governed_patch_task_snapshot_sha256",
     "load_candidate_bundle",
     "parse_governed_patch_request",
     "record_no_effect_result",

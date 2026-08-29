@@ -54,6 +54,11 @@ case "${1-}" in
         shift
         runtime_args=("$@")
         ;;
+    governed-patch-responder)
+        runtime_command="governed-patch-responder"
+        shift
+        runtime_args=("$@")
+        ;;
     governed-patch-foundry-verifier)
         runtime_command="governed-patch-foundry-verifier"
         shift
@@ -135,6 +140,7 @@ git_env=(
     "GIT_CONFIG_GLOBAL=/dev/null"
     "GIT_CONFIG_NOSYSTEM=1"
     "GIT_OPTIONAL_LOCKS=0"
+    "GIT_NO_REPLACE_OBJECTS=1"
 )
 observed_root="$(
     "${git_env[@]}" "${git_bin}" -c core.fsmonitor=false \
@@ -244,6 +250,22 @@ case "${runtime_command}" in
             "${runtime_python}" -B -I -m \
             dharma_swarm.runtime_release_entrypoint \
             codex-composer-semantic-responder "${runtime_args[@]}"
+        ;;
+    governed-patch-responder)
+        # Candidate authorship uses the admitted provider environment. Verifier
+        # key locators remain stripped: this responder has no authority to sign
+        # either independent verification role.
+        # shellcheck disable=SC1090
+        source "${runtime_env_helper}"
+        exec env \
+            DHARMA_RELEASE_ROOT="${release_root}" \
+            DHARMA_RUNTIME_EXPECTED_COMMIT="${expected_commit}" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            PYTHONNOUSERSITE=1 \
+            PYTHONUNBUFFERED=1 \
+            "${runtime_python}" -B -I -m \
+            dharma_swarm.runtime_release_entrypoint \
+            governed-patch-responder "${runtime_args[@]}"
         ;;
     governed-patch-foundry-verifier)
         # Foundry runs after release admission without provider credentials and

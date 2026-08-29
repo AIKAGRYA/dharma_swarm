@@ -6,6 +6,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNNER = REPO_ROOT / "scripts" / "runtime" / "dharma_swarm_release_runner.sh"
@@ -83,6 +85,7 @@ def test_release_runner_uses_pinned_release_interpreter_and_guard() -> None:
     assert text.index("compgen -e") < text.index("dharma_swarm/runtime_admission.py")
     assert "a2a-inbox-bridge" in text
     assert "codex-composer-semantic-responder" in text
+    assert "governed-patch-responder" in text
     assert "governed-patch-foundry-verifier" in text
     assert "governed-patch-vibe-verifier" in text
     assert "DHARMA_FOUNDRY_VERIFIER_KEY_FILE" in text
@@ -238,6 +241,88 @@ def test_release_runner_dispatches_semantic_responder_after_admission(
     assert env_log.read_text(encoding="utf-8").splitlines() == [
         "github=<unset> runtime=<unset> foundry=<unset> vibe=<unset>",
         "github=provider-loaded-after-admission runtime=1 foundry=<unset> vibe=<unset>",
+    ]
+    assert loader_log.read_text(encoding="utf-8").splitlines() == ["loaded"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "mode_args"),
+    (
+        (
+            "once",
+            [
+                "--packet-id",
+                "packet-1",
+                "--delivery-record",
+                "delivery.json",
+            ],
+        ),
+        (
+            "serve",
+            [
+                "--packet-id",
+                "packet-1",
+                "--delivery-record",
+                "delivery.json",
+                "--interval-seconds",
+                "0.5",
+            ],
+        ),
+    ),
+)
+def test_release_runner_dispatches_governed_patch_responder_after_admission(
+    tmp_path: Path,
+    mode: str,
+    mode_args: list[str],
+) -> None:
+    release, _python = _fake_release(tmp_path)
+    call_log = release / ".venv" / "runner_calls.log"
+    env_log = release / ".venv" / "runner_env.log"
+    loader_log = tmp_path / "runtime_loader.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DHARMA_RELEASE_ROOT": str(release),
+            "DHARMA_RUNTIME_EXPECTED_COMMIT": PIN,
+            "DHARMA_FOUNDRY_VERIFIER_KEY_FILE": "must-not-reach-responder",
+            "DHARMA_VIBE_VERIFIER_KEY_FILE": "must-not-reach-responder",
+            "GITHUB_TOKEN": "replaced-by-admitted-runtime-loader",
+            "TEST_RUNTIME_LOADER_LOG": str(loader_log),
+        }
+    )
+
+    result = subprocess.run(
+        [
+            "/bin/bash",
+            str(RUNNER),
+            "governed-patch-responder",
+            mode,
+            *mode_args,
+        ],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    expected_args = " ".join((mode, *mode_args))
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
+        (
+            f"-B -I -S {release}/dharma_swarm/runtime_admission.py "
+            f"--repo {release} --expected-commit {PIN}"
+        ),
+        (
+            "-B -I -m dharma_swarm.runtime_release_entrypoint "
+            f"governed-patch-responder {expected_args}"
+        ),
+    ]
+    assert env_log.read_text(encoding="utf-8").splitlines() == [
+        "github=<unset> runtime=<unset> foundry=<unset> vibe=<unset>",
+        (
+            "github=provider-loaded-after-admission runtime=1 "
+            "foundry=<unset> vibe=<unset>"
+        ),
     ]
     assert loader_log.read_text(encoding="utf-8").splitlines() == ["loaded"]
 

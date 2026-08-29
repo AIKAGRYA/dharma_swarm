@@ -1,0 +1,128 @@
+{
+  "allowed_files": [
+    "dharma_swarm/governed_patch_candidate_bundle.py",
+    "dharma_swarm/governed_patch_evidence.py",
+    "dharma_swarm/governed_patch_provider_authorship.py",
+    "dharma_swarm/runtime_release_entrypoint.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-GOVERNED-PATCH-RESPONDER-20260828.json",
+    "scripts/runtime/dharma_swarm_release_runner.sh",
+    "scripts/runtime/governed_patch_provider.py",
+    "scripts/runtime/governed_patch_responder.py",
+    "tests/test_governed_patch_evidence.py",
+    "tests/test_governed_patch_provider.py",
+    "tests/test_governed_patch_responder.py",
+    "tests/test_runtime_release_entrypoint.py",
+    "tests/test_runtime_release_runner.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "a381ad99f037e8c80178bbd970df984219946c76",
+  "branch": "codex/governed-patch-responder-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "feat(runtime): add proof-bound patch responder"
+  },
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "deploy/sadhana/**",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/foundry/**",
+    "docs/foundry/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "scripts/forge_lab/**",
+    "scripts/foundry/**",
+    "scripts/runtime/sadhana_release.py",
+    "terminal/**",
+    "tests/forge_lab_v1/**",
+    "tests/test_foundry_*.py",
+    "tests/test_sadhana_release.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_governed_patch_evidence.py tests/test_governed_patch_provider.py tests/test_governed_patch_responder.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py",
+      "expected_exit": 0,
+      "name": "governed-patch-responder-focused-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/governed_patch_candidate_bundle.py dharma_swarm/governed_patch_evidence.py dharma_swarm/governed_patch_provider_authorship.py dharma_swarm/runtime_release_entrypoint.py scripts/runtime/governed_patch_provider.py scripts/runtime/governed_patch_responder.py tests/test_governed_patch_evidence.py tests/test_governed_patch_provider.py tests/test_governed_patch_responder.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py",
+      "expected_exit": 0,
+      "name": "governed-patch-responder-ruff",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "governed-patch-responder-module-budget",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "git diff --check a381ad99f037e8c80178bbd970df984219946c76",
+      "expected_exit": 0,
+      "name": "governed-patch-responder-range-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-GOVERNED-PATCH-RESPONDER-20260828",
+  "intent": "Build the smallest production-authored half of Governed Patch Reflex without creating a second NATS consumer or pretending unavailable verification capabilities are positive. Extend the closed governed request with bounded semantic intent; bind that intent to the exact delivered A2A request and current Mission Control task snapshot; call one explicit Ollama Cloud glm-5.2 lane with no provider fallback; accept only one closed full-response SEARCH/REPLACE edit for the authorized file; and persist a content-addressed provider-authorship or provider-refusal receipt before an immutable CandidateBundle. A WAL/FULL responder ledger consumes the existing bridge-owned semantic_jobs row, owns one packet lease, checkpoints exact request/provider/candidate digests, and survives restart without another model call. It starts no Mission Control attempt until a candidate is durably committed, so pre-candidate failure remains a typed non-authorizing responder refusal rather than an unfinishable governed attempt. The immutable release entrypoint and runner admit one governed-patch-responder once|serve command. The effect path remains fail-closed at Vibe/Foundry until independently pinned positive tool contracts exist.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_governed_patch_provider.py -k rejects_non_cloud_transport",
+      "expected_exit": 0,
+      "name": "local-provider-downgrade-fails-closed",
+      "timeout_seconds": 180
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "scripts/runtime/codex_composer_semantic_responder.py",
+      "scripts/runtime/a2a_inbox_bridge.py",
+      "dharma_swarm/governed_patch_evidence.py",
+      "dharma_swarm/governed_patch_candidate_bundle.py",
+      "dharma_swarm/mission_control_a2a_projection.py",
+      "dharma_swarm/forge_v1/run_real_patch.py"
+    ],
+    "collision": {
+      "checked_at_sha": "a381ad99f037e8c80178bbd970df984219946c76",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "Vibe Halt has no candidate-bound dharma_swarm or generic foreign-target operation on this host; existing calibration and cooperative-child receipts cannot authorize a governed patch.",
+      "Foundry positive execution lacks both a running Docker daemon and a supervisor-pinned production image/tool provenance contract; current release child is refusal-only.",
+      "This packet stops after durable provider-authored CandidateBundle/proposal preparation and must not claim a repository effect or Mission Control terminal completion.",
+      "Governed pre-candidate failure has no parent terminal-failure contract; this packet avoids minting an attempt before candidate durability and leaves the task pending with a typed refusal.",
+      "A restart after candidate authorship may observe and continue from the old executor boot identity but must never claim the new process authored that candidate.",
+      "Every stacked PR requires external human approval before merge."
+    ],
+    "interface_mismatches": [
+      "The bridge owns NATS ACK and semantic_jobs transport custody; the responder reads that durable row and must not subscribe or ACK again.",
+      "The v1 governed request binds lineage and file but not semantic intent; a new request version is required rather than silently changing v1 meaning.",
+      "A CandidateBundle proves replayable bytes and lineage, not which provider authored the edit; provider authorship requires its own closed receipt.",
+      "Provider configuration availability is not live reachability, and a served-model response is not accepted merely because the requested model was cloud-tagged.",
+      "Transport ACK, model response, candidate durability, verifier evidence, repository effect, and Mission Control completion remain distinct evidence types."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "441f3d9c3803b0f41e32cd835ccce42ed229b5f92713afdbc17a00c0b996503f",
+    "rollback": "Revert the packet-scoped responder commit. Existing bridge delivery rows, Mission Control attempts, proposals, effect fences, and terminal receipts remain untouched because this packet adds only a fail-closed candidate-authoring consumer and immutable external evidence.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-GOVERNED-PATCH-RESPONDER-20260828"
+  },
+  "worktree": "."
+}
