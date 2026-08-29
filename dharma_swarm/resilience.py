@@ -13,6 +13,8 @@ import random
 import time
 from typing import Any, Awaitable, Callable, TypeVar
 
+from dharma_swarm.base_provider import ProviderTimeoutError
+
 
 T = TypeVar("T")
 
@@ -313,7 +315,9 @@ class CircuitBreakerRegistry:
 
 def is_retryable_exception(exc: Exception) -> bool:
     """Classify retryability conservatively to avoid pointless retries."""
-    if isinstance(exc, (NotImplementedError, KeyError)):
+    # A provider that already burned its full wall-clock budget will not
+    # answer faster on the next attempt; retrying multiplies the hang.
+    if isinstance(exc, (NotImplementedError, KeyError, ProviderTimeoutError)):
         return False
     lowered = str(exc).lower()
     non_retry_terms = (
