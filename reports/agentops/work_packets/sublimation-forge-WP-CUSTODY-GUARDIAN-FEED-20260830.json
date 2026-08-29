@@ -1,0 +1,107 @@
+{
+  "id": "sublimation-forge-WP-CUSTODY-GUARDIAN-FEED-20260830",
+  "base_ref": "a0a88841f0afecc960740e15d2b3ece46d014869",
+  "branch": "governance/one-world-custody-ruling-2026-08-30",
+  "worktree": ".",
+  "intent": "Land the operator-directed ONE_WORLD custody ruling on main: narrow sublimation-forge-2026-08 owned_surfaces to cede exactly the guardian-feed surface (dharma_swarm/foundry/guardian_feed.py and tests/test_foundry_guardian_feed.py) so the fail-closed AgentOps packet-scope gate stops unioning this track's immutable merge-base ownership over PR #1493's already-green reconciliation of the Mac silvering (efca57e40 operator_approved flag) with the quorum-pinning guardian-feed tests. Every other foundry/RUDRA surface stays owned; the ceded globs become explicit file lists as a deliberate fail-closed form. Scope: docs/governance/ACTIVE_TRACK.yaml, the two generated track-include blocks (CLAUDE.md, docs/governance/SOVEREIGN_MANIFEST.md), and this packet.",
+  "allowed_files": [
+    "CLAUDE.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/agentops/work_packets/sublimation-forge-WP-CUSTODY-GUARDIAN-FEED-20260830.json"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/**",
+    "docs/foundry/**",
+    "docs/plans/rudra_v0/**",
+    "reports/rudra/**",
+    "scripts/**",
+    "terminal/**",
+    "tests/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "governance-track-tests",
+      "command": "python3 -m pytest -q tests/test_track_portfolio.py tests/test_check_track_status_lifecycle.py tests/test_active_track_governance.py tests/test_track_closure_rigor.py tests/test_agent_onboard.py tests/governance/test_agentops_packet_scope.py",
+      "expected_exit": 0,
+      "timeout_seconds": 600
+    },
+    {
+      "name": "docops-integrity-and-generated-track-includes",
+      "command": "make docops-integrity",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "committed-range-whitespace",
+      "command": "git diff --check a0a88841f0afecc960740e15d2b3ece46d014869...HEAD",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "guardian-feed-ceded-remainder-still-owned",
+      "command": "python3 -c \"import sys,fnmatch; sys.path.insert(0,'scripts/governance'); from check_track_status import load_active_track, ACTIVE_TRACK_PATH; s=[r for r in load_active_track(ACTIVE_TRACK_PATH)['active_tracks'] if r['id']=='sublimation-forge-2026-08'][0]['owned_surfaces']; m=lambda p: any(x==p or (x.endswith('/**') and p.startswith(x[:-3].rstrip('/')+'/')) or ('*' in x and not x.endswith('/**') and fnmatch.fnmatchcase(p,x)) for x in s); raise SystemExit(0 if (not m('tests/test_foundry_guardian_feed.py') and not m('dharma_swarm/foundry/guardian_feed.py') and m('tests/test_foundry_loop.py') and m('dharma_swarm/foundry/loop.py') and m('scripts/foundry/run_campaign.py') and m('docs/foundry/RUNNING_NONSTOP.md')) else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance(sublimation-forge): cede guardian-feed custody for ONE_WORLD integration"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-CUSTODY-GUARDIAN-FEED-20260830",
+    "active_track": "sublimation-forge-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "a0a88841f0afecc960740e15d2b3ece46d014869",
+      "details": []
+    },
+    "interface_mismatches": [
+      "docs/governance/ACTIVE_TRACK.yaml is owned by no active track; this packet binds to sublimation-forge-2026-08 because the ruling amends that track's own registry entry (a self-narrowing), matching the #1470 RUDRA admission precedent.",
+      "The ONE_WORLD program document (docs/plans/ONE_WORLD_2026-08-30.md) and its custody manifest live on PR #1493's integration branch until that PR merges; this ruling cites them there and does not copy them onto main.",
+      "At the current #1493 merge-base the integration changes only tests/test_foundry_guardian_feed.py of the ceded pair; dharma_swarm/foundry/guardian_feed.py is ceded proactively per the operator directive so the guardian-feed surface moves as one custody unit.",
+      "The cession replaces two globs (dharma_swarm/foundry/**, tests/test_foundry_*.py) with explicit file lists: a deliberate fail-closed consequence is that any NEW foundry file or foundry test is unowned until a future track amendment re-admits it."
+    ],
+    "closest_existing_implementation": [
+      "scripts/governance/check_agentops_packet_scope.py:_validate_track_binding",
+      "docs/governance/ACTIVE_TRACK.yaml:active_tracks[id=sublimation-forge-2026-08].owned_surfaces",
+      "scripts/governance/render_active_track_includes.py:MANAGED_FILES",
+      "reports/agentops/work_packets/organism-rewire-WP-FOUR-LANE-AUTHORITY-TRANSFER-20260827.json"
+    ],
+    "honest_blockers": [
+      "This packet attests a registry custody amendment and its generated projections only; it does not attest that PR #1493's reconciliation content is correct, reviewed, or mergeable \u2014 #1493 carries its own CI and review burden.",
+      "The ruling unblocks the packet-scope gate structurally; #1493 must still update from main and re-run its full required check set before merge.",
+      "No runtime, provider, deployment, credential, remote-host, or external-effect authority is granted or implied by this custody change."
+    ],
+    "rollback": "Revert this single commit: restores the two foundry globs to sublimation-forge-2026-08 owned_surfaces and regenerates the two managed include blocks. Rollback performs no runtime, deployment, provider, credential, or external-state mutation and re-closes the #1493 packet-scope path.",
+    "packet_digest": "b0a4fc83c889845808926fab20665b08883d14201dfda6728c3b299f229aa2ea"
+  }
+}
