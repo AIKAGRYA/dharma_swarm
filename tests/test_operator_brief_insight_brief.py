@@ -89,7 +89,6 @@ def _all_pass_keeper() -> _RecordingGatekeeper:
     return _RecordingGatekeeper(
         {
             "CONSENT": (GateResult.PASS, ""),
-            "BHED_GNAN": (GateResult.PASS, ""),
             "AHIMSA": (GateResult.PASS, ""),
             "SATYA": (GateResult.PASS, ""),
             # STEELMAN/DOGMA_DRIFT are enforced locally by the seam,
@@ -336,7 +335,6 @@ def test_consent_block_fails_closed(registry, isolated_home, good_payload):
     keeper = _RecordingGatekeeper(
         {
             "CONSENT": (GateResult.FAIL, "stubbed exfiltration concern"),
-            "BHED_GNAN": (GateResult.PASS, ""),
             "AHIMSA": (GateResult.PASS, ""),
             "SATYA": (GateResult.PASS, ""),
         }
@@ -387,9 +385,9 @@ def test_top_level_keeper_block_outside_required_gates_fails_closed(
     assert ahimsa_records[0].properties["decision"] == "block"
 
 
-def test_bhed_gnan_smoke_passes_today(registry, isolated_home, good_payload):
-    """BHED_GNAN currently always passes; assert the smoke and update
-    this test when the gate is strengthened upstream (master spec §10.2).
+def test_no_bhed_gnan_row_after_gate_removal(registry, isolated_home, good_payload):
+    """BHED_GNAN was removed from the live gate registry (11→9 silvering);
+    the seam must not fabricate a PASS row for a gate that no longer exists.
     """
     result = run_once(
         registry=registry,
@@ -402,8 +400,7 @@ def test_bhed_gnan_smoke_passes_today(registry, isolated_home, good_payload):
         if o.properties.get("proposal_id") == result["proposal_id"]
         and "BHED_GNAN" in (o.properties.get("reason") or "")
     ]
-    assert bhed_records
-    assert bhed_records[0].properties["decision"] == "allow"
+    assert bhed_records == []
 
 
 def test_failed_input_no_source(registry, isolated_home):

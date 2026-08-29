@@ -1,6 +1,6 @@
 """Dharmic safety gate system.
 
-Eleven gates from Akram Vignan mapped to computational safety checks.
+Nine gates from Akram Vignan mapped to computational safety checks.
 Ported from dgc-core/hooks/telos_gate.py into a clean class-based API.
 Think-point witness logs are written to ~/.dharma/witness/ for audit.
 

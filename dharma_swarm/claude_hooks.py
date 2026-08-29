@@ -139,7 +139,7 @@ def verify_baseline() -> dict:
         "health": None,
     }
 
-    # Gate sweep — check all 11 core gates
+    # Gate sweep — check all 9 core gates
     gate_result = DEFAULT_GATEKEEPER.check(
         action="baseline_verification",
         content="full system baseline check",

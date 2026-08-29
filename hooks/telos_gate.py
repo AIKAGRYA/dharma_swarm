@@ -2,9 +2,9 @@
 """
 TELOS GATE — Claude Code Hook (PreToolUse)
 
-Runs 8 Dharmic Gates before any tool execution.
+Runs 6 Dharmic Gates before any tool execution.
 Ported from DHARMIC_GODEL_CLAW/src/core/unified_gates.py (1806 lines → 180 lines).
-Adds: injection detection, credential protection, BHED_GNAN gate.
+Adds: injection detection, credential protection.
 
 Install: Add to ~/.claude/settings.json hooks.PreToolUse
 """
@@ -21,8 +21,6 @@ GATES = {
     "CONSENT": "B",      # Permission granted?
     "VYAVASTHIT": "C",   # Allow or force?
     "REVERSIBILITY": "C",  # Can undo?
-    "SVABHAAVA": "C",    # Aligned with telos?
-    "BHED_GNAN": "C",    # Witness clarity — distinguishing self from action
     "WITNESS": "C",      # Self-observing? (always passes — the act of checking IS witnessing)
 }
 
@@ -61,7 +59,7 @@ GATED_TOOLS = {"Bash", "Write", "Edit", "NotebookEdit"}
 
 
 def check_gates(tool_name: str, tool_input: dict) -> dict:
-    """Run all 8 gates. Returns {"decision": "allow"|"block"|"review", "reason": str}"""
+    """Run all 6 gates. Returns {"decision": "allow"|"block"|"review", "reason": str}"""
 
     # Safe tools pass immediately
     if tool_name in SAFE_TOOLS:
@@ -114,13 +112,6 @@ def check_gates(tool_name: str, tool_input: dict) -> dict:
     # REVERSIBILITY — Tier C
     irrev_hit = next((w for w in IRREVERSIBLE_WORDS if w in action_lower), None)
     results["REVERSIBILITY"] = ("WARN", f"Irreversible: {irrev_hit}") if irrev_hit else ("PASS", "")
-
-    # SVABHAAVA — Tier C (telos alignment)
-    results["SVABHAAVA"] = ("PASS", "")
-
-    # BHED_GNAN — Tier C (witness clarity: am I the doer or the observer?)
-    # This gate simply records that the system is aware of the distinction
-    results["BHED_GNAN"] = ("PASS", "Doer-witness distinction noted")
 
     # WITNESS — always passes (the check itself IS witnessing)
     results["WITNESS"] = ("PASS", "Witnessed")
