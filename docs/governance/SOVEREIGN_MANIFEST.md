@@ -151,7 +151,6 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 ---
 
 ## VERIFIED NUMBERS (2026-08-01 COUNT REFRESH)
-## VERIFIED NUMBERS (2026-07-16 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 One row per metric — refreshes REPLACE this table (never append; the 2026-06/07
@@ -159,24 +158,18 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **1,176** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Total Python modules | **1,187** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **488 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **416,543** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **416,953** | wc -l across dharma_swarm Python modules |
 | Test files | **1042** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **15,901 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **15,900 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 | Markdown files | **1,535** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **326,983** | wc -l across all tracked .md |
+| Markdown total lines | **326,953** | wc -l across all tracked .md |
 | Bridge files | **37** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **50** | find dharma_swarm -type f \| rg -i "adapter" |
 | Router files | **22** | find dharma_swarm -type f \| rg -i "rout" |
-| Total Python modules | **1176** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **488 (42.6%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
-| Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
-| Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
 
 ## SYSTEM TOPOGRAPHY
 

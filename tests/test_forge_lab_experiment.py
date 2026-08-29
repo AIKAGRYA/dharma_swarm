@@ -133,9 +133,13 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
     assert manifest["git_identity"]["dirty"] is False
     assert manifest["archive_fitness_authority"] == "one_wire_disabled_explicit_lab_shadow"
     assert all(manifest["membrane"].values()), "membrane must be fully recorded"
-    assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + 3 * 2
+    # #1435: the estimate counts one seed-candidate grade per generation on top
+    # of the children, i.e. 1 + (children + 1) * generations.
+    assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + (3 + 1) * 2
 
     results = [json.loads(line) for line in (exp_dir / "results.jsonl").read_text().splitlines()]
+    # Paired-evidence hardening (#1435) added the comparison/evidence fields to
+    # every result row; the set below is the current RESULT_ROW_SCHEMA shape.
     result_keys = {
         "schema",
         "experiment_id",
@@ -151,6 +155,11 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
         "reasons",
         "duplicate_of",
         "at",
+        "comparable_observations",
+        "comparison_block_id",
+        "control_candidate_id",
+        "control_pass_rate",
+        "evidence_class",
     }
     assert results
     assert all(set(r) == result_keys for r in results)

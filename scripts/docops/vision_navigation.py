@@ -63,7 +63,7 @@ OPEN_ROW_COUNT = 8
 OPEN_ROW_RE = re.compile(r"\*\*OPEN-\d ·")
 EFFECT_SIZE_RE = re.compile(r"AUROC|[dg]\s*=\s*-?\d|\d+(\.\d+)?\s*%")
 KERNEL_PRINCIPLE_COUNT = 25
-CORE_GATE_COUNT = 11
+CORE_GATE_COUNT = 9  # 11 -> 9: Tier-C theater-gate silvering (f2ab77a31)
 PACKET_GATE_QUESTIONS = (1, 2, 3, 5, 8)
 
 # Declared-modality role set from the recovered command spec (extracts 1-2):

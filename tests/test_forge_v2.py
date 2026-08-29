@@ -49,9 +49,11 @@ def test_first_slice_windows_all_models_to_fit_budget_before_big_context_calls()
     assert _win(Slot("moonshotai/kimi-k2.6")) == 11000
 
 
-def test_kimi_code_alias_uses_window_and_temperature_wall_repairs() -> None:
-    assert "kimi-code" in WINDOW_MODELS
-    assert "kimi-code" in KIMI_TEMP1
+def test_kimi_k3_alias_uses_temperature_wall_but_no_window() -> None:
+    # Post-K3 (#1008): the Kimi Code alias is "k3" with a 1M-token context, so
+    # the K2.7-era windowing set is empty; the temperature=1 wall still applies.
+    assert WINDOW_MODELS == frozenset()
+    assert "k3" in KIMI_TEMP1
 
 
 def test_provenance_split_and_contamination_are_explicit() -> None:
