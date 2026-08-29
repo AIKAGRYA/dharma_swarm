@@ -38,7 +38,7 @@ entries:
       Unguarded ImportError when huggingface_hub absent crashed
       _load_tiny_router_artifacts and every infer_tiny_router_shadow() call
       in default `auto` backend mode. Was the root blocker for Loop 1.
-    fixed_in: working-tree (verified 2026-04-19 — try/except ImportError → return None present at line 494)
+    fixed_in: working-tree (verified 2026-04-19 — try/except ImportError → return None present at line 494); caller module deleted 2026-08-29 (routing-canon D1)
     test_path: tests/mismatches/test_MISMATCH_01.py
 
   - id: MISMATCH-02

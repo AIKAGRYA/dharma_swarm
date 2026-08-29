@@ -65,8 +65,8 @@
       "classification": "bypass",
       "col": 11,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:23:11",
-      "line": 23,
+      "id": "dharma_swarm/engine/conversation_memory.py:22:11",
+      "line": 22,
       "scope": "runtime",
       "symbol": "datetime.now"
     },
@@ -75,8 +75,8 @@
       "classification": "bypass",
       "col": 8,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:181:8",
-      "line": 181,
+      "id": "dharma_swarm/engine/conversation_memory.py:180:8",
+      "line": 180,
       "scope": "runtime",
       "symbol": "*.mkdir"
     },
@@ -85,8 +85,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:182:13",
-      "line": 182,
+      "id": "dharma_swarm/engine/conversation_memory.py:181:13",
+      "line": 181,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -95,8 +95,8 @@
       "classification": "bypass",
       "col": 26,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:196:26",
-      "line": 196,
+      "id": "dharma_swarm/engine/conversation_memory.py:195:26",
+      "line": 195,
       "scope": "runtime",
       "symbol": "uuid.uuid4"
     },
@@ -105,8 +105,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:202:13",
-      "line": 202,
+      "id": "dharma_swarm/engine/conversation_memory.py:201:13",
+      "line": 201,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -115,8 +115,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:299:13",
-      "line": 299,
+      "id": "dharma_swarm/engine/conversation_memory.py:235:13",
+      "line": 235,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -125,8 +125,8 @@
       "classification": "bypass",
       "col": 34,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:308:34",
-      "line": 308,
+      "id": "dharma_swarm/engine/conversation_memory.py:244:34",
+      "line": 244,
       "scope": "runtime",
       "symbol": "uuid.uuid4"
     },
@@ -135,8 +135,8 @@
       "classification": "bypass",
       "col": 35,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:358:35",
-      "line": 358,
+      "id": "dharma_swarm/engine/conversation_memory.py:284:35",
+      "line": 284,
       "scope": "runtime",
       "symbol": "datetime.now"
     },
@@ -145,8 +145,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:367:13",
-      "line": 367,
+      "id": "dharma_swarm/engine/conversation_memory.py:293:13",
+      "line": 293,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -155,8 +155,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:400:13",
-      "line": 400,
+      "id": "dharma_swarm/engine/conversation_memory.py:326:13",
+      "line": 326,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -165,8 +165,8 @@
       "classification": "bypass",
       "col": 31,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:412:31",
-      "line": 412,
+      "id": "dharma_swarm/engine/conversation_memory.py:338:31",
+      "line": 338,
       "scope": "runtime",
       "symbol": "uuid.uuid4"
     },
@@ -175,8 +175,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:448:13",
-      "line": 448,
+      "id": "dharma_swarm/engine/conversation_memory.py:374:13",
+      "line": 374,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -185,8 +185,8 @@
       "classification": "bypass",
       "col": 27,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:461:27",
-      "line": 461,
+      "id": "dharma_swarm/engine/conversation_memory.py:387:27",
+      "line": 387,
       "scope": "runtime",
       "symbol": "uuid.uuid4"
     },
@@ -195,8 +195,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:502:13",
-      "line": 502,
+      "id": "dharma_swarm/engine/conversation_memory.py:428:13",
+      "line": 428,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -205,8 +205,8 @@
       "classification": "bypass",
       "col": 27,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:515:27",
-      "line": 515,
+      "id": "dharma_swarm/engine/conversation_memory.py:441:27",
+      "line": 441,
       "scope": "runtime",
       "symbol": "uuid.uuid4"
     },
@@ -215,8 +215,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:543:13",
-      "line": 543,
+      "id": "dharma_swarm/engine/conversation_memory.py:469:13",
+      "line": 469,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -225,8 +225,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:561:13",
-      "line": 561,
+      "id": "dharma_swarm/engine/conversation_memory.py:487:13",
+      "line": 487,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -235,8 +235,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:602:13",
-      "line": 602,
+      "id": "dharma_swarm/engine/conversation_memory.py:528:13",
+      "line": 528,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -245,8 +245,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:633:13",
-      "line": 633,
+      "id": "dharma_swarm/engine/conversation_memory.py:559:13",
+      "line": 559,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -255,8 +255,8 @@
       "classification": "bypass",
       "col": 13,
       "file": "dharma_swarm/engine/conversation_memory.py",
-      "id": "dharma_swarm/engine/conversation_memory.py:644:13",
-      "line": 644,
+      "id": "dharma_swarm/engine/conversation_memory.py:570:13",
+      "line": 570,
       "scope": "runtime",
       "symbol": "sqlite3.connect"
     },
@@ -2171,56 +2171,6 @@
       "symbol": "datetime.now"
     },
     {
-      "category": "env",
-      "classification": "bypass",
-      "col": 11,
-      "file": "dharma_swarm/tiny_router_shadow.py",
-      "id": "dharma_swarm/tiny_router_shadow.py:471:11",
-      "line": 471,
-      "scope": "runtime",
-      "symbol": "os.environ"
-    },
-    {
-      "category": "filesystem",
-      "classification": "bypass",
-      "col": 11,
-      "file": "dharma_swarm/tiny_router_shadow.py",
-      "id": "dharma_swarm/tiny_router_shadow.py:513:11",
-      "line": 513,
-      "scope": "runtime",
-      "symbol": "*.exists"
-    },
-    {
-      "category": "filesystem",
-      "classification": "bypass",
-      "col": 45,
-      "file": "dharma_swarm/tiny_router_shadow.py",
-      "id": "dharma_swarm/tiny_router_shadow.py:513:45",
-      "line": 513,
-      "scope": "runtime",
-      "symbol": "*.exists"
-    },
-    {
-      "category": "filesystem",
-      "classification": "bypass",
-      "col": 30,
-      "file": "dharma_swarm/tiny_router_shadow.py",
-      "id": "dharma_swarm/tiny_router_shadow.py:515:30",
-      "line": 515,
-      "scope": "runtime",
-      "symbol": "*.read_text"
-    },
-    {
-      "category": "filesystem",
-      "classification": "bypass",
-      "col": 33,
-      "file": "dharma_swarm/tiny_router_shadow.py",
-      "id": "dharma_swarm/tiny_router_shadow.py:516:33",
-      "line": 516,
-      "scope": "runtime",
-      "symbol": "*.read_text"
-    },
-    {
       "category": "filesystem",
       "classification": "bypass",
       "col": 9,
@@ -3098,26 +3048,6 @@
       "effectful_external_imports": [],
       "external_imports": [
         "__future__",
-        "dataclasses",
-        "functools",
-        "huggingface_hub",
-        "json",
-        "math",
-        "os",
-        "pathlib",
-        "sys",
-        "torch",
-        "transformers",
-        "typing"
-      ],
-      "file": "dharma_swarm/tiny_router_shadow.py",
-      "module": "dharma_swarm.tiny_router_shadow"
-    },
-    {
-      "custody": "outside_track",
-      "effectful_external_imports": [],
-      "external_imports": [
-        "__future__",
         "typing"
       ],
       "file": "packages/telos-kernel/telos_kernel/__init__.py",
@@ -3310,17 +3240,17 @@
   "spec": "docs/prompts/DHARMAGRAPH_ANTITHESIS_V0_GOAL_2026-07-18.md",
   "summary": {
     "bypass_by_category": {
-      "env": 17,
-      "filesystem": 73,
+      "env": 16,
+      "filesystem": 69,
       "ordering": 3,
       "rng": 21,
       "sqlite": 97,
       "time": 19
     },
-    "bypass_total": 230,
-    "effect_site_count": 239,
+    "bypass_total": 225,
+    "effect_site_count": 234,
     "mediated_total": 9,
-    "module_count": 68
+    "module_count": 67
   },
   "workload": {
     "description": "Bounded graph run: GraphBuilder.compile() topology invoked via CompiledGraph.invoke() with SimulatedEffects, a GraphPersistenceKernel (checkpointing on), and a DurableInvoker-wrapped dispatch (derive_graph_side_effect_key). Crosses scheduling (executor superstep barrier), persistence (journal + checkpoint + idempotency store), and channel boundaries.",

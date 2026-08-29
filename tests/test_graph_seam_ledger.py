@@ -32,7 +32,7 @@ from tests.antithesis_support.seam_ledger import (
 # this in the same PR that mediates a bypass family; it never goes up.
 # 232 -> 230 (PR #1129): deleting the pairwise idea-link clique writer removed
 # its sqlite3.connect and uuid.uuid4 effect sites from the workload's reach.
-BYPASS_BASELINE = 230
+BYPASS_BASELINE = 225
 
 CATEGORIES = {
     "time",

@@ -925,7 +925,7 @@ def test_sibling_provider_list_content_not_dropped(provider_cls) -> None:
 
 
 def test_extractor_handles_plain_dict_message() -> None:
-    # NVIDIA NIM and providers_extended parse raw JSON dicts, not SDK objects.
+    # NVIDIA NIM and the Ollama cloud path parse raw JSON dicts, not SDK objects.
     assert _extract_openai_compatible_message_text(
         {"content": None, "reasoning": "dict reasoning"}
     ) == "dict reasoning"
@@ -935,12 +935,14 @@ def test_extractor_handles_plain_dict_message() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Regression: content-drop on providers_extended (Ollama generate, NVIDIA NIM
-# extended, Moonshot). These parse raw httpx JSON; reasoning-only responses
-# must never collapse to "". Completes the honest-spine-v2 lane's conversion.
+# Regression: content-drop on the raw-httpx providers (live Ollama native path,
+# NVIDIA NIM) and the Moonshot shim. These parse raw JSON dicts; reasoning-only
+# responses must never collapse to "". Originally pinned to the extended-provider
+# duplicates deleted under routing-canon D1 (2026-08-29); now pinned to the live
+# classes in providers.py / moonshot_provider.py.
 # ---------------------------------------------------------------------------
 
-from dharma_swarm import providers_extended as _pe  # noqa: E402
+from dharma_swarm.moonshot_provider import MoonshotProvider  # noqa: E402
 
 
 def _fake_httpx_client(payload: dict) -> type:
@@ -953,14 +955,10 @@ def _fake_httpx_client(payload: dict) -> type:
             return payload
 
     class _Client:
+        is_closed = False
+
         def __init__(self, *args, **kwargs) -> None:
             pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc) -> None:
-            return None
 
         async def post(self, *args, **kwargs):
             return _Resp()
@@ -968,33 +966,27 @@ def _fake_httpx_client(payload: dict) -> type:
     return _Client
 
 
-def test_extended_ollama_thinking_only_not_dropped(monkeypatch) -> None:
-    payload = {"response": "", "thinking": "reasoned locally",
+def test_ollama_native_thinking_only_not_dropped(monkeypatch) -> None:
+    payload = {"message": {"content": "", "thinking": "reasoned locally"},
                "prompt_eval_count": 1, "eval_count": 2}
-    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
-    provider = _pe.OllamaProvider()
+    monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", _fake_httpx_client(payload))
+    provider = OllamaProvider(base_url="http://ollama.local", model="llama3.2")
     req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
     resp = asyncio.run(provider.complete(req))
     assert resp.content == "reasoned locally"
 
 
-def test_extended_ollama_response_still_preferred(monkeypatch) -> None:
-    payload = {"response": "the answer", "thinking": "scratchpad",
+def test_ollama_native_content_still_preferred(monkeypatch) -> None:
+    payload = {"message": {"content": "the answer", "thinking": "scratchpad"},
                "prompt_eval_count": 1, "eval_count": 2}
-    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
-    provider = _pe.OllamaProvider()
+    monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", _fake_httpx_client(payload))
+    provider = OllamaProvider(base_url="http://ollama.local", model="llama3.2")
     req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
     resp = asyncio.run(provider.complete(req))
     assert resp.content == "the answer"
 
 
-@pytest.mark.parametrize("provider_factory", [
-    lambda: _pe.NVIDIANIMProvider(api_key="test-key"),
-    lambda: _pe.MoonshotProvider(api_key="test-key"),
-])
-def test_extended_dict_provider_reasoning_only_not_dropped(
-    monkeypatch, provider_factory
-) -> None:
+def test_nvidia_nim_reasoning_only_not_dropped(monkeypatch) -> None:
     payload = {
         "model": "m",
         "usage": {},
@@ -1003,8 +995,24 @@ def test_extended_dict_provider_reasoning_only_not_dropped(
             "finish_reason": "stop",
         }],
     }
-    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
-    provider = provider_factory()
+    monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", _fake_httpx_client(payload))
+    provider = NVIDIANIMProvider(api_key="test-key")
     req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
     resp = asyncio.run(provider.complete(req))
     assert resp.content == "the reasoned answer"
+
+
+def test_moonshot_reasoning_only_content_not_dropped() -> None:
+    provider = MoonshotProvider(api_key="test-key")
+    provider._client = _fake_client(_reasoning_only_resp())
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the reasoned answer"
+
+
+def test_moonshot_list_content_not_dropped() -> None:
+    provider = MoonshotProvider(api_key="test-key")
+    provider._client = _fake_client(_list_content_resp())
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert "part one" in resp.content and "part two" in resp.content

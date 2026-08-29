@@ -139,7 +139,7 @@ API_KEY_AUDIT_SPECS: tuple[ApiKeyAuditSpec, ...] = (
     ApiKeyAuditSpec(
         key_name="MOONSHOT_API_KEY",
         auth_url="https://api.moonshot.cn/v1/models",
-        notes="Legacy/adjacent provider. Present in providers_extended.py, not wired into runtime_provider.py.",
+        notes="Moonshot / Kimi Open Platform lane; class lives in moonshot_provider.py and resolves through runtime_provider.py.",
     ),
 )
 
