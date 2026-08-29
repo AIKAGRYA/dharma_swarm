@@ -253,6 +253,56 @@ def _query_catalytic(text: str, *, limit: int) -> tuple[list[GraphHit], str | No
     return hits, None
 
 
+def _git_toplevel() -> str | None:
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+    if proc.returncode != 0:
+        return None
+    root = proc.stdout.strip()
+    return root or None
+
+
+def _parse_gitnexus_query_stdout(stdout: str) -> dict[str, Any] | None:
+    """gitnexus query prints optional bunyan logs, then a JSON object."""
+    text = stdout.strip()
+    if not text:
+        return None
+    candidates: list[str] = [text]
+    lines = text.splitlines()
+    if len(lines) > 1:
+        candidates.append("\n".join(lines[1:]).strip())
+        candidates.append(lines[0])
+    for blob in candidates:
+        if not blob:
+            continue
+        try:
+            data = json.loads(blob)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and (
+            "processes" in data or "definitions" in data or "process_symbols" in data
+        ):
+            return data
+    return None
+
+
+def _hit_from_gitnexus_row(row: dict[str, Any], *, default_kind: str) -> GraphHit:
+    return GraphHit(
+        source="gitnexus",
+        kind=str(row.get("kind") or row.get("type") or default_kind),
+        id=str(row.get("id") or row.get("uid") or row.get("name") or "?"),
+        label=str(row.get("name") or row.get("label") or row.get("id") or "?"),
+        payload=row,
+    )
+
+
 def _query_gitnexus(text: str, *, limit: int) -> tuple[list[GraphHit], str | None]:
     """Best-effort gitnexus call. Skips silently if the CLI isn't available."""
     bin_check = subprocess.run(
@@ -260,9 +310,13 @@ def _query_gitnexus(text: str, *, limit: int) -> tuple[list[GraphHit], str | Non
     )
     if bin_check.returncode != 0:
         return [], "gitnexus CLI not found"
+    cmd = ["gitnexus", "query", text, "--limit", str(limit)]
+    repo = _git_toplevel()
+    if repo:
+        cmd.extend(["--repo", repo])
     try:
         proc = subprocess.run(
-            ["gitnexus", "search", "--json", "--limit", str(limit), text],
+            cmd,
             capture_output=True,
             text=True,
             timeout=10,
@@ -270,27 +324,34 @@ def _query_gitnexus(text: str, *, limit: int) -> tuple[list[GraphHit], str | Non
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
         return [], f"call failed: {e}"
     if proc.returncode != 0:
-        return [], f"exit {proc.returncode}: {proc.stderr[:120].strip()}"
-    try:
-        data = json.loads(proc.stdout) if proc.stdout.strip() else []
-    except Exception as e:
-        return [], f"json error: {e}"
+        err = (proc.stderr or proc.stdout or "").strip()
+        return [], f"exit {proc.returncode}: {err[:160]}"
+    data = _parse_gitnexus_query_stdout(proc.stdout)
+    if data is None:
+        return [], "json error: no query payload"
 
     hits: list[GraphHit] = []
-    rows = data.get("results", data) if isinstance(data, dict) else data
-    if isinstance(rows, list):
-        for row in rows[:limit]:
-            if not isinstance(row, dict):
-                continue
-            hits.append(
-                GraphHit(
-                    source="gitnexus",
-                    kind=row.get("type", "symbol"),
-                    id=str(row.get("id") or row.get("name") or "?"),
-                    label=str(row.get("name") or row.get("label") or "?"),
-                    payload=row,
-                )
-            )
+    for row in data.get("definitions") or []:
+        if isinstance(row, dict):
+            hits.append(_hit_from_gitnexus_row(row, default_kind="symbol"))
+        if len(hits) >= limit:
+            break
+    if len(hits) < limit:
+        for row in data.get("process_symbols") or []:
+            if isinstance(row, dict):
+                hits.append(_hit_from_gitnexus_row(row, default_kind="symbol"))
+            if len(hits) >= limit:
+                break
+    if len(hits) < limit:
+        for row in data.get("processes") or []:
+            if isinstance(row, dict):
+                hits.append(_hit_from_gitnexus_row(row, default_kind="process"))
+            if len(hits) >= limit:
+                break
+
+    note = data.get("warning")
+    if isinstance(note, str) and note.strip():
+        return hits, note.strip()
     return hits, None
 
 

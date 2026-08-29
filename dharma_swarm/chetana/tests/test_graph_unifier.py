@@ -98,6 +98,52 @@ def test_query_missing_backends_dont_break(tmp_path, monkeypatch):
     assert all(v >= 0 for v in result.coverage.values())
 
 
+def test_query_gitnexus_parses_modern_query_json(monkeypatch):
+    """gitnexus 1.6 dropped `search --json`; the unifier must use `query`."""
+
+    class _Proc:
+        def __init__(self, returncode=0, stdout="", stderr=""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(list(cmd))
+        if cmd[:2] == ["which", "gitnexus"]:
+            return _Proc(stdout="/usr/local/bin/gitnexus\n")
+        if cmd[:2] == ["git", "rev-parse"]:
+            return _Proc(stdout="/Users/dhyana/dharma_swarm\n")
+        if cmd[:2] == ["gitnexus", "query"]:
+            payload = {
+                "processes": [],
+                "process_symbols": [],
+                "definitions": [
+                    {
+                        "id": "SwarmManager",
+                        "name": "SwarmManager",
+                        "kind": "Class",
+                    }
+                ],
+            }
+            return _Proc(
+                stdout='{"level":40,"msg":"log"}\n' + json.dumps(payload, indent=2)
+            )
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    monkeypatch.setattr(gu_mod.subprocess, "run", fake_run)
+    hits, note = gu_mod._query_gitnexus("SwarmManager", limit=5)
+    assert note is None
+    assert len(hits) == 1
+    assert hits[0].label == "SwarmManager"
+    assert hits[0].kind == "Class"
+    query_cmds = [c for c in calls if c[:2] == ["gitnexus", "query"]]
+    assert query_cmds, calls
+    assert "--repo" in query_cmds[0]
+    assert "search" not in query_cmds[0]
+
+
 def test_coverage_summary_renders():
     from dharma_swarm.chetana.graph_unifier import UnifiedQueryResult, GraphHit
 
