@@ -579,6 +579,9 @@ def test_doctor_json_is_truthful_and_versioned() -> None:
     result = _invoke(MODULE_COMMAND, "doctor", "--json")
 
     assert result.returncode != 0
+    assert result.stdout, (
+        f"empty stdout; rc={result.returncode} stderr={result.stderr[-2000:]}"
+    )
     payload = json.loads(result.stdout)
     assert payload["schema"] == "forge_lab.cli_result.v1"
     assert payload["ok"] is False
@@ -685,6 +688,9 @@ def test_minimum_read_only_cli_views_are_implemented(tmp_path: Path) -> None:
         text=True,
     )
     assert reconcile.returncode != 0
+    assert reconcile.stdout, (
+        f"empty stdout; rc={reconcile.returncode} stderr={reconcile.stderr[-2000:]}"
+    )
     report = json.loads(reconcile.stdout)["result"]
     assert report["read_only"] is True
     assert report["findings"]
@@ -735,7 +741,9 @@ raise SystemExit(rsi_cli.main(['doctor']))
     )
 
     assert result.returncode != 0
-    assert "not ready" in result.stdout.lower()
+    assert "not ready" in result.stdout.lower(), (
+        f"stdout={result.stdout[-1000:]!r} stderr={result.stderr[-2000:]!r}"
+    )
     assert "traceback" not in result.stderr.lower()
 
 
