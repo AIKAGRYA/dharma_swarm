@@ -257,7 +257,6 @@
     "tests/test_forge_v1_providers.py",
     "tests/test_forge_v2.py",
     "tests/test_forge_v2_runner_slots.py",
-    "tests/test_foundry_guardian_feed.py",
     "tests/test_gaia_platform.py",
     "tests/test_godel_claw_e2e.py",
     "tests/test_integration.py",
@@ -342,7 +341,7 @@
       "The forge_lab estate arrived with modules over the repo's 500-line budget and direct ~/.dharma references; both are repo-law violations on main even though the satellite branch never ran those gates."
     ],
     "owner": "@dhyana",
-    "packet_digest": "e2f73669b2714868d8576395832215e4269d644633827321b982ac130f131ede",
+    "packet_digest": "1e638a9cf2e46b9ed03059a66720d610e0f9443ab1f6ebaeecbecd8881e6b4df",
     "rollback": "git revert the integration merge commit and the repair commits on integrate/one-world-2026-08-30; satellites remain intact on their own branches.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
