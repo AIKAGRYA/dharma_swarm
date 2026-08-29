@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from dharma_swarm.base_provider import ProviderTimeoutError
 from dharma_swarm.model_hierarchy import default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.providers import (
@@ -218,7 +219,7 @@ async def test_claude_code_provider_builds_prompt():
 
 @pytest.mark.asyncio
 async def test_claude_code_provider_timeout():
-    """Verify timeout returns a TIMEOUT response instead of raising."""
+    """Verify timeout raises a lane failure instead of returning a fake TIMEOUT response."""
 
     async def fake_exec(*args, **kwargs):
         mock_proc = AsyncMock()
@@ -228,12 +229,10 @@ async def test_claude_code_provider_timeout():
 
     provider = ClaudeCodeProvider(timeout=1)
     with patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec):
-        result = await provider.complete(
-            LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
-        )
-
-    assert "TIMEOUT" in result.content
-    assert result.model == "claude-code"
+        with pytest.raises(ProviderTimeoutError, match="claude-code timed out"):
+            await provider.complete(
+                LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
+            )
 
 
 @pytest.mark.asyncio

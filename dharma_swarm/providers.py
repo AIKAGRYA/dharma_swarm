@@ -42,7 +42,7 @@ from dharma_swarm.api_keys import (
     TOGETHER_API_KEY_ENV,
     ZHIPU_API_KEY_ENV,
 )
-from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
+from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities, ProviderTimeoutError
 from dharma_swarm.api_keys import strip_metered_anthropic_key
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
 from dharma_swarm.key_oracle import live_providers
@@ -744,7 +744,9 @@ class _SubprocessProvider(LLMProvider):
             if inspect.isawaitable(terminate_result):
                 await terminate_result
             await proc.wait()
-            return LLMResponse(content="TIMEOUT: exceeded limit", model=self._cli_label)
+            raise ProviderTimeoutError(
+                f"{self._cli_label} timed out after {self._timeout}s"
+            )
 
         content = stdout.decode()[:50_000] if stdout else ""
         if proc.returncode != 0:
@@ -3271,6 +3273,7 @@ class ModelRouter:
                     if "attempt_started" in locals()
                     else 0.0
                 )
+                error_label = getattr(exc, "failure_kind", None) or str(exc)[:120]
                 self._update_reward(provider_type, reward_model, -1.0)
                 self._record_routing_memory_outcome(
                     provider=provider_type,
@@ -3281,7 +3284,7 @@ class ModelRouter:
                     success=False,
                     latency_ms=latency_ms,
                     total_tokens=0,
-                    error=str(exc)[:120],
+                    error=error_label,
                 )
                 failure_trace.append(
                     {
@@ -3300,7 +3303,7 @@ class ModelRouter:
                     success=False,
                     latency_ms=latency_ms,
                     total_tokens=0,
-                    error=str(exc)[:120],
+                    error=error_label,
                 )
 
         self._append_routing_audit(
