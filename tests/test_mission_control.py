@@ -1008,9 +1008,32 @@ async def test_expired_interrupted_heartbeat_allows_successor(
 
 
 @pytest.mark.asyncio
+async def test_expired_normal_active_heartbeat_allows_successor(
+    mission_control: MissionControl,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await _active_attempt(mission_control, task.task_id)
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert claim is not None
+    await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=_expired_stale_after(claim))
+    )
+
+    successor = await mission_control.start_attempt(
+        "m-alpha", task.task_id, "agent-b", attempt_key="after-normal-heartbeat"
+    )
+
+    recovered_run = await mission_control._runtime.get_delegation_run(first.attempt_id)
+    recovered_claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert successor.status == "queued"
+    assert recovered_run is not None and recovered_run.status == "stale_recovered"
+    assert recovered_claim is not None and recovered_claim.status == "stale_recovered"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "shape",
-    ("pre_heartbeat", "post_heartbeat", "ack_timestamp", "started_timestamp"),
+    ("pre_heartbeat", "ack_timestamp", "started_timestamp"),
 )
 async def test_recovery_refuses_adjacent_or_mismatched_heartbeat_states(
     mission_control: MissionControl,
@@ -1041,11 +1064,6 @@ async def test_recovery_refuses_adjacent_or_mismatched_heartbeat_states(
         monkeypatch.setattr(
             mission_control._runtime, "record_delegation_run", original_record_run
         )
-    elif shape == "post_heartbeat":
-        await mission_control.heartbeat_lease(
-            "m-alpha", task.task_id, "agent-a", attempt_id=first.attempt_id
-        )
-
     run = await mission_control._runtime.get_delegation_run(first.attempt_id)
     claim = await mission_control._runtime.get_task_claim(first.claim_id)
     assert run is not None and claim is not None

@@ -85,32 +85,46 @@ def _canonical_preimage(
     }
     if completion_contract:
         expected_identity_metadata["completion_contract"] = completion_contract
-    # Heartbeat records the claim activation before it records the run's
-    # queued-to-running transition.  Recovery owns only this one interrupted
-    # durable window; pre-heartbeat and already-running states are not
-    # interchangeable recovery preimages.
+    normal_active = (run.status, claim.status.lower()) == ("running", "active")
     interrupted_heartbeat = (run.status, claim.status.lower()) == ("queued", "active")
-    timeline = (
+    normal_timeline = (
+        claim.acked_at is not None
+        and claim.heartbeat_at is not None
+        and claim.claimed_at <= claim.acked_at <= claim.heartbeat_at
+    )
+    interrupted_timeline = (
         claim.acked_at is not None
         and claim.heartbeat_at is not None
         and claim.acked_at == claim.heartbeat_at
         and claim.claimed_at <= claim.acked_at
     )
-    task_projection = (
+    normal_projection = (
+        task.status == TaskStatus.RUNNING
+        and task.assigned_to == run.assigned_to
+        and task.metadata.get("mission_attempt_id") == run.run_id
+        and task.metadata.get("mission_claim_id") == claim.claim_id
+    )
+    interrupted_projection = (
         task.status == TaskStatus.ASSIGNED
         and task.assigned_to == run.assigned_to
         and task.metadata.get("mission_attempt_id") == run.run_id
         and task.metadata.get("mission_claim_id") == claim.claim_id
     )
-    return bool(
-        interrupted_heartbeat
-        and timeline
-        and task_projection
-        and task.status
-        in {TaskStatus.PENDING, TaskStatus.ASSIGNED, TaskStatus.RUNNING}
-        and run.completed_at is None
+    base_guards = (
+        run.completed_at is None
         and run.failure_code == ""
         and claim.recovered_at is None
+    )
+    return bool(
+        (
+            (normal_active and normal_timeline and normal_projection)
+            or (
+                interrupted_heartbeat
+                and interrupted_timeline
+                and interrupted_projection
+            )
+        )
+        and base_guards
         and claim.stale_after is not None
         and claim.heartbeat_at is not None
         and claim.heartbeat_at <= claim.stale_after
