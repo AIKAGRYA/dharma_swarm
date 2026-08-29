@@ -241,9 +241,8 @@ def _bridge_record(
     )
     promotion_decision = build_promotion_decision(
         write_receipt_id=write_receipt.receipt_id,
-        reviewer=request.reviewer,
+        human_approved=bool(str(request.reviewer).strip()),
         rationale=request.rationale,
-        approved_gates=request.approved_gates,
         source_proposal_id=request.proposal_id,
         source_decision_id=knowledgeops_decision_id,
         target_authority_surface=target_authority_surface,

@@ -12,7 +12,6 @@ from dharma_swarm.memory_kernel import (
     DEFAULT_PROMOTION_DECISION_PATH,
     DEFAULT_REVIEWED_CANONICAL_RECEIPT_PATH,
     DEFAULT_WRITE_RECEIPT_PATH,
-    REQUIRED_PROMOTION_GATES,
     append_promotion_artifacts,
     build_promotion_decision,
     latest_allowed_write_receipt,
@@ -48,9 +47,8 @@ def main(argv: list[str] | None = None) -> int:
     rollback_engaged = _truthy(os.environ.get(ROLLBACK_ENV_VAR, ""))
     decision = build_promotion_decision(
         write_receipt_id=str(write_receipt["receipt_id"]),
-        reviewer="human",
+        human_approved=True,
         rationale="reviewed provenance, conflicts, privacy, and canon policy",
-        approved_gates=REQUIRED_PROMOTION_GATES,
     )
     canonical_receipt = reviewed_canonical_receipt(
         write_receipt,

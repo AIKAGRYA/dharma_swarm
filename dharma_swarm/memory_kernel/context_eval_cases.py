@@ -7,6 +7,7 @@ or wiring MemoryKernel into prompt construction.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from dharma_swarm.memory_kernel.atoms import (
     AdapterMode,
@@ -113,7 +114,10 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
         surface=_runtime_surface(),
         atom_type=MemoryAtomType.RUNTIME_EVENT,
         content_ref="runtime_event:bounded-content-1",
-        content="Evidence from /Users/dhyana/.dharma/state/runtime.db secret_token=abc123",
+        content=(
+            f"Evidence from {Path.home()}/.dharma/state/runtime.db "
+            "secret_token=abc123"
+        ),
         truth_state=TruthState.OBSERVED,
         context_admissible=True,
     )
@@ -122,7 +126,7 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
         atom_type=MemoryAtomType.RUNTIME_EVENT,
         content_ref="runtime_event:truncated-content-1",
         content=(
-            "Evidence from /Users/dhyana/.dharma/state/runtime.db "
+            f"Evidence from {Path.home()}/.dharma/state/runtime.db "
             "secret_token=abc123 " + "verified " * 24
         ),
         truth_state=TruthState.OBSERVED,
@@ -145,7 +149,7 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
             description="Legacy context text with local path and secret-like marker is warned and redacted.",
             config=ContextEvalConfig(include_memory_kernel=False),
             current_context_text=(
-                "Use /Users/dhyana/.dharma/db/memory_plane.db secret_token=abc123"
+                f"Use {Path.home()}/.dharma/db/memory_plane.db secret_token=abc123"
             ),
             expected_hard_failures=0,
             expected_min_warnings=6,

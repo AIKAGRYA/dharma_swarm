@@ -2644,6 +2644,7 @@ def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(
             backup_reviewers="backup_opus",
             backup_reviewer_reason="Claude Code subscription credits unavailable",
             merge_authorization=str(_write_merge_authorization(tmp_path)),
+            required_reviewers="codex,claude",
         )
     )
 
@@ -2848,6 +2849,7 @@ def test_gate_blocks_backup_reviewer_without_written_reason(tmp_path, monkeypatc
             allow_backup_reviewer=True,
             backup_reviewers="backup_opus",
             backup_reviewer_reason="",
+            required_reviewers="codex,claude",
         )
     )
 

@@ -50,6 +50,11 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 `SOVEREIGN_MANIFEST.md` remains the deeper architecture/doctrine authority; it
 is no longer a forced first-read surface.
 
+`docs/vision_maps/VISION_TRANSMISSION.md` (rendered by `make vision`) is a
+TRANSMISSION projection of the vision corpus: its registry entries retain
+their own authority, and it is NOT a sixth first-read surface — depth-on-demand
+only.
+
 ---
 
 ## Ownership Map (what owns what)

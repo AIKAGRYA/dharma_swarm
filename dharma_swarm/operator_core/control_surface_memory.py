@@ -725,7 +725,7 @@ def project_context_canary_report() -> dict[str, Any]:
             query="MemoryKernel operator canary",
             current_context_text=(
                 "Canary should surface sensitive context risk: "
-                "/Users/dhyana/.dharma/db/memory_plane.db "
+                f"{Path.home()}/.dharma/db/memory_plane.db "
                 "API_KEY=sample_placeholder "
                 "Authorization: Bearer aaaaaaaaaaaaaaaa"
             ),

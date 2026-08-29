@@ -8,7 +8,7 @@ Anti-slop justification: one index doc for the Oz-integration track (branch `oz/
 Oz is the swarm's replaceable peripheral nervous system — elastic hands, decorrelated eyes, an external heartbeat — strictly subordinate to APEX/Sarathi and the holarchy. The spine owns all receipts; Oz is overflow + external surface, never the nervous system or an authority.
 
 ## Five workstreams (archetype -> instance)
-- W1 Decorrelated Verifier — `.warp/skills/oz-verify-claim/` + `.github/workflows/oz-verify-claim.yml` (runs on PRs).
+- W1 Decorrelated Verifier — `.warp/skills/oz-verify-claim/` (skill only; the `oz-verify-claim.yml` PR workflow was removed 2026-08 as a dead, silently-green lane — run it by hand per the runbook below).
 - W2 Forge Automation — wraps `scripts/runtime/forge_swarm_evolution_arena_v0_*` + the overnight-autopilot harness; operator leases on spend/fitness (next).
 - W3 AGNI Watchdog -> Dharma Capital strategy feed — read-only over `~/.dharma/remote_nodes/agni/*.json` (next).
 - W4 Cleanup Janitor — `.warp/skills/oz-repo-hygiene/` + weekly schedule.
@@ -26,7 +26,7 @@ Inspect / run read-only checks / review / recommend / open PRs and issues — ye
 1. GitHub Actions secret for W1 (one time):
    `gh secret set WARP_API_KEY` (paste the Warp API key from `warp://settings/platform`).
    Optional: set repo variable `WARP_AGENT_PROFILE`.
-2. W1 smoke test (verify a PR by hand before relying on the workflow):
+2. W1 smoke test (verify a PR by hand; the PR workflow no longer exists):
    `oz agent run-cloud --environment fGXBFftNfOkc2nKXSmyBNn --skill "AIKAGRYA/dharma_swarm:oz-verify-claim" --prompt "Verify PR #<n>"`
 3. W4 weekly hygiene schedule (after the skill is on the env's default branch):
    `oz schedule create --name "dharma repo hygiene" --cron "0 16 * * 1" --environment fGXBFftNfOkc2nKXSmyBNn --prompt "Read and run the oz-repo-hygiene skill; open ONE consolidated triage PR. Recommend only; never merge."`

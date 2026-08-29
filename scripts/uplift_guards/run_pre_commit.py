@@ -6,8 +6,10 @@ its own message; pass/warn messages go to stdout, fail messages to stderr.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -33,7 +35,13 @@ def check_assurance_diff(repo_root: Path) -> tuple[bool, str]:
         from dharma_swarm.assurance.runner import run_assurance
         from dharma_swarm.assurance.scanner_test_gaps import _git_changed_files
     except ImportError as exc:
-        return True, f"assurance diff skipped (dependency not available: {exc})"
+        # Fail-open but never silently green (fail_closed.py AI-N1 spirit):
+        # loud message plus a durable witness flag under ~/.dharma/witness/.
+        _write_assurance_unavailable_witness(repo_root, str(exc))
+        return True, (
+            "ASSURANCE SCAN UNAVAILABLE (dependency missing) — not a pass: "
+            f"{exc}"
+        )
 
     changed_files = _git_changed_files(repo_root)
     if not changed_files:
@@ -71,6 +79,35 @@ def check_assurance_diff(repo_root: Path) -> tuple[bool, str]:
             f"First blocking finding: {top}",
         )
     return True, f"assurance diff clear of blocking findings (medium={medium})"
+
+def _write_assurance_unavailable_witness(repo_root: Path, detail: str) -> None:
+    """Leave a durable flag that the assurance scan did not run.
+
+    The commit is still allowed; the flag exists so the gap is auditable
+    rather than invisible. Witness failures must never block a commit.
+    """
+    try:
+        log = (
+            Path.home()
+            / ".dharma"
+            / "witness"
+            / "assurance_guard_unavailable.jsonl"
+        )
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "ts": datetime.now(UTC).isoformat(),
+                        "repo": str(repo_root),
+                        "detail": detail,
+                    }
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+
 
 GUARDS = [
     ("kernel-integrity", check_kernel_integrity),

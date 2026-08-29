@@ -2,6 +2,11 @@
 
 Promotion emits reviewed canonical receipts only. It never mutates canon,
 Chetana, prompt context, projection stores, or legacy memory databases.
+
+Human approval is a single explicit boolean supplied by the caller
+(`human_approved`) plus a free-text `rationale`. There is no self-checked
+gate battery here: provenance/conflict/privacy/canon review happens upstream
+(KnowledgeOps decision ledger, write-receipt policy) or it does not happen.
 """
 
 from __future__ import annotations
@@ -35,14 +40,6 @@ DEFAULT_PROMOTION_DECISION_PATH = Path("reports/memory_kernel/promotion_decision
 DEFAULT_REVIEWED_CANONICAL_RECEIPT_PATH = Path(
     "reports/memory_kernel/reviewed_canonical_receipts.jsonl"
 )
-REQUIRED_PROMOTION_GATES = (
-    "human_review",
-    "provenance_review",
-    "conflict_review",
-    "privacy_review",
-    "canon_policy_review",
-    "knowledgeops_linking",
-)
 
 
 class MemoryKernelPromotionDecisionKind(StrEnum):
@@ -62,9 +59,8 @@ class MemoryKernelPromotionDecision:
     decision_id: str
     write_receipt_id: str
     decision: MemoryKernelPromotionDecisionKind
-    reviewer: str
+    human_approved: bool
     rationale: str
-    approved_gates: tuple[str, ...]
     created_at: str
     source_proposal_id: str = ""
     source_decision_id: str = ""
@@ -121,9 +117,8 @@ class MemoryKernelPromotionStatus:
 def build_promotion_decision(
     *,
     write_receipt_id: str,
-    reviewer: str,
+    human_approved: bool,
     rationale: str,
-    approved_gates: Iterable[str],
     decision: MemoryKernelPromotionDecisionKind = MemoryKernelPromotionDecisionKind.APPROVE,
     created_at: str | None = None,
     source_proposal_id: str = "",
@@ -131,18 +126,15 @@ def build_promotion_decision(
     target_authority_surface: str = "",
 ) -> MemoryKernelPromotionDecision:
     resolved_created_at = created_at or utc_now()
-    safe_reviewer = redact_context_text(reviewer.strip())
     safe_rationale = redact_context_text(rationale.strip())
     safe_source_proposal_id = redact_context_text(source_proposal_id.strip())
     safe_source_decision_id = redact_context_text(source_decision_id.strip())
     safe_target_authority_surface = redact_context_text(target_authority_surface.strip())
-    gate_tuple = tuple(sorted(set(str(gate) for gate in approved_gates)))
     decision_id_parts = [
         write_receipt_id,
         decision.value,
-        safe_reviewer,
+        str(bool(human_approved)),
         safe_rationale,
-        *gate_tuple,
     ]
     if safe_source_proposal_id:
         decision_id_parts.extend(("source_proposal_id", safe_source_proposal_id))
@@ -156,9 +148,8 @@ def build_promotion_decision(
         decision_id=decision_id,
         write_receipt_id=write_receipt_id,
         decision=decision,
-        reviewer=safe_reviewer,
+        human_approved=bool(human_approved),
         rationale=safe_rationale,
-        approved_gates=gate_tuple,
         created_at=resolved_created_at,
         source_proposal_id=safe_source_proposal_id,
         source_decision_id=safe_source_decision_id,
@@ -178,8 +169,7 @@ def reviewed_canonical_receipt(
     blockers = list(_promotion_blockers(write_receipt, decision, rollback_engaged))
     human_approved = (
         decision.decision == MemoryKernelPromotionDecisionKind.APPROVE
-        and bool(decision.reviewer.strip())
-        and not set(REQUIRED_PROMOTION_GATES) - set(decision.approved_gates)
+        and decision.human_approved
     )
     status = (
         MemoryKernelPromotionReceiptStatus.BLOCKED
@@ -366,13 +356,10 @@ def _promotion_blockers(
         blockers.append("write_receipt_request_missing")
     if decision.decision != MemoryKernelPromotionDecisionKind.APPROVE:
         blockers.append("promotion_decision_not_approve")
-    if not decision.reviewer.strip():
-        blockers.append("missing_human_reviewer")
+    if not decision.human_approved:
+        blockers.append("promotion_not_human_approved")
     if not decision.rationale.strip():
         blockers.append("missing_human_rationale")
-    missing_gates = sorted(set(REQUIRED_PROMOTION_GATES) - set(decision.approved_gates))
-    if missing_gates:
-        blockers.append("missing_required_gates:" + ",".join(missing_gates))
     return tuple(blockers)
 
 
