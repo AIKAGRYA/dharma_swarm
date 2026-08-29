@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
+    OPEN_CLAIM_STATUSES,
     OWNER_TERMINAL_ATTEMPT_STATUSES,
     PUBLIC_TERMINAL_ATTEMPT_STATUSES,
     RECOVERY_RECEIPT_TYPE,
@@ -17,6 +18,7 @@ from dharma_swarm.mission_control_contract import (
     TERMINAL_RECEIPT_TYPE,
     MissionControlError,
     ReceiptView,
+    claim_is_expired,
     clean_identifier,
     stable_id,
     terminal_operation_metadata,
@@ -228,6 +230,20 @@ class MissionControlRecoveryMixin:
         recovered_at: datetime,
     ) -> bool:
         """Close an expired lineage; no cross-process lease CAS is claimed."""
+        current_claim = await self._runtime.get_task_claim(claim.claim_id)
+        if current_claim is None:
+            raise MissionControlError(f"claim {claim.claim_id!r} was not found")
+        claim = current_claim
+        trusted_now = utc_now()
+        if (
+            claim.status.lower() not in OPEN_CLAIM_STATUSES
+            or not claim_is_expired(claim, trusted_now)
+            or claim.stale_after is None
+        ):
+            raise MissionControlError(
+                f"claim {claim.claim_id!r} is not an expired open lineage"
+            )
+        expired_stale_after = claim.stale_after
         attempt_id = str(claim.metadata.get("attempt_id") or "")
         self._require_claim_identity(
             claim, mission_id, claim.task_id, claim.agent_id, attempt_id
@@ -329,6 +345,7 @@ class MissionControlRecoveryMixin:
             "attempt_id": attempt_id,
             "recovered_claim_id": claim.claim_id,
             "reason": "expired_lease",
+            "expired_stale_after": expired_stale_after.isoformat(),
         }
         recovery = self._matching_receipt(
             recovery_receipts,
@@ -348,7 +365,7 @@ class MissionControlRecoveryMixin:
                 payload=payload,
                 receipt_id=receipt_id,
             )
-        transitioned_at = max(recovered_at, utc_now())
+        transitioned_at = max(recovered_at, trusted_now, utc_now())
         if run is not None and run.status != "stale_recovered":
             await self._runtime.record_delegation_run(
                 replace(
@@ -368,7 +385,6 @@ class MissionControlRecoveryMixin:
                 replace(
                     claim,
                     status="stale_recovered",
-                    stale_after=transitioned_at,
                     recovered_at=transitioned_at,
                     metadata={
                         **claim.metadata,

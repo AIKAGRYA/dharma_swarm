@@ -13,7 +13,6 @@ import os
 import re
 import shlex
 import stat
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -375,37 +374,21 @@ def apply_unified_diff(
     *,
     allowed_paths: Iterable[str],
     check_only: bool = False,
+    expected_identity: tuple[int, int, int] | None = None,
+    expected_root_identity: tuple[int, int] | None = None,
+    operation_id: str | None = None,
 ) -> Path:
-    """Replay ``diff`` exactly, atomically replacing one scoped UTF-8 file."""
-    parsed = parse_unified_diff(diff)
-    target = _scoped_target(Path(root), parsed.path, allowed_paths)
-    try:
-        # ``Path.read_text`` enables universal-newline translation and would
-        # silently rewrite untouched CRLF/mixed-newline lines. Exact replay
-        # keeps the source terminators byte-for-byte unless the diff names them.
-        with target.open("r", encoding="utf-8", newline="") as handle:
-            source = handle.readlines()
-    except UnicodeDecodeError as exc:
-        raise PatchReplayError("binary artifact targets are unsupported") from exc
-    candidate = "".join(_replay(source, parsed))
-    if check_only:
-        return target
+    """Replay one diff through no-follow directory descriptors."""
 
-    descriptor, temporary = tempfile.mkstemp(prefix=".foundry-replay-", dir=target.parent)
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
-            handle.write(candidate)
-            handle.flush()
-            os.fsync(handle.fileno())
-        original_mode = stat.S_IMODE(target.stat().st_mode)
-        os.chmod(temporary_path, original_mode)
-        os.replace(temporary_path, target)
-        directory_fd = os.open(target.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
-    finally:
-        temporary_path.unlink(missing_ok=True)
-    return target
+    parsed = parse_unified_diff(diff)
+    from dharma_swarm.foundry.patches_atomic import apply_parsed_diff_atomic
+
+    return apply_parsed_diff_atomic(
+        Path(root),
+        parsed,
+        allowed_paths=allowed_paths,
+        check_only=check_only,
+        expected_identity=expected_identity,
+        expected_root_identity=expected_root_identity,
+        operation_id=operation_id,
+    )

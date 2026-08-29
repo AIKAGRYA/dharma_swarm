@@ -132,10 +132,16 @@ def reconciliation(
                 return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
             terminal_by_run.setdefault(receipt.run_id, []).append(receipt)
         elif receipt.receipt_type == RECOVERY_RECEIPT_TYPE:
+            claim = claim_by_id.get(identity.claim_id)
             if (
                 receipt.run_id not in run_by_id
-                or identity.claim_id not in claim_by_id
-                or not recovery_receipt_matches_contract(receipt, identity, mission_id)
+                or claim is None
+                or not recovery_receipt_matches_contract(
+                    receipt,
+                    identity,
+                    mission_id,
+                    expired_stale_after=claim.stale_after,
+                )
             ):
                 return ReconciliationState.CONFLICTING_TERMINAL_EVIDENCE
             recovery_by_run.setdefault(receipt.run_id, []).append(receipt)
