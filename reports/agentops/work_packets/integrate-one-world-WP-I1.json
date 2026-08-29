@@ -91,6 +91,7 @@
     "dharma_swarm/forge_v1/providers.py",
     "dharma_swarm/forge_v1/run_real.py",
     "dharma_swarm/forge_v1/smoke_live.py",
+    "dharma_swarm/foundry/guardian_feed.py",
     "dharma_swarm/gaia_platform.py",
     "dharma_swarm/gaia_verification.py",
     "dharma_swarm/knowledge_ops/memory_kernel_promotion_bridge.py",
@@ -257,6 +258,7 @@
     "tests/test_forge_v1_providers.py",
     "tests/test_forge_v2.py",
     "tests/test_forge_v2_runner_slots.py",
+    "tests/test_foundry_guardian_feed.py",
     "tests/test_gaia_platform.py",
     "tests/test_godel_claw_e2e.py",
     "tests/test_integration.py",
@@ -338,10 +340,11 @@
     "interface_mismatches": [
       "The rsi-lab satellite was built against a pre-consolidation model pool; its newrun preset referenced FORGE_KIMI_27_CODE_CLOUD_MODEL_ID, removed by main's Kimi K3 promotion (#1008), so the merge had to rebind the diverse mutator to the sanctioned K3 successor route.",
       "Satellite work packets rsi-lab-WP-O20/WP-O21 declare a retired track (hyperbolic-time-chamber-2026-07) and satellite base refs that are not ancestors of main; they are kept in satellite history and deliberately not landed on main.",
-      "The forge_lab estate arrived with modules over the repo's 500-line budget and direct ~/.dharma references; both are repo-law violations on main even though the satellite branch never ran those gates."
+      "The forge_lab estate arrived with modules over the repo's 500-line budget and direct ~/.dharma references; both are repo-law violations on main even though the satellite branch never ran those gates.",
+      "Cross-track integration reconciliation (operator-directed unification program, 2026-08-30): the one-world merge created this conflict \u2014 the silvering efca57e40 replaced archive's quorum-based one-wire authority (ONE_WIRE_REQUIRED_CONFIRMED/DOMAINS) with an explicit operator_approved flag, while the foundry guardian-feed surface still pinned the removed quorum API (tests/test_foundry_guardian_feed.py::test_constants_match_archive and test_written_receipt_satisfies_real_one_wire_guard). Custody of dharma_swarm/foundry/guardian_feed.py and tests/test_foundry_guardian_feed.py is admitted to this packet so the integration can reconcile the foundry tests to the silvered archive contract; this admission supersedes the bc2d97cec revert, which was ownership-gate-only."
     ],
     "owner": "@dhyana",
-    "packet_digest": "1e638a9cf2e46b9ed03059a66720d610e0f9443ab1f6ebaeecbecd8881e6b4df",
+    "packet_digest": "93f4e1b570c14898e926a2908cc23d23baeac82621824cad23530b4bb601f1ba",
     "rollback": "git revert the integration merge commit and the repair commits on integrate/one-world-2026-08-30; satellites remain intact on their own branches.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {

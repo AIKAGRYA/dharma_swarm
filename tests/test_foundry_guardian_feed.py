@@ -61,17 +61,26 @@ def test_grant_requires_both_flag_and_eligibility():
     assert payload["authority_result"]["fitness_authority_granted"] is False
 
 
-def test_constants_match_archive():
+def test_receipt_path_matches_archive():
     from dharma_swarm import archive
 
-    assert REQUIRED_CONFIRMED == archive.ONE_WIRE_REQUIRED_CONFIRMED
-    assert REQUIRED_DOMAINS == archive.ONE_WIRE_REQUIRED_DOMAINS
+    # archive dropped ONE_WIRE_REQUIRED_CONFIRMED/DOMAINS in efca57e40 (quorum
+    # arithmetic is no longer the authority channel; the explicit operator flag
+    # is). The load-bearing shared contract is the receipt path.
     assert GUARDIAN_RECEIPT_RELPATH == archive.ONE_WIRE_GUARDIAN_RECEIPT
 
 
-def test_written_receipt_satisfies_real_one_wire_guard(tmp_path):
+def test_written_receipt_no_longer_authorizes_without_operator_flag(tmp_path):
     from dharma_swarm import archive
 
+    # efca57e40 (11->9 silvering): archive authorizes only a literal top-level
+    # "operator_approved": true. guardian_feed still writes the legacy quorum
+    # shape (nested authority_result), so its receipts are inert until the
+    # foundry surface re-adopts the operator flag. Custody of this surface was
+    # admitted to integrate-one-world-WP-I1 (cross-track reconciliation under
+    # the operator-directed unification program); the integration reconciles
+    # the tests to the silvered contract and deliberately leaves
+    # guardian_feed.py behavior unchanged.
     receipts = [_confirmed("d1", 1), _confirmed("d1", 2), _confirmed("d1", 3),
                 _confirmed("d2", 4), _confirmed("d3", 5)]
     payload = build_guardian_receipt(receipts, grant_authority=True)
@@ -79,9 +88,9 @@ def test_written_receipt_satisfies_real_one_wire_guard(tmp_path):
 
     authority = archive.read_one_wire_fitness_authority(tmp_path)
     assert authority.exists
-    assert authority.confirmed == 5
-    assert authority.domains == 3
-    assert authority.allowed is True
+    assert authority.operator_approved is False
+    assert authority.allowed is False
+    assert "operator_approved" in authority.blocker
 
 
 def test_ineligible_receipt_denied_by_real_guard(tmp_path):
