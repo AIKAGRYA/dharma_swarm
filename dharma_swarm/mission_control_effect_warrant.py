@@ -46,6 +46,17 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
 
 
+class _WeakReferenceable:
+    """Adds a ``__weakref__`` slot so a slotted frozen dataclass stays weak-referenceable.
+
+    Only types tracked by an in-process identity registry (:class:`EffectWarrant`,
+    :class:`SupervisorEffectAuthority`) need this; it does not widen any public
+    surface or change equality/hash/repr behavior.
+    """
+
+    __slots__ = ("__weakref__",)
+
+
 @dataclass(frozen=True, slots=True)
 class CanaryPatchBinding:
     """All bytes, identities, and scratch custody both canaries must sign."""
@@ -178,7 +189,7 @@ class IndependentPatchVerification:
 
 
 @dataclass(frozen=True, slots=True)
-class SupervisorEffectAuthority:
+class SupervisorEffectAuthority(_WeakReferenceable):
     """Injected process-owned authority; never reconstructible from a receipt."""
 
     binding_sha256: str
@@ -255,7 +266,7 @@ class EffectBinding:
 
 
 @dataclass(frozen=True, slots=True)
-class EffectWarrant:
+class EffectWarrant(_WeakReferenceable):
     fence_id: str
     binding: EffectBinding
     issued_at: datetime

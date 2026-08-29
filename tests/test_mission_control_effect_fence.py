@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+import gc
 import hashlib
 import json
 import os
@@ -1298,6 +1299,134 @@ def test_expired_issued_preimage_requires_fresh_reissue(
     assert isinstance(terminal, EffectTerminalRecord)
     assert terminal.recovery_finalized is False
     assert (harness.scratch / SOURCE_PATH).read_text(encoding="utf-8") == POSTIMAGE
+
+
+def test_repeated_issuance_prunes_expired_entries_from_in_process_registries(
+    effect_harness: EffectHarness,
+) -> None:
+    """Repeated issuance prunes expired entries so in-process registries stay bounded."""
+    harness = effect_harness
+    rotations = 5
+    for _ in range(rotations):
+        owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
+        authority = harness.issuer.issue(harness.binding, owners, ttl_seconds=1)
+        warrant = harness.fence.issue_effect_warrant(
+            harness.runtime_path,
+            harness.task_path,
+            harness.expected,
+            harness.candidate,
+            harness.verification,
+            authority,
+            ttl_seconds=1,
+        )
+        assert isinstance(warrant, EffectWarrant)
+        _wait_past(max(warrant.expires_at, authority.expires_at))
+        assert len(harness.fence._warrants) <= 1  # noqa: SLF001
+        assert len(harness.issuer._issued) <= 1  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_terminal_warrant_registries_reach_zero_across_a_consumption_burst(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Terminal-but-unexpired warrants/authorities do not linger as strong refs."""
+    for index in range(3):
+        round_path = tmp_path / f"burst-round-{index}"
+        round_path.mkdir()
+        harness = await effect_harness.__wrapped__(round_path, monkeypatch)
+        warrant = _issue(harness)
+        assert warrant.expires_at > datetime.now(timezone.utc)
+        terminal = harness.fence.consume_effect_slot(
+            harness.runtime_path,
+            harness.task_path,
+            harness.expected,
+            warrant,
+            harness.candidate,
+            claimed_by="effect-supervisor",
+        )
+        assert isinstance(terminal, EffectTerminalRecord)
+        del warrant, terminal
+        gc.collect()
+        assert len(harness.fence._warrants) == 0  # noqa: SLF001
+        assert len(harness.issuer._issued) == 0  # noqa: SLF001
+
+
+def test_expired_unconsumed_registry_reaches_zero_without_further_issuance(
+    effect_harness: EffectHarness,
+) -> None:
+    """Expired entries do not require a later ``.issue()`` call to stop lingering."""
+    harness = effect_harness
+    owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
+    authority = harness.issuer.issue(harness.binding, owners, ttl_seconds=1)
+    warrant = harness.fence.issue_effect_warrant(
+        harness.runtime_path,
+        harness.task_path,
+        harness.expected,
+        harness.candidate,
+        harness.verification,
+        authority,
+        ttl_seconds=1,
+    )
+    assert isinstance(warrant, EffectWarrant)
+    _wait_past(max(warrant.expires_at, authority.expires_at))
+    assert len(harness.fence._warrants) == 1  # noqa: SLF001
+    assert len(harness.issuer._issued) == 1  # noqa: SLF001
+
+    del warrant, authority
+    gc.collect()
+
+    assert len(harness.fence._warrants) == 0  # noqa: SLF001
+    assert len(harness.issuer._issued) == 0  # noqa: SLF001
+
+
+def test_replay_survives_live_reference_then_refuses_forged_replay_after_retirement(
+    effect_harness: EffectHarness,
+) -> None:
+    """Replay works while the caller holds the warrant; retirement forgets it."""
+    harness = effect_harness
+    warrant = _issue(harness)
+
+    first = harness.fence.consume_effect_slot(
+        harness.runtime_path,
+        harness.task_path,
+        harness.expected,
+        warrant,
+        harness.candidate,
+        claimed_by="effect-supervisor",
+    )
+    replay = harness.fence.consume_effect_slot(
+        harness.runtime_path,
+        harness.task_path,
+        harness.expected,
+        warrant,
+        harness.candidate,
+        claimed_by="effect-supervisor",
+    )
+    assert isinstance(first, EffectTerminalRecord)
+    assert replay == first
+
+    forged = EffectWarrant(
+        warrant.fence_id,
+        warrant.binding,
+        warrant.issued_at,
+        warrant.expires_at,
+        warrant.warrant_token,
+    )
+    object.__setattr__(forged, "_seal", warrant._seal)  # noqa: SLF001
+
+    del warrant, first, replay
+    gc.collect()
+    assert len(harness.fence._warrants) == 0  # noqa: SLF001
+
+    refused = harness.fence.consume_effect_slot(
+        harness.runtime_path,
+        harness.task_path,
+        harness.expected,
+        forged,
+        harness.candidate,
+        claimed_by="effect-supervisor",
+    )
+    assert refused == EffectRefusal(("fresh_registered_effect_warrant_required",))
 
 
 @pytest.mark.asyncio

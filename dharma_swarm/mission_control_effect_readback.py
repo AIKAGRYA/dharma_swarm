@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from dharma_swarm.mission_control_effect_fence_store import row_binding
 from dharma_swarm.mission_control_effect_records import (
@@ -30,7 +31,7 @@ def read_effect_fence(
 ) -> EffectFenceRecord | None:
     """Read historical evidence; this does not assert current target bytes."""
 
-    uri = f"file:{Path(runtime_database).resolve(strict=True)}?mode=ro"
+    uri = f"file:{quote(str(Path(runtime_database).resolve(strict=True)))}?mode=ro"
     with sqlite3.connect(uri, uri=True) as db:
         db.row_factory = sqlite3.Row
         require_effect_fence_schema(db)

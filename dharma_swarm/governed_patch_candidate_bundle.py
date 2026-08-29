@@ -191,6 +191,10 @@ def build_candidate_bundle(
                 parsed,
             )
         ).encode("utf-8")
+        if len(postimage) > MAX_SOURCE_BYTES:
+            raise GovernedPatchEvidenceError(
+                "candidate postimage exceeds the bounded source size"
+            )
         if postimage == request.source_bytes:
             raise GovernedPatchEvidenceError(
                 "candidate diff must change the exact source bytes"
@@ -372,6 +376,10 @@ def verify_candidate_bundle(bundle: CandidateBundle) -> CandidateBundle:
         postimage = "".join(
             _replay(source_text.splitlines(keepends=True), parsed_diff)
         ).encode("utf-8")
+        if len(postimage) > MAX_SOURCE_BYTES:
+            raise GovernedPatchEvidenceError(
+                "candidate postimage exceeds the bounded source size"
+            )
         if postimage == components["source.utf8"]:
             raise GovernedPatchEvidenceError(
                 "candidate diff must change the exact source bytes"

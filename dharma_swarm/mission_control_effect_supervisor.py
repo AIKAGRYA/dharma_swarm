@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import sys
+import weakref
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -76,7 +77,13 @@ class SupervisorAuthorityIssuer:
         self._supervisor_id = supervisor_id
         self._creator_pid = os.getpid()
         self._sentinel = object()
-        self._issued: dict[int, tuple[SupervisorEffectAuthority, str]] = {}
+        self._issued: dict[int, tuple[weakref.ReferenceType[SupervisorEffectAuthority], str]] = {}
+
+    def _prune_expired_issued(self, current: datetime) -> None:
+        for tracked_id, (tracked_ref, _) in list(self._issued.items()):
+            tracked = tracked_ref()
+            if tracked is None or tracked.expires_at <= current:
+                self._issued.pop(tracked_id, None)
 
     def issue(
         self, binding: CanaryPatchBinding, owner_stores: OwnerStoreBinding, *,
@@ -88,6 +95,7 @@ class SupervisorAuthorityIssuer:
             raise ValueError("supervisor authority lifetime is not bounded")
         issued_at = datetime.now(timezone.utc)
         expires_at = issued_at + timedelta(seconds=ttl_seconds)
+        self._prune_expired_issued(issued_at)
         os_uid = os.getuid()
         scratch = binding.scratch
         if os_uid not in {
@@ -136,7 +144,24 @@ class SupervisorAuthorityIssuer:
             signature=self._signer.sign(message).hex(),
         )
         object.__setattr__(result, "_ownership_token", self._sentinel)
-        self._issued[id(result)] = (result, supervisor_authority_sha256(result))
+        issued = self._issued
+        tracked_id = id(result)
+
+        def _on_collected(
+            ref: "weakref.ReferenceType[SupervisorEffectAuthority]",
+            *,
+            tracked_id: int = tracked_id,
+            issued: dict[
+                int,
+                tuple[weakref.ReferenceType[SupervisorEffectAuthority], str],
+            ] = issued,
+        ) -> None:
+            if issued.get(tracked_id, (None,))[0] is ref:
+                issued.pop(tracked_id, None)
+
+        issued[tracked_id] = (
+            weakref.ref(result, _on_collected), supervisor_authority_sha256(result),
+        )
         return result
 
     def validates(
@@ -159,7 +184,7 @@ class SupervisorAuthorityIssuer:
                 os.getpid() == self._creator_pid
                 and type(authority) is SupervisorEffectAuthority
                 and authority._ownership_token is self._sentinel  # noqa: SLF001
-                and registered is not None and registered[0] is authority
+                and registered is not None and registered[0]() is authority
                 and registered[1] == supervisor_authority_sha256(authority)
                 and authority.authority_public_key == self._public_key
                 and authority.authority_key_id == self._key_id

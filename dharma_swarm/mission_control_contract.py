@@ -31,6 +31,10 @@ OWNER_TERMINAL_ATTEMPT_STATUSES = frozenset(
 )
 TERMINAL_RECEIPT_TYPE = "mission_attempt_terminal"
 RECOVERY_RECEIPT_TYPE = "mission_attempt_recovery"
+_RECOVERY_RECEIPT_LEGACY_FIELDS = frozenset(
+    {"schema_version", "mission_id", "attempt_id", "recovered_claim_id", "reason"}
+)
+_RECOVERY_RECEIPT_FIELDS = _RECOVERY_RECEIPT_LEGACY_FIELDS | {"expired_stale_after"}
 GOVERNED_PATCH_COMPLETION_CONTRACT = "governed_patch_effect_v1"
 GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA = (
     "dharma.mission_control.governed_patch_completion.v1"
@@ -368,12 +372,37 @@ def recovery_receipt_matches_contract(
     *,
     expired_stale_after: datetime | None = None,
 ) -> bool:
-    """Return whether a recovery receipt is canonical for its exact claim."""
-    raw_deadline = receipt.payload.get("expired_stale_after")
-    try:
-        deadline = datetime.fromisoformat(raw_deadline) if type(raw_deadline) is str else None
-    except ValueError:
-        deadline = None
+    """Return whether a recovery receipt is canonical for its exact claim.
+
+    Pre-upgrade ``dharma.mission_control.v1`` recovery receipts legitimately
+    lack ``expired_stale_after``; this accepts exactly that closed legacy
+    shape as a pinned migration path, never an arbitrary open one.
+    """
+    payload_fields = set(receipt.payload)
+    is_legacy = payload_fields == _RECOVERY_RECEIPT_LEGACY_FIELDS
+    if not is_legacy and payload_fields != _RECOVERY_RECEIPT_FIELDS:
+        return False
+    if is_legacy:
+        if expired_stale_after is not None and expired_stale_after > receipt.created_at:
+            return False
+    else:
+        raw_deadline = receipt.payload.get("expired_stale_after")
+        try:
+            deadline = (
+                datetime.fromisoformat(raw_deadline)
+                if type(raw_deadline) is str
+                else None
+            )
+        except ValueError:
+            deadline = None
+        if (
+            deadline is None
+            or deadline.tzinfo is None
+            or deadline.utcoffset() is None
+            or deadline > receipt.created_at
+            or (expired_stale_after is not None and deadline != expired_stale_after)
+        ):
+            return False
     return bool(
         receipt_matches_identity(receipt, identity)
         and receipt.receipt_type == RECOVERY_RECEIPT_TYPE
@@ -387,15 +416,6 @@ def recovery_receipt_matches_contract(
         and receipt.payload.get("attempt_id") == identity.run_id
         and receipt.payload.get("recovered_claim_id") == identity.claim_id
         and receipt.payload.get("reason") == "expired_lease"
-        and set(receipt.payload) == {
-            "schema_version", "mission_id", "attempt_id", "recovered_claim_id",
-            "reason", "expired_stale_after",
-        }
-        and deadline is not None
-        and deadline.tzinfo is not None
-        and deadline.utcoffset() is not None
-        and deadline <= receipt.created_at
-        and (expired_stale_after is None or deadline == expired_stale_after)
     )
 
 
