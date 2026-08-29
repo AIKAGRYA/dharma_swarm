@@ -269,7 +269,8 @@
     "tests/test_telos_gates.py",
     "tests/test_telos_gates_witness_enhancement.py",
     "tests/test_vision_citations.py",
-    "tests/test_vision_navigation.py"
+    "tests/test_vision_navigation.py",
+    "uv.lock"
   ],
   "approval": {
     "before_commit": true,
@@ -335,7 +336,7 @@
       "The forge_lab estate arrived with modules over the repo's 500-line budget and direct ~/.dharma references; both are repo-law violations on main even though the satellite branch never ran those gates."
     ],
     "owner": "@dhyana",
-    "packet_digest": "ed024c5394ad1b4e1378fd3c176fa11a3020b57f457599d8e5d73503413b19c3",
+    "packet_digest": "3a7109c123ed9476131bda5fa87fe6637917a28fe4181fda854cbb047960fd18",
     "rollback": "git revert the integration merge commit and the repair commits on integrate/one-world-2026-08-30; satellites remain intact on their own branches.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
