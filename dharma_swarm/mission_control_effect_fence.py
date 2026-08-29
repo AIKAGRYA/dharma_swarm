@@ -120,6 +120,12 @@ class GovernedPatchEffectFence:
             and entry[3] == self._creator_pid == os.getpid()
         )
 
+    def _prune_expired_warrants(self) -> None:
+        current = _now()
+        for tracked_id, (tracked, _) in list(self._warrants.items()):
+            if tracked.expires_at <= current:
+                del self._warrants[tracked_id]
+
     def _register_warrant(self, warrant: EffectWarrant) -> EffectWarrant:
         if not self._valid_composition():
             raise ValueError("effect fence cannot register across a process boundary")
@@ -152,6 +158,7 @@ class GovernedPatchEffectFence:
             or type(supervisor_authority) is not SupervisorEffectAuthority
         ):
             return EffectRefusal(("canonical_effect_issuance_refused",))
+        self._prune_expired_warrants()
         try:
             owners = inspect_owner_stores(runtime_database, task_database)
             canary = verification.binding

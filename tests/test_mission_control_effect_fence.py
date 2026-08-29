@@ -1265,6 +1265,30 @@ def test_expired_issued_preimage_requires_fresh_reissue(
     assert (harness.scratch / SOURCE_PATH).read_text(encoding="utf-8") == POSTIMAGE
 
 
+def test_repeated_issuance_prunes_expired_entries_from_in_process_registries(
+    effect_harness: EffectHarness,
+) -> None:
+    """Bound in-process warrant/authority registries across repeated issuance."""
+    harness = effect_harness
+    rotations = 5
+    for _ in range(rotations):
+        owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
+        authority = harness.issuer.issue(harness.binding, owners, ttl_seconds=1)
+        warrant = harness.fence.issue_effect_warrant(
+            harness.runtime_path,
+            harness.task_path,
+            harness.expected,
+            harness.candidate,
+            harness.verification,
+            authority,
+            ttl_seconds=1,
+        )
+        assert isinstance(warrant, EffectWarrant)
+        _wait_past(max(warrant.expires_at, authority.expires_at))
+        assert len(harness.fence._warrants) <= 1  # noqa: SLF001
+        assert len(harness.issuer._issued) <= 1  # noqa: SLF001
+
+
 @pytest.mark.asyncio
 async def test_exact_postimage_recovers_after_genuine_expired_active_owner_lease(
     effect_harness: EffectHarness,

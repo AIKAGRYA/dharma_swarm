@@ -374,6 +374,97 @@ def test_candidate_rejects_wrong_path_stale_context_and_source_drift(
         build_candidate_bundle(request, DIFF, bundle_root=evidence)
 
 
+def test_candidate_rejects_oversized_postimage_before_any_effect_or_evidence_write(
+    roots: tuple[Path, Path],
+) -> None:
+    repo, evidence = roots
+    bindings = _bindings()
+    large_line = "x" * (MAX_SOURCE_BYTES - 100)
+    large_source = large_line + "\n"
+    (repo / SOURCE_PATH).write_text(large_source, encoding="utf-8", newline="")
+    content = _content(bindings)
+    request = parse_governed_patch_request(
+        content,
+        repo_root=repo,
+        expected=bindings,
+        accepted_base_sha=BASE_SHA,
+        expected_content_sha256=hashlib.sha256(content.encode()).hexdigest(),
+    )
+    added_line = "y" * 200
+    # This custom parser treats an ``old_count=0`` hunk as a pure insertion
+    # anchored after ``old_start`` (see ``_replay`` in foundry/patches.py),
+    # so ``@@ -1,0 +2,1 @@`` inserts one line after the file's first line
+    # without requiring any removed/context lines in the diff body itself.
+    diff = (
+        "--- a/pkg/example.py\n"
+        "+++ b/pkg/example.py\n"
+        "@@ -1,0 +2,1 @@\n"
+        f"+{added_line}\n"
+    )
+    assert len(diff.encode("utf-8")) < 1024  # far below any diff size bound
+    assert len(large_source.encode("utf-8")) + len(added_line) + 1 > MAX_SOURCE_BYTES
+    target = repo / SOURCE_PATH
+    before = target.stat()
+
+    with pytest.raises(GovernedPatchEvidenceError, match="bounded source size"):
+        build_candidate_bundle(request, diff, bundle_root=evidence)
+
+    after = target.stat()
+    assert target.read_bytes() == large_source.encode("utf-8")
+    assert (after.st_dev, after.st_ino, after.st_ctime_ns) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_ctime_ns,
+    )
+    assert not evidence.exists()
+
+
+def test_verify_rejects_oversized_postimage_for_a_bundle_built_before_the_bound(
+    roots: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verification alone must catch an oversized postimage in an existing bundle."""
+    import dharma_swarm.governed_patch_candidate_bundle as bundle_module
+
+    repo, evidence = roots
+    bindings = _bindings()
+    large_line = "x" * (MAX_SOURCE_BYTES - 100)
+    large_source = large_line + "\n"
+    (repo / SOURCE_PATH).write_text(large_source, encoding="utf-8", newline="")
+    content = _content(bindings)
+    request = parse_governed_patch_request(
+        content,
+        repo_root=repo,
+        expected=bindings,
+        accepted_base_sha=BASE_SHA,
+        expected_content_sha256=hashlib.sha256(content.encode()).hexdigest(),
+    )
+    added_line = "y" * 200
+    diff = (
+        "--- a/pkg/example.py\n"
+        "+++ b/pkg/example.py\n"
+        "@@ -1,0 +2,1 @@\n"
+        f"+{added_line}\n"
+    )
+    with monkeypatch.context() as patch:
+        # Simulate a bundle materialized under a lenient historical bound.
+        patch.setattr(bundle_module, "MAX_SOURCE_BYTES", MAX_SOURCE_BYTES * 2)
+        bundle = build_candidate_bundle(request, diff, bundle_root=evidence)
+
+    target = repo / SOURCE_PATH
+    before = target.stat()
+
+    with pytest.raises(GovernedPatchEvidenceError, match="bounded source size"):
+        verify_candidate_bundle(bundle)
+
+    after = target.stat()
+    assert target.read_bytes() == large_source.encode("utf-8")
+    assert (after.st_dev, after.st_ino, after.st_ctime_ns) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_ctime_ns,
+    )
+
+
 def test_candidate_rejects_noop_diff_before_any_effect_or_evidence_write(
     roots: tuple[Path, Path],
 ) -> None:

@@ -88,6 +88,9 @@ class SupervisorAuthorityIssuer:
             raise ValueError("supervisor authority lifetime is not bounded")
         issued_at = datetime.now(timezone.utc)
         expires_at = issued_at + timedelta(seconds=ttl_seconds)
+        for tracked_id, (tracked, _) in list(self._issued.items()):
+            if tracked.expires_at <= issued_at:
+                del self._issued[tracked_id]
         os_uid = os.getuid()
         scratch = binding.scratch
         if os_uid not in {
