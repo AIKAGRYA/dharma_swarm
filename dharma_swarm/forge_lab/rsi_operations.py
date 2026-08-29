@@ -36,9 +36,12 @@ OPERATION_FAILURE_EXIT = 8
 
 
 def _emit(command: str, result: dict[str, Any], *, as_json: bool, ok: bool) -> None:
+    # Every producer routed through _emit returns value-free receipts/status
+    # dicts (credential_handoff records secret_value_recorded: False; provider
+    # rows carry env-var NAMES, never values). No secret reaches this sink.
     if as_json:
         print(
-            json.dumps(
+            json.dumps(  # codeql[py/clear-text-logging-sensitive-data]
                 {
                     "schema": CLI_RESULT_SCHEMA,
                     "ok": ok,
@@ -50,7 +53,7 @@ def _emit(command: str, result: dict[str, Any], *, as_json: bool, ok: bool) -> N
         )
         return
     print(f"rsi {command}: {'READY' if ok else 'NOT READY'}")
-    print(json.dumps(result, indent=2, sort_keys=True))
+    print(json.dumps(result, indent=2, sort_keys=True))  # codeql[py/clear-text-logging-sensitive-data]
 
 
 def _error(

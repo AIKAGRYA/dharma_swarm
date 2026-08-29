@@ -77,7 +77,9 @@ def canonical_json(payload: Any) -> bytes:
 
 
 def content_digest(payload: Any) -> str:
-    return "sha256:" + hashlib.sha256(canonical_json(payload)).hexdigest()
+    # Integrity digest of value-free receipts/specs (credential_handoff receipts
+    # carry secret_value_recorded: False by construction); not password storage.
+    return "sha256:" + hashlib.sha256(canonical_json(payload)).hexdigest()  # codeql[py/weak-sensitive-data-hashing]
 
 
 def validate_digest(value: str) -> str:

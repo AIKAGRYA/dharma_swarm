@@ -233,9 +233,12 @@ def _emit_sync_payload(
 
 
 def _emit_provider_selftest_payload(result: dict[str, Any], *, as_json: bool) -> None:
+    # The provider-selftest payload is redacted by construction (module contract:
+    # "No secret values are printed or persisted" — rows carry credential env-var
+    # NAMES and presence booleans, never values).
     if as_json:
         print(
-            json.dumps(
+            json.dumps(  # codeql[py/clear-text-logging-sensitive-data]
                 {
                     "schema": CLI_RESULT_SCHEMA,
                     "ok": bool(result.get("ok")),
