@@ -629,6 +629,34 @@ async def _shorten_claim(
     return deadline
 
 
+async def _interrupted_heartbeat_window(
+    harness: EffectHarness, attempt_id: str
+) -> None:
+    """Materialize heartbeat's claim write before its run/projected-task writes."""
+
+    run = await harness.runtime.get_delegation_run(attempt_id)
+    assert run is not None
+    claim = await harness.runtime.get_task_claim(run.claim_id)
+    assert claim is not None
+    await harness.runtime.record_delegation_run(
+        replace(run, status="queued", started_at=claim.claimed_at)
+    )
+    await harness.runtime.record_task_claim(
+        replace(
+            claim,
+            status="active",
+            acked_at=claim.claimed_at,
+            heartbeat_at=claim.claimed_at,
+        )
+    )
+    with sqlite3.connect(harness.task_path) as database:
+        database.execute(
+            "UPDATE tasks SET status='assigned' WHERE id=?",
+            (harness.binding.task_id,),
+        )
+        database.commit()
+
+
 def _fresh_recovery_authority(harness: EffectHarness):
     owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
     return harness.issuer.issue(harness.binding, owners, ttl_seconds=20)
@@ -1485,6 +1513,9 @@ async def test_two_public_takeovers_preserve_old_effect_recovery_graph(
         harness, harness.binding.mission_claim_id, seconds=2.0
     )
     warrant = _issue(harness)
+    await _interrupted_heartbeat_window(
+        harness, harness.binding.mission_attempt_id
+    )
     effect_impl._perform_prevalidated_effect(warrant.binding, harness.candidate)
     _wait_past(original_deadline)
 
@@ -1495,6 +1526,7 @@ async def test_two_public_takeovers_preserve_old_effect_recovery_graph(
         attempt_key="effect-successor-one",
         assigned_by="effect-takeover-test",
     )
+    await _interrupted_heartbeat_window(harness, first_successor.attempt_id)
     first_deadline = await _shorten_claim(
         harness, first_successor.claim_id, seconds=0.2
     )

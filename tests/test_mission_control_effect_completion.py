@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import sqlite3
+import threading
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -12,6 +15,7 @@ import pytest
 import dharma_swarm.governed_patch_effect as effect_impl
 import dharma_swarm.mission_control_effect_completion as completion_module
 import dharma_swarm.mission_control_recovery as recovery_module
+from dharma_swarm.mission_control import MissionControl
 from dharma_swarm.mission_control_contract import (
     GOVERNED_PATCH_COMPLETION_CONTRACT,
     GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA,
@@ -30,11 +34,12 @@ from dharma_swarm.mission_control_effect_owner_recovery import (
     observe_expired_proposal_for_effect_recovery_from_connection,
 )
 from dharma_swarm.models import TaskStatus
+from dharma_swarm.mission_control_mcp import _ImmutableSnapshotMissionControl
 from dharma_swarm.runtime_state_effect_fence import (
     EFFECT_FENCE_TABLE,
     EFFECT_RECEIPT_ID_PREFIX,
 )
-from dharma_swarm.task_board import TaskBoardError
+from dharma_swarm.task_board import TaskBoard, TaskBoardError
 from tests.test_mission_control_effect_fence import (
     EffectHarness,
     _fresh_recovery_authority,
@@ -453,7 +458,241 @@ async def test_snapshot_refuses_malformed_preterminal_effect_receipt(
 
     snapshot = await harness.control.get_snapshot(harness.binding.mission_id)
     assert snapshot is not None
-    assert snapshot.reconciliation.value == "foreign_runtime_record"
+    assert snapshot.reconciliation.value == "conflicting_terminal_evidence"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ("missing_fence", "mismatched_idempotency", "forged"))
+async def test_snapshot_rejoins_every_preterminal_governed_effect_receipt(
+    effect_harness: EffectHarness,
+    surface: str,
+) -> None:
+    harness = effect_harness
+    terminal = _consume(harness)
+    with sqlite3.connect(harness.runtime_path) as database:
+        if surface == "missing_fence":
+            database.execute(
+                f"DELETE FROM {EFFECT_FENCE_TABLE} WHERE effect_key=?",
+                (terminal.effect_key,),
+            )
+        elif surface == "mismatched_idempotency":
+            database.execute(
+                "UPDATE idempotency_records SET result_receipt_id='rr_forged'"
+                " WHERE side_effect_key=?",
+                (terminal.effect_key,),
+            )
+        else:
+            database.execute(
+                "INSERT INTO runtime_receipts SELECT ?,receipt_type,run_id,task_id,"
+                "trace_id,correlation_id,causation_id,parent_run_id,agent_id,?,?,status,"
+                "payload_json,created_at FROM runtime_receipts WHERE receipt_id=?",
+                (
+                    "rr_forged_preterminal_effect",
+                    "idem_rr_forged_preterminal_effect",
+                    "governed_patch_effect:forged-preterminal",
+                    terminal.terminal_receipt_id,
+                ),
+            )
+        database.commit()
+
+    await _assert_no_parent_terminal(harness)
+    snapshot = await harness.control.get_snapshot(harness.binding.mission_id)
+    assert snapshot is not None
+    assert snapshot.reconciliation.value == "conflicting_terminal_evidence"
+
+
+@pytest.mark.asyncio
+async def test_recovery_refuses_orphaned_preterminal_governed_effect(
+    effect_harness: EffectHarness,
+) -> None:
+    harness = effect_harness
+    terminal = _consume(harness)
+    claim = await harness.runtime.get_task_claim(harness.binding.mission_claim_id)
+    assert claim is not None
+    await harness.runtime.record_task_claim(
+        replace(claim, stale_after=terminal.consumed_at + timedelta(microseconds=1))
+    )
+    with sqlite3.connect(harness.runtime_path) as database:
+        database.execute(
+            f"DELETE FROM {EFFECT_FENCE_TABLE} WHERE effect_key=?",
+            (terminal.effect_key,),
+        )
+        database.commit()
+
+    with pytest.raises(MissionControlError, match="effect owner fence"):
+        await harness.control._recover_expired_claim(
+            harness.binding.mission_id,
+            claim,
+            recovered_at=datetime.now(timezone.utc),
+        )
+    await _assert_no_parent_terminal(harness)
+
+
+@pytest.mark.asyncio
+async def test_immutable_snapshot_retains_exact_source_owner_identity(
+    effect_harness: EffectHarness,
+) -> None:
+    harness = effect_harness
+    terminal = _consume(harness)
+    for path in (harness.runtime_path, harness.task_path):
+        with sqlite3.connect(path) as database:
+            database.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+    immutable = _ImmutableSnapshotMissionControl(
+        task_db=harness.task_path,
+        runtime_db=harness.runtime_path,
+    )
+
+    snapshot = await immutable.get_snapshot(harness.binding.mission_id)
+
+    assert snapshot is not None
+    assert snapshot.reconciliation.value == "coherent"
+    assert [receipt.receipt_id for receipt in snapshot.receipts] == [
+        terminal.terminal_receipt_id
+    ]
+
+
+@pytest.mark.asyncio
+async def test_copied_or_forged_snapshot_owner_is_never_a_source_substitute(
+    effect_harness: EffectHarness,
+    tmp_path,
+) -> None:
+    harness = effect_harness
+    _consume(harness)
+    source_owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
+    copied_runtime = tmp_path / "copied-runtime.db"
+    copied_task = tmp_path / "copied-task.db"
+    for source, destination in (
+        (harness.runtime_path, copied_runtime),
+        (harness.task_path, copied_task),
+    ):
+        with sqlite3.connect(source) as source_db, sqlite3.connect(
+            destination
+        ) as destination_db:
+            source_db.backup(destination_db)
+    copied_owners = inspect_owner_stores(copied_runtime, copied_task)
+
+    copied_control = MissionControl(
+        TaskBoard(copied_task),
+        runtime_state=type(harness.runtime)(
+            copied_runtime, include_memory_plane=False
+        ),
+        immutable_snapshot_source_owners=copied_owners,
+    )
+    copied = await copied_control.get_snapshot(harness.binding.mission_id)
+    forged_control = MissionControl(
+        TaskBoard(copied_task),
+        runtime_state=type(harness.runtime)(
+            copied_runtime, include_memory_plane=False
+        ),
+        immutable_snapshot_source_owners=replace(
+            source_owners,
+            runtime_database_inode=source_owners.runtime_database_inode + 1,
+        ),
+    )
+    forged = await forged_control.get_snapshot(harness.binding.mission_id)
+
+    assert copied is not None
+    assert copied.reconciliation.value == "conflicting_terminal_evidence"
+    assert forged is not None
+    assert forged.reconciliation.value == "conflicting_terminal_evidence"
+
+
+@pytest.mark.asyncio
+async def test_joined_owner_work_keeps_unrelated_heartbeats_serviceable(
+    effect_harness: EffectHarness,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = effect_harness
+    _consume(harness)
+    task = await harness.control.create_task(
+        harness.binding.mission_id, title="Unrelated heartbeat"
+    )
+    unrelated = await harness.control.start_attempt(
+        harness.binding.mission_id,
+        task.task_id,
+        "heartbeat-agent",
+        attempt_key="unrelated-heartbeat",
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    original_transaction = completion_module.owner_transaction
+
+    @contextmanager
+    def blocked_transaction(owners, *, read_only=False):
+        entered.set()
+        if not release.wait(timeout=2):
+            raise RuntimeError("joined owner transaction remained blocked")
+        with original_transaction(owners, read_only=read_only) as database:
+            yield database
+
+    monkeypatch.setattr(completion_module, "owner_transaction", blocked_transaction)
+    promotion = asyncio.create_task(_finish(harness))
+    await asyncio.wait_for(asyncio.to_thread(entered.wait), timeout=1)
+    heartbeat = await asyncio.wait_for(
+        harness.control.heartbeat_lease(
+            harness.binding.mission_id,
+            task.task_id,
+            "heartbeat-agent",
+            attempt_id=unrelated.attempt_id,
+        ),
+        timeout=1,
+    )
+    release.set()
+    await promotion
+
+    assert heartbeat.active is True
+
+
+@pytest.mark.asyncio
+async def test_joined_snapshot_readback_keeps_unrelated_heartbeats_serviceable(
+    effect_harness: EffectHarness,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = effect_harness
+    _consume(harness)
+    await _finish(harness)
+    task = await harness.control.create_task(
+        harness.binding.mission_id, title="Unrelated snapshot heartbeat"
+    )
+    unrelated = await harness.control.start_attempt(
+        harness.binding.mission_id,
+        task.task_id,
+        "snapshot-heartbeat-agent",
+        attempt_key="unrelated-snapshot-heartbeat",
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    original_transaction = completion_module.owner_transaction
+
+    @contextmanager
+    def blocked_readback(owners, *, read_only=False):
+        if read_only:
+            entered.set()
+            if not release.wait(timeout=2):
+                raise RuntimeError("joined snapshot readback remained blocked")
+        with original_transaction(owners, read_only=read_only) as database:
+            yield database
+
+    monkeypatch.setattr(completion_module, "owner_transaction", blocked_readback)
+    snapshot_task = asyncio.create_task(
+        harness.control.get_snapshot(harness.binding.mission_id)
+    )
+    await asyncio.wait_for(asyncio.to_thread(entered.wait), timeout=1)
+    heartbeat = await asyncio.wait_for(
+        harness.control.heartbeat_lease(
+            harness.binding.mission_id,
+            task.task_id,
+            "snapshot-heartbeat-agent",
+            attempt_id=unrelated.attempt_id,
+        ),
+        timeout=1,
+    )
+    release.set()
+    snapshot = await snapshot_task
+
+    assert heartbeat.active is True
+    assert snapshot is not None
+    assert snapshot.reconciliation.value == "coherent"
 
 
 @pytest.mark.asyncio

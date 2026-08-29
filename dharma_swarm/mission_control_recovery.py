@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import sqlite3
@@ -32,9 +33,40 @@ from dharma_swarm.mission_control_lifecycle import _serialized_task
 from dharma_swarm.mission_control_effect_owner import inspect_owner_stores, owner_transaction
 from dharma_swarm.mission_control_projection import receipt_view
 from dharma_swarm.mission_control_recovery_cas import recover_stale_lineage_cas
-from dharma_swarm.runtime_state import RuntimeReceipt, TaskClaim
+from dharma_swarm.models import Task
+from dharma_swarm.runtime_state import DelegationRun, RuntimeReceipt, TaskClaim
 from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
+
+
+def _recover_stale_lineage_in_owner_transaction(
+    runtime_database: Path,
+    task_database: Path,
+    *,
+    mission_id: str,
+    task: Task,
+    run: DelegationRun,
+    claim: TaskClaim,
+    identity: ExecutionIdentity,
+    receipt: RuntimeReceipt,
+    recovered_at: datetime,
+) -> RuntimeReceipt:
+    """Commit one exact stale recovery without occupying the event loop."""
+
+    owners = inspect_owner_stores(runtime_database, task_database)
+    with owner_transaction(owners) as database:
+        result = recover_stale_lineage_cas(
+            database,
+            mission_id=mission_id,
+            task=task,
+            run=run,
+            claim=claim,
+            identity=identity,
+            receipt=receipt,
+            recovered_at=recovered_at,
+        )
+        database.commit()
+        return result
 
 
 class MissionControlRecoveryMixin:
@@ -305,6 +337,7 @@ class MissionControlRecoveryMixin:
             receipt_type=EFFECT_RECEIPT_TYPE,
             limit=2,
         )
+        await self._validate_observed_patch_effect_receipts(effect_receipts)
         if terminal_receipts:
             if len(terminal_receipts) != 1 or recovery_receipts:
                 raise MissionControlError(
@@ -417,22 +450,19 @@ class MissionControlRecoveryMixin:
             payload=payload,
             created_at=receipt_at,
         )
-        owners = inspect_owner_stores(
-            Path(self._runtime.db_path), Path(self._board._db_path)
-        )
         try:
-            with owner_transaction(owners) as database:
-                recover_stale_lineage_cas(
-                    database,
-                    mission_id=mission_id,
-                    task=task,
-                    run=run,
-                    claim=claim,
-                    identity=identity,
-                    receipt=recovery,
-                    recovered_at=transitioned_at,
-                )
-                database.commit()
+            await asyncio.to_thread(
+                _recover_stale_lineage_in_owner_transaction,
+                Path(self._runtime.db_path),
+                Path(self._board._db_path),
+                mission_id=mission_id,
+                task=task,
+                run=run,
+                claim=claim,
+                identity=identity,
+                receipt=recovery,
+                recovered_at=transitioned_at,
+            )
         except (OSError, RuntimeError, sqlite3.Error, ValueError) as exc:
             raise MissionControlError("expired claim recovery CAS was lost") from exc
         return False

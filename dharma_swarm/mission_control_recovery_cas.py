@@ -85,29 +85,25 @@ def _canonical_preimage(
     }
     if completion_contract:
         expected_identity_metadata["completion_contract"] = completion_contract
-    pair = (run.status, claim.status.lower())
-    queued = pair == ("queued", "claimed")
-    running = pair == ("running", "active")
+    # Heartbeat records the claim activation before it records the run's
+    # queued-to-running transition.  Recovery owns only this one interrupted
+    # durable window; pre-heartbeat and already-running states are not
+    # interchangeable recovery preimages.
+    interrupted_heartbeat = (run.status, claim.status.lower()) == ("queued", "active")
     timeline = (
-        claim.acked_at is None and claim.heartbeat_at is None
-        if queued
-        else claim.acked_at is not None
+        claim.acked_at is not None
         and claim.heartbeat_at is not None
-        and claim.claimed_at <= claim.acked_at <= claim.heartbeat_at
+        and claim.acked_at == claim.heartbeat_at
+        and claim.claimed_at <= claim.acked_at
     )
     task_projection = (
-        task.status == TaskStatus.PENDING
-        and task.assigned_to is None
-        and "mission_attempt_id" not in task.metadata
-        and "mission_claim_id" not in task.metadata
-    ) or (
-        task.status in {TaskStatus.ASSIGNED, TaskStatus.RUNNING}
+        task.status == TaskStatus.ASSIGNED
         and task.assigned_to == run.assigned_to
         and task.metadata.get("mission_attempt_id") == run.run_id
         and task.metadata.get("mission_claim_id") == claim.claim_id
     )
     return bool(
-        (queued or running)
+        interrupted_heartbeat
         and timeline
         and task_projection
         and task.status
@@ -116,13 +112,8 @@ def _canonical_preimage(
         and run.failure_code == ""
         and claim.recovered_at is None
         and claim.stale_after is not None
-        and (
-            not running
-            or (
-                claim.heartbeat_at is not None
-                and claim.heartbeat_at <= claim.stale_after
-            )
-        )
+        and claim.heartbeat_at is not None
+        and claim.heartbeat_at <= claim.stale_after
         and claim.claimed_at == run.started_at
         and claim.claimed_at < claim.stale_after <= recovered_at
         and run.task_id == task.id == claim.task_id == identity.task_id

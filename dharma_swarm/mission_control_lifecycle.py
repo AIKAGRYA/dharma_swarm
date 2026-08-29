@@ -346,7 +346,10 @@ class MissionControlLifecycleMixin:
             session_id=mission_session_id(mission_id),
             claim_id=claim_id,
             assigned_by=str(assigned_by or "mission_control"),
-            started_at=now,
+            # A retried start may adopt the already-durable claim written
+            # before its predecessor crashed.  Its lineage begins at that
+            # durable claim boundary, not at the retry's wall clock.
+            started_at=claim.claimed_at,
             metadata=common_metadata,
         )
         run = await self._runtime.record_delegation_run(run)

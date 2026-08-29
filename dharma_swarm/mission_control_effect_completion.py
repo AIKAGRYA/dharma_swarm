@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -10,7 +11,14 @@ from dharma_swarm.mission_control_a2a_owner_snapshot import one_owner_row, owner
 from dharma_swarm.mission_control_contract import GOVERNED_PATCH_COMPLETION_CONTRACT, GOVERNED_PATCH_COMPLETION_METADATA_FIELDS, GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA, GOVERNED_PATCH_COMPLETION_RESULT, OPEN_CLAIM_STATUSES, RECOVERY_RECEIPT_TYPE, SCHEMA_VERSION, TERMINAL_RECEIPT_TYPE, MissionControlError, ReceiptView, completion_contract_from_metadata, session_id, stable_id, terminal_operation_metadata
 from dharma_swarm.mission_control_effect_codec import canonical_json, terminal_from_json
 from dharma_swarm.mission_control_effect_fence_store import row_binding
-from dharma_swarm.mission_control_effect_owner import inspect_owner_stores, owner_transaction
+from dharma_swarm.mission_control_effect_owner import (
+    inspect_owner_stores,
+    owner_transaction,
+)
+from dharma_swarm.mission_control_effect_owner_graph import (
+    validate_observed_effect_owner_triples,
+)
+from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
 from dharma_swarm.mission_control_effect_terminal_store import existing_terminal
 from dharma_swarm.mission_control_lifecycle import _serialized_task
 from dharma_swarm.mission_control_projection import receipt_view
@@ -222,7 +230,49 @@ def _exact_replay(
 
 
 class MissionControlEffectCompletionMixin:
-    def _validate_patch_effect_completion_readback(
+    def _effect_readback_owner_stores(
+        self, snapshot_owners: OwnerStoreBinding
+    ) -> OwnerStoreBinding:
+        source_owners = getattr(self, "_immutable_snapshot_source_owners", None)
+        if source_owners is None:
+            return snapshot_owners
+        if type(source_owners) is not OwnerStoreBinding:
+            raise MissionControlError("immutable snapshot source identity is malformed")
+        try:
+            current = inspect_owner_stores(
+                Path(source_owners.runtime_database_path),
+                Path(source_owners.task_database_path),
+            )
+        except (OSError, ValueError) as exc:
+            raise MissionControlError(
+                "immutable snapshot source identity is unavailable"
+            ) from exc
+        if current != source_owners:
+            raise MissionControlError("immutable snapshot source identity drifted")
+        return source_owners
+
+    def _validate_observed_patch_effect_receipts_sync(
+        self, receipts: Sequence[RuntimeReceipt]
+    ) -> None:
+        snapshot_owners = inspect_owner_stores(
+            Path(self._runtime.db_path), Path(self._board._db_path)
+        )
+        expected_owners = self._effect_readback_owner_stores(snapshot_owners)
+        with owner_transaction(snapshot_owners, read_only=True) as db:
+            validate_observed_effect_owner_triples(
+                db, receipts, expected_owner_stores=expected_owners
+            )
+            db.rollback()
+
+    async def _validate_observed_patch_effect_receipts(
+        self, receipts: Sequence[RuntimeReceipt]
+    ) -> None:
+        if receipts:
+            await asyncio.to_thread(
+                self._validate_observed_patch_effect_receipts_sync, tuple(receipts)
+            )
+
+    def _validate_patch_effect_completion_readback_sync(
         self,
         receipt: RuntimeReceipt,
         *,
@@ -232,12 +282,13 @@ class MissionControlEffectCompletionMixin:
         attempt_id: str,
         effect_key: str,
     ) -> None:
-        """Rejoin a promoted parent receipt to its live exact effect owners."""
+        """Rejoin a promoted parent receipt to its exact effect owners."""
 
-        owners = inspect_owner_stores(
+        snapshot_owners = inspect_owner_stores(
             Path(self._runtime.db_path), Path(self._board._db_path)
         )
-        with owner_transaction(owners) as db:
+        expected_owners = self._effect_readback_owner_stores(snapshot_owners)
+        with owner_transaction(snapshot_owners, read_only=True) as db:
             rows = db.execute(
                 "SELECT * FROM runtime_receipts WHERE receipt_id=?"
                 " AND run_id=? AND receipt_type=? LIMIT 2",
@@ -249,16 +300,37 @@ class MissionControlEffectCompletionMixin:
                 )
             validated = self._promote_patch_effect(
                 db,
-                owners,
+                snapshot_owners,
                 mission_id=mission_id,
                 task_id=task_id,
                 agent_id=agent_id,
                 attempt_id=attempt_id,
                 effect_key=effect_key,
+                expected_owner_stores=expected_owners,
             )
             if validated != receipt:
                 raise MissionControlError("promoted parent proof readback disagrees")
             db.rollback()
+
+    async def _validate_patch_effect_completion_readback(
+        self,
+        receipt: RuntimeReceipt,
+        *,
+        mission_id: str,
+        task_id: str,
+        agent_id: str,
+        attempt_id: str,
+        effect_key: str,
+    ) -> None:
+        await asyncio.to_thread(
+            self._validate_patch_effect_completion_readback_sync,
+            receipt,
+            mission_id=mission_id,
+            task_id=task_id,
+            agent_id=agent_id,
+            attempt_id=attempt_id,
+            effect_key=effect_key,
+        )
 
     @_serialized_task
     async def finish_attempt_from_patch_effect(
@@ -294,22 +366,16 @@ class MissionControlEffectCompletionMixin:
         await self._resolve_attempt(
             mission_id, task_id, agent_id, attempt_id=attempt_id
         )
-        owners = inspect_owner_stores(
-            Path(self._runtime.db_path), Path(self._board._db_path)
-        )
         try:
-            with owner_transaction(owners) as db:
-                receipt = self._promote_patch_effect(
-                    db,
-                    owners,
-                    mission_id=mission_id,
-                    task_id=task_id,
-                    agent_id=agent_id,
-                    attempt_id=attempt_id,
-                    effect_key=effect_key,
-                    _recovery_only=_recovery_only,
-                )
-                db.commit()
+            receipt = await asyncio.to_thread(
+                self._commit_patch_effect_promotion,
+                mission_id=mission_id,
+                task_id=task_id,
+                agent_id=agent_id,
+                attempt_id=attempt_id,
+                effect_key=effect_key,
+                _recovery_only=_recovery_only,
+            )
         except MissionControlError:
             raise
         except (KeyError, OSError, RuntimeError, sqlite3.Error, TypeError, ValueError) as exc:
@@ -332,6 +398,33 @@ class MissionControlEffectCompletionMixin:
         )
         return receipt_view(receipt, mission_id)
 
+    def _commit_patch_effect_promotion(
+        self,
+        *,
+        mission_id: str,
+        task_id: str,
+        agent_id: str,
+        attempt_id: str,
+        effect_key: str,
+        _recovery_only: bool,
+    ) -> RuntimeReceipt:
+        owners = inspect_owner_stores(
+            Path(self._runtime.db_path), Path(self._board._db_path)
+        )
+        with owner_transaction(owners) as db:
+            receipt = self._promote_patch_effect(
+                db,
+                owners,
+                mission_id=mission_id,
+                task_id=task_id,
+                agent_id=agent_id,
+                attempt_id=attempt_id,
+                effect_key=effect_key,
+                _recovery_only=_recovery_only,
+            )
+            db.commit()
+            return receipt
+
     def _promote_patch_effect(
         self,
         db: sqlite3.Connection,
@@ -343,6 +436,7 @@ class MissionControlEffectCompletionMixin:
         attempt_id: str,
         effect_key: str,
         _recovery_only: bool = False,
+        expected_owner_stores: OwnerStoreBinding | None = None,
     ) -> RuntimeReceipt:
         task = one_owner_row(
             db, "SELECT * FROM taskboard.tasks WHERE id=? LIMIT 2", (task_id,), "task"
@@ -418,7 +512,12 @@ class MissionControlEffectCompletionMixin:
         effect_binding = row_binding(fence)
         canary = effect_binding.canary
         if (
-            effect_binding.owner_stores != owners
+            effect_binding.owner_stores
+            != (
+                owners
+                if expected_owner_stores is None
+                else expected_owner_stores
+            )
             or terminal.effect_key != effect_key
             or canary.mission_id != mission_id
             or canary.task_id != task_id

@@ -75,6 +75,32 @@ async def _active_attempt(
     return attempt
 
 
+async def _interrupted_heartbeat_attempt(
+    control: MissionControl,
+    task_id: str,
+    *,
+    mission_id: str = "m-alpha",
+    agent_id: str = "agent-a",
+    attempt_key: str = "attempt-proof",
+):
+    """Materialize only heartbeat's durable claim activation before its run write."""
+
+    attempt = await control.start_attempt(
+        mission_id, task_id, agent_id, attempt_key=attempt_key
+    )
+    claim = await control._runtime.get_task_claim(attempt.claim_id)
+    assert claim is not None
+    await control._runtime.record_task_claim(
+        replace(
+            claim,
+            status="active",
+            acked_at=claim.claimed_at,
+            heartbeat_at=claim.claimed_at,
+        )
+    )
+    return attempt
+
+
 def _expired_stale_after(claim: TaskClaim) -> datetime:
     """Return an already-expired deadline without corrupting lease chronology."""
 
@@ -845,7 +871,7 @@ async def test_new_claim_fences_stale_prior_finisher(
     mission_control: MissionControl,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -898,6 +924,11 @@ async def test_start_retry_adopts_orphan_claim_and_snapshot_exposes_it(
         await mission_control.start_attempt(
             "m-alpha", task.task_id, "agent-a", attempt_key="orphan-proof"
         )
+    orphan_claims = await mission_control._runtime.list_task_claims(
+        task_id=task.task_id, limit=2
+    )
+    assert len(orphan_claims) == 1
+    orphan_claim = orphan_claims[0]
 
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
@@ -914,14 +945,140 @@ async def test_start_retry_adopts_orphan_claim_and_snapshot_exposes_it(
     recovered = await mission_control.start_attempt(
         "m-alpha", task.task_id, "agent-a", attempt_key="orphan-proof"
     )
+    adopted_run = await mission_control._runtime.get_delegation_run(
+        recovered.attempt_id
+    )
     projected = await mission_control._board.get(task.task_id)
     assert recovered.status == "queued"
+    assert adopted_run is not None
+    assert adopted_run.started_at == orphan_claim.claimed_at
     assert projected is not None and projected.status == TaskStatus.ASSIGNED
     assert len(
         await mission_control._runtime.list_task_claims(
             task_id=task.task_id, limit=100
         )
     ) == 1
+
+
+@pytest.mark.asyncio
+async def test_expired_interrupted_heartbeat_allows_successor(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await mission_control.start_attempt(
+        "m-alpha", task.task_id, "agent-a", attempt_key="interrupted-heartbeat"
+    )
+    original_record_run = mission_control._runtime.record_delegation_run
+
+    async def crash_after_claim_activation(candidate):
+        if candidate.run_id == first.attempt_id and candidate.status == "running":
+            raise RuntimeError("simulated interrupted heartbeat")
+        return await original_record_run(candidate)
+
+    monkeypatch.setattr(
+        mission_control._runtime, "record_delegation_run", crash_after_claim_activation
+    )
+    with pytest.raises(RuntimeError, match="interrupted heartbeat"):
+        await mission_control.heartbeat_lease(
+            "m-alpha", task.task_id, "agent-a", attempt_id=first.attempt_id
+        )
+    monkeypatch.setattr(
+        mission_control._runtime, "record_delegation_run", original_record_run
+    )
+    run = await mission_control._runtime.get_delegation_run(first.attempt_id)
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert run is not None and claim is not None
+    assert (run.status, claim.status) == ("queued", "active")
+    assert run.started_at == claim.claimed_at
+    assert claim.acked_at == claim.heartbeat_at
+    await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=_expired_stale_after(claim))
+    )
+
+    successor = await mission_control.start_attempt(
+        "m-alpha", task.task_id, "agent-b", attempt_key="after-interrupted-heartbeat"
+    )
+
+    recovered_run = await mission_control._runtime.get_delegation_run(first.attempt_id)
+    recovered_claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert successor.status == "queued"
+    assert recovered_run is not None and recovered_run.status == "stale_recovered"
+    assert recovered_claim is not None and recovered_claim.status == "stale_recovered"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "shape",
+    ("pre_heartbeat", "post_heartbeat", "ack_timestamp", "started_timestamp"),
+)
+async def test_recovery_refuses_adjacent_or_mismatched_heartbeat_states(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+    shape: str,
+) -> None:
+    task = await _mission_task(mission_control)
+    first = await mission_control.start_attempt(
+        "m-alpha", task.task_id, "agent-a", attempt_key=f"reject-{shape}"
+    )
+    original_record_run = mission_control._runtime.record_delegation_run
+    if shape in {"ack_timestamp", "started_timestamp"}:
+
+        async def crash_after_claim_activation(candidate):
+            if candidate.run_id == first.attempt_id and candidate.status == "running":
+                raise RuntimeError("simulated interrupted heartbeat")
+            return await original_record_run(candidate)
+
+        monkeypatch.setattr(
+            mission_control._runtime,
+            "record_delegation_run",
+            crash_after_claim_activation,
+        )
+        with pytest.raises(RuntimeError, match="interrupted heartbeat"):
+            await mission_control.heartbeat_lease(
+                "m-alpha", task.task_id, "agent-a", attempt_id=first.attempt_id
+            )
+        monkeypatch.setattr(
+            mission_control._runtime, "record_delegation_run", original_record_run
+        )
+    elif shape == "post_heartbeat":
+        await mission_control.heartbeat_lease(
+            "m-alpha", task.task_id, "agent-a", attempt_id=first.attempt_id
+        )
+
+    run = await mission_control._runtime.get_delegation_run(first.attempt_id)
+    claim = await mission_control._runtime.get_task_claim(first.claim_id)
+    assert run is not None and claim is not None
+    if shape == "ack_timestamp":
+        assert claim.heartbeat_at is not None
+        claim = await mission_control._runtime.record_task_claim(
+            replace(claim, acked_at=claim.heartbeat_at - timedelta(microseconds=1))
+        )
+    elif shape == "started_timestamp":
+        run = await mission_control._runtime.record_delegation_run(
+            replace(run, started_at=run.started_at + timedelta(microseconds=1))
+        )
+    claim = await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=_expired_stale_after(claim))
+    )
+
+    with pytest.raises(MissionControlError):
+        await mission_control.start_attempt(
+            "m-alpha", task.task_id, "agent-b", attempt_key=f"blocked-{shape}"
+        )
+
+    runs = await mission_control._runtime.list_delegation_runs(
+        task_id=task.task_id, limit=10
+    )
+    assert [run.run_id for run in runs] == [first.attempt_id]
+    assert (
+        await mission_control._runtime.list_runtime_receipts(
+            run_id=first.attempt_id,
+            receipt_type="mission_attempt_recovery",
+            limit=10,
+        )
+        == []
+    )
 
 
 @pytest.mark.asyncio
@@ -1018,8 +1175,8 @@ async def test_attempt_resolution_without_id_rejects_ambiguity(
     mission_control: MissionControl,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await mission_control.start_attempt(
-        "m-alpha", task.task_id, "agent-a", attempt_key="attempt-one"
+    first = await _interrupted_heartbeat_attempt(
+        mission_control, task.task_id, agent_id="agent-a", attempt_key="attempt-one"
     )
     first_claim = await mission_control._runtime.get_task_claim(first.claim_id)
     assert first_claim is not None
@@ -1346,7 +1503,7 @@ async def test_expired_takeover_terminalizes_prior_lineage_before_reassignment(
     mission_control: MissionControl,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -1757,7 +1914,7 @@ async def test_recovery_transition_is_atomic_before_replacement_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -1847,7 +2004,7 @@ async def test_snapshot_receipt_budget_is_global_across_attempts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -1946,7 +2103,7 @@ async def test_post_recovery_pre_replacement_crash_is_projection_drift(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -1979,7 +2136,7 @@ async def test_post_recovery_pre_replacement_crash_is_projection_drift(
         )
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
-    assert snapshot.tasks[0].status == TaskStatus.RUNNING
+    assert snapshot.tasks[0].status == TaskStatus.ASSIGNED
     assert snapshot.tasks[0].metadata["mission_attempt_id"] == first.attempt_id
     assert snapshot.attempts[0].status == "stale_recovered"
     assert snapshot.leases[0].status == "stale_recovered"
@@ -2006,7 +2163,7 @@ async def test_recovery_evidence_cannot_authorize_terminal_task(
     mission_control: MissionControl,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -2023,6 +2180,7 @@ async def test_recovery_evidence_cannot_authorize_terminal_task(
     await mission_control._recover_expired_claim(
         "m-alpha", claim, recovered_at=datetime.now(timezone.utc)
     )
+    await mission_control._board.start(task.task_id)
     await mission_control._board.complete(task.task_id, result="foreign completion")
     snapshot = await mission_control.get_snapshot("m-alpha")
     assert snapshot is not None
@@ -2037,7 +2195,7 @@ async def test_recovered_attempt_then_replacement_success_is_coherent(
     mission_control: MissionControl,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",
@@ -2357,7 +2515,7 @@ async def test_snapshot_rejects_forged_recovery_receipt_contract(
     mission_control: MissionControl,
 ) -> None:
     task = await _mission_task(mission_control)
-    first = await _active_attempt(
+    first = await _interrupted_heartbeat_attempt(
         mission_control,
         task.task_id,
         agent_id="agent-a",

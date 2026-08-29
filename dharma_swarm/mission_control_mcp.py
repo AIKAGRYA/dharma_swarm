@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any, TypeAlias
 
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.mission_control_effect_owner import inspect_owner_stores
+from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
 from dharma_swarm.mission_control_mcp_mutations import (
     AUTHORIZED_PRINCIPAL_METADATA_KEY as AUTHORIZED_PRINCIPAL_METADATA_KEY,
 )
@@ -104,7 +106,21 @@ ReadStateGuard: TypeAlias = Callable[[str], bool]
 MutationRequest.__module__ = __name__
 
 
-def _copy_immutable_sqlite(source: Path, destination: Path) -> None:
+def _source_identity(source: Path) -> tuple[str, int, int]:
+    try:
+        resolved = source.resolve(strict=True)
+        info = resolved.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise ValueError("immutable snapshot source is unavailable") from exc
+    return str(resolved), info.st_dev, info.st_ino
+
+
+def _copy_immutable_sqlite(
+    source: Path,
+    destination: Path,
+    *,
+    expected_source: tuple[str, int, int] | None = None,
+) -> None:
     """Copy a no-write main-database snapshot into disposable local state.
 
     ``immutable=1`` prevents SQLite from creating or updating source WAL/SHM
@@ -113,12 +129,52 @@ def _copy_immutable_sqlite(source: Path, destination: Path) -> None:
     projection, never as executor liveness or a linearizable read.
     """
 
+    expected = expected_source or _source_identity(source)
+    if _source_identity(source) != expected:
+        raise ValueError("immutable snapshot source identity drifted before copy")
     source_uri = f"{source.resolve().as_uri()}?mode=ro&immutable=1"
     with (
         sqlite3.connect(source_uri, uri=True) as source_db,
         sqlite3.connect(destination) as destination_db,
     ):
         source_db.backup(destination_db)
+    if _source_identity(source) != expected:
+        raise ValueError("immutable snapshot source identity drifted during copy")
+
+
+def _copy_immutable_owner_pair(
+    runtime_source: Path,
+    task_source: Path,
+    runtime_destination: Path,
+    task_destination: Path,
+    *,
+    require_task_db: bool,
+) -> OwnerStoreBinding | None:
+    if not require_task_db:
+        _copy_immutable_sqlite(runtime_source, runtime_destination)
+        return None
+    owners = inspect_owner_stores(runtime_source, task_source)
+    _copy_immutable_sqlite(
+        runtime_source,
+        runtime_destination,
+        expected_source=(
+            owners.runtime_database_path,
+            owners.runtime_database_device,
+            owners.runtime_database_inode,
+        ),
+    )
+    _copy_immutable_sqlite(
+        task_source,
+        task_destination,
+        expected_source=(
+            owners.task_database_path,
+            owners.task_database_device,
+            owners.task_database_inode,
+        ),
+    )
+    if inspect_owner_stores(runtime_source, task_source) != owners:
+        raise ValueError("immutable snapshot owner identity drifted during copy")
+    return owners
 
 
 class _ImmutableSnapshotMissionControl:
@@ -143,14 +199,18 @@ class _ImmutableSnapshotMissionControl:
             root = Path(raw)
             runtime_copy = root / "runtime.db"
             task_copy = root / "tasks.db"
-            await asyncio.to_thread(
-                _copy_immutable_sqlite, self.runtime_db, runtime_copy
+            source_owners = await asyncio.to_thread(
+                _copy_immutable_owner_pair,
+                self.runtime_db,
+                self.task_db,
+                runtime_copy,
+                task_copy,
+                require_task_db=require_task_db,
             )
-            if require_task_db:
-                await asyncio.to_thread(_copy_immutable_sqlite, self.task_db, task_copy)
             control = MissionControl(
                 TaskBoard(task_copy),
                 RuntimeStateStore(runtime_copy),
+                immutable_snapshot_source_owners=source_owners,
             )
             return await getattr(control, method_name)(*args, **kwargs)
 

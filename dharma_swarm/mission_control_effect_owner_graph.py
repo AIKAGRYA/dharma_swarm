@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from datetime import datetime
+from pathlib import Path
 
 from dharma_swarm.mission_control_a2a_owner_snapshot import (
     owner_object,
@@ -18,6 +20,8 @@ from dharma_swarm.mission_control_contract import (
     ReconciliationState,
     TaskView,
 )
+from dharma_swarm.mission_control_effect_owner import inspect_owner_stores
+from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
 from dharma_swarm.mission_control_effect_fence_store import row_binding
 from dharma_swarm.mission_control_effect_terminal_store import existing_terminal
 from dharma_swarm.mission_control_reconciliation import reconciliation
@@ -28,6 +32,7 @@ from dharma_swarm.runtime_state import (
     _row_to_run,
     _row_to_runtime_receipt,
 )
+from dharma_swarm.runtime_state import RuntimeReceipt
 from dharma_swarm.runtime_state_effect_fence import (
     EFFECT_FENCE_TABLE,
     EFFECT_RECEIPT_TYPE,
@@ -93,6 +98,8 @@ def _validate_runtime_rows(
 def _validate_effect_owner_triples(
     connection: sqlite3.Connection,
     receipt_rows: list[sqlite3.Row],
+    *,
+    expected_owner_stores: OwnerStoreBinding,
 ) -> None:
     for row in receipt_rows:
         if owner_text(row, "receipt_type") != EFFECT_RECEIPT_TYPE:
@@ -105,6 +112,8 @@ def _validate_effect_owner_triples(
         if len(fences) != 1:
             raise MissionControlError("exact effect owner fence is not unique")
         binding = row_binding(fences[0])
+        if binding.owner_stores != expected_owner_stores:
+            raise MissionControlError("effect owner stores disagree with the snapshot source")
         terminal = existing_terminal(connection, fences[0])
         expected = _row_to_runtime_receipt(row)
         if (
@@ -123,6 +132,58 @@ def _validate_effect_owner_triples(
             or expected.created_at != terminal.consumed_at
         ):
             raise MissionControlError("exact effect owner triple disagrees")
+
+
+def _connection_owner_stores(connection: sqlite3.Connection) -> OwnerStoreBinding:
+    if type(connection) is not sqlite3.Connection or connection.row_factory is not sqlite3.Row:
+        raise MissionControlError("exact owner snapshot identity is required")
+    databases = {
+        owner_text(row, "name"): owner_text(row, "file")
+        for row in connection.execute("PRAGMA database_list").fetchall()
+    }
+    if (
+        set(databases) != {"main", "taskboard"}
+        or not databases["main"]
+        or not databases["taskboard"]
+    ):
+        raise MissionControlError("exact owner snapshot identity is required")
+    try:
+        return inspect_owner_stores(
+            Path(databases["main"]), Path(databases["taskboard"])
+        )
+    except (OSError, ValueError) as exc:
+        raise MissionControlError("exact owner snapshot identity is unavailable") from exc
+
+
+def validate_observed_effect_owner_triples(
+    connection: sqlite3.Connection,
+    receipts: Sequence[RuntimeReceipt],
+    *,
+    expected_owner_stores: OwnerStoreBinding | None = None,
+) -> None:
+    """Rejoin each observed governed effect receipt to one durable triple."""
+
+    if not receipts:
+        return
+    rows: list[sqlite3.Row] = []
+    for receipt in receipts:
+        if type(receipt) is not RuntimeReceipt or receipt.receipt_type != EFFECT_RECEIPT_TYPE:
+            raise MissionControlError("observed effect receipt has the wrong type")
+        matches = connection.execute(
+            "SELECT * FROM runtime_receipts WHERE receipt_id=?"
+            " AND receipt_type=? LIMIT 2",
+            (receipt.receipt_id, EFFECT_RECEIPT_TYPE),
+        ).fetchall()
+        if len(matches) != 1 or _row_to_runtime_receipt(matches[0]) != receipt:
+            raise MissionControlError("observed effect receipt no longer matches its owner")
+        rows.append(matches[0])
+    _validate_effect_owner_triples(
+        connection,
+        rows,
+        expected_owner_stores=expected_owner_stores
+        if expected_owner_stores is not None
+        else _connection_owner_stores(connection),
+    )
 
 
 def observe_recovery_owner_graph(
@@ -187,7 +248,11 @@ def observe_recovery_owner_graph(
         "Mission Control receipt",
     )
     _validate_runtime_rows(run_rows, claim_rows, identity_rows, receipt_rows)
-    _validate_effect_owner_triples(connection, receipt_rows)
+    _validate_effect_owner_triples(
+        connection,
+        receipt_rows,
+        expected_owner_stores=_connection_owner_stores(connection),
+    )
     runs = [_row_to_run(row) for row in run_rows]
     claims = [_row_to_claim(row) for row in claim_rows]
     receipts = [_row_to_runtime_receipt(row) for row in receipt_rows]
@@ -224,4 +289,7 @@ def observe_recovery_owner_graph(
     )
 
 
-__all__ = ["observe_recovery_owner_graph"]
+__all__ = [
+    "observe_recovery_owner_graph",
+    "validate_observed_effect_owner_triples",
+]

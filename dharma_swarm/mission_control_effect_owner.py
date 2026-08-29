@@ -95,7 +95,17 @@ def inspect_owner_stores(
 
 
 @contextmanager
-def owner_transaction(owner: OwnerStoreBinding) -> Iterator[sqlite3.Connection]:
+def owner_transaction(
+    owner: OwnerStoreBinding, *, read_only: bool = False
+) -> Iterator[sqlite3.Connection]:
+    """Yield one exact joined owner transaction.
+
+    Validation readbacks use a deferred query-only transaction so they do not
+    take a writer reservation merely to verify durable evidence.
+    """
+
+    if type(read_only) is not bool:
+        raise ValueError("owner transaction read-only mode must be boolean")
     current = inspect_owner_stores(
         Path(owner.runtime_database_path), Path(owner.task_database_path)
     )
@@ -116,7 +126,11 @@ def owner_transaction(owner: OwnerStoreBinding) -> Iterator[sqlite3.Connection]:
         synchronous = connection.execute("PRAGMA main.synchronous").fetchone()
         if synchronous is None or synchronous[0] != 2:
             raise ValueError("RuntimeState durability policy is not FULL")
-        connection.execute("BEGIN IMMEDIATE")
+        if read_only:
+            connection.execute("PRAGMA query_only=ON")
+            connection.execute("BEGIN")
+        else:
+            connection.execute("BEGIN IMMEDIATE")
         listed = {
             str(row[1]): str(Path(str(row[2])).resolve(strict=True))
             for row in connection.execute("PRAGMA database_list").fetchall()

@@ -55,6 +55,7 @@ from dharma_swarm.mission_control_projection import (
     task_view,
 )
 from dharma_swarm.mission_control_recovery import MissionControlRecoveryMixin
+from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
 from dharma_swarm.models import Task, TaskPriority, TaskStatus
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -63,6 +64,7 @@ from dharma_swarm.runtime_state import (
     SessionState,
     TaskClaim,
 )
+from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
 
@@ -91,7 +93,13 @@ class MissionControl(
 ):
     """Join and mutate canonical owner records without creating new storage."""
 
-    def __init__(self, board: TaskBoard, runtime_state: RuntimeStateStore) -> None:
+    def __init__(
+        self,
+        board: TaskBoard,
+        runtime_state: RuntimeStateStore,
+        *,
+        immutable_snapshot_source_owners: OwnerStoreBinding | None = None,
+    ) -> None:
         """Build an adapter over the two canonical owners.
 
         The owners use separate databases, so lifecycle mutations are not
@@ -106,6 +114,7 @@ class MissionControl(
         self._task_locks: dict[str, asyncio.Lock] = {}
         self._mission_locks: dict[str, asyncio.Lock] = {}
         self._task_creation_locks: dict[str, asyncio.Lock] = {}
+        self._immutable_snapshot_source_owners = immutable_snapshot_source_owners
 
     async def create_mission(
         self,
@@ -330,6 +339,27 @@ class MissionControl(
         governed_proof_conflict = False
         if not scan_saturated:
             for receipt in receipts:
+                if receipt.receipt_type == EFFECT_RECEIPT_TYPE:
+                    identity = identities.get(receipt.run_id)
+                    try:
+                        if identity is not None and (
+                            completion_contract_from_metadata(identity.metadata)
+                            == GOVERNED_PATCH_COMPLETION_CONTRACT
+                        ):
+                            await self._validate_observed_patch_effect_receipts(
+                                (receipt,)
+                            )
+                    except (
+                        MissionControlError,
+                        OSError,
+                        RuntimeError,
+                        sqlite3.Error,
+                        TypeError,
+                        ValueError,
+                    ):
+                        governed_proof_conflict = True
+                        break
+                    continue
                 if receipt.receipt_type != TERMINAL_RECEIPT_TYPE:
                     continue
                 identity = identities.get(receipt.run_id)
@@ -350,7 +380,7 @@ class MissionControl(
                         raise MissionControlError(
                             "governed parent receipt lacks an effect key"
                         )
-                    self._validate_patch_effect_completion_readback(
+                    await self._validate_patch_effect_completion_readback(
                         receipt,
                         mission_id=mission_id,
                         task_id=identity.task_id,
