@@ -25,11 +25,13 @@ TaskpackMode = Literal["governed_fresh", "search_only_public_swebench"]
 
 MODE_GOVERNED_FRESH: TaskpackMode = "governed_fresh"
 MODE_SEARCH_ONLY_PUBLIC_SWEBENCH: TaskpackMode = "search_only_public_swebench"
-FRESH_SOURCE, FRESH_TASKBED = DEFAULT_SOURCE, "fresh_pr_suite"
+FRESH_SOURCE = DEFAULT_SOURCE
+FRESH_TASKBED = "fresh_pr_suite"
 SEARCH_SOURCE = "official_swebench_search_only"
 SEARCH_TASKBED = "search_only_public_swebench"
 POLICY_MAX_USES_PER_EPOCH = 1
-MAX_MANIFEST_BYTES, MAX_MANIFEST_ROWS = 8 * 1024 * 1024, 5_000
+MAX_MANIFEST_BYTES = 8 * 1024 * 1024
+MAX_MANIFEST_ROWS = 5_000
 ORACLE_SCHEMA = "forge_v2.fresh_task_oracle.v1"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _SWE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+__[A-Za-z0-9_.-]+-[1-9][0-9]*$")

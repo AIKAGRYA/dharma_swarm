@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.forge_lab import unattended_explore as unattended
+from dharma_swarm.forge_lab import unattended_admission, unattended_child, unattended_explore as unattended
 from dharma_swarm.forge_lab import unattended_child_support
 from dharma_swarm.forge_lab import unattended_ledger
 from dharma_swarm.forge_lab import unattended_scratch
@@ -20,7 +20,7 @@ _CONTEXT_DIGEST = "sha256:" + "d" * 64
 @pytest.fixture(autouse=True)
 def _admitted_context(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "load_admitted_task_context",
         lambda task_id, *, state_root: (
             {"task_id": task_id},
@@ -253,7 +253,7 @@ def test_model_evidence_requires_receipt_bound_to_exact_active_roles(
     payload["receipt_digest"] = provider_selftest._receipt_digest(payload)
     receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "activation_status",
         lambda: {
             "active": True,
@@ -290,7 +290,7 @@ def test_admission_requires_halt_absent_exact_state_and_two_routes(
     logical_state.symlink_to(state, target_is_directory=True)
     monkeypatch.setenv("RSI_LAB_STATE", str(logical_state))
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "require_execution_source",
         lambda *_args, **_kwargs: {
             "ready": True,
@@ -298,14 +298,14 @@ def test_admission_requires_halt_absent_exact_state_and_two_routes(
             "commit": "a" * 40,
         },
     )
-    monkeypatch.setattr(unattended, "doctor", _ready_doctor)
+    monkeypatch.setattr(unattended_admission, "doctor", _ready_doctor)
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "reconciliation_status",
         lambda: {"ok": True, "read_only": True, "findings": []},
     )
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "_selected_model_evidence",
         lambda _check: _model_evidence(),
     )
@@ -330,7 +330,7 @@ def test_admission_refuses_unreconciled_control_plane_before_spend(
     state.mkdir()
     monkeypatch.setenv("RSI_LAB_STATE", str(state))
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "require_execution_source",
         lambda *_args, **_kwargs: {
             "ready": True,
@@ -338,9 +338,9 @@ def test_admission_refuses_unreconciled_control_plane_before_spend(
             "commit": "a" * 40,
         },
     )
-    monkeypatch.setattr(unattended, "doctor", _ready_doctor)
+    monkeypatch.setattr(unattended_admission, "doctor", _ready_doctor)
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "reconciliation_status",
         lambda: {
             "ok": False,
@@ -354,7 +354,7 @@ def test_admission_refuses_unreconciled_control_plane_before_spend(
         },
     )
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "_selected_model_evidence",
         lambda _check: _model_evidence(),
     )
@@ -374,7 +374,7 @@ def test_judge_cache_refusal_is_receipted_before_budget_or_child_invocation(
     state.mkdir()
     monkeypatch.setenv("RSI_LAB_STATE", str(state))
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "require_execution_source",
         lambda *_args, **_kwargs: {
             "ready": True,
@@ -382,14 +382,14 @@ def test_judge_cache_refusal_is_receipted_before_budget_or_child_invocation(
             "commit": "a" * 40,
         },
     )
-    monkeypatch.setattr(unattended, "doctor", _ready_doctor)
+    monkeypatch.setattr(unattended_admission, "doctor", _ready_doctor)
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "reconciliation_status",
         lambda: {"ok": True, "read_only": True, "findings": []},
     )
     monkeypatch.setattr(
-        unattended,
+        unattended_admission,
         "_selected_model_evidence",
         lambda _check: _model_evidence(),
     )
@@ -412,7 +412,7 @@ def test_judge_cache_refusal_is_receipted_before_budget_or_child_invocation(
         child_calls.append((args, kwargs))
         raise AssertionError("child/provider dispatch must follow admitted context")
 
-    monkeypatch.setattr(unattended, "load_admitted_task_context", refuse_judge_cache)
+    monkeypatch.setattr(unattended_admission, "load_admitted_task_context", refuse_judge_cache)
     monkeypatch.setattr(unattended, "reserve_budget", unexpected_budget)
     monkeypatch.setattr(unattended, "_run_child_process", unexpected_child)
 
@@ -528,7 +528,7 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
     fake_secret = "provider-secret-must-never-enter-child-evidence"
     monkeypatch.setenv("OPENAI_API_KEY", fake_secret)
     monkeypatch.setattr(
-        unattended,
+        unattended_child,
         "admission_status",
         lambda _state: {
             "ready": True,
@@ -559,7 +559,7 @@ def test_child_config_is_fixed_1x1x1_hard_budget_and_explore_only(
             remove_worktree=lambda **_kwargs: None,
         )
 
-    monkeypatch.setattr(unattended, "_bounded_child_seams", fake_seams)
+    monkeypatch.setattr(unattended_child, "_bounded_child_seams", fake_seams)
     captured = {}
 
     async def fake_run(cfg, *, seams):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -315,8 +316,11 @@ def _docker_sdk_status() -> tuple[bool, str | None]:
         if client is not None:
             try:
                 client.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                print(
+                    f"[readiness] docker client close failed: {type(exc).__name__}",
+                    file=sys.stderr,
+                )
 
 
 def taskbed_readiness() -> dict[str, Any]:

@@ -112,6 +112,10 @@ def _node_source() -> str:
     module_paths = (
         (f"{package}.sync_identity", Path(core.__file__).with_name("sync_identity.py")),
         (f"{package}.sync_node", Path(core.__file__).with_name("sync_node.py")),
+        (
+            f"{package}.sync_campaign_guard",
+            Path(core.__file__).with_name("sync_campaign_guard.py"),
+        ),
     )
     lines = ["import sys", "import types"]
     for module_name, path in module_paths:

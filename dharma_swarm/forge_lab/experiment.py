@@ -31,6 +31,7 @@ from dharma_swarm.forge_lab.freeform_explore import (
     validate_freeform_explore_envelope,
 )
 from dharma_swarm.forge_lab.genome_spec import check_genome, merged_with_defaults
+from dharma_swarm.forge_lab.state_io import dharma_home
 from dharma_swarm.forge_lab.run_receipts import (
     AFTER_RUN_NOTES_SCHEMA,
     EXPLORE_CLOSEOUTS,
@@ -76,7 +77,7 @@ class ExperimentConfig:
     # stochastic policy by default.
     force_single_llm_mutation: bool = False
     source_repo: Path = field(default_factory=lambda: Path.home() / "dharma_swarm")
-    state_root: Path = field(default_factory=lambda: Path.home() / ".dharma" / "evolution_archive")
+    state_root: Path = field(default_factory=lambda: dharma_home() / "evolution_archive")
 
 
 @dataclass

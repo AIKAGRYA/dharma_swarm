@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from dharma_swarm.forge_lab import daily_attempt_status as daily_attempt
 from dharma_swarm.forge_lab import daily_status as daily
 from dharma_swarm.forge_lab import unattended_explore as unattended
 
@@ -57,7 +58,7 @@ def test_last_attempt_resolves_exact_referenced_prior_admission(
 ) -> None:
     forge_root = tmp_path / "state" / ".dharma" / "forge_lab"
     receipts = forge_root / "unattended_explore" / "receipts.jsonl"
-    monkeypatch.setattr(daily, "forge_state_root", lambda: forge_root)
+    monkeypatch.setattr(daily_attempt, "forge_state_root", lambda: forge_root)
     admitted = unattended.append_chain(
         receipts,
         {"kind": "run_admitted", "run_id": "run-a"},

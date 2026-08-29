@@ -446,6 +446,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/strange_loop.py', 'execute_single_step', 'path_write', 'c77238abb207', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/system_integration_probe.py', 'run_all', 'path_write', '430b9a968242', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/test_sentinel.py', 'main', 'path_write', 'c6056417f922', 'test_or_experiment', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/uplift_guards/run_pre_commit.py', '_write_assurance_unavailable_witness', 'path_open_write', 'c26658dd29a4', 'operational_state', occurrences=1, review_note='Append-only assurance-unavailable witness flag (~/.dharma/witness/assurance_guard_unavailable.jsonl): the guard fails open but leaves a durable audit record; a witness-write failure is reported on stderr and never blocks the commit.'),
     )
 
 

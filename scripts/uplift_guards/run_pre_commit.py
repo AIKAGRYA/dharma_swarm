@@ -105,8 +105,12 @@ def _write_assurance_unavailable_witness(repo_root: Path, detail: str) -> None:
                 )
                 + "\n"
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        # Witness failures must never block a commit, but must be visible.
+        print(
+            f"  [witness] assurance-unavailable flag not written: {exc}",
+            file=sys.stderr,
+        )
 
 
 GUARDS = [

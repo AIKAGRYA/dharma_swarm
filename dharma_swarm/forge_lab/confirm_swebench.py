@@ -58,10 +58,10 @@ from dharma_swarm.forge_lab.provider_selftest import (
     PROVIDER_SELFTEST_SCHEMA,
     validate_provider_receipt,
 )
-from dharma_swarm.forge_lab.state_io import safe_json
+from dharma_swarm.forge_lab.state_io import forge_state_root, safe_json
 from dharma_swarm.forge_lab.version import PACKAGE_VERSION, source_commit
 
-CONFIRM_ROOT = Path.home() / ".dharma" / "forge_lab" / "confirm"
+CONFIRM_ROOT = forge_state_root() / "confirm"
 
 
 def confirm_provider_admission(

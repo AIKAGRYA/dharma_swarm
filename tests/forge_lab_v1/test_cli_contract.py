@@ -361,7 +361,7 @@ def test_newrun_menu_projects_bleeding_edge_options_without_live_imports() -> No
     assert current["command"].startswith("python -m dharma_swarm.forge_lab.cli run --mode shadow")
 
 
-def test_newrun_diverse_preset_uses_exact_routeable_cloud_ids() -> None:
+def test_newrun_diverse_preset_uses_exact_routeable_pool_ids() -> None:
     result = _invoke(MODULE_COMMAND, "newrun", "--json", "--preset", "diverse")
 
     assert result.returncode == 0, result.stderr
@@ -369,10 +369,10 @@ def test_newrun_diverse_preset_uses_exact_routeable_cloud_ids() -> None:
     selected = payload["selected"]
     assert selected["solver_model"] == "deepseek-v4-pro:cloud"
     assert selected["verifier_model"] == "minimax-m3:cloud"
-    assert selected["mutator_model"] == "kimi-k2.7-code:cloud"
+    assert selected["mutator_model"] == "moonshotai/kimi-k3"
     assert "--solver-model deepseek-v4-pro:cloud" in selected["command"]
     assert "--verifier-model minimax-m3:cloud" in selected["command"]
-    assert "--mutator-model kimi-k2.7-code:cloud" in selected["command"]
+    assert "--mutator-model moonshotai/kimi-k3" in selected["command"]
 
 
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import os
+import sys
 import threading
 from collections.abc import Callable, Iterator
 from pathlib import PurePosixPath
@@ -93,9 +94,13 @@ def forbidden_environment_names(entries: list[str] | None) -> list[str]:
 def _remove_container(container: Any) -> None:
     try:
         container.remove(force=True, v=True)
-    except Exception:
-        # A Docker outage must not conceal the original isolation error.
-        pass
+    except Exception as exc:
+        # A Docker outage must not conceal the original isolation error, but
+        # it must not vanish either — witness it on stderr.
+        print(
+            f"[grader-isolation] container cleanup failed: {type(exc).__name__}",
+            file=sys.stderr,
+        )
 
 
 def isolation_proof(container: Any) -> dict[str, Any]:

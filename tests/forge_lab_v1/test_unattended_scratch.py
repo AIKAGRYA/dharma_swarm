@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dharma_swarm.forge_lab import scratch_cleanup
 from dharma_swarm.forge_lab import unattended_scratch as scratch
 from dharma_swarm.forge_lab.state_io import content_digest
 
@@ -286,7 +287,7 @@ def test_marker_survives_if_post_inventory_deletion_refuses(
     repo.mkdir(parents=True)
     os.mkfifo(repo / "special")
     monkeypatch.setattr(
-        scratch,
+        scratch_cleanup,
         "_inventory_run",
         lambda *_args, **_kwargs: {
             "entries": 3,

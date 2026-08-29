@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any, Iterable
 from uuid import uuid4
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 DIGEST_RE = re.compile(r"^sha256:([0-9a-f]{64})$")
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
 
@@ -30,7 +32,12 @@ def now_utc() -> str:
 
 
 def dharma_home() -> Path:
-    """Return the stable host state anchor, never the source checkout."""
+    """Return the stable host state anchor, never the source checkout.
+
+    The default branch delegates to the canonical state-dir owner
+    (``dharma_swarm.daemon_config.dharma_state_dir``) so ``~/.dharma``
+    ownership stays centralized (ANTI_SLOP_RULES Rule 1).
+    """
 
     explicit = os.environ.get("DHARMA_HOME", "").strip()
     if explicit:
@@ -38,7 +45,7 @@ def dharma_home() -> Path:
     state = os.environ.get("RSI_LAB_STATE", "").strip()
     if state:
         return (Path(state).expanduser() / ".dharma").resolve(strict=False)
-    return (Path.home() / ".dharma").resolve(strict=False)
+    return dharma_state_dir().resolve(strict=False)
 
 
 def forge_state_root() -> Path:

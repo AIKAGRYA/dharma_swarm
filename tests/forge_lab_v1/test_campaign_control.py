@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.forge_lab import campaign_control
+from dharma_swarm.forge_lab import campaign_control, campaign_event_chain
 
 
 @pytest.fixture
@@ -144,7 +144,7 @@ def test_interrupted_campaign_resumes_validated_prefix_without_duplicates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     plan = campaign_control.plan_campaign(campaign_control.PILOT_PROFILE)
-    original_append = campaign_control._append_event
+    original_append = campaign_event_chain._append_event
     crashed = False
 
     def crash_before_third_attempt_event(*args, **kwargs):
@@ -156,14 +156,14 @@ def test_interrupted_campaign_resumes_validated_prefix_without_duplicates(
         return original_append(*args, **kwargs)
 
     monkeypatch.setattr(
-        campaign_control,
+        campaign_event_chain,
         "_append_event",
         crash_before_third_attempt_event,
     )
     with pytest.raises(RuntimeError, match="simulated_process_loss"):
         campaign_control.run_campaign(plan["manifest_digest"], "resume-pilot")
 
-    monkeypatch.setattr(campaign_control, "_append_event", original_append)
+    monkeypatch.setattr(campaign_event_chain, "_append_event", original_append)
     resumed = campaign_control.run_campaign(
         plan["manifest_digest"],
         "resume-pilot",
