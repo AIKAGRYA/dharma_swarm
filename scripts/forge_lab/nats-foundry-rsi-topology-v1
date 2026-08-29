@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Render the no-secret Foundry/RSI JetStream v1 topology and NKey ACL."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if (REPO_ROOT / "dharma_swarm").is_dir():
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.a2a.candidate_transport_contract import validate_public_user_nkey
+
+SCHEMA = "forge_lab.foundry_rsi_nats_topology_acl.v1"
+CONFIG = {
+    "subject": "dharma.foundry_rsi.candidate.v1",
+    "dlq_subject": "dharma.foundry_rsi.candidate.dlq.v1",
+    "stream_name": "FOUNDRY_RSI_CANDIDATES_V1",
+    "dlq_stream_name": "FOUNDRY_RSI_CANDIDATES_DLQ_V1",
+    "consumer_name": "foundry_rsi_evaluator_v1",
+}
+PLACEHOLDERS = {
+    "provisioner": "UPROVISIONER_PUBLIC_NKEY_REQUIRED",
+    "publisher": "URSI_PUBLISHER_PUBLIC_NKEY_REQUIRED",
+    "consumer": "UFOUNDRY_CONSUMER_PUBLIC_NKEY_REQUIRED",
+}
+
+
+def _public_nkey(value: str, role: str, *, allow_placeholder: bool) -> str:
+    text = str(value or "").strip()
+    if allow_placeholder and text == PLACEHOLDERS[role]:
+        return text
+    try:
+        validate_public_user_nkey(text)
+    except ValueError as exc:
+        raise ValueError(f"{role} must be a 56-character public NATS user NKey")
+    return text
+
+
+def _topology() -> dict[str, Any]:
+    common = {
+        "retention": "limits", "storage": "file", "discard": "new",
+        "max_msgs": -1, "max_bytes": 512 * 1024 * 1024,
+        "max_msg_size": 8 * 1024 * 1024, "duplicate_window": 10 * 60,
+        "num_replicas": 1, "deny_delete": False, "deny_purge": True,
+        "allow_rollup_hdrs": False,
+    }
+    return {
+        "streams": {
+            CONFIG["stream_name"]: {
+                "name": CONFIG["stream_name"], "subjects": [CONFIG["subject"]],
+                "max_age": 7 * 24 * 60 * 60, **common,
+            },
+            CONFIG["dlq_stream_name"]: {
+                "name": CONFIG["dlq_stream_name"], "subjects": [CONFIG["dlq_subject"]],
+                "max_age": 30 * 24 * 60 * 60, **common,
+            },
+        },
+        "consumer": {
+            "durable_name": CONFIG["consumer_name"], "filter_subject": CONFIG["subject"],
+            "ack_policy": "explicit", "ack_wait": 60.0, "max_deliver": 4,
+            "backoff": [60.0, 300.0, 900.0], "deliver_policy": "all",
+            "replay_policy": "instant", "max_ack_pending": 1,
+        },
+    }
+
+
+def build_manifest(
+    *,
+    provisioner: str,
+    publisher: str,
+    consumer: str,
+    allow_placeholders: bool = False,
+) -> dict[str, Any]:
+    provisioner = _public_nkey(provisioner, "provisioner", allow_placeholder=allow_placeholders)
+    publisher = _public_nkey(publisher, "publisher", allow_placeholder=allow_placeholders)
+    consumer = _public_nkey(consumer, "consumer", allow_placeholder=allow_placeholders)
+    if len({provisioner, publisher, consumer}) != 3:
+        raise ValueError("provisioner, publisher, and consumer public NKeys must be distinct")
+    topology = _topology()
+    js = "$JS.API"
+    topology_read = [
+        f"{js}.STREAM.INFO.{CONFIG['stream_name']}",
+        f"{js}.STREAM.INFO.{CONFIG['dlq_stream_name']}",
+        f"{js}.CONSUMER.INFO.{CONFIG['stream_name']}.{CONFIG['consumer_name']}",
+    ]
+    users = [
+        {
+            "role": "topology_provisioner",
+            "nkey": provisioner,
+            "runtime_candidate_access": False,
+            "permissions": {
+                "publish": [
+                    f"{js}.INFO",
+                    *topology_read,
+                    f"{js}.STREAM.CREATE.{CONFIG['stream_name']}",
+                    f"{js}.STREAM.CREATE.{CONFIG['dlq_stream_name']}",
+                    f"{js}.CONSUMER.DURABLE.CREATE.{CONFIG['stream_name']}.{CONFIG['consumer_name']}",
+                    f"{js}.CONSUMER.DELETE.{CONFIG['stream_name']}.{CONFIG['consumer_name']}",
+                    f"{js}.STREAM.DELETE.{CONFIG['stream_name']}",
+                    f"{js}.STREAM.DELETE.{CONFIG['dlq_stream_name']}",
+                ],
+                "subscribe": ["_INBOX.>"],
+            },
+        },
+        {
+            "role": "rsi_candidate_publisher",
+            "nkey": publisher,
+            "permissions": {
+                "publish": [CONFIG["subject"], *topology_read],
+                "subscribe": ["_INBOX.>"],
+            },
+        },
+        {
+            "role": "foundry_candidate_consumer",
+            "nkey": consumer,
+            "permissions": {
+                "publish": [
+                    *topology_read,
+                    f"{js}.CONSUMER.MSG.NEXT.{CONFIG['stream_name']}.{CONFIG['consumer_name']}",
+                    f"$JS.ACK.{CONFIG['stream_name']}.{CONFIG['consumer_name']}.>",
+                    CONFIG["dlq_subject"],
+                ],
+                "subscribe": ["_INBOX.>"],
+            },
+        },
+    ]
+    body = {
+        "schema": SCHEMA,
+        "topology": topology,
+        "acl_users": users,
+        "authority_separation": {
+            "provisioner_cannot_publish_or_consume_candidates": True,
+            "publisher_cannot_manage_topology_or_consume": True,
+            "consumer_cannot_manage_topology_or_publish_candidates": True,
+            "live_promotion_authority_present": False,
+        },
+        "private_material": {
+            "included": False,
+            "runtime_seed_contract": "root-owned path, mode 0600 or stricter",
+            "provisioning_seed_is_distinct_from_runtime_seeds": True,
+        },
+        "transport_security": {
+            "authentication_required": True,
+            "loopback_non_tls_allowed": True,
+            "loopback_endpoints": ["nats://127.0.0.1:4222", "nats://[::1]:4222"],
+            "remote_tls_required": True,
+        },
+    }
+    encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+    return {**body, "manifest_sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--provisioner-nkey", default=PLACEHOLDERS["provisioner"])
+    parser.add_argument("--publisher-nkey", default=PLACEHOLDERS["publisher"])
+    parser.add_argument("--consumer-nkey", default=PLACEHOLDERS["consumer"])
+    parser.add_argument("--format", choices=("json",), default="json")
+    args = parser.parse_args(argv)
+    placeholders = any(
+        value in PLACEHOLDERS.values()
+        for value in (args.provisioner_nkey, args.publisher_nkey, args.consumer_nkey)
+    )
+    try:
+        manifest = build_manifest(
+            provisioner=args.provisioner_nkey,
+            publisher=args.publisher_nkey,
+            consumer=args.consumer_nkey,
+            allow_placeholders=placeholders,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    sys.stdout.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

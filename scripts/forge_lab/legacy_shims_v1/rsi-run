@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'rsi-run is retired: use `rsi newrun` and review its explicit governed command.\n' >&2
+exit 64

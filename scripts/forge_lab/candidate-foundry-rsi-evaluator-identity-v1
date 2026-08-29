@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Compute the exact offline Foundry evaluator executable and release identities."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import runpy
+import sys
+import tempfile
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if (REPO_ROOT / "dharma_swarm").is_dir():
+    sys.path.insert(0, str(REPO_ROOT))
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from dharma_swarm.a2a.candidate_evaluator_deployment import (
+    EvaluatorDeployment,
+    sign_evaluator_deployment,
+)
+from dharma_swarm.a2a.candidate_transport_contract import secure_private_file
+
+
+def _private_signing_key(path: str) -> Ed25519PrivateKey:
+    safe = secure_private_file(path, "evaluator deployment signing key")
+    key = serialization.load_pem_private_key(safe.read_bytes(), password=None)
+    if not isinstance(key, Ed25519PrivateKey):
+        raise ValueError(
+            "evaluator deployment signing key must be an unencrypted Ed25519 PKCS8 PEM key"
+        )
+    return key
+
+
+def _atomic_output(path: Path, payload: bytes, *, replace: bool) -> None:
+    if path.is_symlink():
+        raise ValueError("evaluator deployment manifest output cannot be a symlink")
+    if path.exists() and not replace:
+        raise ValueError("evaluator deployment manifest exists; use --replace-output")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        os.fchmod(descriptor, 0o644)
+        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--evaluator-executable", type=Path, required=True)
+    parser.add_argument("--evaluator-release-root", type=Path, required=True)
+    parser.add_argument("--evaluator-id", required=True)
+    parser.add_argument("--evaluator-release-sha", required=True)
+    parser.add_argument("--deployment-signing-key-file", required=True)
+    parser.add_argument("--authority-epoch-sha256", required=True)
+    parser.add_argument("--key-id", default="")
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--replace-output", action="store_true")
+    args = parser.parse_args()
+    if not args.evaluator_executable.is_absolute() or not args.evaluator_release_root.is_absolute():
+        parser.error("evaluator executable and release root must be absolute")
+    functions = runpy.run_path(
+        str(Path(__file__).with_name("candidate-foundry-rsi-consume-v1"))
+    )
+    if not functions["_GIT_SHA"].fullmatch(args.evaluator_release_sha or ""):
+        parser.error("evaluator release Git SHA must be a full object id")
+    try:
+        executable_sha256 = functions["_sha_file"](args.evaluator_executable)
+        tree_sha256 = functions["_release_tree_sha256"](args.evaluator_release_root)
+        safe, _, _ = functions["_verify_evaluator_release"](
+            args.evaluator_executable,
+            args.evaluator_release_root,
+            expected_executable_sha256=executable_sha256,
+            expected_tree_sha256=tree_sha256,
+        )
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    relative = safe.relative_to(args.evaluator_release_root.absolute()).as_posix()
+    try:
+        deployment = EvaluatorDeployment(
+            evaluator_id=args.evaluator_id,
+            evaluator_release_sha=args.evaluator_release_sha,
+            evaluator_executable_relative_path=relative,
+            evaluator_executable_sha256=executable_sha256,
+            evaluator_release_tree_sha256=tree_sha256,
+        )
+        signed = sign_evaluator_deployment(
+            deployment,
+            signing_key=_private_signing_key(args.deployment_signing_key_file),
+            authority_epoch_sha256=args.authority_epoch_sha256,
+            key_id=args.key_id,
+        )
+        encoded = (json.dumps(signed.to_dict(), sort_keys=True, indent=2) + "\n").encode()
+        _atomic_output(args.output.absolute(), encoded, replace=args.replace_output)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    print(json.dumps({
+        "schema": "forge_lab.offline_evaluator_deployment_identity.v1",
+        "evaluator_deployment_id": deployment.deployment_id,
+        "evaluator_id": deployment.evaluator_id,
+        "evaluator_executable": str(args.evaluator_executable),
+        "evaluator_release_root": str(args.evaluator_release_root),
+        "evaluator_release_sha": args.evaluator_release_sha,
+        "evaluator_executable_sha256": executable_sha256,
+        "evaluator_release_tree_sha256": tree_sha256,
+        "signed_deployment_manifest": str(args.output.absolute()),
+        "deployment_signer_public_key": signed.signature_receipt["signature"]["public_key"],
+        "offline_network_isolation_required": True,
+        "live_promotion_attempted": False,
+    }, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

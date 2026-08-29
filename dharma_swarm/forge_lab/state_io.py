@@ -66,11 +66,27 @@ def canonical_json(payload: Any) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
+        allow_nan=False,
     ).encode("utf-8")
 
 
 def content_digest(payload: Any) -> str:
     return "sha256:" + hashlib.sha256(canonical_json(payload)).hexdigest()
+
+
+def _fsync_directory(path: Path) -> None:
+    """Persist directory-entry changes after create, replace, or unlink."""
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def validate_digest(value: str) -> str:
@@ -99,11 +115,19 @@ def atomic_json(path: Path, payload: dict[str, Any], *, mode: int = 0o600) -> No
     try:
         descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
+            json.dump(
+                payload,
+                handle,
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                allow_nan=False,
+            )
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        _fsync_directory(path.parent)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -126,14 +150,23 @@ def write_json_exclusive(
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
+            json.dump(
+                payload,
+                handle,
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                allow_nan=False,
+            )
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
+        _fsync_directory(path.parent)
     except Exception:
         # If serialization or fsync fails, a partial path must never masquerade
         # as a durable receipt. The caller still receives the original error.
         path.unlink(missing_ok=True)
+        _fsync_directory(path.parent)
         raise
 
 
@@ -144,6 +177,7 @@ def append_jsonl(path: Path, payload: dict[str, Any], *, mode: int = 0o600) -> N
         handle.write(canonical_json(payload).decode("utf-8") + "\n")
         handle.flush()
         os.fsync(handle.fileno())
+    _fsync_directory(path.parent)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -166,6 +200,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 __all__ = [
     "DIGEST_RE",
+    "_fsync_directory",
     "append_jsonl",
     "atomic_json",
     "canonical_json",

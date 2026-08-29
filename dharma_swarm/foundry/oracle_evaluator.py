@@ -1,0 +1,537 @@
+"""The real evaluator — applies a candidate diff and runs the target's oracle.
+
+This is the muscle the readiness audit found missing: the bridge from a
+:class:`~dharma_swarm.foundry.evaluator.Candidate` (a unified diff) to an
+actual score from the target's own test/benchmark command, executed under the
+strongest available isolation.
+
+Discipline per evaluation:
+
+1. Fresh scratch copy of the pinned tree (the pinned checkout is never touched).
+2. ``git apply --check`` then ``git apply`` — a diff that does not apply cleanly
+   scores zero (``apply_failed``), it does not crash the loop.
+3. The oracle runs via :func:`run_isolated` — Docker ``--network none``,
+   read-only workdir when the suite tolerates it (prevention), otherwise
+   read-write with a post-run tamper digest over every non-evolve path
+   (detection). Either way, a candidate that rewrites the oracle mid-run
+   cannot keep a score: ``oracle_tampered`` zeroes it.
+4. Fitness is gated on correctness: the oracle must exit 0 (zero regressions)
+   before any score counts.
+5. The receipt gets the truth: the ACTUAL isolation level and tamper mode that
+   ran are reported in ``EvalMetrics.metrics`` / ``notes`` — never asserted.
+
+Baseline: :meth:`OracleEvaluator.prepare` runs the oracle once on the clean
+tree and refuses to proceed if the target is already broken.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import re
+import shutil
+import subprocess
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable
+
+from dharma_swarm.foundry.evaluator import Candidate, EvalMetrics
+from dharma_swarm.foundry.runner_isolation import (
+    IsolationProof,
+    IsolationPolicy,
+    RunResult,
+    promotion_allowed,
+    run_isolated,
+)
+from dharma_swarm.foundry.tripwires import validate_diff_paths
+
+# Sentinel line an oracle command can print to hand structured metrics back:
+#   FOUNDRY_METRICS {"combined_score": 0.87, ...}
+METRICS_SENTINEL = "FOUNDRY_METRICS"
+_SENTINEL_RE = re.compile(re.escape(METRICS_SENTINEL) + r"\s+(\{.*\})")
+
+MetricParser = Callable[[RunResult], EvalMetrics]
+
+
+def sentinel_metrics_parser(primary_key: str = "combined_score") -> MetricParser:
+    """Parse ``FOUNDRY_METRICS {json}`` from oracle stdout.
+
+    Correctness requires exit 0 AND a parseable sentinel with ``primary_key``.
+    """
+
+    def parse(result: RunResult) -> EvalMetrics:
+        if result.output_limited:
+            return EvalMetrics(
+                0.0,
+                False,
+                notes="oracle output limit exceeded",
+                failure_category="oracle_output_limit",
+            )
+        if result.blocked:
+            return EvalMetrics(
+                0.0,
+                False,
+                notes=f"oracle blocked: {result.blocked_reason}",
+                failure_category="oracle_isolation_blocked",
+            )
+        if result.timed_out:
+            return EvalMetrics(
+                0.0,
+                False,
+                notes="oracle timeout",
+                failure_category="oracle_timeout",
+            )
+        if result.exit_code != 0:
+            return EvalMetrics(
+                0.0,
+                False,
+                notes=f"oracle exit={result.exit_code}",
+                failure_category="oracle_exit_nonzero",
+            )
+        m = _SENTINEL_RE.search(result.stdout)
+        if not m:
+            return EvalMetrics(
+                0.0,
+                False,
+                notes="no FOUNDRY_METRICS sentinel in oracle output",
+                failure_category="oracle_metrics_missing",
+            )
+        try:
+            data = json.loads(m.group(1))
+            if not isinstance(data, dict):
+                raise TypeError("sentinel is not an object")
+            raw_score = data[primary_key]
+            if isinstance(raw_score, bool) or not isinstance(raw_score, (int, float)):
+                raise TypeError("primary metric is not numeric")
+            score = float(raw_score)
+            if not math.isfinite(score):
+                raise ValueError("primary metric is non-finite")
+            normalized: dict[str, float] = {}
+            for key, value in data.items():
+                if not isinstance(key, str):
+                    raise TypeError("metric name is not a string")
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                numeric = float(value)
+                if not math.isfinite(numeric):
+                    raise ValueError("metric is non-finite")
+                normalized[key] = numeric
+        except (ValueError, KeyError, TypeError) as exc:
+            return EvalMetrics(
+                0.0,
+                False,
+                notes=f"bad sentinel payload: {type(exc).__name__}",
+                failure_category="oracle_metrics_malformed",
+            )
+        return EvalMetrics(
+            primary_score=score,
+            correctness_passed=True,
+            metrics=normalized,
+            wall_clock_s=result.duration_s,
+        )
+
+    return parse
+
+
+def suite_pass_parser() -> MetricParser:
+    """Zero-regression oracle: exit 0 = correct; score is inverse duration.
+
+    Suitable when the objective is 'make the suite faster without breaking it'.
+    The loop compares scores across candidates; the baseline anchors deltas.
+    """
+
+    def parse(result: RunResult) -> EvalMetrics:
+        ok = result.exit_code == 0 and not result.timed_out
+        score = (1.0 / result.duration_s) if ok and result.duration_s > 0 else 0.0
+        return EvalMetrics(primary_score=score, correctness_passed=ok,
+                           metrics={"duration_s": result.duration_s},
+                           wall_clock_s=result.duration_s,
+                           failure_category=(
+                               "" if ok else (
+                                   "oracle_timeout" if result.timed_out
+                                   else "oracle_exit_nonzero"
+                               )
+                           ))
+
+    return parse
+
+
+def _parse_single_file_diff(diff: str) -> "tuple[str, list[tuple[list[str], list[str]]]] | None":
+    """Parse a single-file unified diff into (rel_path, [(old_block, new_block)]).
+
+    Returns None if the diff touches more than one file or has no hunks.
+    """
+    path = ""
+    hunks: list[tuple[list[str], list[str]]] = []
+    old: list[str] = []
+    new: list[str] = []
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            token = line[4:].strip()
+            token = token[2:] if token.startswith(("a/", "b/")) else token
+            if path and token != path:
+                return None  # multi-file: loose applier does not attempt these
+            path = token
+        elif line.startswith("@@ "):
+            if in_hunk and (old or new):
+                hunks.append((old, new))
+                old, new = [], []
+            in_hunk = True
+        elif in_hunk:
+            if line.startswith("-") and not line.startswith("---"):
+                old.append(line[1:])
+            elif line.startswith("+") and not line.startswith("+++"):
+                new.append(line[1:])
+            elif line.startswith(" ") or line == "":
+                old.append(line[1:] if line else "")
+                new.append(line[1:] if line else "")
+    if in_hunk and (old or new):
+        hunks.append((old, new))
+    return (path, hunks) if path and hunks else None
+
+
+def loose_apply(tree: Path, diff: str) -> str | None:
+    """Last-resort applier: locate each hunk's old-block by fuzzy match.
+
+    LLM diffs frequently rewrite a couple of INTERIOR context lines — fatal
+    for git apply and for patch's edge-only fuzz, even when the actual change
+    is perfectly valid (production case 7525a462: 2/80 context lines drifted,
+    scored 0.5834, then failed to re-apply). This applier finds the old block
+    with difflib (>=0.9 similarity), replaces it, and leaves judgment to the
+    oracle. Single-file diffs only. Returns None on success, reason on failure.
+    """
+    import difflib
+
+    safety = validate_diff_paths(diff, tree_root=Path(tree))
+    if not safety.clean:
+        return f"{safety.category}: {safety.detail}"
+    parsed = _parse_single_file_diff(diff)
+    if parsed is None:
+        return "loose_apply: not a single-file diff"
+    rel_path, hunks = parsed
+    target = tree / rel_path
+    if not target.is_file():
+        return f"loose_apply: no such file {rel_path}"
+    lines = target.read_text(encoding="utf-8").splitlines()
+
+    for old, new in hunks:
+        if not old:
+            return "loose_apply: pure-insert hunk without anchor"
+        best_i, best_score = -1, 0.0
+        for i in range(0, max(1, len(lines) - len(old) + 1)):
+            window = lines[i:i + len(old)]
+            # autojunk=False: code is whitespace-heavy, and autojunk's
+            # popular-character heuristic collapses ratios on indentation.
+            score = difflib.SequenceMatcher(
+                None, "\n".join(window), "\n".join(old), autojunk=False
+            ).ratio()
+            if score > best_score:
+                best_i, best_score = i, score
+        # A one-line replacement has no context. Similar text is not an
+        # anchor: accepting VALUE=999 against VALUE=1 would silently apply a
+        # stale proposal to unrelated bytes.
+        if len(old) == 1 and (best_i < 0 or lines[best_i:best_i + 1] != old):
+            best_score = 0.0
+        # 0.85 floor: strong anchor required, but mis-anchored applies are not
+        # a scoring risk — the oracle, tamper digest, and win floor all sit
+        # downstream, so a wrongly-placed hunk just scores zero.
+        if best_score < 0.85:
+            # A short hunk may have drifted context but still carry one exact,
+            # unique change anchor. Derive the changed segment from old->new
+            # and accept it only when it occurs exactly once in the real file.
+            matcher = difflib.SequenceMatcher(None, old, new, autojunk=False)
+            changes = [opcode for opcode in matcher.get_opcodes() if opcode[0] != "equal"]
+            if len(changes) != 1:
+                return (
+                    "loose_apply: old-block not found "
+                    f"(best similarity {best_score:.2f} < 0.85)"
+                )
+            _, old_start, old_end, new_start, new_end = changes[0]
+            anchor = old[old_start:old_end]
+            replacement = new[new_start:new_end]
+            if not anchor:
+                return "loose_apply: pure-insert hunk without unique anchor"
+            matches = [
+                i for i in range(0, len(lines) - len(anchor) + 1)
+                if lines[i:i + len(anchor)] == anchor
+            ]
+            if len(matches) != 1:
+                return (
+                    "loose_apply: changed segment is not uniquely anchored "
+                    f"(matches={len(matches)})"
+                )
+            anchor_i = matches[0]
+            lines = lines[:anchor_i] + replacement + lines[anchor_i + len(anchor):]
+        else:
+            lines = lines[:best_i] + new + lines[best_i + len(old):]
+
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return None
+
+
+def canonicalize_diff(
+    pinned_root: Path,
+    evolve_file: str,
+    raw_diff: str,
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> str | None:
+    """Regenerate a proposal as a CANONICAL diff that will always re-apply.
+
+    Applies ``raw_diff`` (git -> patch-fuzz -> loose) to a temp copy of the
+    pinned tree, then emits ``diff -u`` of the evolve file with proper
+    ``a/ b/`` labels. Artifacts and receipts store only canonical diffs, so a
+    receipt's patch re-applies byte-for-byte for as long as the pin exists.
+    Returns None when the raw diff cannot be applied at all.
+    """
+    src = Path(pinned_root)
+    safety = validate_diff_paths(
+        raw_diff,
+        expected_path=evolve_file,
+        allowed_paths=[evolve_file],
+        tree_root=src,
+    )
+    if not safety.clean:
+        return None
+    work = Path(tempfile.mkdtemp(prefix="canon_"))
+    try:
+        shutil.rmtree(work)
+        shutil.copytree(src, work, ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv"))
+        if apply_diff(work, raw_diff, runner) is not None and loose_apply(work, raw_diff) is not None:
+            return None
+        proc = runner(
+            ["diff", "-u",
+             "--label", f"a/{evolve_file}", str(src / evolve_file),
+             "--label", f"b/{evolve_file}", str(work / evolve_file)],
+            capture_output=True, text=True, timeout=30,
+        )
+        out = getattr(proc, "stdout", "") or ""
+        # diff exits 1 when files differ (expected); 0 = no-op proposal.
+        if getattr(proc, "returncode", 2) not in (0, 1) or not out.strip():
+            return None
+        return out if out.endswith("\n") else out + "\n"
+    except (OSError, subprocess.SubprocessError):
+        return None
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def apply_diff(tree: Path, diff: str,
+               runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+               *, check_only: bool = False,
+               expected_path: str | None = None,
+               allowed_paths: list[str] | None = None) -> str | None:
+    """Apply a unified diff to ``tree``. Returns None on success, reason on failure.
+
+    Two appliers, strict first: ``git apply`` (exact context), then
+    ``patch --fuzz=3`` (tolerates the slightly-shifted line numbers LLM diffs
+    commonly carry — 74/78 candidates died at ring 1 in the first campaign,
+    largely as apply failures). Fuzz never changes WHAT is applied, only how
+    much surrounding drift is tolerated; the oracle still judges the result.
+    """
+    safety = validate_diff_paths(
+        diff,
+        expected_path=expected_path,
+        allowed_paths=allowed_paths,
+        tree_root=Path(tree),
+    )
+    if not safety.clean:
+        return f"{safety.category}: {safety.detail}"
+    with tempfile.NamedTemporaryFile("w", suffix=".patch", delete=False) as fh:
+        fh.write(diff if diff.endswith("\n") else diff + "\n")
+        patch_path = fh.name
+
+    def _run(cmd: list[str]) -> tuple[int, str]:
+        proc = runner(cmd, capture_output=True, text=True, timeout=30)
+        return (getattr(proc, "returncode", 1),
+                (getattr(proc, "stderr", "") or getattr(proc, "stdout", "") or "").strip()[:200])
+
+    try:
+        rc, err_git = _run(["git", "apply", "--check",
+                            "--directory", str(tree), patch_path])
+        if rc == 0:
+            if check_only:
+                return None
+            rc, err = _run(["git", "apply",
+                            "--directory", str(tree), patch_path])
+            return None if rc == 0 else f"apply failed: {err}"
+
+        # Fallback: fuzz-tolerant patch(1).
+        # Use short POSIX/BSD-compatible flags: macOS patch rejects or behaves
+        # differently with GNU long options (``--forward --fuzz --dry-run``).
+        rc, err_patch = _run(["patch", "-p1", "-N", "-F", "3", "-C",
+                              "-d", str(tree), "-i", patch_path])
+        if rc != 0:
+            # Interior context drift is beyond patch(1)'s edge-fuzz model. The
+            # bounded single-file loose applier is the final portable path; a
+            # check runs against a disposable copy and never mutates ``tree``.
+            if check_only:
+                probe = Path(tempfile.mkdtemp(prefix="foundry_apply_check_"))
+                try:
+                    shutil.rmtree(probe)
+                    shutil.copytree(tree, probe)
+                    loose_error = loose_apply(probe, diff)
+                finally:
+                    shutil.rmtree(probe, ignore_errors=True)
+            else:
+                loose_error = loose_apply(tree, diff)
+            if loose_error is None:
+                return None
+            return (
+                f"apply --check failed: {err_git} | patch fallback: {err_patch} | "
+                f"{loose_error}"
+            )
+        if check_only:
+            return None
+        rc, err = _run(["patch", "-p1", "-N", "-F", "3",
+                        "-d", str(tree), "-i", patch_path])
+        return None if rc == 0 else f"patch apply failed: {err}"
+    except (subprocess.SubprocessError, OSError) as exc:
+        return f"apply error: {type(exc).__name__}"
+    finally:
+        Path(patch_path).unlink(missing_ok=True)
+
+
+@dataclass
+class OracleEvaluator:
+    """Evaluator protocol implementation backed by the target's own oracle."""
+
+    evaluator_id: str
+    pinned_root: Path
+    oracle_cmd: list[str] | str
+    evolve_paths: list[str] = field(default_factory=list)
+    metric_parser: MetricParser = field(default_factory=sentinel_metrics_parser)
+    policy: IsolationPolicy = field(default_factory=IsolationPolicy)
+    scratch_root: Path | None = None
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run
+    docker_ok: bool | None = None
+
+    baseline: EvalMetrics | None = None
+    last_isolation_level: str = ""
+    last_promotion_allowed: bool = False
+    last_isolation_proof: IsolationProof | None = None
+    _oracle_digest_baseline: str = ""
+
+    def _scratch(self) -> Path:
+        root = Path(self.scratch_root) if self.scratch_root else Path(tempfile.gettempdir()) / "foundry_scratch"
+        root.mkdir(parents=True, exist_ok=True)
+        dest = Path(tempfile.mkdtemp(prefix="cand_", dir=root))
+        shutil.rmtree(dest)
+        shutil.copytree(self.pinned_root, dest,
+                        ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv"))
+        return dest
+
+    def _digest_excluding_evolve(self, tree: Path) -> str:
+        """Digest over everything OUTSIDE the evolve scope (the oracle+tests).
+
+        This is the tamper reference: these files must be byte-identical
+        before and after an oracle run, or the score cannot be trusted.
+        """
+        import hashlib
+
+        tree = Path(tree)
+        prefixes = [p.rstrip("*").rstrip("/") for p in (self.evolve_paths or [])]
+        entries: list[str] = []
+        for file in sorted(tree.rglob("*")):
+            if not file.is_file():
+                continue
+            rel = file.relative_to(tree).as_posix()
+            if any(part in {".git", "__pycache__", ".venv"} for part in file.relative_to(tree).parts):
+                continue
+            if any(rel == p or rel.startswith(p + "/") for p in prefixes):
+                continue  # evolve scope: the candidate is ALLOWED to differ here
+            entries.append(f"{rel}:{hashlib.sha256(file.read_bytes()).hexdigest()}")
+        return "sha256:" + hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
+
+    def _run_oracle(self, tree: Path) -> RunResult:
+        result = run_isolated(self.oracle_cmd, str(tree), self.policy,
+                              docker_ok=self.docker_ok, runner=self.runner)
+        self.last_isolation_level = result.isolation_level
+        self.last_isolation_proof = IsolationProof.from_result(result, self.policy)
+        self.last_promotion_allowed = promotion_allowed(result, self.policy)
+        return result
+
+    def prepare(self) -> None:
+        """Capture the clean-tree baseline; refuse a target that is already red."""
+        tree = self._scratch()
+        try:
+            pre_excl = self._digest_excluding_evolve(tree)
+            result = self._run_oracle(tree)
+            metrics = self.metric_parser(result)
+            if not metrics.correctness_passed:
+                raise RuntimeError(
+                    f"baseline oracle failed on clean tree ({metrics.notes}); "
+                    "target is broken or oracle_cmd is wrong — refusing to campaign"
+                )
+            self._oracle_digest_baseline = pre_excl
+            # A suite that writes into its own tree defeats the digest-based
+            # tamper gate; record it honestly so evaluate() knows detection is
+            # weakened and only prevention-mode (:ro) results may promote.
+            if self._digest_excluding_evolve(tree) != pre_excl:
+                metrics = EvalMetrics(
+                    metrics.primary_score, True, metrics.metrics,
+                    metrics.wall_clock_s,
+                    notes=(metrics.notes + " | oracle writes to its own tree; "
+                           "digest tamper-detection unavailable — require "
+                           "readonly_workdir for promotion").strip(" |"),
+                )
+            self.baseline = metrics
+        finally:
+            shutil.rmtree(tree, ignore_errors=True)
+
+    def evaluate(self, candidate: Candidate, *, seed: int) -> EvalMetrics:
+        tree = self._scratch()
+        try:
+            failure = apply_diff(
+                tree,
+                candidate.diff,
+                self.runner,
+                allowed_paths=self.evolve_paths or None,
+            )
+            if failure is not None:
+                category = failure.split(":", 1)[0]
+                if category not in {
+                    "unsafe_diff_path",
+                    "mismatched_diff_headers",
+                    "symlink_escape",
+                    "out_of_scope_diff",
+                    "malformed_diff",
+                    "extraction_failure",
+                    "no_op_diff",
+                }:
+                    category = "apply_failure"
+                return EvalMetrics(
+                    0.0,
+                    False,
+                    notes=f"apply_failed: {failure}",
+                    failure_category=category,
+                )
+
+            pre_excl = self._digest_excluding_evolve(tree)
+            result = self._run_oracle(tree)
+            metrics = self.metric_parser(result)
+
+            # Tamper gate: files outside the evolve scope must be byte-identical
+            # after the run. Prevention (:ro mount) makes this impossible by
+            # construction; detection (digest) zeroes the score after the fact.
+            baseline_writes = bool(self.baseline and "writes to its own tree" in (self.baseline.notes or ""))
+            if (not self.policy.readonly_workdir
+                    and not baseline_writes
+                    and self._digest_excluding_evolve(tree) != pre_excl):
+                return EvalMetrics(0.0, False, metrics=metrics.metrics,
+                                   notes="oracle_tampered: non-evolve files changed during run",
+                                   failure_category="oracle_tampered")
+
+            return EvalMetrics(
+                primary_score=metrics.primary_score,
+                correctness_passed=metrics.correctness_passed,
+                metrics={**metrics.metrics,
+                         "promotion_allowed": 1.0 if self.last_promotion_allowed else 0.0},
+                wall_clock_s=metrics.wall_clock_s,
+                notes=(metrics.notes + f" | isolation={self.last_isolation_level}").strip(" |"),
+                isolation_proof=self.last_isolation_proof,
+                failure_category=metrics.failure_category,
+            )
+        finally:
+            shutil.rmtree(tree, ignore_errors=True)

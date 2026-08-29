@@ -1,0 +1,76 @@
+{
+  "schema": "forge_lab.candidate_envelope_template.v1",
+  "content": {
+    "schema": "forge_lab.rsi_foundry_candidate.v1",
+    "candidate_id": "${CANDIDATE_ID}",
+    "revision": 1,
+    "predecessor_envelope_id": "",
+    "correlation_id": "REPLACE_WITH_CORRELATION_ID",
+    "idempotency_key": "REPLACE_WITH_IDEMPOTENCY_KEY",
+    "source_run_id": "REPLACE_WITH_RSI_RUN_ID",
+    "source_task_id": "REPLACE_WITH_RSI_TASK_ID",
+    "source_sha": "REPLACE_WITH_FULL_SOURCE_GIT_SHA",
+    "controller_sha": "REPLACE_WITH_FULL_CONTROLLER_GIT_SHA",
+    "harness_sha": "REPLACE_WITH_FULL_HARNESS_GIT_SHA",
+    "evaluator_sha": "REPLACE_WITH_FULL_SOURCE_EVALUATOR_GIT_SHA",
+    "target_sha": "REPLACE_WITH_FULL_FOUNDRY_TARGET_GIT_SHA",
+    "base_sha": "REPLACE_WITH_FULL_PATCH_BASE_GIT_SHA",
+    "digests": {
+      "patch": "REPLACE_WITH_PATCH_SHA256",
+      "dependencies": "REPLACE_WITH_DEPENDENCIES_SHA256",
+      "toolchain": "REPLACE_WITH_TOOLCHAIN_SHA256",
+      "artifact": "${CANDIDATE_EXPORT_SHA256}",
+      "configuration": "REPLACE_WITH_CONFIGURATION_SHA256"
+    },
+    "evidence": {
+      "provider_attestation": {
+        "schema": "REPLACE_WITH_PROVIDER_RECEIPT_SCHEMA",
+        "receipt_id": "REPLACE_WITH_PROVIDER_RECEIPT_ID",
+        "sha256": "REPLACE_WITH_PROVIDER_RECEIPT_SHA256",
+        "issuer": "REPLACE_WITH_PROVIDER_RECEIPT_ISSUER",
+        "created_at": "REPLACE_WITH_PROVIDER_RECEIPT_TIME"
+      },
+      "budget_receipt": {
+        "schema": "REPLACE_WITH_BUDGET_RECEIPT_SCHEMA",
+        "receipt_id": "REPLACE_WITH_BUDGET_RECEIPT_ID",
+        "sha256": "REPLACE_WITH_BUDGET_RECEIPT_SHA256",
+        "issuer": "REPLACE_WITH_BUDGET_RECEIPT_ISSUER",
+        "created_at": "REPLACE_WITH_BUDGET_RECEIPT_TIME"
+      },
+      "evaluation_receipt": {
+        "schema": "REPLACE_WITH_SOURCE_EVALUATION_SCHEMA",
+        "receipt_id": "REPLACE_WITH_SOURCE_EVALUATION_ID",
+        "sha256": "REPLACE_WITH_SOURCE_EVALUATION_SHA256",
+        "issuer": "REPLACE_WITH_SOURCE_EVALUATION_ISSUER",
+        "created_at": "REPLACE_WITH_SOURCE_EVALUATION_TIME"
+      },
+      "provenance_receipt": {
+        "schema": "REPLACE_WITH_PROVENANCE_SCHEMA",
+        "receipt_id": "REPLACE_WITH_PROVENANCE_ID",
+        "sha256": "REPLACE_WITH_PROVENANCE_SHA256",
+        "issuer": "REPLACE_WITH_PROVENANCE_ISSUER",
+        "created_at": "REPLACE_WITH_PROVENANCE_TIME"
+      }
+    },
+    "task_identity": "REPLACE_WITH_TASK_IDENTITY",
+    "holdout_identity": "REPLACE_WITH_HOLDOUT_IDENTITY",
+    "parent_lineage": ["REPLACE_WITH_PARENT_CANDIDATE_ID"],
+    "evaluation_outcome": "REPLACE_WITH_COMPARABLE_SOURCE_OUTCOME",
+    "evaluation_comparable": true,
+    "authority": {
+      "authority_id": "REPLACE_WITH_RSI_AUTHORITY_ID",
+      "lease_id": "REPLACE_WITH_RSI_LEASE_ID",
+      "lease_expires_at": "REPLACE_WITH_LEASE_EXPIRY_UTC"
+    },
+    "created_at": "REPLACE_WITH_CREATED_AT_UTC",
+    "expires_at": "REPLACE_WITH_CANDIDATE_EXPIRY_UTC",
+    "attempt": 1,
+    "fence": 1,
+    "terminal_disposition": {
+      "state": "submitted",
+      "reason_code": "submitted_for_foundry_shadow_evaluation",
+      "receipt_id": "REPLACE_WITH_SUBMISSION_RECEIPT_ID",
+      "at": "REPLACE_WITH_CREATED_AT_UTC"
+    }
+  }
+}

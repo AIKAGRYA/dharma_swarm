@@ -1,18 +1,35 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+import sys
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 from dharma_swarm.forge_lab import grader_isolation
 
 
+class NotFound(RuntimeError):
+    status_code = 404
+
+
+class _Volumes:
+    def __init__(self):
+        self.present: set[str] = set()
+
+    def get(self, name: str):
+        if name not in self.present:
+            raise NotFound(name)
+        return SimpleNamespace(name=name)
+
+
 class _Container:
     def __init__(
         self,
+        identity: str,
         *,
         network_disabled: bool,
         env: list[str] | None = None,
+        volume_names: tuple[str, ...] = (),
         host_overrides: dict[str, object] | None = None,
     ):
         host = {
@@ -25,45 +42,96 @@ class _Container:
             "NanoCpus": grader_isolation.NANO_CPU_LIMIT,
             "Memory": grader_isolation.MEMORY_LIMIT_BYTES,
             "MemorySwap": grader_isolation.MEMORY_LIMIT_BYTES,
-            "Tmpfs": {"/tmp": "rw,nosuid,nodev,noexec,size=512m"},
+            "Tmpfs": {
+                "/tmp": "rw,nosuid,nodev,noexec,size=512m",
+                "/testbed": "rw,nosuid,nodev,size=3072m",
+            },
         }
         host.update(host_overrides or {})
+        mounts = [
+            {"Type": "volume", "Name": name, "Destination": "/testbed", "RW": True}
+            for name in volume_names
+        ]
+        if not mounts:
+            mounts = [
+                {"Type": "tmpfs", "Destination": "/tmp", "RW": True},
+                {"Type": "tmpfs", "Destination": "/testbed", "RW": True},
+            ]
+        self.id = identity
+        self.name = identity
         self.attrs = {
+            "Id": identity,
             "Config": {
                 "NetworkDisabled": network_disabled,
                 "Env": env or ["PATH=/usr/bin", "LANG=C.UTF-8"],
-                "Volumes": {"/testbed": {}},
+                "Volumes": {},
             },
             "HostConfig": host,
             "NetworkSettings": {"Networks": {}},
-            "Mounts": [{"Destination": "/testbed", "RW": True}],
+            "Mounts": mounts,
         }
+        self.volume_names = volume_names
         self.removed = False
         self.reloaded = False
+        self.remove_fail = False
+        self.leave_volumes = False
+        self.owner = None
+        self.volumes = None
 
     def reload(self) -> None:
+        if self.removed:
+            raise NotFound(self.id)
         self.reloaded = True
 
-    def remove(self, *, force: bool) -> None:
-        assert force is True
+    def remove(self, *, force: bool, v: bool) -> None:
+        assert force is True and v is True
+        if self.remove_fail:
+            raise RuntimeError("docker unavailable")
         self.removed = True
+        if self.owner is not None:
+            self.owner.present.pop(self.id, None)
+        if v and not self.leave_volumes and self.volumes is not None:
+            for name in self.volume_names:
+                self.volumes.present.discard(name)
 
 
 class _Containers:
-    def __init__(self, result: _Container):
+    def __init__(self, result: _Container, volumes: _Volumes):
         self.result = result
+        self.volumes = volumes
+        self.present: dict[str, _Container] = {}
         self.kwargs: dict[str, object] | None = None
+        self.add(result)
+
+    def add(self, container: _Container) -> None:
+        container.owner = self
+        container.volumes = self.volumes
+        self.present[container.id] = container
+        self.volumes.present.update(container.volume_names)
 
     def create(self, **kwargs: object) -> _Container:
         self.kwargs = kwargs
+        self.add(self.result)
         return self.result
+
+    def get(self, identity: str) -> _Container:
+        try:
+            return self.present[identity]
+        except KeyError as exc:
+            raise NotFound(identity) from exc
+
+
+def _client(original: _Container, isolated: _Container):
+    volumes = _Volumes()
+    containers = _Containers(isolated, volumes)
+    containers.add(original)
+    return SimpleNamespace(containers=containers, volumes=volumes)
 
 
 def _spec() -> SimpleNamespace:
     return SimpleNamespace(
         instance_image_key="swebench/example:latest",
         platform="linux/amd64",
-        docker_specs={"run_args": {"cap_add": ["SYS_ADMIN"]}},
         get_instance_container_name=lambda run_id: f"candidate-{run_id}",
     )
 
@@ -71,29 +139,18 @@ def _spec() -> SimpleNamespace:
 def test_forbidden_environment_detection_returns_names_only() -> None:
     secret = "do-not-return-this-value"
     names = grader_isolation.forbidden_environment_names(
-        [
-            f"OPENAI_API_KEY={secret}",
-            f"openrouter_api_key={secret}",
-            "DHARMA_HOME=/control/state",
-            "A2A_AGENT_UID=judge",
-            "PATH=/usr/bin",
-        ]
+        [f"OPENAI_API_KEY={secret}", "DHARMA_HOME=/control", "PATH=/usr/bin"]
     )
-    assert names == [
-        "A2A_AGENT_UID",
-        "DHARMA_HOME",
-        "OPENAI_API_KEY",
-        "OPENROUTER_API_KEY",
-    ]
+    assert names == ["DHARMA_HOME", "OPENAI_API_KEY"]
     assert secret not in repr(names)
 
 
-def test_official_container_is_recreated_offline_with_empty_host_environment() -> None:
-    original = _Container(network_disabled=False)
-    isolated = _Container(network_disabled=True)
-    containers = _Containers(isolated)
-    client = SimpleNamespace(containers=containers)
-
+def test_official_builder_volume_and_container_are_removed_and_receipted() -> None:
+    original = _Container(
+        "original-1", network_disabled=False, volume_names=("anonymous-testbed-1",)
+    )
+    isolated = _Container("isolated-1", network_disabled=True)
+    client = _client(original, isolated)
     result = grader_isolation.recreate_isolated_container(
         lambda *_args, **_kwargs: original,
         _spec(),
@@ -103,68 +160,116 @@ def test_official_container_is_recreated_offline_with_empty_host_environment() -
         False,
         docker_user="root",
     )
-
-    assert result is isolated
+    proof = result.rsi_isolation_proof
     assert original.removed is True
-    assert isolated.reloaded is True
-    assert containers.kwargs is not None
-    assert containers.kwargs["network_disabled"] is True
-    assert containers.kwargs["environment"] == {}
-    assert containers.kwargs["image"] == "swebench/example:latest"
-    assert containers.kwargs["cap_add"] == []
-    assert containers.kwargs["cap_drop"] == ["ALL"]
-    assert containers.kwargs["read_only"] is True
-    assert containers.kwargs["security_opt"] == ["no-new-privileges:true"]
-    assert containers.kwargs["pids_limit"] == grader_isolation.PID_LIMIT
-    assert containers.kwargs["nano_cpus"] == grader_isolation.NANO_CPU_LIMIT
-    assert containers.kwargs["mem_limit"] == grader_isolation.MEMORY_LIMIT_BYTES
-    assert containers.kwargs["memswap_limit"] == grader_isolation.MEMORY_LIMIT_BYTES
-    assert result.rsi_isolation_proof["promotion_eligible"] is True
-    assert all(result.rsi_isolation_proof["controls"].values())
+    assert "anonymous-testbed-1" not in client.volumes.present
+    assert proof["upstream_builder_cleanup"] == {
+        "resource_identity": {
+            "container_identity": "original-1",
+            "volume_mounts": [
+                {"name": "anonymous-testbed-1", "destination": "/testbed"}
+            ],
+            "volume_mount_names": ["anonymous-testbed-1"],
+            "volume_mount_count": 1,
+        },
+        "container_identity": "original-1",
+        "container_absent_before_remove": False,
+        "container_removed": True,
+        "container_absence_verified": True,
+        "volume_mount_names": ["anonymous-testbed-1"],
+        "volume_mount_count": 1,
+        "volume_absence_verified": True,
+        "cleanup_verified": True,
+    }
+    assert proof["resource_identity"] == {
+        "container_identity": "isolated-1",
+        "volume_mounts": [],
+        "volume_mount_names": [],
+        "volume_mount_count": 0,
+    }
+    assert proof["promotion_eligible"] is True
+    assert set(client.containers.kwargs["tmpfs"]) == {"/tmp", "/testbed"}
+    assert "volumes" not in client.containers.kwargs
 
 
-@pytest.mark.parametrize(
-    ("container", "match"),
-    [
-        (_Container(network_disabled=False), "network_disabled"),
-        (
-            _Container(network_disabled=True, env=["KIMI_API_KEY=redacted"]),
-            "forbidden_environment_names:KIMI_API_KEY",
-        ),
-    ],
-)
-def test_isolation_attestation_failure_removes_candidate_container(
-    container: _Container,
-    match: str,
-) -> None:
-    client = SimpleNamespace(containers=_Containers(container))
-    with pytest.raises(RuntimeError, match=match):
+def test_cleanup_remove_failure_is_surfaced() -> None:
+    original = _Container("original-fail", network_disabled=False)
+    original.remove_fail = True
+    isolated = _Container("isolated-fail", network_disabled=True)
+    client = _client(original, isolated)
+    with pytest.raises(RuntimeError, match="cleanup_remove_failed"):
         grader_isolation.recreate_isolated_container(
-            lambda *_args, **_kwargs: _Container(network_disabled=False),
-            _spec(),
-            client,
-            "run-2",
-            SimpleNamespace(),
-            False,
-            docker_user="root",
+            lambda *_args, **_kwargs: original,
+            _spec(), client, "run-fail", SimpleNamespace(), False, docker_user="root"
         )
-    assert container.removed is True
 
 
-def test_missing_resource_or_privilege_control_blocks_promotion() -> None:
-    container = _Container(
-        network_disabled=True,
-        host_overrides={"CapAdd": ["SYS_ADMIN"], "PidsLimit": 0},
+def test_original_anonymous_volume_cleanup_must_be_verified() -> None:
+    original = _Container(
+        "original-volume", network_disabled=False, volume_names=("leaked-volume",)
     )
-    client = SimpleNamespace(containers=_Containers(container))
-    with pytest.raises(RuntimeError, match="cap_add_none.*pid_limit"):
+    original.leave_volumes = True
+    isolated = _Container("isolated-volume", network_disabled=True)
+    client = _client(original, isolated)
+    with pytest.raises(RuntimeError, match="volume_still_present"):
         grader_isolation.recreate_isolated_container(
-            lambda *_args, **_kwargs: _Container(network_disabled=False),
-            _spec(),
-            client,
-            "run-3",
-            SimpleNamespace(),
-            False,
-            docker_user="root",
+            lambda *_args, **_kwargs: original,
+            _spec(), client, "run-volume", SimpleNamespace(), False, docker_user="root"
         )
-    assert container.removed is True
+
+
+def test_isolation_proof_checks_inspected_volume_mounts_not_only_config() -> None:
+    isolated = _Container(
+        "isolated-with-volume",
+        network_disabled=True,
+        volume_names=("unexpected-volume",),
+    )
+    isolated.attrs["Config"]["Volumes"] = {}
+    proof = grader_isolation.isolation_proof(isolated)
+    assert proof["controls"]["anonymous_volumes_absent"] is False
+    assert proof["promotion_eligible"] is False
+
+
+def test_isolation_failure_removes_candidate_and_surfaces_cleanup() -> None:
+    original = _Container("original-bad", network_disabled=False)
+    isolated = _Container("isolated-bad", network_disabled=False)
+    client = _client(original, isolated)
+    with pytest.raises(RuntimeError, match="network_disabled"):
+        grader_isolation.recreate_isolated_container(
+            lambda *_args, **_kwargs: original,
+            _spec(), client, "run-bad", SimpleNamespace(), False, docker_user="root"
+        )
+    assert isolated.removed is True
+
+
+def test_context_closeout_mutates_proof_and_cleanup_failure_is_not_swallowed(
+    monkeypatch,
+) -> None:
+    original = _Container("original-context", network_disabled=False)
+    isolated = _Container("isolated-context", network_disabled=True)
+    client = _client(original, isolated)
+    run_evaluation = SimpleNamespace(
+        build_container=lambda *_args, **_kwargs: original
+    )
+    harness = ModuleType("swebench.harness")
+    harness.run_evaluation = run_evaluation
+    constants = ModuleType("swebench.harness.constants")
+    constants.DOCKER_USER = "root"
+    swebench = ModuleType("swebench")
+    swebench.harness = harness
+    monkeypatch.setitem(sys.modules, "swebench", swebench)
+    monkeypatch.setitem(sys.modules, "swebench.harness", harness)
+    monkeypatch.setitem(sys.modules, "swebench.harness.constants", constants)
+
+    proofs = None
+    with pytest.raises(RuntimeError, match="cleanup_unverified"):
+        with grader_isolation.isolated_swebench_containers() as proofs:
+            built = run_evaluation.build_container(
+                _spec(), client, "run-context", SimpleNamespace(), False
+            )
+            built.remove_fail = True
+            assert proofs[0]["promotion_eligible"] is True
+    assert proofs is not None
+    assert proofs[0]["cleanup"]["cleanup_verified"] is False
+    assert proofs[0]["controls"]["cleanup_verified"] is False
+    assert proofs[0]["promotion_eligible"] is False

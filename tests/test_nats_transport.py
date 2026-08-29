@@ -616,3 +616,209 @@ def _consume_metadata(
         "message_id": message_id,
         "operation_hash": operation,
     }
+
+
+def test_foundry_rsi_topology_acl_generator_matches_runtime_contract(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    from dharma_swarm.forge_lab.candidate_store import CandidateStore
+    from dharma_swarm.forge_lab.candidate_transport import (
+        CandidateJetStreamTransport,
+        ConnectionSecurity,
+    )
+
+    script = Path("scripts/forge_lab/nats-foundry-rsi-topology-v1")
+    public_keys = (
+        "UC7ACWTC5VF3V6NDGT3KH3LYODJ3Z45MG36JOEP6CBW22R6IZZ2WDU52",
+        "UDM3NS6Q66CDRMAW4DQ7VPWMCWYK6LMEJLYTMYWPFH2Y6A6A2VJIA42W",
+        "UBAFW3IITXG5LA47A2WCE6RP2HY2N3ZEBEXLKE2SF5EH7RNJTXFUYMRS",
+    )
+    command = [
+        sys.executable,
+        str(script),
+        "--provisioner-nkey", public_keys[0],
+        "--publisher-nkey", public_keys[1],
+        "--consumer-nkey", public_keys[2],
+        "--format", "json",
+    ]
+    generated = subprocess.run(command, check=True, text=True, capture_output=True)
+    manifest = json.loads(generated.stdout)
+    transport = CandidateJetStreamTransport(
+        trusted_source_public_keys=(),
+        terminal_store=CandidateStore(tmp_path / "unused.jsonl", experiment_id="template"),
+        lease_verifier=None,
+        jetstream=object(),
+        security=ConnectionSecurity(True, False, "loopback", "nkey-seed-file"),
+    )
+    runtime_topology = json.loads(json.dumps(transport.desired_topology()))
+
+    assert manifest["topology"] == runtime_topology
+    assert manifest["private_material"]["included"] is False
+    assert manifest["transport_security"] == {
+        "authentication_required": True,
+        "loopback_non_tls_allowed": True,
+        "loopback_endpoints": ["nats://127.0.0.1:4222", "nats://[::1]:4222"],
+        "remote_tls_required": True,
+    }
+    roles = {item["role"]: item for item in manifest["acl_users"]}
+    provisioner_publish = roles["topology_provisioner"]["permissions"]["publish"]
+    publisher_publish = roles["rsi_candidate_publisher"]["permissions"]["publish"]
+    consumer_publish = roles["foundry_candidate_consumer"]["permissions"]["publish"]
+    assert transport.config.subject not in provisioner_publish
+    assert f"$JS.API.STREAM.DELETE.{transport.config.stream_name}" in provisioner_publish
+    assert f"$JS.API.STREAM.DELETE.{transport.config.dlq_stream_name}" in provisioner_publish
+    assert (
+        f"$JS.API.CONSUMER.DELETE.{transport.config.stream_name}.{transport.config.consumer_name}"
+        in provisioner_publish
+    )
+    assert transport.config.subject in publisher_publish
+    assert not any(".CREATE." in subject for subject in publisher_publish)
+    assert transport.config.subject not in consumer_publish
+    assert transport.config.dlq_subject in consumer_publish
+    assert not any(".CREATE." in subject for subject in consumer_publish)
+
+
+@pytest.mark.parametrize("role", ("provisioner", "publisher", "consumer"))
+@pytest.mark.parametrize("unsafe_kind", ("symlink", "non_regular"))
+def test_foundry_rsi_renderer_seed_proof_rejects_unsafe_files(
+    tmp_path: Path, role: str, unsafe_kind: str,
+) -> None:
+    import runpy
+
+    functions = runpy.run_path("scripts/forge_lab/nats-foundry-rsi-render-config-v1")
+    target = tmp_path / f"{role}.nk"
+    target.write_text("fixture", encoding="utf-8")
+    target.chmod(0o600)
+    unsafe = tmp_path / f"{role}-unsafe"
+    if unsafe_kind == "symlink":
+        unsafe.symlink_to(target)
+    else:
+        unsafe.mkdir()
+    with pytest.raises(ValueError, match="single-link root-owned"):
+        functions["_seed_public"]("nats", unsafe, "U" + "A" * 55, role)
+
+
+
+def test_foundry_rsi_full_config_renderer_preserves_auth_and_exact_rollback(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+    import sys
+
+    if not shutil.which("nats-server"):
+        pytest.skip("nats-server is unavailable")
+    script = Path("scripts/forge_lab/nats-foundry-rsi-render-config-v1")
+    keys = (
+        "UC7ACWTC5VF3V6NDGT3KH3LYODJ3Z45MG36JOEP6CBW22R6IZZ2WDU52",
+        "UDM3NS6Q66CDRMAW4DQ7VPWMCWYK6LMEJLYTMYWPFH2Y6A6A2VJIA42W",
+        "UBAFW3IITXG5LA47A2WCE6RP2HY2N3ZEBEXLKE2SF5EH7RNJTXFUYMRS",
+    )
+    original = (
+        b"listen: 127.0.0.1:4222\n"
+        b"# bytes and legacy auth below must survive exactly\n"
+        b"authorization {\n"
+        b"  timeout: 2\n"
+        b"  users = [\n"
+        b"    { user: \"legacy-fixture\", password: \"fixture-only\" }\n"
+        b"  ]\n"
+        b"}\n"
+    )
+    base = tmp_path / "base.conf"
+    base.write_bytes(original)
+
+    def render(source: Path, output: Path, selected: tuple[str, str, str]) -> dict[str, object]:
+        result = subprocess.run(
+            [
+                sys.executable, str(script), "--base", str(source), "--output", str(output),
+                "--provisioner-nkey", selected[0], "--publisher-nkey", selected[1],
+                "--consumer-nkey", selected[2],
+            ],
+            check=True, text=True, capture_output=True,
+        )
+        return json.loads(result.stdout)
+
+    first = tmp_path / "first.conf"
+    first_receipt = render(base, first, keys)
+    assert first_receipt["existing_bytes_preserved_outside_managed_block"] is True
+    assert first_receipt["rollback_is_exact_pre_change_input"] is True
+    assert Path(str(first) + ".rollback").read_bytes() == original
+    assert first.stat().st_mode & 0o777 == 0o600
+    assert first.read_text().count("BEGIN MANAGED FOUNDRY_RSI_CANDIDATE_USERS_V1") == 1
+
+    idempotent = tmp_path / "idempotent.conf"
+    render(first, idempotent, keys)
+    assert idempotent.read_bytes() == first.read_bytes()
+    assert Path(str(idempotent) + ".rollback").read_bytes() == first.read_bytes()
+
+    rotated = tmp_path / "rotated.conf"
+    rotated_receipt = render(first, rotated, (keys[1], keys[2], keys[0]))
+    assert rotated_receipt["existing_bytes_preserved_outside_managed_block"] is True
+    assert rotated.read_bytes() != first.read_bytes()
+    assert Path(str(rotated) + ".rollback").read_bytes() == first.read_bytes()
+
+    removed = tmp_path / "removed.conf"
+    removed_result = subprocess.run(
+        [
+            sys.executable, str(script), "--base", str(rotated), "--output", str(removed),
+            "--remove-managed",
+        ],
+        check=True, text=True, capture_output=True,
+    )
+    assert json.loads(removed_result.stdout)["rollback_is_exact_pre_change_input"] is True
+    assert removed.read_bytes() == original
+    assert Path(str(removed) + ".rollback").read_bytes() == rotated.read_bytes()
+
+
+def test_foundry_rsi_full_config_disposable_auth_acl_proof(tmp_path: Path) -> None:
+    import os
+    import secrets
+    import shutil
+    import subprocess
+    import sys
+
+    nats_cli = shutil.which("nats")
+    server = shutil.which("nats-server")
+    if not nats_cli or not server:
+        pytest.skip("nats CLI or nats-server is unavailable")
+    seeds: list[Path] = []
+    public_keys: list[str] = []
+    for role in ("provisioner", "publisher", "consumer"):
+        seed = tmp_path / f"{role}.nk"
+        subprocess.run(
+            [nats_cli, "auth", "nkey", "gen", "user", "--output", str(seed)],
+            check=True, text=True, capture_output=True,
+        )
+        seed.chmod(0o600)
+        public = subprocess.run(
+            [nats_cli, "auth", "nkey", "show", str(seed)],
+            check=True, text=True, capture_output=True,
+        ).stdout.strip()
+        seeds.append(seed)
+        public_keys.append(public)
+    username = "legacy-fixture"
+    password = secrets.token_urlsafe(18)
+    base = tmp_path / "base.conf"
+    base.write_text(
+        "listen: 127.0.0.1:4222\nauthorization {\n  users = [\n"
+        f"    {{ user: {json.dumps(username)}, password: {json.dumps(password)} }}\n"
+        "  ]\n}\n",
+        encoding="utf-8",
+    )
+    env = {**os.environ, "TEST_LEGACY_NATS_USER": username, "TEST_LEGACY_NATS_PASSWORD": password}
+    result = subprocess.run(
+        [
+            sys.executable, "scripts/forge_lab/nats-foundry-rsi-render-config-v1",
+            "--base", str(base), "--output", str(tmp_path / "rendered.conf"),
+            "--provisioner-nkey", public_keys[0], "--publisher-nkey", public_keys[1],
+            "--consumer-nkey", public_keys[2], "--self-test",
+            "--existing-user-env", "TEST_LEGACY_NATS_USER",
+            "--existing-password-env", "TEST_LEGACY_NATS_PASSWORD",
+            "--provisioner-nkey-file", str(seeds[0]),
+            "--publisher-nkey-file", str(seeds[1]),
+            "--consumer-nkey-file", str(seeds[2]),
+        ],
+        env=env, text=True, capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    proof = json.loads(result.stdout)["disposable_auth_proof"]
+    assert proof and all(proof.values())

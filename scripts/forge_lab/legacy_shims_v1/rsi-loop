@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'rsi-loop is retired: unattended execution remains disabled; inspect `rsi doctor`.\n' >&2
+exit 64

@@ -1,0 +1,11 @@
+/root/rsi-lab/state/provider_refresh.log {
+    daily
+    rotate 14
+    size 8M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    su root root
+}

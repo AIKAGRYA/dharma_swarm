@@ -158,6 +158,7 @@ def prepare_release(
         "reused": reused,
         "verification": {**verified, "offline": offline},
     }
+    manifest["manifest_digest"] = "sha256:" + _sha256_bytes(_canonical_json(manifest))
     _atomic_json(release / "RELEASE_MANIFEST.json", manifest)
     return {
         "node": node,
@@ -318,6 +319,26 @@ def _install_wrappers(root: Path, release: Path, *, node: str) -> dict[str, str]
         / "scripts"
         / "forge_lab"
         / "rsi-unattended-explore",
+        "rsi-alert": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-alert",
+        "rsi-alert-v1": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-alert-v1",
+        "rsi-service-install-v1": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-service-install-v1",
+        "rsi-legacy-cutover-v1": release
+        / "repo"
+        / "scripts"
+        / "forge_lab"
+        / "rsi-legacy-cutover-v1",
     }
     if node != "meghadharma":
         targets["rsi-env"] = targets["rsi-lab-env"]
@@ -353,7 +374,9 @@ def _write_receipt(root: Path, payload: dict[str, Any]) -> Path:
         / "receipts"
         / f"{stamp}__{safe_request}__{payload['action']}__{nonce}.json"
     )
-    _atomic_json(path, payload)
+    stored = {**payload, "receipt_path": str(path)}
+    stored["receipt_digest"] = "sha256:" + _sha256_bytes(_canonical_json(stored))
+    _atomic_json(path, stored)
     return path
 
 
@@ -385,6 +408,13 @@ def activate_release(
         manifest.get("schema") != RELEASE_SCHEMA
         or manifest.get("plan_digest") != plan["plan_digest"]
         or embedded_plan != plan
+        or manifest.get("manifest_digest")
+        != "sha256:"
+        + _sha256_bytes(
+            _canonical_json(
+                {key: value for key, value in manifest.items() if key != "manifest_digest"}
+            )
+        )
     ):
         raise SyncError(
             "RELEASE_MANIFEST_MISMATCH", "release manifest does not match the plan"

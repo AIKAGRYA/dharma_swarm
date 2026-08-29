@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bin_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if (($# == 0)); then
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    exec "${bin_dir}/rsi" safety halt \
+        --operator-id legacy-stop-root \
+        --request-id "legacy-stop-${stamp}-$$" \
+        --reason "zero-argument legacy stop requested durable HALT"
+fi
+exec "${bin_dir}/rsi" safety halt "$@"

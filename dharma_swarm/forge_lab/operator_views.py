@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sqlite3
@@ -14,13 +15,19 @@ from dharma_swarm.forge_lab.campaign_control import list_campaigns
 from dharma_swarm.forge_lab.provider_selftest import validate_provider_receipt
 from dharma_swarm.forge_lab.source_guard import execution_source_status
 from dharma_swarm.forge_lab.state_io import (
+    content_digest,
     dharma_home,
     forge_state_root,
     provider_selftest_root,
     read_jsonl,
     safe_json,
+    validate_safe_id,
 )
 from dharma_swarm.forge_lab.version import PACKAGE_VERSION, source_commit
+from dharma_swarm.forge_lab.safety_control import halt_status
+from dharma_swarm.forge_lab.unattended_budget import budget_status
+from dharma_swarm.forge_lab.unattended_lease import lease_status
+from dharma_swarm.forge_lab.unattended_receipts import UnattendedError
 
 DOCTOR_SCHEMA = "rsi_lab.doctor.v1"
 RECONCILE_SCHEMA = "rsi_lab.reconciliation_report.v1"
@@ -62,10 +69,12 @@ def provider_readiness(*, ttl_seconds: int = 3600) -> dict[str, Any]:
     checked = _parse_time((payload or {}).get("checked_at"))
     age: float | None = None
     if checked is not None:
-        age = max(0.0, (datetime.now(timezone.utc) - checked).total_seconds())
+        observed_age = (datetime.now(timezone.utc) - checked).total_seconds()
+        age = observed_age if observed_age >= 0 else None
     routes = int((payload or {}).get("independent_route_count") or 0)
     live = bool((payload or {}).get("live"))
     callable_count = int((payload or {}).get("callable_count") or 0)
+    admission_count = int((payload or {}).get("admission_eligible_count") or 0)
     fresh = age is not None and age <= ttl_seconds
     ready = bool(
         payload
@@ -88,6 +97,8 @@ def provider_readiness(*, ttl_seconds: int = 3600) -> dict[str, Any]:
             reasons.append("latest_provider_receipt_not_live")
         if callable_count == 0:
             reasons.append("zero_callable_routes")
+        elif admission_count == 0:
+            reasons.append("zero_priced_budget_eligible_routes")
         if routes < 2:
             reasons.append(f"independent_routes:{routes}/2")
         if not fresh:
@@ -99,7 +110,9 @@ def provider_readiness(*, ttl_seconds: int = 3600) -> dict[str, Any]:
         "receipt": str(path) if path else None,
         "live": live,
         "callable_count": callable_count,
+        "admission_eligible_count": admission_count,
         "independent_route_count": routes,
+        "rows": list((payload or {}).get("rows") or []) if ready else [],
         "age_seconds": round(age, 3) if age is not None else None,
         "ttl_seconds": ttl_seconds,
         "reasons": reasons,
@@ -294,6 +307,8 @@ def taskbed_readiness() -> dict[str, Any]:
     path = dharma_home() / "forge_v1" / "taskbed.db"
     reasons: list[str] = []
     eligible_ids: list[str] = []
+    eligible_bindings: dict[str, dict[str, Any]] = {}
+    rejected: dict[str, int] = {}
     if path.is_symlink() or not path.is_file():
         reasons.append("anchored_taskbed_missing_or_unsafe")
     else:
@@ -302,7 +317,9 @@ def taskbed_readiness() -> dict[str, Any]:
             with sqlite3.connect(uri, uri=True, timeout=2) as connection:
                 rows = connection.execute(
                     """
-                    SELECT task.task_id FROM taskbed_tasks task
+                    SELECT task.task_id, task.task_json, task.provenance_json,
+                           task.source, task.taskbed
+                      FROM taskbed_tasks task
                      WHERE task.active=1
                        AND NOT EXISTS (
                          SELECT 1 FROM taskbed_allocations prior
@@ -314,9 +331,164 @@ def taskbed_readiness() -> dict[str, Any]:
                               task.task_id ASC
                     """
                 ).fetchall()
-                eligible_ids = [
-                    str(row[0]) for row in rows if not is_pr_suite_task_id(str(row[0]))
-                ]
+                for row in rows:
+                    task_id = str(row[0])
+                    if is_pr_suite_task_id(task_id):
+                        rejected["pr_suite_not_official_swebench"] = rejected.get(
+                            "pr_suite_not_official_swebench", 0
+                        ) + 1
+                        continue
+                    try:
+                        task = json.loads(str(row[1]))
+                        provenance = json.loads(str(row[2]))
+                    except (TypeError, json.JSONDecodeError):
+                        rejected["task_or_provenance_malformed"] = rejected.get(
+                            "task_or_provenance_malformed", 0
+                        ) + 1
+                        continue
+                    task_digest = str(task.get("task_digest") or "")
+                    unsigned_task = {
+                        key: value
+                        for key, value in task.items()
+                        if key not in {"task_digest", "provenance", "sealed_provenance"}
+                    }
+                    manifest_shaped_task = {
+                        key: value
+                        for key, value in task.items()
+                        if key not in {"provenance", "sealed_provenance"}
+                    }
+                    request_id = str(provenance.get("import_request_id") or "")
+                    try:
+                        request_id = validate_safe_id(request_id, field="import_request_id")
+                    except ValueError:
+                        request_id = ""
+                    receipt_path = (
+                        dharma_home()
+                        / "forge_lab"
+                        / "taskpacks"
+                        / "import_receipts"
+                        / f"{request_id}.json"
+                    )
+                    receipt = safe_json(receipt_path) if request_id else None
+                    receipt_unsigned = (
+                        {key: value for key, value in receipt.items() if key != "receipt_digest"}
+                        if receipt
+                        else {}
+                    )
+                    taskpack_binding = False
+                    try:
+                        from dharma_swarm.forge_lab.taskpack import (
+                            TaskpackError,
+                            _inspect_local_image,
+                            _revalidate_official_content,
+                            load_taskpack,
+                        )
+
+                        taskpack_digest = str(provenance.get("taskpack_digest") or "")
+                        manifest_path = (
+                            dharma_home()
+                            / "forge_lab"
+                            / "taskpacks"
+                            / taskpack_digest.removeprefix("sha256:")
+                            / "manifest.json"
+                        )
+                        manifest = load_taskpack(manifest_path)
+                        manifest_tasks = {
+                            str(item.get("instance_id") or ""): item
+                            for item in manifest["content"]["tasks"]
+                        }
+                        manifest_task = manifest_tasks.get(task_id)
+                        official_revalidation_digest = _revalidate_official_content(
+                            manifest["content"]
+                        )
+                        import_plan = {
+                            "schema": "rsi_lab.taskpack_import_plan.v1",
+                            "taskpack_digest": taskpack_digest,
+                            "manifest_path": str(manifest_path),
+                            "taskbed_db": str(path),
+                            "task_ids": [
+                                item["instance_id"]
+                                for item in manifest["content"]["tasks"]
+                            ],
+                            "registration_api": (
+                                "dharma_swarm.forge_v1.forge_v2.taskbed_ledger.register_task"
+                            ),
+                            "direct_sqlite_edits": False,
+                            "official_revalidation_digest": official_revalidation_digest,
+                        }
+                        registration = next(
+                            (
+                                item
+                                for item in (receipt or {}).get("registered", [])
+                                if isinstance(item, dict) and item.get("task_id") == task_id
+                            ),
+                            None,
+                        )
+                        current_image = _inspect_local_image(str(task.get("image_key") or ""))
+                        taskpack_binding = bool(
+                            manifest["taskpack_digest"] == taskpack_digest
+                            and manifest["manifest_path"] == str(manifest_path)
+                            and provenance.get("manifest_path") == str(manifest_path)
+                            and manifest["content"].get("official_eligible") is True
+                            and manifest_task == manifest_shaped_task
+                            and receipt
+                            and receipt.get("manifest_path") == str(manifest_path)
+                            and receipt.get("receipt_path") == str(receipt_path)
+                            and receipt.get("request_id") == request_id
+                            and receipt.get("plan_digest") == content_digest(import_plan)
+                            and receipt.get("taskbed_db") == str(path)
+                            and receipt.get("registration_api")
+                            == import_plan["registration_api"]
+                            and receipt.get("direct_sqlite_edits") is False
+                            and receipt.get("official_revalidation_digest")
+                            == official_revalidation_digest
+                            and registration
+                            and registration.get("task_digest") == task_digest
+                            and registration.get("stored_task_digest") == content_digest(task)
+                            and current_image.get("local_image_id") == task.get("local_image_id")
+                            and current_image.get("local_image_repo_digests")
+                            == task.get("local_image_repo_digests")
+                        )
+                    except (OSError, TaskpackError, TypeError, ValueError):
+                        taskpack_binding = False
+                    official = bool(
+                        row[3] == "official_swebench_verified_taskpack"
+                        and row[4] == "official_swebench_verified_shadow"
+                        and task.get("source_kind") == "official_swebench_verified"
+                        and task.get("official_harness_required") is True
+                        and task.get("candidate_network_disabled") is True
+                        and task.get("official_eligible") is True
+                        and str(task.get("image_key") or "").startswith("swebench/sweb.eval.")
+                        and task_digest == content_digest(unsigned_task)
+                        and provenance.get("task_digest") == task_digest
+                        and task.get("provenance") == provenance
+                        and task.get("sealed_provenance") == provenance
+                        and taskpack_binding
+                        and receipt
+                        and receipt.get("schema") == "rsi_lab.taskpack_import_receipt.v1"
+                        and receipt.get("taskpack_digest") == provenance.get("taskpack_digest")
+                        and receipt.get("receipt_digest") == content_digest(receipt_unsigned)
+                    )
+                    if official:
+                        eligible_ids.append(task_id)
+                        eligible_bindings[task_id] = {
+                            "task_id": task_id,
+                            "task_digest": task_digest,
+                            "taskpack_digest": provenance["taskpack_digest"],
+                            "official_source_row_digest": task[
+                                "official_source_row_digest"
+                            ],
+                            "image_key": task["image_key"],
+                            "local_image_id": task["local_image_id"],
+                            "local_image_repo_digests": task[
+                                "local_image_repo_digests"
+                            ],
+                            "base_commit": task["base_commit"],
+                        }
+                    else:
+                        rejected["official_taskpack_receipt_or_binding_invalid"] = rejected.get(
+                            "official_taskpack_receipt_or_binding_invalid", 0
+                        ) + 1
         except (OSError, sqlite3.Error, TypeError, ValueError):
             reasons.append("anchored_taskbed_unreadable_or_schema_invalid")
     if not reasons and not eligible_ids:
@@ -326,8 +498,65 @@ def taskbed_readiness() -> dict[str, Any]:
         "path": str(path),
         "eligible_explore_tasks": len(eligible_ids),
         "next_explore_task_id": eligible_ids[0] if eligible_ids else None,
+        "next_explore_task_binding": (
+            eligible_bindings[eligible_ids[0]] if eligible_ids else None
+        ),
         "required": 1,
         "read_only": True,
+        "eligibility_policy": "official_swebench_taskpack_receipt.v1",
+        "rejected_counts": rejected,
+        "reasons": reasons,
+    }
+
+
+def unattended_control_readiness() -> dict[str, Any]:
+    """Project HALT, fenced ownership, accounting, progress, and disk truth."""
+
+    root = forge_state_root()
+    control = root / "unattended_explore"
+    reasons: list[str] = []
+    try:
+        safety = halt_status(root)
+    except UnattendedError as exc:
+        safety = {"active": True, "error": exc.code}
+        reasons.append(f"halt_state_invalid:{exc.code}")
+    if safety.get("active"):
+        reasons.append("durable_HALT_active")
+    try:
+        lease = lease_status(control)
+    except UnattendedError as exc:
+        lease = {"ready": False, "active": False, "error": exc.code}
+        reasons.append(f"lease_invalid:{exc.code}")
+    if not lease.get("ready"):
+        reasons.append("lease_expired_or_invalid")
+    try:
+        budget = budget_status(control / "budget_ledger.jsonl")
+    except UnattendedError as exc:
+        budget = {"ready": False, "open_run_ids": [], "error": exc.code}
+        reasons.append(f"budget_invalid:{exc.code}")
+    open_runs = set(budget.get("open_run_ids") or [])
+    active_run = str(((lease.get("lease") or {}).get("run_id") or ""))
+    if open_runs and open_runs != ({active_run} if active_run else set()):
+        reasons.append("orphaned_budget_reservation")
+    state = Path(os.environ.get("RSI_LAB_STATE", str(dharma_home().parent))).expanduser()
+    try:
+        usage = shutil.disk_usage(state)
+        fraction = usage.free / usage.total if usage.total else 0.0
+        disk = {
+            "ready": usage.free >= 2 * 1024**3 and fraction >= 0.05,
+            "free_bytes": usage.free,
+            "free_fraction": round(fraction, 6),
+        }
+    except OSError as exc:
+        disk = {"ready": False, "error": f"{type(exc).__name__}:{exc}"[:500]}
+    if not disk["ready"]:
+        reasons.append("state_disk_floor_not_met")
+    return {
+        "ready": not reasons,
+        "halt": safety,
+        "lease": lease,
+        "budget": budget,
+        "disk": disk,
         "reasons": reasons,
     }
 
@@ -340,6 +569,7 @@ def doctor() -> dict[str, Any]:
         "grader": grader_readiness(),
         "taskbed": taskbed_readiness(),
         "legacy_controls": legacy_control_status(),
+        "unattended_control": unattended_control_readiness(),
     }
     return {
         "schema": DOCTOR_SCHEMA,
@@ -373,6 +603,9 @@ def reconcile() -> dict[str, Any]:
     legacy = legacy_control_status()
     for hazard in legacy["hazards"]:
         findings.append({"code": "LEGACY_CONTROL_DRIFT", "detail": hazard})
+    control = unattended_control_readiness()
+    for reason in control["reasons"]:
+        findings.append({"code": "UNATTENDED_CONTROL_DRIFT", "detail": reason})
     return {
         "schema": RECONCILE_SCHEMA,
         "ok": not findings,
@@ -452,4 +685,5 @@ __all__ = [
     "reconcile",
     "state_anchor_status",
     "taskbed_readiness",
+    "unattended_control_readiness",
 ]

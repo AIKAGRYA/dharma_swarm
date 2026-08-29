@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Prepare or publish one actual graded RSI candidate; never promote it."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import hashlib
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if (REPO_ROOT / "dharma_swarm").is_dir():
+    sys.path.insert(0, str(REPO_ROOT))
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from dharma_swarm.a2a.candidate_lease_receipt import SignedLeaseFileVerifier
+from dharma_swarm.a2a.candidate_transport_contract import secure_private_file, secure_public_file
+from dharma_swarm.forge_lab.candidate_envelope import (
+    CandidateEnvelope,
+    SignedCandidateEnvelope,
+    sign_candidate_envelope,
+)
+from dharma_swarm.forge_lab.candidate_store import CandidateStore
+from dharma_swarm.forge_lab.candidate_transport import (
+    CandidateJetStreamTransport,
+    CandidateTransportConfig,
+)
+from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
+
+TEMPLATE_SCHEMA = "forge_lab.candidate_envelope_template.v1"
+PREPARE_RECEIPT_SCHEMA = "forge_lab.candidate_prepare_operation.v1"
+PUBLISH_RECEIPT_SCHEMA = "forge_lab.candidate_publish_operation.v1"
+
+
+def _sha_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _atomic_write(path: Path, payload: bytes, *, replace: bool, mode: int = 0o644) -> None:
+    if path.exists() and not replace:
+        raise ValueError("output exists; pass --replace-output for an explicit rewrite")
+    if path.is_symlink():
+        raise ValueError("output path cannot be a symlink")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        os.fchmod(descriptor, mode)
+        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _private_signing_key(path: str) -> Ed25519PrivateKey:
+    safe = secure_private_file(path, "candidate signing key")
+    key = serialization.load_pem_private_key(safe.read_bytes(), password=None)
+    if not isinstance(key, Ed25519PrivateKey):
+        raise ValueError("candidate signing key must be an unencrypted Ed25519 PKCS8 PEM key")
+    return key
+
+
+def _public_key(key: Ed25519PrivateKey) -> str:
+    return key.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    ).hex()
+
+
+async def _export(args: argparse.Namespace) -> tuple[CandidateStore, dict[str, Any], str]:
+    archive = args.archive.resolve(strict=True)
+    before = _sha_file(archive)
+    store = CandidateStore(archive, experiment_id=args.experiment_id)
+    await store.load()
+    exported = await store.export_candidate(args.candidate_id)
+    if exported["candidate_id"] != args.candidate_id:
+        raise ValueError("candidate store export identity mismatch")
+    return store, exported, before
+
+
+async def _prepare(args: argparse.Namespace) -> dict[str, Any]:
+    _, exported, archive_before = await _export(args)
+    template_path = secure_public_file(str(args.envelope_template), "candidate envelope template")
+    template = json.loads(template_path.read_text(encoding="utf-8"))
+    if set(template) != {"schema", "content"} or template.get("schema") != TEMPLATE_SCHEMA:
+        raise ValueError("candidate envelope template schema or fields are invalid")
+    content = template.get("content")
+    if not isinstance(content, dict):
+        raise ValueError("candidate envelope template content is invalid")
+    if content.get("candidate_id") != "${CANDIDATE_ID}":
+        raise ValueError("candidate template must use the candidate identity placeholder")
+    digests = content.get("digests")
+    if not isinstance(digests, dict) or digests.get("artifact") != "${CANDIDATE_EXPORT_SHA256}":
+        raise ValueError("candidate template must bind the deterministic export placeholder")
+    detached = json.loads(json.dumps(content))
+    detached["candidate_id"] = exported["candidate_id"]
+    detached["digests"]["artifact"] = exported["record_sha256"]
+    envelope = CandidateEnvelope.from_content_dict(detached)
+    key = _private_signing_key(args.signing_key_file)
+    signed = sign_candidate_envelope(
+        envelope,
+        signing_key=key,
+        authority_epoch_sha256=args.authority_epoch_sha256,
+    )
+    encoded = (json.dumps(signed.to_dict(), sort_keys=True, indent=2) + "\n").encode()
+    _atomic_write(args.output.resolve(), encoded, replace=args.replace_output)
+    archive_after = _sha_file(args.archive.resolve(strict=True))
+    if archive_after != archive_before:
+        raise ValueError("candidate preparation detected a source archive mutation")
+    return {
+        "schema": PREPARE_RECEIPT_SCHEMA,
+        "action": "prepared_signed_candidate",
+        "candidate_id": envelope.candidate_id,
+        "envelope_id": envelope.envelope_id,
+        "candidate_export_sha256": exported["record_sha256"],
+        "signed_envelope_sha256": canonical_sha256(signed.to_dict()),
+        "source_public_key": _public_key(key),
+        "source_archive_sha256": archive_after,
+        "source_archive_unchanged": True,
+        "live_promotion_attempted": False,
+    }
+
+
+def _transport_config(args: argparse.Namespace) -> CandidateTransportConfig:
+    auth_count = sum(bool(value) for value in (args.nkey_file, args.credentials_path, args.username_env))
+    if auth_count != 1:
+        raise ValueError("publish requires exactly one runtime authentication method")
+    return CandidateTransportConfig(
+        endpoint=args.endpoint,
+        require_tls=args.remote_tls,
+        nkey_file=args.nkey_file or "",
+        nkey_public_key=args.nkey_public_key or "",
+        credentials_path=args.credentials_path or "",
+        username_env=args.username_env or "",
+        password_env=args.password_env or "",
+        tls_ca_path=args.tls_ca_path or "",
+    )
+
+
+async def _publish(args: argparse.Namespace) -> dict[str, Any]:
+    _, exported, archive_before = await _export(args)
+    signed_path = secure_public_file(str(args.signed_envelope), "signed candidate envelope")
+    signed = SignedCandidateEnvelope.from_dict(json.loads(signed_path.read_text(encoding="utf-8")))
+    if (
+        signed.envelope.candidate_id != exported["candidate_id"]
+        or signed.envelope.artifact_sha256 != exported["record_sha256"]
+        or not signed.verify(trusted_public_keys=args.source_public_key)
+    ):
+        raise ValueError("signed candidate does not bind the trusted deterministic store export")
+    verifier = SignedLeaseFileVerifier(
+        args.operator_lease_receipt,
+        trusted_public_keys=args.operator_lease_public_key,
+    )
+    store = CandidateStore(args.terminal_archive, experiment_id=args.terminal_experiment_id)
+    await store.load()
+    transport = CandidateJetStreamTransport(
+        trusted_source_public_keys=args.source_public_key,
+        terminal_store=store,
+        lease_verifier=verifier,
+        config=_transport_config(args),
+    )
+    try:
+        await transport.connect()
+        topology = await transport.ensure_topology()
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        ack = await transport.publish(signed, now=now)
+    finally:
+        await transport.close()
+    archive_after = _sha_file(args.archive.resolve(strict=True))
+    if archive_after != archive_before:
+        raise ValueError("candidate publication detected a source archive mutation")
+    return {
+        "schema": PUBLISH_RECEIPT_SCHEMA,
+        "action": "published_candidate",
+        "candidate_id": signed.envelope.candidate_id,
+        "envelope_id": ack.envelope_id,
+        "stream": ack.stream,
+        "stream_seq": ack.seq,
+        "duplicate": ack.duplicate,
+        "attempts": ack.attempts,
+        "transport_receipt_id": ack.receipt_id,
+        "topology_sha256": topology["topology_sha256"],
+        "source_archive_sha256": archive_after,
+        "source_archive_unchanged": True,
+        "live_promotion_attempted": False,
+    }
+
+
+def _common(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--experiment-id", required=True)
+    parser.add_argument("--candidate-id", required=True)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    prepare = subparsers.add_parser("prepare", help="export, bind, and sign one graded candidate")
+    _common(prepare)
+    prepare.add_argument("--envelope-template", type=Path, required=True)
+    prepare.add_argument("--signing-key-file", required=True)
+    prepare.add_argument("--authority-epoch-sha256", required=True)
+    prepare.add_argument("--output", type=Path, required=True)
+    prepare.add_argument("--replace-output", action="store_true")
+
+    publish = subparsers.add_parser("publish", help="verify and publish a prepared signed candidate")
+    _common(publish)
+    publish.add_argument("--signed-envelope", type=Path, required=True)
+    publish.add_argument("--source-public-key", action="append", required=True)
+    publish.add_argument("--operator-lease-receipt", type=Path, required=True)
+    publish.add_argument("--operator-lease-public-key", action="append", required=True)
+    publish.add_argument("--terminal-archive", type=Path, required=True)
+    publish.add_argument("--terminal-experiment-id", required=True)
+    publish.add_argument("--endpoint", required=True)
+    security = publish.add_mutually_exclusive_group(required=True)
+    security.add_argument("--loopback-authenticated-non-tls", action="store_true")
+    security.add_argument("--remote-tls", action="store_true")
+    publish.add_argument("--nkey-file")
+    publish.add_argument("--nkey-public-key")
+    publish.add_argument("--credentials-path")
+    publish.add_argument("--username-env")
+    publish.add_argument("--password-env")
+    publish.add_argument("--tls-ca-path")
+    return parser
+
+
+def main() -> int:
+    parser = _parser()
+    args = parser.parse_args()
+    try:
+        receipt = asyncio.run(_prepare(args) if args.command == "prepare" else _publish(args))
+    except Exception as exc:
+        parser.error(str(exc))
+    print(json.dumps(receipt, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

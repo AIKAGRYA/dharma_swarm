@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Check or create only absent v1 candidate topology with a provisioner NKey."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if (REPO_ROOT / "dharma_swarm").is_dir():
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.forge_lab.candidate_store import CandidateStore
+from dharma_swarm.forge_lab.candidate_transport import (
+    CandidateJetStreamTransport,
+    CandidateTransportConfig,
+)
+
+
+async def _run(args: argparse.Namespace) -> dict[str, object]:
+    config = CandidateTransportConfig(
+        endpoint=args.endpoint,
+        require_tls=args.remote_tls,
+        nkey_file=args.provisioner_nkey_file,
+        nkey_public_key=args.provisioner_public_nkey,
+        tls_ca_path=args.tls_ca_path or "",
+    )
+    with tempfile.TemporaryDirectory(prefix="foundry-rsi-topology-check-") as directory:
+        store = CandidateStore(Path(directory) / "unused.jsonl", experiment_id="topology-provision")
+        transport = CandidateJetStreamTransport(
+            trusted_source_public_keys=(),
+            terminal_store=store,
+            lease_verifier=None,
+            config=config,
+        )
+        try:
+            await transport.connect()
+            if args.rollback:
+                result = await transport.rollback_topology(
+                    receipt_path=args.operation_receipt,
+                    now=args.now,
+                )
+            elif args.create_missing:
+                result = await transport.provision_topology(
+                    receipt_path=args.operation_receipt,
+                    now=args.now,
+                )
+            else:
+                result = await transport.ensure_topology()
+        finally:
+            await transport.close()
+    return {
+        "schema": "forge_lab.nats_topology_provision_operation.v1",
+        "action": (
+            "rollback" if args.rollback else
+            "provision_or_reconcile" if args.create_missing else
+            "verified_exact_topology"
+        ),
+        "topology_sha256": result.get("topology_sha256", ""),
+        "operation_id": result.get("operation_id", ""),
+        "state": result.get("state", "verified"),
+        "created": result.get("created_resources", result.get("created", [])),
+        "removed": result.get("removed_resources", []),
+        "existing_topology_updated": False,
+        "drift_refusal_enabled": True,
+        "runtime_candidate_authority_used": False,
+        "live_promotion_attempted": False,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--endpoint", required=True)
+    security = parser.add_mutually_exclusive_group(required=True)
+    security.add_argument("--loopback-authenticated-non-tls", action="store_true")
+    security.add_argument("--remote-tls", action="store_true")
+    parser.add_argument("--tls-ca-path")
+    parser.add_argument("--provisioner-nkey-file", required=True)
+    parser.add_argument("--provisioner-public-nkey", required=True)
+    parser.add_argument(
+        "--operation-receipt",
+        type=Path,
+        help="private durable journal path; required for create/reconcile/rollback",
+    )
+    parser.add_argument("--now", help="explicit UTC operation timestamp")
+    parser.add_argument(
+        "--create-missing",
+        action="store_true",
+        help="create absent dedicated resources; existing drift is always refused",
+    )
+    parser.add_argument(
+        "--rollback",
+        action="store_true",
+        help="remove only exact resources proven created by the operation receipt",
+    )
+    args = parser.parse_args()
+    if args.create_missing and args.rollback:
+        parser.error("--create-missing and --rollback are mutually exclusive")
+    if (args.create_missing or args.rollback) and (not args.operation_receipt or not args.now):
+        parser.error("mutation requires --operation-receipt and --now")
+    try:
+        receipt = asyncio.run(_run(args))
+    except Exception as exc:
+        parser.error(str(exc))
+    print(json.dumps(receipt, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

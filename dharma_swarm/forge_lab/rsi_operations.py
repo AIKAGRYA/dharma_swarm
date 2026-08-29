@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 from dharma_swarm.forge_lab.campaign_control import (
@@ -97,18 +98,78 @@ def dispatch(args: argparse.Namespace) -> int | None:
         if command == "doctor":
             result = doctor()
             ok = bool(result.get("ok"))
+        elif command == "taskpack build":
+            from dharma_swarm.forge_lab.taskpack import build_taskpack
+
+            result = build_taskpack(
+                profile=args.profile,
+                source_manifest=Path(args.source_manifest) if args.source_manifest else None,
+                instance_ids=args.instances,
+                root=Path(args.taskpack_root) if args.taskpack_root else None,
+            )
+            ok = True
+        elif command == "taskpack import":
+            from dharma_swarm.forge_lab.taskpack import import_taskpack
+
+            result = import_taskpack(
+                args.taskpack,
+                request_id=args.request_id,
+                apply=args.apply,
+                db_path=Path(args.taskbed_db) if args.taskbed_db else None,
+                root=Path(args.taskpack_root) if args.taskpack_root else None,
+            )
+            ok = bool(result.get("ok"))
+        elif command == "safety status":
+            from dharma_swarm.forge_lab.safety_control import halt_status
+            from dharma_swarm.forge_lab.state_io import forge_state_root
+
+            result, ok = halt_status(forge_state_root()), True
+        elif command == "safety halt":
+            from dharma_swarm.forge_lab.safety_control import latch_halt
+            from dharma_swarm.forge_lab.state_io import forge_state_root, now_utc
+
+            result = latch_halt(
+                forge_state_root(),
+                at=now_utc(),
+                code=args.code,
+                reason=args.reason,
+                source="operator_cli",
+                operator_id=args.operator_id,
+                request_id=args.request_id,
+            )
+            ok = True
+        elif command == "safety resume":
+            from dharma_swarm.forge_lab.safety_control import resume_halt
+            from dharma_swarm.forge_lab.state_io import forge_state_root, now_utc
+
+            result = resume_halt(
+                forge_state_root(),
+                at=now_utc(),
+                operator_id=args.operator_id,
+                request_id=args.request_id,
+                reason=args.reason,
+                expected_halt_digest=args.expected_halt_digest,
+                signature_path=Path(args.signature),
+            )
+            ok = True
         elif command.startswith("campaign "):
             result, ok = _campaign(args)
         elif command == "reconcile":
             if args.apply:
-                return _error(
-                    command,
-                    "APPLY_NOT_IMPLEMENTED",
-                    "reconciliation is read-only until fenced repair actions exist",
-                    as_json=args.json,
-                )
-            result = reconcile()
-            ok = bool(result.get("ok"))
+                if not args.request_id:
+                    return _error(
+                        command,
+                        "REQUEST_ID_REQUIRED",
+                        "--request-id is required for receipted reconciliation",
+                        as_json=args.json,
+                    )
+                from dharma_swarm.forge_lab.unattended_reconcile import reconcile_abandoned_runs
+
+                result = reconcile_abandoned_runs(request_id=args.request_id)
+                ok = True
+            else:
+                result = reconcile()
+                ok = bool(result.get("ok"))
         elif command == "worker list":
             result, ok = list_workers(), True
         elif command == "alerts list":
@@ -121,6 +182,13 @@ def dispatch(args: argparse.Namespace) -> int | None:
         return _error(command, exc.code, str(exc), as_json=args.json)
     except ValueError as exc:
         return _error(command, "INVALID_ARGUMENT", str(exc), as_json=args.json)
+    except Exception as exc:
+        from dharma_swarm.forge_lab.taskpack import TaskpackError
+        from dharma_swarm.forge_lab.unattended_receipts import UnattendedError
+
+        if isinstance(exc, (TaskpackError, UnattendedError)):
+            return _error(command, exc.code, str(exc), as_json=args.json)
+        raise
 
     _emit(command, result, as_json=args.json, ok=ok)
     return 0 if ok else OPERATION_FAILURE_EXIT

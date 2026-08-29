@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+if [[ -d /root/rsi-lab/current ]]; then
+    logical_base="/root/rsi-lab/current"
+    state="/root/rsi-lab/state"
+else
+    logical_base="${HOME}/.dharma/rsi-lab/current"
+    state="${HOME}/.dharma/rsi-lab/state"
+fi
+base="$(cd -- "${logical_base}" && pwd -P)"
+repo="${base}/repo"
+python="${base}/.venv/bin/python"
+pydeps="${base}/pydeps"
+if [[ ! -x "${python}" || ! -d "${repo}/dharma_swarm/forge_lab" ]]; then
+    printf 'rsi-alert: immutable release runtime is incomplete\n' >&2
+    exit 9
+fi
+
+export PYTHONDONTWRITEBYTECODE=1
+export RSI_LAB_BASE="${base}"
+export RSI_LAB_REPO="${repo}"
+export RSI_LAB_STATE="${state}"
+export DHARMA_HOME="${state}/.dharma"
+export PYTHONPATH="${repo}:${pydeps}"
+cd "${repo}"
+exec "${python}" -m dharma_swarm.forge_lab.alert_control "$@"

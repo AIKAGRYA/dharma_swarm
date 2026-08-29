@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cat <<'EOF'
+RSI Lab canonical mobile-safe commands:
+  rsi doctor
+  rsi safety status
+  rsi-stop                 # safely latches HALT with a generated audit ID
+  rsi alerts list
+  rsi archive inspect
+
+Legacy rsi-run/rsi-loop/current-main instructions are retired. Live execution
+and service enablement remain disabled; use `rsi newrun` only for a reviewed,
+explicit governed command.
+EOF

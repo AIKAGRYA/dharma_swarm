@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# Install only the reviewed, versioned systemd/logrotate templates.  The
+# default is a read-only plan.  Apply never starts or enables any unit.
+apply=0
+request_id=""
+while (($#)); do
+    case "$1" in
+        --plan) apply=0 ;;
+        --apply) apply=1 ;;
+        --request-id)
+            shift
+            request_id="${1:-}"
+            ;;
+        *)
+            printf 'usage: rsi-service-install-v1 [--plan | --apply --request-id ID]\n' >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+if ((apply)) && [[ ! "${request_id}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$ ]]; then
+    printf 'rsi-service-install-v1: --apply requires a safe request ID\n' >&2
+    exit 2
+fi
+
+source_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
+script_dir="$(cd -- "$(dirname -- "${source_path}")" && pwd -P)"
+repo_root="$(cd -- "${script_dir}/../.." && pwd -P)"
+unit_dir="/etc/systemd/system"
+logrotate_dir="/etc/logrotate.d"
+if [[ -n "${RSI_LAB_SERVICE_INSTALL_TEST_ROOT:-}" ]]; then
+    if [[ "${RSI_LAB_DEV_SOURCE:-}" != "1" ]]; then
+        printf 'rsi-service-install-v1: test root requires RSI_LAB_DEV_SOURCE=1\n' >&2
+        exit 2
+    fi
+    unit_dir="${RSI_LAB_SERVICE_INSTALL_TEST_ROOT}/systemd"
+    logrotate_dir="${RSI_LAB_SERVICE_INSTALL_TEST_ROOT}/logrotate"
+fi
+
+names=(
+    rsi-lab-explore.service
+    rsi-lab-explore.timer
+    'rsi-lab-alert-v1@.service'
+)
+sources=(
+    "${repo_root}/scripts/forge_lab/systemd/rsi-lab-explore.service"
+    "${repo_root}/scripts/forge_lab/systemd/rsi-lab-explore.timer"
+    "${repo_root}/scripts/forge_lab/systemd/rsi-lab-alert-v1@.service"
+)
+targets=(
+    "${unit_dir}/rsi-lab-explore.service"
+    "${unit_dir}/rsi-lab-explore.timer"
+    "${unit_dir}/rsi-lab-alert-v1@.service"
+)
+for source in "${sources[@]}" "${repo_root}/scripts/forge_lab/logrotate/rsi-lab"; do
+    if [[ ! -f "${source}" || -L "${source}" ]]; then
+        printf 'rsi-service-install-v1: immutable template missing or unsafe: %s\n' "${source}" >&2
+        exit 3
+    fi
+done
+
+source_hashes=()
+for source in "${sources[@]}"; do
+    source_hashes+=("$(sha256sum -- "${source}" | awk '{print $1}')")
+done
+logrotate_source="${repo_root}/scripts/forge_lab/logrotate/rsi-lab"
+logrotate_target="${logrotate_dir}/rsi-lab"
+logrotate_hash="$(sha256sum -- "${logrotate_source}" | awk '{print $1}')"
+
+printf 'schema: rsi_lab.service_install_plan.v1\n'
+printf 'mode: %s\n' "$([[ ${apply} -eq 1 ]] && printf APPLY || printf PLAN_ONLY)"
+for index in "${!names[@]}"; do
+    status="missing"
+    if [[ -f "${targets[index]}" && ! -L "${targets[index]}" ]]; then
+        installed_hash="$(sha256sum -- "${targets[index]}" | awk '{print $1}')"
+        status="$([[ "${installed_hash}" == "${source_hashes[index]}" ]] && printf exact || printf drift)"
+    fi
+    printf 'template: %s sha256:%s installed=%s\n' \
+        "${names[index]}" "${source_hashes[index]}" "${status}"
+done
+logrotate_status="missing"
+if [[ -f "${logrotate_target}" && ! -L "${logrotate_target}" ]]; then
+    installed_hash="$(sha256sum -- "${logrotate_target}" | awk '{print $1}')"
+    logrotate_status="$([[ "${installed_hash}" == "${logrotate_hash}" ]] && printf exact || printf drift)"
+fi
+printf 'template: logrotate/rsi-lab sha256:%s installed=%s\n' \
+    "${logrotate_hash}" "${logrotate_status}"
+printf 'execution_scheduler: rsi-lab-explore.timer (exactly one)\n'
+printf 'provider_refresh_scheduler: versioned receipt-producing cron only (no experiment launch)\n'
+printf 'live_execution_enabled: false\n'
+
+if ((!apply)); then
+    exit 0
+fi
+if [[ -n "${RSI_LAB_SERVICE_INSTALL_TEST_ROOT:-}" ]]; then
+    systemctl_checked=false
+else
+    if [[ "$(id -u)" != "0" ]]; then
+        printf 'rsi-service-install-v1: --apply requires root\n' >&2
+        exit 4
+    fi
+    if [[ ! -x /root/rsi-lab/bin/rsi-alert-v1 ]]; then
+        printf 'rsi-service-install-v1: activated rsi-alert-v1 wrapper is missing\n' >&2
+        exit 4
+    fi
+    wrapper_source_hash="$(sha256sum -- "${repo_root}/scripts/forge_lab/rsi-alert-v1" | awk '{print $1}')"
+    wrapper_live_hash="$(sha256sum -- /root/rsi-lab/bin/rsi-alert-v1 | awk '{print $1}')"
+    if [[ "${wrapper_source_hash}" != "${wrapper_live_hash}" ]]; then
+        printf 'rsi-service-install-v1: activated rsi-alert-v1 wrapper hash drift\n' >&2
+        exit 4
+    fi
+    for unit in rsi-lab-explore.service rsi-lab-explore.timer; do
+        if systemctl is-active --quiet "${unit}"; then
+            printf 'rsi-service-install-v1: refusing active unit: %s\n' "${unit}" >&2
+            exit 4
+        fi
+        if systemctl is-enabled --quiet "${unit}"; then
+            printf 'rsi-service-install-v1: refusing enabled unit: %s\n' "${unit}" >&2
+            exit 4
+        fi
+    done
+    systemctl_checked=true
+fi
+
+if [[ -n "${RSI_LAB_STATE:-}" ]]; then
+    state="${RSI_LAB_STATE}"
+else
+    state="/root/rsi-lab/state"
+fi
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+receipt_dir="${state}/.dharma/forge_lab/maintenance/service_install_v1"
+backup_dir="${receipt_dir}/backups/${stamp}__${request_id}"
+mkdir -p -- "${unit_dir}" "${logrotate_dir}" "${backup_dir}"
+for index in "${!names[@]}"; do
+    if [[ -e "${targets[index]}" || -L "${targets[index]}" ]]; then
+        install -m 0600 -- "${targets[index]}" "${backup_dir}/${names[index]}"
+    fi
+    install -m 0644 -- "${sources[index]}" "${targets[index]}"
+done
+if [[ -e "${logrotate_target}" || -L "${logrotate_target}" ]]; then
+    install -m 0600 -- "${logrotate_target}" "${backup_dir}/logrotate-rsi-lab"
+fi
+install -m 0644 -- "${logrotate_source}" "${logrotate_target}"
+
+for index in "${!names[@]}"; do
+    installed_hash="$(sha256sum -- "${targets[index]}" | awk '{print $1}')"
+    if [[ "${installed_hash}" != "${source_hashes[index]}" ]]; then
+        printf 'rsi-service-install-v1: installed hash mismatch: %s\n' "${names[index]}" >&2
+        exit 5
+    fi
+done
+installed_logrotate_hash="$(sha256sum -- "${logrotate_target}" | awk '{print $1}')"
+if [[ "${installed_logrotate_hash}" != "${logrotate_hash}" ]]; then
+    printf 'rsi-service-install-v1: installed hash mismatch: logrotate/rsi-lab\n' >&2
+    exit 5
+fi
+if [[ "${systemctl_checked}" == true ]]; then
+    systemctl daemon-reload
+fi
+
+receipt="${receipt_dir}/${stamp}__${request_id}__service_install.json"
+if [[ -e "${receipt}" || -L "${receipt}" ]]; then
+    printf 'rsi-service-install-v1: receipt already exists\n' >&2
+    exit 6
+fi
+printf '{"schema":"rsi_lab.service_install_receipt.v1","request_id":"%s","explore_service_sha256":"%s","explore_timer_sha256":"%s","alert_unit_sha256":"%s","logrotate_sha256":"%s","systemctl_checked":%s,"units_enabled":false,"units_started":false,"provider_calls":false,"secret_values_recorded":false}\n' \
+    "${request_id}" "${source_hashes[0]}" "${source_hashes[1]}" \
+    "${source_hashes[2]}" "${logrotate_hash}" "${systemctl_checked}" >"${receipt}"
+printf 'result: APPLIED_DISABLED\nreceipt: %s\n' "${receipt}"

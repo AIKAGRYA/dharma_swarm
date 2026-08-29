@@ -1,0 +1,558 @@
+#!/usr/bin/env python3
+"""Render and validate a private full NATS config without touching /etc."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import socket
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import Any
+
+BEGIN = "# BEGIN MANAGED FOUNDRY_RSI_CANDIDATE_USERS_V1"
+END = "# END MANAGED FOUNDRY_RSI_CANDIDATE_USERS_V1"
+GENERATOR = Path(__file__).with_name("nats-foundry-rsi-topology-v1")
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _tokens(text: str) -> list[tuple[str, int, int]]:
+    tokens: list[tuple[str, int, int]] = []
+    index = 0
+    punctuation = "{}[]=:,"
+    while index < len(text):
+        char = text[index]
+        if char.isspace():
+            index += 1
+            continue
+        if char == "#" or text.startswith("//", index):
+            newline = text.find("\n", index)
+            index = len(text) if newline < 0 else newline + 1
+            continue
+        if char in "\"'`":
+            quote, start = char, index
+            index += 1
+            while index < len(text):
+                if text[index] == "\\" and quote != "`":
+                    index += 2
+                elif text[index] == quote:
+                    index += 1
+                    break
+                else:
+                    index += 1
+            tokens.append(("<string>", start, index))
+            continue
+        if char in punctuation:
+            tokens.append((char, index, index + 1))
+            index += 1
+            continue
+        start = index
+        while (
+            index < len(text)
+            and not text[index].isspace()
+            and text[index] not in punctuation + "#\"'`"
+            and not text.startswith("//", index)
+        ):
+            index += 1
+        tokens.append((text[start:index], start, index))
+    return tokens
+
+
+def _matching(tokens: list[tuple[str, int, int]], start: int, opening: str, closing: str) -> int:
+    depth = 0
+    for index in range(start, len(tokens)):
+        if tokens[index][0] == opening:
+            depth += 1
+        elif tokens[index][0] == closing:
+            depth -= 1
+            if depth == 0:
+                return index
+    raise ValueError(f"unclosed {opening} in NATS configuration")
+
+
+def _authorization_users(text: str) -> dict[str, int]:
+    tokens = _tokens(text)
+    matches: list[dict[str, int]] = []
+    for index, token in enumerate(tokens):
+        if token[0] != "authorization":
+            continue
+        brace = next((i for i in range(index + 1, len(tokens)) if tokens[i][0] == "{"), -1)
+        if brace < 0:
+            continue
+        brace_end = _matching(tokens, brace, "{", "}")
+        users: list[tuple[int, int]] = []
+        for candidate in range(brace + 1, brace_end):
+            if tokens[candidate][0] != "users":
+                continue
+            square = candidate + 1
+            while square < brace_end and tokens[square][0] in {"=", ":"}:
+                square += 1
+            if square < brace_end and tokens[square][0] == "[":
+                users.append((square, _matching(tokens, square, "[", "]")))
+        if len(users) != 1:
+            raise ValueError("authorization block must contain exactly one users array")
+        matches.append(
+            {
+                "auth_start": token[1],
+                "auth_end": tokens[brace_end][2],
+                "users_start": tokens[users[0][0]][2],
+                "users_end": tokens[users[0][1]][1],
+            }
+        )
+    if len(matches) != 1:
+        raise ValueError("configuration must contain exactly one authorization block")
+    return matches[0]
+
+
+def _managed_region(text: str) -> tuple[int, int] | None:
+    if text.count(BEGIN) != text.count(END):
+        raise ValueError("managed candidate-user markers are incomplete")
+    if text.count(BEGIN) > 1:
+        raise ValueError("multiple managed candidate-user blocks are forbidden")
+    if BEGIN not in text:
+        return None
+    begin = text.index(BEGIN)
+    start = text.rfind("\n", 0, begin) + 1
+    end_marker = text.index(END, begin) + len(END)
+    newline = text.find("\n", end_marker)
+    end = len(text) if newline < 0 else newline + 1
+    return start, end
+
+
+def _without_managed(text: str) -> str:
+    region = _managed_region(text)
+    if region is None:
+        return text
+    positions = _authorization_users(text)
+    if not (
+        positions["users_start"] <= region[0]
+        and region[1] <= positions["users_end"]
+    ):
+        raise ValueError("managed candidate-user block is outside authorization.users")
+    prefix = text[: region[0]]
+    begin_line_end = text.find("\n", region[0], region[1])
+    begin_line = text[region[0] : region[1] if begin_line_end < 0 else begin_line_end]
+    if "separator=comma" in begin_line:
+        cursor = len(prefix) - 2
+        while cursor >= 0 and prefix[cursor] in " \t":
+            cursor -= 1
+        if cursor < 0 or prefix[cursor] != ",":
+            raise ValueError("managed candidate-user separator marker is inconsistent")
+        prefix = prefix[:cursor] + prefix[cursor + 1 :]
+    elif "separator=none" not in begin_line:
+        raise ValueError("managed candidate-user separator marker is missing")
+    return prefix + text[region[1] :]
+
+
+def _manifest(provisioner: str, publisher: str, consumer: str) -> dict[str, Any]:
+    command = [
+        sys.executable, str(GENERATOR),
+        "--provisioner-nkey", provisioner,
+        "--publisher-nkey", publisher,
+        "--consumer-nkey", consumer,
+        "--format", "json",
+    ]
+    result = subprocess.run(command, check=True, text=True, capture_output=True)
+    return json.loads(result.stdout)
+
+
+def _managed_block(manifest: dict[str, Any], *, indent: str, comma: bool) -> str:
+    separator = "comma" if comma else "none"
+    lines = [f"{indent}{BEGIN} separator={separator}"]
+    for offset, user in enumerate(manifest["acl_users"]):
+        permissions = user["permissions"]
+        publish = ", ".join(json.dumps(item) for item in permissions["publish"])
+        subscribe = ", ".join(json.dumps(item) for item in permissions["subscribe"])
+        lines.extend(
+            [
+                f"{indent}# role: {user['role']}",
+                f"{indent}{{",
+                f"{indent}  nkey: {json.dumps(user['nkey'])}",
+                f"{indent}  permissions: {{",
+                f"{indent}    publish: {{ allow: [{publish}] }}",
+                f"{indent}    subscribe: {{ allow: [{subscribe}] }}",
+                f"{indent}  }}",
+                f"{indent}}}{',' if offset < len(manifest['acl_users']) - 1 else ''}",
+            ]
+        )
+    lines.append(f"{indent}{END}")
+    return "\n".join(lines) + "\n"
+
+
+def render(text: str, manifest: dict[str, Any] | None, *, remove: bool = False) -> str:
+    without = _without_managed(text)
+    if remove:
+        return without
+    if manifest is None:
+        raise ValueError("candidate user manifest is required")
+    positions = _authorization_users(without)
+    close = positions["users_end"]
+    line_start = without.rfind("\n", 0, close) + 1
+    indent = without[line_start:close]
+    if indent.strip():
+        raise ValueError("authorization.users closing bracket must be on its own line")
+    interior = without[positions["users_start"] : line_start]
+    significant = [token for token in _tokens(interior) if token[0] != ","]
+    trailing_comma = bool(_tokens(interior) and _tokens(interior)[-1][0] == ",")
+    comma = bool(significant and not trailing_comma)
+    block = _managed_block(manifest, indent=indent + "  ", comma=comma)
+    if comma:
+        if line_start < 1 or without[line_start - 1] != "\n":
+            raise ValueError("authorization.users requires a newline before its closing bracket")
+        return without[: line_start - 1] + ",\n" + block + without[line_start:]
+    return without[:line_start] + block + without[line_start:]
+
+
+def _write_private(path: Path, payload: bytes, *, replace: bool) -> None:
+    if path.exists() and not replace:
+        raise ValueError("output exists; pass --replace-output for a staged-file rewrite")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _validate(path: Path, server: str) -> None:
+    result = subprocess.run([server, "-t", "-c", str(path)], text=True, capture_output=True)
+    if result.returncode:
+        raise ValueError("nats-server rejected the complete staged configuration")
+
+
+def _seed_public(nats_cli: str, seed: Path, expected: str, role: str) -> None:
+    try:
+        before = seed.lstat()
+    except OSError as exc:
+        raise ValueError(f"{role} NKey seed is unavailable") from exc
+    if (
+        stat.S_ISLNK(before.st_mode)
+        or not stat.S_ISREG(before.st_mode)
+        or before.st_uid != 0
+        or before.st_nlink != 1
+        or before.st_mode & 0o077
+        or not before.st_mode & 0o400
+    ):
+        raise ValueError(
+            f"{role} NKey seed must be a single-link root-owned mode-0600 regular file"
+        )
+    descriptor = os.open(seed, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise ValueError(f"{role} NKey seed changed during identity proof")
+        shown = subprocess.run(
+            [nats_cli, "auth", "nkey", "show", f"/proc/self/fd/{descriptor}"],
+            check=True, text=True, capture_output=True, pass_fds=(descriptor,),
+        ).stdout.strip()
+    finally:
+        os.close(descriptor)
+    if shown != expected:
+        raise ValueError(f"{role} NKey seed does not match its configured public identity")
+
+
+def _nats_probe(
+    nats_cli: str,
+    env: dict[str, str],
+    arguments: list[str],
+    *,
+    allowed: bool,
+) -> str:
+    result = subprocess.run(
+        [nats_cli, "--no-context", "--timeout=1s", *arguments],
+        env=env, text=True, capture_output=True,
+    )
+    combined = (result.stdout + result.stderr).strip()
+    permission_denied = "permissions violation" in combined.lower()
+    if allowed and (result.returncode or permission_denied):
+        raise ValueError(f"disposable ACL positive probe failed: {' '.join(arguments[:2])}")
+    if not allowed and not permission_denied:
+        detail = combined.replace("\n", " ")[:240]
+        raise ValueError(
+            f"disposable ACL denial was not explicit: {' '.join(arguments[:2])}: {detail}"
+        )
+    return result.stdout
+
+
+def _jetstream_request(
+    nats_cli: str,
+    env: dict[str, str],
+    subject: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    output = _nats_probe(
+        nats_cli, env,
+        ["request", "--raw", subject, json.dumps(payload, separators=(",", ":"))],
+        allowed=True,
+    )
+    try:
+        response = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise ValueError("disposable JetStream proof returned non-JSON") from exc
+    if response.get("error"):
+        raise ValueError("disposable JetStream topology creation was refused")
+    return response
+
+
+def _raw_stream_config(config: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(config)
+    for field in ("max_age", "duplicate_window"):
+        payload[field] = int(float(payload[field]) * 1_000_000_000)
+    return payload
+
+
+def _raw_consumer_config(config: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(config)
+    payload["ack_wait"] = int(float(payload["ack_wait"]) * 1_000_000_000)
+    payload["backoff"] = [int(float(value) * 1_000_000_000) for value in payload["backoff"]]
+    return payload
+
+
+def _self_test(
+    rendered: str,
+    *,
+    server: str,
+    nats_cli: str,
+    existing_user_env: str,
+    existing_password_env: str,
+    manifest: dict[str, Any],
+    provisioner_nkey_file: Path,
+    publisher_nkey: str,
+    publisher_nkey_file: Path,
+    consumer_nkey_file: Path,
+) -> dict[str, bool]:
+    username = os.environ.get(existing_user_env, "")
+    password = os.environ.get(existing_password_env, "")
+    if not username or not password:
+        raise ValueError("existing-user self-test environment is incomplete")
+    users = {item["role"]: item for item in manifest["acl_users"]}
+    provisioner_nkey = users["topology_provisioner"]["nkey"]
+    consumer_nkey = users["foundry_candidate_consumer"]["nkey"]
+    _seed_public(nats_cli, provisioner_nkey_file, provisioner_nkey, "provisioner")
+    _seed_public(nats_cli, publisher_nkey_file, publisher_nkey, "publisher")
+    _seed_public(nats_cli, consumer_nkey_file, consumer_nkey, "consumer")
+    positions = _authorization_users(rendered)
+    auth = rendered[positions["auth_start"] : positions["auth_end"]]
+    with tempfile.TemporaryDirectory(prefix="foundry-rsi-nats-proof-") as directory:
+        root = Path(directory)
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = int(probe.getsockname()[1])
+        disposable = root / "nats.conf"
+        disposable.write_text(
+            f"listen: 127.0.0.1:{port}\njetstream {{ store_dir: {root / 'js'} }}\n{auth}\n",
+            encoding="utf-8",
+        )
+        _validate(disposable, server)
+        process = subprocess.Popen(
+            [server, "-c", str(disposable)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            for _ in range(60):
+                try:
+                    with socket.create_connection(("127.0.0.1", port), timeout=0.05):
+                        break
+                except OSError:
+                    if process.poll() is not None:
+                        raise ValueError("disposable NATS exited before authentication proof")
+                    time.sleep(0.05)
+            else:
+                raise ValueError("disposable NATS did not become ready")
+            clean_env = {
+                key: value for key, value in os.environ.items()
+                if key not in {"NATS_USER", "NATS_PASSWORD", "NATS_NKEY", "NATS_CREDS", "NATS_TOKEN"}
+            }
+            clean_env["NATS_URL"] = f"nats://127.0.0.1:{port}"
+            legacy_env = {**clean_env, "NATS_USER": username, "NATS_PASSWORD": password}
+            existing = subprocess.run(
+                [nats_cli, "--no-context", "--timeout=1s", "rtt", "1"],
+                env=legacy_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            ).returncode == 0
+            wrong_env = {**legacy_env, "NATS_PASSWORD": password + "-invalid"}
+            wrong_rejected = subprocess.run(
+                [nats_cli, "--no-context", "--timeout=1s", "rtt", "1"],
+                env=wrong_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            ).returncode != 0
+            if not (existing and wrong_rejected):
+                raise ValueError("disposable legacy authentication preservation proof failed")
+            provisioner_env = {**clean_env, "NATS_NKEY": str(provisioner_nkey_file)}
+            publisher_env = {**clean_env, "NATS_NKEY": str(publisher_nkey_file)}
+            consumer_env = {**clean_env, "NATS_NKEY": str(consumer_nkey_file)}
+            topology = manifest["topology"]
+            for name, config in topology["streams"].items():
+                _jetstream_request(
+                    nats_cli, provisioner_env, f"$JS.API.STREAM.CREATE.{name}",
+                    _raw_stream_config(config),
+                )
+            consumer = topology["consumer"]
+            _jetstream_request(
+                nats_cli, provisioner_env,
+                "$JS.API.CONSUMER.DURABLE.CREATE."
+                f"FOUNDRY_RSI_CANDIDATES_V1.{consumer['durable_name']}",
+                {
+                    "stream_name": "FOUNDRY_RSI_CANDIDATES_V1",
+                    "config": _raw_consumer_config(consumer),
+                },
+            )
+            _nats_probe(
+                nats_cli, provisioner_env,
+                ["publish", "--jetstream", "dharma.foundry_rsi.candidate.v1", "denied"],
+                allowed=False,
+            )
+            _nats_probe(
+                nats_cli, publisher_env,
+                ["publish", "--jetstream", "dharma.foundry_rsi.candidate.v1", "proof"],
+                allowed=True,
+            )
+            denied_create = "$JS.API.STREAM.CREATE.FOUNDRY_RSI_CANDIDATES_V1"
+            _nats_probe(nats_cli, publisher_env, ["request", denied_create, "{}"], allowed=False)
+            _nats_probe(
+                nats_cli, publisher_env,
+                ["publish", "--jetstream", "dharma.foundry_rsi.candidate.dlq.v1", "denied"],
+                allowed=False,
+            )
+            _nats_probe(
+                nats_cli, consumer_env,
+                ["consumer", "next", "--count=1", "--ack", "FOUNDRY_RSI_CANDIDATES_V1", consumer["durable_name"]],
+                allowed=True,
+            )
+            _nats_probe(
+                nats_cli, consumer_env,
+                ["publish", "--jetstream", "dharma.foundry_rsi.candidate.dlq.v1", "proof"],
+                allowed=True,
+            )
+            _nats_probe(
+                nats_cli, consumer_env,
+                ["publish", "--jetstream", "dharma.foundry_rsi.candidate.v1", "denied"],
+                allowed=False,
+            )
+            _nats_probe(nats_cli, consumer_env, ["request", denied_create, "{}"], allowed=False)
+            return {
+                "existing_user_authenticated": existing,
+                "wrong_password_rejected": wrong_rejected,
+                "provisioner_created_disposable_topology": True,
+                "provisioner_candidate_publish_denied": True,
+                "publisher_candidate_publish_allowed": True,
+                "publisher_topology_create_denied": True,
+                "publisher_dlq_publish_denied": True,
+                "consumer_durable_pull_ack_allowed": True,
+                "consumer_dlq_publish_allowed": True,
+                "consumer_candidate_publish_denied": True,
+                "consumer_topology_create_denied": True,
+            }
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--provisioner-nkey", default="")
+    parser.add_argument("--publisher-nkey", default="")
+    parser.add_argument("--consumer-nkey", default="")
+    parser.add_argument("--remove-managed", action="store_true")
+    parser.add_argument("--replace-output", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--existing-user-env", default="")
+    parser.add_argument("--existing-password-env", default="")
+    parser.add_argument("--provisioner-nkey-file", type=Path)
+    parser.add_argument("--publisher-nkey-file", type=Path)
+    parser.add_argument("--consumer-nkey-file", type=Path)
+    parser.add_argument("--rollback-output", type=Path)
+    args = parser.parse_args(argv)
+    try:
+        base = args.base.resolve(strict=True)
+        output = args.output.resolve(strict=False)
+        rollback_output = (
+            args.rollback_output.resolve(strict=False)
+            if args.rollback_output else Path(str(output) + ".rollback")
+        )
+        staged_paths = (output, rollback_output)
+        if (
+            base in staged_paths or output == rollback_output
+            or any(path == Path("/etc") or Path("/etc") in path.parents for path in staged_paths)
+        ):
+            raise ValueError("renderer refuses in-place or /etc output; stage a private full config")
+        original = base.read_bytes()
+        text = original.decode("utf-8")
+        manifest = None if args.remove_managed else _manifest(
+            args.provisioner_nkey, args.publisher_nkey, args.consumer_nkey,
+        )
+        rendered = render(text, manifest, remove=args.remove_managed)
+        original_outside = render(text, None, remove=True).encode()
+        rendered_outside = render(rendered, None, remove=True).encode()
+        preserved = original_outside == rendered_outside
+        if not preserved:
+            raise ValueError("renderer changed bytes outside the managed candidate-user block")
+        _write_private(rollback_output, original, replace=args.replace_output)
+        _write_private(output, rendered.encode(), replace=args.replace_output)
+        server = shutil.which("nats-server")
+        if not server:
+            raise ValueError("nats-server is required for complete-config validation")
+        _validate(output, server)
+        proof: dict[str, bool] = {}
+        if args.self_test:
+            nats_cli = shutil.which("nats")
+            seeds = (
+                args.provisioner_nkey_file,
+                args.publisher_nkey_file,
+                args.consumer_nkey_file,
+            )
+            if not nats_cli or not manifest or not all(seeds):
+                raise ValueError("self-test requires nats CLI, all three public keys, and all three seed files")
+            proof = _self_test(
+                rendered, server=server, nats_cli=nats_cli,
+                existing_user_env=args.existing_user_env,
+                existing_password_env=args.existing_password_env,
+                manifest=manifest,
+                provisioner_nkey_file=args.provisioner_nkey_file,
+                publisher_nkey=args.publisher_nkey,
+                publisher_nkey_file=args.publisher_nkey_file,
+                consumer_nkey_file=args.consumer_nkey_file,
+            )
+        receipt = {
+            "schema": "forge_lab.nats_full_config_render.v1",
+            "base_sha256": _sha(original),
+            "rendered_sha256": _sha(rendered.encode()),
+            "managed_manifest_sha256": manifest.get("manifest_sha256", "") if manifest else "",
+            "complete_config_valid": True,
+            "output_mode": oct(output.stat().st_mode & 0o777),
+            "output": str(output),
+            "rollback_output": str(rollback_output),
+            "rollback_sha256": _sha(rollback_output.read_bytes()),
+            "rollback_is_exact_pre_change_input": rollback_output.read_bytes() == original,
+            "existing_bytes_preserved_outside_managed_block": preserved,
+            "disposable_auth_proof": proof,
+            "live_config_mutated": False,
+        }
+        print(json.dumps(receipt, sort_keys=True))
+        return 0
+    except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as exc:
+        parser.error(str(exc))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

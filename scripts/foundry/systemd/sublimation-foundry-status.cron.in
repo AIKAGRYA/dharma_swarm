@@ -1,0 +1,1 @@
+*/15 * * * * root . /etc/dharma-foundry/status.env && "$FOUNDRY_PYTHON" -B /usr/local/bin/sublimation-foundry-status-job.py

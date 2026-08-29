@@ -1,0 +1,22 @@
+[Unit]
+Description=Persist versioned RSI Lab v1 failure alert for %i
+Documentation=file:/root/rsi-lab/current/repo/docs/ops/FORGE_LAB_V0_1_RUNBOOK.md
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/root/rsi-lab/bin/rsi-alert-v1 --unit %i --result failure
+TimeoutStartSec=30
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/rsi-lab/state
+ReadOnlyPaths=/root/rsi-lab/current
+PrivateTmp=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+MemoryMax=128M
+TasksMax=32
+LimitFSIZE=8M

@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
+import ipaddress
 from typing import Any, Protocol
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from dharma_swarm.a2a.a2a_server import (
@@ -34,6 +36,53 @@ class NatsWireMessageLike(Protocol):
 NATS_ENVELOPE_SCHEMA = "dharma.nats.envelope.v1"
 A2A_TASK_PAYLOAD_SCHEMA = "dharma.a2a.nats_task.v1"
 DLQ_PAYLOAD_SCHEMA = "dharma.nats.dlq_failure.v1"
+
+_NATS_DURATION_FIELDS = {
+    "max_age",
+    "duplicate_window",
+    "ack_wait",
+    "inactive_threshold",
+    "idle_heartbeat",
+}
+
+
+def _nats_endpoint_is_loopback(endpoint: str) -> bool:
+    """True only for literal loopback IPs or the exact localhost hostname."""
+
+    try:
+        host = urlparse(endpoint).hostname
+        if host == "localhost":
+            return True
+        return bool(host and ipaddress.ip_address(host).is_loopback)
+    except ValueError:
+        return False
+
+
+def _nats_endpoint_uses_tls(endpoint: str) -> bool:
+    return urlparse(endpoint).scheme.lower() in {"tls", "wss"}
+
+
+def _normalize_nats_topology_value(field: str, value: Any, expected: Any) -> Any:
+    """Normalize nats.py enums and raw nanoseconds, preserving real drift."""
+
+    value = getattr(value, "value", value)
+    if value is None:
+        return None
+    if field == "backoff":
+        return tuple(
+            _normalize_nats_topology_value("ack_wait", item, 1.0)
+            for item in value
+        )
+    if isinstance(expected, tuple) and isinstance(value, (list, tuple)):
+        return tuple(getattr(item, "value", item) for item in value)
+    if field in _NATS_DURATION_FIELDS and isinstance(value, (int, float)):
+        # Raw JetStream API responses encode durations as nanoseconds. nats.py
+        # model instances expose seconds. Only the raw-scale representation is
+        # converted; None and all non-duration defaults remain visible drift.
+        if abs(float(value)) >= 1_000_000_000 and abs(float(expected or 0)) < 100_000_000:
+            return float(value) / 1_000_000_000
+        return float(value)
+    return value
 
 
 def _task_to_wire(task: A2ATask, identity: ExecutionIdentity, *, subject: str) -> dict[str, Any]:

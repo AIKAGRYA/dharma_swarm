@@ -1,0 +1,540 @@
+#!/usr/bin/env python3
+"""Pull, fence, independently evaluate, and terminalize at most one candidate."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import math
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if (REPO_ROOT / "dharma_swarm").is_dir():
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.a2a.candidate_lease import lease_instant
+from dharma_swarm.a2a.candidate_lease_receipt import SignedLeaseFileVerifier
+from dharma_swarm.a2a.candidate_evaluator_deployment import (
+    SignedEvaluatorDeployment,
+)
+from dharma_swarm.a2a.candidate_transport_contract import secure_public_file
+from dharma_swarm.forge_lab.candidate_envelope import SignedCandidateEnvelope, TerminalDisposition, TerminalState
+from dharma_swarm.forge_lab.candidate_store import CandidateStore
+from dharma_swarm.forge_lab.candidate_transport import (
+    CandidateHandlingResult,
+    CandidateJetStreamTransport,
+    CandidateTransportConfig,
+)
+from dharma_swarm.forge_lab.promotion_controller import SignedIndependentEvaluation
+from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
+
+CONSUME_RECEIPT_SCHEMA = "forge_lab.candidate_consume_operation.v1"
+_GIT_SHA = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _atomic_receipt(path: Path, payload: bytes) -> None:
+    if path.is_symlink():
+        raise ValueError("evaluation receipt path cannot be a symlink")
+    if path.exists():
+        if path.read_bytes() != payload:
+            raise ValueError("a conflicting evaluation receipt already exists")
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        os.fchmod(descriptor, 0o644)
+        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _signer(receipt: Mapping[str, Any]) -> str:
+    signature = receipt.get("signature")
+    return str(signature.get("public_key") if isinstance(signature, Mapping) else "").lower()
+
+
+def _sha_file(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _reject_symlinked_components(path: Path, field: str) -> None:
+    if not path.is_absolute():
+        raise ValueError(f"{field} must be absolute")
+    current = Path(path.anchor)
+    for component in path.parts[1:]:
+        current /= component
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise ValueError(f"{field} is unavailable") from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ValueError(f"{field} cannot traverse a symlink")
+
+
+def _release_tree_sha256(root: Path) -> str:
+    """Hash an immutable, symlink-free offline evaluator release tree."""
+
+    _reject_symlinked_components(root, "evaluator release root")
+    try:
+        metadata = root.lstat()
+    except OSError as exc:
+        raise ValueError("evaluator release root is unavailable") from exc
+    if (
+        stat.S_ISLNK(metadata.st_mode)
+        or not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid not in {0, os.geteuid()}
+        or metadata.st_mode & 0o022
+    ):
+        raise ValueError("evaluator release root must be an owned immutable directory")
+    records: list[dict[str, Any]] = []
+    total_bytes = 0
+    for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
+        item = path.lstat()
+        relative = path.relative_to(root).as_posix()
+        if (
+            stat.S_ISLNK(item.st_mode)
+            or item.st_uid not in {0, os.geteuid()}
+            or item.st_mode & 0o022
+        ):
+            raise ValueError(f"evaluator release contains an unsafe entry: {relative}")
+        if stat.S_ISDIR(item.st_mode):
+            records.append({"path": relative + "/", "mode": stat.S_IMODE(item.st_mode)})
+            continue
+        if not stat.S_ISREG(item.st_mode) or item.st_nlink != 1:
+            raise ValueError(f"evaluator release contains a non-regular entry: {relative}")
+        total_bytes += item.st_size
+        if len(records) >= 10_000 or total_bytes > 512 * 1024 * 1024:
+            raise ValueError("evaluator release exceeds the bounded tree-hash policy")
+        records.append({
+            "path": relative,
+            "mode": stat.S_IMODE(item.st_mode),
+            "size": item.st_size,
+            "sha256": _sha_file(path),
+        })
+    return canonical_sha256({"schema": "forge_lab.offline_evaluator_release_tree.v1", "entries": records})
+
+
+def _verify_evaluator_release(
+    executable: Path,
+    release_root: Path,
+    *,
+    expected_executable_sha256: str,
+    expected_tree_sha256: str,
+) -> tuple[Path, str, str]:
+    if not executable.is_absolute() or not release_root.is_absolute():
+        raise ValueError("evaluator executable and release root must be absolute paths")
+    if not _SHA256.fullmatch(expected_executable_sha256 or ""):
+        raise ValueError("expected evaluator executable SHA-256 is invalid")
+    if not _SHA256.fullmatch(expected_tree_sha256 or ""):
+        raise ValueError("expected evaluator release-tree SHA-256 is invalid")
+    _reject_symlinked_components(release_root, "evaluator release root")
+    _reject_symlinked_components(executable, "Foundry evaluator executable")
+    root = release_root.absolute()
+    safe = secure_public_file(str(executable), "Foundry evaluator executable").absolute()
+    try:
+        safe.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("Foundry evaluator executable is outside the immutable release") from exc
+    if not os.access(safe, os.X_OK):
+        raise ValueError("Foundry evaluator executable must be an absolute executable file")
+    executable_sha256 = _sha_file(safe)
+    tree_sha256 = _release_tree_sha256(root)
+    if executable_sha256 != expected_executable_sha256:
+        raise ValueError("Foundry evaluator executable digest drifted")
+    if tree_sha256 != expected_tree_sha256:
+        raise ValueError("Foundry evaluator release-tree digest drifted")
+    return safe, executable_sha256, tree_sha256
+
+
+def _validate_evaluation(
+    signed: SignedIndependentEvaluation,
+    envelope: SignedCandidateEnvelope,
+    *,
+    trusted_evaluator_keys: list[str],
+    expected_evaluator_id: str,
+    expected_evaluator_sha: str,
+    expected_executable_sha256: str,
+    expected_tree_sha256: str,
+    as_of: str,
+) -> None:
+    item = signed.evaluation
+    candidate = envelope.envelope
+    if not signed.verify(trusted_public_keys=trusted_evaluator_keys):
+        raise ValueError("Foundry evaluator signature is untrusted or invalid")
+    if (
+        item.envelope_id != candidate.envelope_id
+        or item.candidate_id != candidate.candidate_id
+        or item.evaluator_id != expected_evaluator_id
+        or item.target_sha != candidate.target_sha
+        or item.evaluator_sha != expected_evaluator_sha
+        or item.evaluator_executable_sha256 != expected_executable_sha256
+        or item.evaluator_release_tree_sha256 != expected_tree_sha256
+        or item.evaluator_id == candidate.authority_id
+        or _signer(signed.signature_receipt) == _signer(envelope.signature_receipt)
+    ):
+        raise ValueError("Foundry evaluation identity or target binding is invalid")
+    evaluated_at = lease_instant(item.created_at, "evaluation.created_at")
+    if not (
+        lease_instant(candidate.created_at, "candidate.created_at")
+        <= evaluated_at
+        <= lease_instant(as_of, "as_of")
+        and evaluated_at < lease_instant(candidate.expires_at, "candidate.expires_at")
+    ):
+        raise ValueError("Foundry evaluation time is outside the candidate lifetime")
+    for receipt in (item.isolation_receipt, item.evidence_receipt):
+        if not (
+            lease_instant(candidate.created_at, "candidate.created_at")
+            <= lease_instant(receipt.created_at, "evidence.created_at")
+            <= evaluated_at
+        ):
+            raise ValueError("Foundry evaluation evidence time binding is invalid")
+
+
+def _load_evaluator_deployment(
+    path: Path,
+    *,
+    trusted_public_keys: list[str],
+) -> SignedEvaluatorDeployment:
+    _reject_symlinked_components(path, "evaluator deployment manifest")
+    safe = secure_public_file(str(path), "evaluator deployment manifest")
+    if safe.stat().st_size > 1024 * 1024:
+        raise ValueError("evaluator deployment manifest is unexpectedly large")
+    try:
+        payload = json.loads(safe.read_text(encoding="utf-8"))
+        signed = SignedEvaluatorDeployment.from_dict(payload)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("evaluator deployment manifest is invalid") from exc
+    if not signed.verify(trusted_public_keys=trusted_public_keys):
+        raise ValueError("evaluator deployment manifest signature is untrusted or invalid")
+    return signed
+
+
+def _evaluator_environment(names: list[str]) -> dict[str, str]:
+    if names:
+        raise ValueError("candidate lane evaluator is offline; provider environment is forbidden")
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C.UTF-8",
+        "HOME": "/nonexistent",
+        "TMPDIR": "/tmp",
+        "FOUNDRY_RSI_SHADOW_ONLY": "1",
+        "FOUNDRY_RSI_LIVE_PROMOTION_DISABLED": "1",
+    }
+    return environment
+
+
+def _bubblewrap_command(
+    bubblewrap: str,
+    *,
+    executable: Path,
+    release_root: Path,
+) -> list[str]:
+    """Build an empty-root, non-root, networkless evaluator mount namespace."""
+
+    relative = executable.relative_to(release_root)
+    command = [
+        bubblewrap,
+        "--die-with-parent", "--new-session",
+        "--unshare-user", "--unshare-pid", "--unshare-net",
+        "--unshare-ipc", "--unshare-uts",
+        "--uid", "65534", "--gid", "65534", "--cap-drop", "ALL",
+        "--dir", "/usr",
+    ]
+    for source in (Path("/usr/bin"), Path("/usr/lib"), Path("/usr/lib64"), Path("/usr/share")):
+        if source.exists():
+            command.extend(("--ro-bind", str(source), str(source)))
+    command.extend((
+        "--symlink", "usr/bin", "/bin",
+        "--symlink", "usr/lib", "/lib",
+        "--symlink", "usr/lib64", "/lib64",
+        "--ro-bind", str(release_root), "/release",
+        "--ro-bind", "{input}", "/input",
+        "--bind", "{output}", "/output",
+        "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+        "--chdir", "/output", "--clearenv",
+        "--setenv", "PATH", "/usr/bin:/bin",
+        "--setenv", "LANG", "C.UTF-8",
+        "--setenv", "HOME", "/nonexistent",
+        "--setenv", "TMPDIR", "/tmp",
+        "--setenv", "FOUNDRY_RSI_SHADOW_ONLY", "1",
+        "--setenv", "FOUNDRY_RSI_LIVE_PROMOTION_DISABLED", "1",
+        str(Path("/release") / relative),
+        "--signed-envelope", "/input/signed-envelope.json",
+        "--evaluation-output", "/output/signed-evaluation.json",
+    ))
+    return command
+
+
+def _run_evaluator(
+    executable: Path,
+    signed: SignedCandidateEnvelope,
+    *,
+    timeout: float,
+    environment_names: list[str],
+    release_root: Path,
+    expected_executable_sha256: str,
+    expected_tree_sha256: str,
+) -> tuple[SignedIndependentEvaluation, str, str]:
+    safe, executable_sha256, tree_sha256 = _verify_evaluator_release(
+        executable,
+        release_root,
+        expected_executable_sha256=expected_executable_sha256,
+        expected_tree_sha256=expected_tree_sha256,
+    )
+    bubblewrap = shutil.which("bwrap")
+    if not bubblewrap:
+        raise ValueError("bubblewrap is required for offline evaluator network isolation")
+    with tempfile.TemporaryDirectory(prefix="foundry-rsi-evaluation-") as directory:
+        root = Path(directory)
+        input_directory = root / "input"
+        output_directory = root / "output"
+        input_directory.mkdir(mode=0o755)
+        output_directory.mkdir(mode=0o777)
+        output_directory.chmod(0o777)
+        source = input_directory / "signed-envelope.json"
+        output = output_directory / "signed-evaluation.json"
+        source.write_text(json.dumps(signed.to_dict(), sort_keys=True), encoding="utf-8")
+        source.chmod(0o444)
+        command = _bubblewrap_command(
+            bubblewrap,
+            executable=safe,
+            release_root=release_root.absolute(),
+        )
+        command = [
+            str(input_directory) if value == "{input}" else
+            str(output_directory) if value == "{output}" else value
+            for value in command
+        ]
+        result = subprocess.run(
+            command,
+            env=_evaluator_environment(environment_names),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+        )
+        if (
+            result.returncode
+            or not output.is_file()
+            or output.is_symlink()
+            or output.stat().st_nlink != 1
+            or output.stat().st_size > 8 * 1024 * 1024
+        ):
+            raise ValueError("bounded Foundry evaluator failed to produce a receipt")
+        evaluated = SignedIndependentEvaluation.from_dict(json.loads(output.read_text(encoding="utf-8")))
+        if _sha_file(safe) != executable_sha256 or _release_tree_sha256(release_root.absolute()) != tree_sha256:
+            raise ValueError("Foundry evaluator release changed during execution")
+        return evaluated, executable_sha256, tree_sha256
+
+
+def _config(args: argparse.Namespace) -> CandidateTransportConfig:
+    methods = sum(bool(value) for value in (args.nkey_file, args.credentials_path, args.username_env))
+    if methods != 1:
+        raise ValueError("consumer requires exactly one runtime authentication method")
+    return CandidateTransportConfig(
+        endpoint=args.endpoint,
+        require_tls=args.remote_tls,
+        nkey_file=args.nkey_file or "",
+        nkey_public_key=args.nkey_public_key or "",
+        credentials_path=args.credentials_path or "",
+        username_env=args.username_env or "",
+        password_env=args.password_env or "",
+        tls_ca_path=args.tls_ca_path or "",
+    )
+
+
+async def _run(args: argparse.Namespace) -> dict[str, Any]:
+    if not math.isfinite(args.fetch_timeout) or args.fetch_timeout <= 0:
+        raise ValueError("fetch timeout must be finite and positive")
+    if not math.isfinite(args.evaluator_timeout) or not 0 < args.evaluator_timeout <= 3600:
+        raise ValueError("evaluator timeout must be between zero and one hour")
+    signed_deployment = _load_evaluator_deployment(
+        args.evaluator_deployment_manifest,
+        trusted_public_keys=args.evaluator_deployment_public_key,
+    )
+    deployment = signed_deployment.deployment
+    safe_evaluator, _, _ = _verify_evaluator_release(
+        args.evaluator_executable,
+        args.evaluator_release_root,
+        expected_executable_sha256=deployment.evaluator_executable_sha256,
+        expected_tree_sha256=deployment.evaluator_release_tree_sha256,
+    )
+    relative_evaluator = safe_evaluator.relative_to(
+        args.evaluator_release_root.absolute()
+    ).as_posix()
+    if relative_evaluator != deployment.evaluator_executable_relative_path:
+        raise ValueError("evaluator deployment manifest executable path binding is invalid")
+    store = CandidateStore(args.terminal_archive, experiment_id=args.terminal_experiment_id)
+    await store.load()
+    verifier = SignedLeaseFileVerifier(
+        args.operator_lease_receipt,
+        trusted_public_keys=args.operator_lease_public_key,
+    )
+    transport = CandidateJetStreamTransport(
+        trusted_source_public_keys=args.source_public_key,
+        terminal_store=store,
+        lease_verifier=verifier,
+        config=_config(args),
+    )
+    try:
+        await transport.connect()
+        topology = await transport.ensure_topology()
+        reconciled = await transport.reconcile_dlq_outbox(now=_now())
+        subscription = await transport.jetstream.pull_subscribe_bind(
+            stream=transport.config.stream_name,
+            consumer=transport.config.consumer_name,
+        )
+        try:
+            messages = await subscription.fetch(1, timeout=args.fetch_timeout)
+        except TimeoutError:
+            messages = []
+        if not messages:
+            return {
+                "schema": CONSUME_RECEIPT_SCHEMA,
+                "action": "no_candidate",
+                "topology_sha256": topology["topology_sha256"],
+                "dlq_reconciled": reconciled,
+                "live_promotion_attempted": False,
+            }
+        message = messages[0]
+        preflight_at = _now()
+        try:
+            signed = await transport.validate_message(message, now=preflight_at)
+        except Exception:
+            result = await transport.consume(message, lambda _: None, now=preflight_at)
+            return {
+                "schema": CONSUME_RECEIPT_SCHEMA,
+                "action": result.action,
+                "envelope_id": result.envelope_id,
+                "disposition": result.disposition,
+                "topology_sha256": topology["topology_sha256"],
+                "dlq_reconciled": reconciled,
+                "live_promotion_attempted": False,
+            }
+        try:
+            evaluation, evaluator_sha256, evaluator_tree_sha256 = _run_evaluator(
+                args.evaluator_executable,
+                signed,
+                timeout=args.evaluator_timeout,
+                environment_names=args.evaluator_env,
+                release_root=args.evaluator_release_root,
+                expected_executable_sha256=deployment.evaluator_executable_sha256,
+                expected_tree_sha256=deployment.evaluator_release_tree_sha256,
+            )
+            completed_at = _now()
+            _validate_evaluation(
+                evaluation,
+                signed,
+                trusted_evaluator_keys=args.evaluator_public_key,
+                expected_evaluator_id=deployment.evaluator_id,
+                expected_evaluator_sha=deployment.evaluator_release_sha,
+                expected_executable_sha256=evaluator_sha256,
+                expected_tree_sha256=evaluator_tree_sha256,
+                as_of=completed_at,
+            )
+            receipt_bytes = (json.dumps(evaluation.to_dict(), sort_keys=True, indent=2) + "\n").encode()
+            receipt_path = args.evaluation_receipt_dir / f"{signed.envelope.envelope_id}.json"
+            _atomic_receipt(receipt_path, receipt_bytes)
+            evaluation_sha256 = canonical_sha256(evaluation.to_dict())
+        except Exception:
+            async def failed(_: SignedCandidateEnvelope) -> CandidateHandlingResult:
+                raise RuntimeError("bounded Foundry evaluator failed")
+            result = await transport.consume(message, failed, now=_now())
+        else:
+            async def handled(_: SignedCandidateEnvelope) -> CandidateHandlingResult:
+                return CandidateHandlingResult(
+                    disposition=TerminalDisposition(
+                        state=TerminalState.EVALUATED,
+                        reason_code="foundry_independent_evaluation_complete",
+                        receipt_id="evaluation_" + evaluation.evaluation.evaluation_id[:24],
+                        at=evaluation.evaluation.created_at,
+                    ),
+                    transport_receipt_id="consume_" + signed.envelope.envelope_id[:24],
+                    evaluation_receipt_sha256=evaluation_sha256,
+                )
+            result = await transport.consume(message, handled, now=completed_at)
+        return {
+            "schema": CONSUME_RECEIPT_SCHEMA,
+            "action": result.action,
+            "envelope_id": result.envelope_id,
+            "disposition": result.disposition,
+            "duplicate": result.duplicate,
+            "topology_sha256": topology["topology_sha256"],
+            "dlq_reconciled": reconciled,
+            "evaluator_deployment_id": deployment.deployment_id,
+            "evaluator_release_sha": deployment.evaluator_release_sha,
+            "evaluator_executable_sha256": evaluator_sha256 if 'evaluator_sha256' in locals() else "",
+            "evaluator_release_tree_sha256": evaluator_tree_sha256 if 'evaluator_tree_sha256' in locals() else "",
+            "live_promotion_attempted": False,
+        }
+    finally:
+        await transport.close()
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--terminal-archive", type=Path, required=True)
+    parser.add_argument("--terminal-experiment-id", required=True)
+    parser.add_argument("--source-public-key", action="append", required=True)
+    parser.add_argument("--operator-lease-receipt", type=Path, required=True)
+    parser.add_argument("--operator-lease-public-key", action="append", required=True)
+    parser.add_argument("--evaluator-executable", type=Path, required=True)
+    parser.add_argument("--evaluator-release-root", type=Path, required=True)
+    parser.add_argument("--evaluator-deployment-manifest", type=Path, required=True)
+    parser.add_argument("--evaluator-deployment-public-key", action="append", required=True)
+    parser.add_argument("--evaluator-public-key", action="append", required=True)
+    parser.add_argument("--evaluator-env", action="append", default=[])
+    parser.add_argument("--evaluation-receipt-dir", type=Path, required=True)
+    parser.add_argument("--evaluator-timeout", type=float, default=900.0)
+    parser.add_argument("--fetch-timeout", type=float, default=5.0)
+    parser.add_argument("--endpoint", required=True)
+    security = parser.add_mutually_exclusive_group(required=True)
+    security.add_argument("--loopback-authenticated-non-tls", action="store_true")
+    security.add_argument("--remote-tls", action="store_true")
+    parser.add_argument("--nkey-file")
+    parser.add_argument("--nkey-public-key")
+    parser.add_argument("--credentials-path")
+    parser.add_argument("--username-env")
+    parser.add_argument("--password-env")
+    parser.add_argument("--tls-ca-path")
+    return parser
+
+
+def main() -> int:
+    parser = _parser()
+    args = parser.parse_args()
+    try:
+        receipt = asyncio.run(_run(args))
+    except Exception as exc:
+        parser.error(str(exc))
+    print(json.dumps(receipt, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+apply=0
+request_id=""
+while (($#)); do
+    case "$1" in
+        --plan) apply=0 ;;
+        --apply) apply=1 ;;
+        --request-id)
+            shift
+            request_id="${1:-}"
+            ;;
+        *)
+            printf 'usage: rsi-legacy-cutover-v1 [--plan | --apply --request-id ID]\n' >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+if ((apply)) && [[ ! "${request_id}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$ ]]; then
+    printf 'rsi-legacy-cutover-v1: --apply requires a safe request ID\n' >&2
+    exit 2
+fi
+
+source_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
+script_dir="$(cd -- "$(dirname -- "${source_path}")" && pwd -P)"
+shim_dir="${script_dir}/legacy_shims_v1"
+bin_dir="/root/rsi-lab/bin"
+state="${RSI_LAB_STATE:-/root/rsi-lab/state}"
+if [[ -n "${RSI_LAB_LEGACY_CUTOVER_TEST_ROOT:-}" ]]; then
+    if [[ "${RSI_LAB_DEV_SOURCE:-}" != "1" ]]; then
+        printf 'rsi-legacy-cutover-v1: test root requires RSI_LAB_DEV_SOURCE=1\n' >&2
+        exit 2
+    fi
+    bin_dir="${RSI_LAB_LEGACY_CUTOVER_TEST_ROOT}/bin"
+fi
+
+names=(rsi-run rsi-loop rsi-status rsi-stop rsi-mobile-help)
+hashes=()
+for name in "${names[@]}"; do
+    source="${shim_dir}/${name}"
+    if [[ ! -f "${source}" || -L "${source}" || ! -x "${source}" ]]; then
+        printf 'rsi-legacy-cutover-v1: versioned shim missing or unsafe: %s\n' "${source}" >&2
+        exit 3
+    fi
+    hashes+=("$(sha256sum -- "${source}" | awk '{print $1}')")
+done
+
+printf 'schema: rsi_lab.legacy_cutover_plan.v1\n'
+printf 'mode: %s\n' "$([[ ${apply} -eq 1 ]] && printf APPLY || printf PLAN_ONLY)"
+for index in "${!names[@]}"; do
+    target="${bin_dir}/${names[index]}"
+    status="missing"
+    if [[ -e "${target}" || -L "${target}" ]]; then
+        if [[ -L "${target}" ]] && [[ "$(readlink -f -- "${target}")" == "$(readlink -f -- "${shim_dir}/${names[index]}")" ]]; then
+            status="canonical_exact"
+        else
+            status="legacy_to_archive"
+        fi
+    fi
+    printf 'shim: %s sha256:%s status=%s\n' "${names[index]}" "${hashes[index]}" "${status}"
+done
+printf 'unsafe_preset_emulation: false\n'
+printf 'live_execution_enabled: false\n'
+if ((!apply)); then
+    exit 0
+fi
+if [[ -z "${RSI_LAB_LEGACY_CUTOVER_TEST_ROOT:-}" && "$(id -u)" != "0" ]]; then
+    printf 'rsi-legacy-cutover-v1: --apply requires root\n' >&2
+    exit 4
+fi
+
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+receipt_root="${state}/.dharma/forge_lab/maintenance/legacy_cutover_v1"
+mkdir -p -- "${receipt_root}"
+lock_path="${receipt_root}/cutover.lock"
+if [[ -L "${lock_path}" ]]; then
+    printf 'rsi-legacy-cutover-v1: unsafe lock path\n' >&2
+    exit 5
+fi
+exec 9>>"${lock_path}"
+chmod 0600 -- "${lock_path}"
+flock -x 9
+prior_receipts=()
+while IFS= read -r match; do
+    prior_receipts+=("${match}")
+done < <(find "${receipt_root}" -maxdepth 1 -type f -name "*__${request_id}__legacy_cutover.json" -print 2>/dev/null || true)
+if ((${#prior_receipts[@]} == 1)); then
+    printf 'result: ALREADY_APPLIED\nreceipt: %s\n' "${prior_receipts[0]}"
+    exit 0
+elif ((${#prior_receipts[@]} > 1)); then
+    printf 'rsi-legacy-cutover-v1: duplicate receipts for request ID\n' >&2
+    exit 5
+fi
+existing_evidence=()
+while IFS= read -r match; do
+    existing_evidence+=("${match}")
+done < <(find "${receipt_root}/evidence" -mindepth 1 -maxdepth 1 -type d -name "*__${request_id}" -print 2>/dev/null || true)
+if ((${#existing_evidence[@]} > 1)); then
+    printf 'rsi-legacy-cutover-v1: conflicting partial evidence for request ID\n' >&2
+    exit 5
+fi
+evidence_dir="${existing_evidence[0]:-${receipt_root}/evidence/${stamp}__${request_id}}"
+receipt="${receipt_root}/${stamp}__${request_id}__legacy_cutover.json"
+mkdir -p -- "${bin_dir}" "${evidence_dir}"
+if [[ -e "${receipt}" || -L "${receipt}" ]]; then
+    printf 'rsi-legacy-cutover-v1: receipt already exists\n' >&2
+    exit 5
+fi
+archived=0
+for index in "${!names[@]}"; do
+    name="${names[index]}"
+    target="${bin_dir}/${name}"
+    source="${shim_dir}/${name}"
+    exact=0
+    if [[ -L "${target}" ]] && [[ "$(readlink -f -- "${target}")" == "$(readlink -f -- "${source}")" ]]; then
+        exact=1
+    fi
+    if ((exact == 0)) && [[ -e "${target}" || -L "${target}" ]]; then
+        if [[ -e "${evidence_dir}/${name}" || -L "${evidence_dir}/${name}" ]]; then
+            printf 'rsi-legacy-cutover-v1: refusing to overwrite archived original: %s\n' "${name}" >&2
+            exit 5
+        fi
+        mv -- "${target}" "${evidence_dir}/${name}"
+        archived=$((archived + 1))
+    fi
+    temporary="${bin_dir}/.${name}.tmp-${request_id}"
+    ln -s -- "${source}" "${temporary}"
+    mv -Tf -- "${temporary}" "${target}"
+    installed_hash="$(sha256sum -- "${target}" | awk '{print $1}')"
+    if [[ "${installed_hash}" != "${hashes[index]}" ]]; then
+        printf 'rsi-legacy-cutover-v1: installed hash mismatch: %s\n' "${name}" >&2
+        exit 6
+    fi
+done
+printf '{"schema":"rsi_lab.legacy_cutover_receipt.v1","request_id":"%s","archived_count":%s,"evidence_dir":"%s","shim_hashes":{"rsi-run":"%s","rsi-loop":"%s","rsi-status":"%s","rsi-stop":"%s","rsi-mobile-help":"%s"},"unsafe_preset_emulation":false,"live_execution_enabled":false,"provider_calls":false,"secret_values_recorded":false}\n' \
+    "${request_id}" "${archived}" "${evidence_dir}" \
+    "${hashes[0]}" "${hashes[1]}" "${hashes[2]}" "${hashes[3]}" "${hashes[4]}" >"${receipt}"
+printf 'result: APPLIED_FAIL_CLOSED\nreceipt: %s\n' "${receipt}"

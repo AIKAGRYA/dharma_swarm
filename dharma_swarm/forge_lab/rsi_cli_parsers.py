@@ -51,7 +51,59 @@ def add_operator_commands(
         help_text="build a content-addressed taskpack",
     )
     taskpack_build.add_argument("--profile", required=True)
+    taskpack_build.add_argument("--source-manifest")
+    taskpack_build.add_argument("--instance", action="append", dest="instances")
+    taskpack_build.add_argument("--taskpack-root")
     json_flag(taskpack_build)
+    taskpack_import = leaf(
+        taskpack_commands,
+        "import",
+        command_path="taskpack import",
+        help_text="admit a sealed official taskpack through the canonical taskbed API",
+    )
+    taskpack_import.add_argument("--taskpack", required=True)
+    taskpack_import.add_argument("--request-id", required=True)
+    taskpack_import.add_argument("--taskbed-db")
+    taskpack_import.add_argument("--taskpack-root")
+    taskpack_import.add_argument("--apply", action="store_true")
+    json_flag(taskpack_import)
+
+    safety = commands.add_parser("safety", help="inspect and operate the durable HALT latch")
+    safety_commands = safety.add_subparsers(dest="safety_command", required=True)
+    safety_status = leaf(
+        safety_commands,
+        "status",
+        command_path="safety status",
+        help_text="inspect the durable HALT latch and receipt chain",
+    )
+    json_flag(safety_status)
+    safety_halt = leaf(
+        safety_commands,
+        "halt",
+        command_path="safety halt",
+        help_text="latch an operator-requested durable safety stop",
+    )
+    safety_halt.add_argument("--operator-id", required=True)
+    safety_halt.add_argument("--request-id", required=True)
+    safety_halt.add_argument("--reason", required=True)
+    safety_halt.add_argument("--code", default="OPERATOR_HALT")
+    json_flag(safety_halt)
+    safety_resume = leaf(
+        safety_commands,
+        "resume",
+        command_path="safety resume",
+        help_text="resume only the exact HALT digest under explicit operator authority",
+    )
+    safety_resume.add_argument("--operator-id", required=True)
+    safety_resume.add_argument("--request-id", required=True)
+    safety_resume.add_argument("--reason", required=True)
+    safety_resume.add_argument("--expected-halt-digest", required=True)
+    safety_resume.add_argument(
+        "--signature",
+        required=True,
+        help="OpenSSH signature over the canonical resume-authority statement",
+    )
+    json_flag(safety_resume)
 
     campaign = commands.add_parser("campaign", help="manage governed RSI campaigns")
     campaign_commands = campaign.add_subparsers(dest="campaign_command", required=True)
@@ -156,6 +208,7 @@ def add_operator_commands(
         help_text="report control-plane drift",
     )
     reconcile.add_argument("--apply", action="store_true")
+    reconcile.add_argument("--request-id")
     json_flag(reconcile)
 
     backup = commands.add_parser("backup", help="manage control-plane snapshots")

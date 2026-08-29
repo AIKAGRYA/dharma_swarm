@@ -38,7 +38,15 @@ CRITICAL_FILES = (
     "dharma_swarm/forge_lab/state_io.py",
     "dharma_swarm/forge_lab/campaign_control.py",
     "dharma_swarm/forge_lab/operator_views.py",
+    "dharma_swarm/forge_lab/alert_control.py",
+    "dharma_swarm/forge_lab/safety_control.py",
+    "dharma_swarm/forge_lab/taskpack.py",
+    "dharma_swarm/forge_lab/unattended_budget.py",
+    "dharma_swarm/forge_lab/unattended_child.py",
     "dharma_swarm/forge_lab/unattended_explore.py",
+    "dharma_swarm/forge_lab/unattended_lease.py",
+    "dharma_swarm/forge_lab/unattended_receipts.py",
+    "dharma_swarm/forge_lab/unattended_reconcile.py",
     "dharma_swarm/forge_lab/rsi_operations.py",
     "dharma_swarm/forge_lab/sync_control.py",
     "dharma_swarm/forge_lab/sync_identity.py",
@@ -62,6 +70,18 @@ CRITICAL_FILES = (
     "scripts/forge_lab/rsi-provider-refresh",
     "scripts/forge_lab/rsi-provider-refresh-install",
     "scripts/forge_lab/rsi-unattended-explore",
+    "scripts/forge_lab/rsi-alert",
+    "scripts/forge_lab/rsi-alert-v1",
+    "scripts/forge_lab/rsi-service-install-v1",
+    "scripts/forge_lab/rsi-legacy-cutover-v1",
+    "scripts/forge_lab/legacy_shims_v1/rsi-run",
+    "scripts/forge_lab/legacy_shims_v1/rsi-loop",
+    "scripts/forge_lab/legacy_shims_v1/rsi-status",
+    "scripts/forge_lab/legacy_shims_v1/rsi-stop",
+    "scripts/forge_lab/legacy_shims_v1/rsi-mobile-help",
+    "scripts/forge_lab/logrotate/rsi-lab",
+    "scripts/forge_lab/systemd/rsi-lab-alert@.service",
+    "scripts/forge_lab/systemd/rsi-lab-alert-v1@.service",
     "scripts/forge_lab/systemd/rsi-lab-explore.service",
     "scripts/forge_lab/systemd/rsi-lab-explore.timer",
     "scripts/forge_lab/rsi-sync-retired",
@@ -156,6 +176,11 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temp, path)
+        directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         temp.unlink(missing_ok=True)
 

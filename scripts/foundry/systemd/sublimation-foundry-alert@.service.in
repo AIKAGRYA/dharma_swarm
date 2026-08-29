@@ -1,0 +1,24 @@
+[Unit]
+Description=Sublimation Foundry failure receipt for %i
+
+[Service]
+Type=oneshot
+User=@@USER@@
+Group=@@USER@@
+WorkingDirectory=@@REPO@@
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=@@PYTHON@@ -B /usr/local/bin/sublimation-foundry-alert.py --state-root @@STATE_ROOT@@ --unit %i
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@@STATE_ROOT@@
+ReadOnlyPaths=@@REPO@@
+MemoryMax=128M
+TasksMax=32
+LimitNOFILE=256

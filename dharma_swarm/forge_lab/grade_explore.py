@@ -154,8 +154,19 @@ def production_seams() -> GradeSeams:
             return GraderResult.infrastructure(
                 "isolated_pr_suite_grader_unavailable",
             )
+        expected_image = None
+        if inst.get("official_eligible") is True:
+            expected_image = {
+                "image_key": inst.get("image_key"),
+                "local_image_id": inst.get("local_image_id"),
+                "local_image_repo_digests": inst.get("local_image_repo_digests"),
+            }
+            if not all(expected_image.values()):
+                return GraderResult.infrastructure(
+                    "taskpack_image_attestation_missing",
+                )
         try:
-            with isolated_swebench_containers() as isolation_proofs:
+            with isolated_swebench_containers(expected_image=expected_image) as isolation_proofs:
                 resolved, seconds, error = _grade_task(inst, patch, timeout=timeout)
             proofs = tuple(isolation_proofs)
             if error:
@@ -177,9 +188,11 @@ def production_seams() -> GradeSeams:
                 isolation_proofs=proofs,
             )
         except Exception as exc:
+            proofs = tuple(locals().get("isolation_proofs", ()))
             return GraderResult.infrastructure(
                 "isolated_swebench_grader_failed",
                 note=f"{type(exc).__name__}:{exc}"[:500],
+                isolation_proofs=proofs,
             )
 
     return GradeSeams(
