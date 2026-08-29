@@ -151,7 +151,8 @@ async def test_store_graded_rows_are_fitness_bearing_and_deduped(store):
     await store.append_graded(
         candidate_id=cid, genome={"g": 1, "arm_kind": "freeform_single"}, parent_id=None,
         generation=0, loop_iteration=0, role="seed_baseline", pass_rate=0.5,
-        per_task=[{"task_id": "t1", "resolved": True}], budget={}, tier="explore-fast-host-pytest",
+        per_task=[{"task_id": "t1", "resolved": True}, {"task_id": "t2", "resolved": False}],
+        budget={}, tier="explore-fast-host-pytest",
         executed_fields=("arm_kind",), ignored_fields=(), envelope=_envelope(cid),
     )
     assert await store.has(cid)

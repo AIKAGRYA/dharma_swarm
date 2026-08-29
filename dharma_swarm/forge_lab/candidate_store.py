@@ -12,6 +12,10 @@ Row semantics:
   test_results["forge_lab"]["state"]. Only graded rows carry fitness-bearing
   status ("shadow"), so selection naturally sees only graded candidates while
   blocked/errored children persist as evidence (mycelial compost).
+- append_graded never trusts a caller-asserted aggregate: pass_rate is
+  recomputed from per_task (mismatch raises), and a budget-invalid grade is
+  re-routed to the errored lane — over cap makes the run INVALID, never a
+  lower score.
 - The archive is never pruned. Ever.
 """
 
@@ -82,6 +86,25 @@ class CandidateStore:
         model: str = "",
         tokens_used: int = 0,
     ) -> ArchiveEntry:
+        # Custody honesty (L009/L022-L024): only graded-AND-budget-valid rows
+        # may bear fitness. Per the Budget contract an over-cap run is INVALID,
+        # never a lower score — re-route to the errored lane, never graded.
+        if budget.get("invalid"):
+            return await self._append_non_graded(
+                ERRORED,
+                candidate_id=candidate_id, genome=genome, parent_id=parent_id,
+                generation=generation, loop_iteration=loop_iteration,
+                reasons=[f"budget_invalid:{budget.get('invalid_reason') or 'over_cap'}"],
+            )
+        # Never trust a caller-asserted aggregate: pass_rate is recomputed from
+        # per_task and a mismatch is refused fail-closed.
+        recomputed = (
+            (sum(1 for r in per_task if r.get("resolved")) / len(per_task))
+            if per_task else 0.0
+        )
+        if abs(float(pass_rate) - recomputed) > 1e-9:
+            raise ValueError(f"pass_rate_mismatch: caller={pass_rate} recomputed={recomputed}")
+        pass_rate = recomputed
         entry = ArchiveEntry(
             id=candidate_id,
             parent_id=parent_id,

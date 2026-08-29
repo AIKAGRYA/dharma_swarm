@@ -113,7 +113,13 @@ def grade_genome_explore(
     grade_timeout_s: int = 600,
 ) -> GradeOutcome:
     """Grade one genome on the generation's task slice. Never raises for
-    per-task trouble — a failed observation is a row, not an exception."""
+    per-task trouble — a failed observation is a row, not an exception.
+
+    Grade-level custody faults are fail-closed via ``GradeOutcome.error``:
+    an over-cap budget (``budget_invalid:...`` — the run is INVALID, never a
+    lower score) or a sweep where zero tasks were actually attempted
+    (``no_tasks_attempted`` — a laundered infra zero). Callers must archive
+    such outcomes as errored, never graded."""
     budget = seams.budget_factory(cap_tokens=budget_cap_tokens, cap_usd=budget_cap_usd)
     per_task: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -145,14 +151,25 @@ def grade_genome_explore(
         per_task.append(row)
         if not row.get("resolved"):
             failures.append(row)
-    graded = [r for r in per_task if "error" not in r or r.get("resolved")]
+    # Custody truth: a task counts as attempted only if the generation seam
+    # actually ran for it (tokens_spent) or it reached grading (grade_seconds /
+    # clean row). Pre-generation infra skips are NOT attempts — a zero-attempt
+    # sweep is a laundered infra zero (L009), never a score.
+    attempted = [r for r in per_task if "tokens_spent" in r or "grade_seconds" in r or "error" not in r]
     denominator = len(per_task)
     pass_rate = (sum(1 for r in per_task if r.get("resolved")) / denominator) if denominator else 0.0
+    error: str | None = None
+    if getattr(budget, "invalid", False):
+        # Budget contract: over cap makes the run INVALID, never a lower score.
+        error = f"budget_invalid:{getattr(budget, 'invalid_reason', None) or 'over_cap'}"
+    elif not attempted:
+        error = "no_tasks_attempted"
     return GradeOutcome(
         pass_rate=pass_rate,
         per_task=per_task,
         budget=budget.to_dict() if hasattr(budget, "to_dict") else {},
         tokens_used=int(getattr(budget, "spent", tokens_total) or tokens_total),
+        error=error,
         failures=failures,
     )
 

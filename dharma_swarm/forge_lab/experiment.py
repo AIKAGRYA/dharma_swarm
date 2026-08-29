@@ -258,6 +258,31 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             grade_timeout_s=cfg.grade_timeout_s,
         )
         tokens_spent_total += outcome.tokens_used
+        if outcome.error:
+            # Custody fail-closed: budget-invalid or zero-attempt grades are
+            # errored evidence rows, never GRADED / fitness-bearing.
+            await store.append_errored(
+                candidate_id=cid, genome=genome, parent_id=parent_id,
+                generation=generation, loop_iteration=loop_iteration,
+                reasons=[outcome.error], raw_output=raw,
+            )
+            counters["errored"] += 1
+            return _append_result_row(
+                results_path,
+                _result_row(
+                    exp_id=exp_id,
+                    candidate_id=cid,
+                    parent_id=parent_id,
+                    state="errored",
+                    role=role,
+                    op=op,
+                    generation=generation,
+                    pass_rate=outcome.pass_rate,
+                    per_task=outcome.per_task,
+                    budget=outcome.budget,
+                    reasons=[outcome.error],
+                ),
+            )
         envelope = FreeformExploreEnvelope(
             candidate_id=cid, parent_id=parent_id, experiment_id=exp_id,
             category=cfg.category, raw_output=raw, notes=notes,
