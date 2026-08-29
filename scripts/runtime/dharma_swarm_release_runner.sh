@@ -54,10 +54,36 @@ case "${1-}" in
         shift
         runtime_args=("$@")
         ;;
+    governed-patch-foundry-verifier)
+        runtime_command="governed-patch-foundry-verifier"
+        shift
+        runtime_args=("$@")
+        ;;
+    governed-patch-vibe-verifier)
+        runtime_command="governed-patch-vibe-verifier"
+        shift
+        runtime_args=("$@")
+        ;;
     *)
         fail "unsupported command"
         ;;
 esac
+
+# Preserve only the selected verifier key locator as a non-exported shell
+# variable. Provider credentials are reloaded from the canonical vault only
+# after admission; neither role key nor inherited secret-shaped variables may
+# remain in the parent environment while unadmitted release code executes.
+foundry_verifier_key_file="${DHARMA_FOUNDRY_VERIFIER_KEY_FILE-}"
+vibe_verifier_key_file="${DHARMA_VIBE_VERIFIER_KEY_FILE-}"
+while IFS= read -r environment_name; do
+    case "${environment_name}" in
+        *_API_KEY|*_AUTH_TOKEN|*_TOKEN|*_SECRET_KEY|*_SECRET_ACCESS_KEY|\
+        DHARMA_FOUNDRY_VERIFIER_KEY_FILE|DHARMA_VIBE_VERIFIER_KEY_FILE)
+            unset "${environment_name}"
+            ;;
+    esac
+done < <(compgen -e)
+unset environment_name
 
 release_root="${DHARMA_RELEASE_ROOT:?DHARMA_RELEASE_ROOT is required}"
 expected_commit="${DHARMA_RUNTIME_EXPECTED_COMMIT-}"
@@ -142,7 +168,20 @@ export PATH="${safe_path}"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONNOUSERSITE=1
 
-"${runtime_python}" -B -I -S "${release_root}/dharma_swarm/runtime_admission.py" \
+# The release-local interpreter and admission module are themselves still
+# unadmitted at this point. Give that process no provider credentials, runtime
+# configuration, or verifier key paths. The parent shell retains its environment
+# so the selected admitted role can receive only its intended capabilities later.
+admission_env=(
+    env -i
+    "HOME=/nonexistent"
+    "PATH=/usr/bin:/bin"
+    "TMPDIR=/tmp"
+    "PYTHONDONTWRITEBYTECODE=1"
+    "PYTHONNOUSERSITE=1"
+)
+"${admission_env[@]}" \
+    "${runtime_python}" -B -I -S "${release_root}/dharma_swarm/runtime_admission.py" \
     --repo "${release_root}" \
     --expected-commit "${expected_commit}"
 
@@ -205,6 +244,62 @@ case "${runtime_command}" in
             "${runtime_python}" -B -I -m \
             dharma_swarm.runtime_release_entrypoint \
             codex-composer-semantic-responder "${runtime_args[@]}"
+        ;;
+    governed-patch-foundry-verifier)
+        # Foundry runs after release admission without provider credentials and
+        # receives only its own key path. The Vibe key is deliberately absent.
+        [[ -n "${foundry_verifier_key_file}" ]] \
+            || fail "DHARMA_FOUNDRY_VERIFIER_KEY_FILE is required"
+        verifier_env=(
+            env -i
+            "HOME=${HOME:?HOME is required}"
+            "PATH=${safe_path}"
+            "TMPDIR=${TMPDIR:-/tmp}"
+            "DHARMA_RELEASE_ROOT=${release_root}"
+            "DHARMA_RUNTIME_EXPECTED_COMMIT=${expected_commit}"
+            "DHARMA_FOUNDRY_VERIFIER_KEY_FILE=${foundry_verifier_key_file}"
+            "PYTHONDONTWRITEBYTECODE=1"
+            "PYTHONNOUSERSITE=1"
+            "PYTHONUNBUFFERED=1"
+        )
+        if [[ -n "${DHARMA_STATE_DIR-}" ]]; then
+            verifier_env+=("DHARMA_STATE_DIR=${DHARMA_STATE_DIR}")
+        fi
+        if [[ -n "${DHARMA_HOME-}" ]]; then
+            verifier_env+=("DHARMA_HOME=${DHARMA_HOME}")
+        fi
+        exec "${verifier_env[@]}" \
+            "${runtime_python}" -B -I -m \
+            dharma_swarm.runtime_release_entrypoint \
+            governed-patch-foundry-verifier "${runtime_args[@]}"
+        ;;
+    governed-patch-vibe-verifier)
+        # Vibe has an independent environment and key path. It cannot inherit
+        # the Foundry key or model/provider credentials through this boundary.
+        [[ -n "${vibe_verifier_key_file}" ]] \
+            || fail "DHARMA_VIBE_VERIFIER_KEY_FILE is required"
+        verifier_env=(
+            env -i
+            "HOME=${HOME:?HOME is required}"
+            "PATH=${safe_path}"
+            "TMPDIR=${TMPDIR:-/tmp}"
+            "DHARMA_RELEASE_ROOT=${release_root}"
+            "DHARMA_RUNTIME_EXPECTED_COMMIT=${expected_commit}"
+            "DHARMA_VIBE_VERIFIER_KEY_FILE=${vibe_verifier_key_file}"
+            "PYTHONDONTWRITEBYTECODE=1"
+            "PYTHONNOUSERSITE=1"
+            "PYTHONUNBUFFERED=1"
+        )
+        if [[ -n "${DHARMA_STATE_DIR-}" ]]; then
+            verifier_env+=("DHARMA_STATE_DIR=${DHARMA_STATE_DIR}")
+        fi
+        if [[ -n "${DHARMA_HOME-}" ]]; then
+            verifier_env+=("DHARMA_HOME=${DHARMA_HOME}")
+        fi
+        exec "${verifier_env[@]}" \
+            "${runtime_python}" -B -I -m \
+            dharma_swarm.runtime_release_entrypoint \
+            governed-patch-vibe-verifier "${runtime_args[@]}"
         ;;
     *)
         fail "unsupported command"

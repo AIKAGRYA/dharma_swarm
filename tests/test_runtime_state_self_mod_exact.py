@@ -124,8 +124,242 @@ def _pair_counts(store: RuntimeStateStore, side_effect_key: str) -> tuple[int, i
     return int(row[0]), int(row[1])
 
 
+def _verifier_identity(
+    *,
+    signer_public_key: str = "signer-key-one",
+    process_boot_id: str = "boot-one",
+) -> ExecutionIdentity:
+    return replace(
+        _identity("verifier"),
+        metadata={
+            "role": "foundry_verifier",
+            "signer_public_key": signer_public_key,
+            "process_boot_id": process_boot_id,
+            "nested": {"ordinal": 1},
+        },
+    )
+
+
+def _exact_identity_row(store: RuntimeStateStore, run_id: str) -> sqlite3.Row:
+    with sqlite3.connect(store.db_path) as db:
+        db.row_factory = sqlite3.Row
+        row = db.execute(
+            "SELECT * FROM execution_identities WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+    assert row is not None
+    return row
+
+
+def test_exact_execution_identity_sync_insert_and_restart_replay(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    identity = _verifier_identity()
+
+    first = store.record_execution_identity_exact_sync(
+        identity,
+        source="governed_patch.foundry_verifier",
+    )
+    first_row = _exact_identity_row(store, identity.run_id)
+    restarted = RuntimeStateStore(store.db_path, include_memory_plane=False)
+    replay = restarted.record_execution_identity_exact_sync(
+        identity,
+        source="governed_patch.foundry_verifier",
+    )
+    replay_row = _exact_identity_row(restarted, identity.run_id)
+
+    assert first == replay == identity
+    assert first_row["source"] == "exact:governed_patch.foundry_verifier"
+    assert json.loads(first_row["metadata_json"]) == identity.metadata
+    assert first_row["metadata_json"] == json.dumps(
+        identity.metadata,
+        sort_keys=True,
+        ensure_ascii=True,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+    assert first_row["created_at"] == replay_row["created_at"]
+    assert first_row["updated_at"] == replay_row["updated_at"]
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "trace_id",
+        "correlation_id",
+        "task_id",
+        "claim_id",
+        "idempotency_key",
+        "causation_id",
+        "parent_run_id",
+        "agent_id",
+        "session_id",
+        "external_a2a_task_id",
+        "message_id",
+        "event_id",
+        "artifact_id",
+        "proposal_id",
+    ],
+)
+def test_exact_execution_identity_sync_rejects_every_changed_field(
+    tmp_path,
+    field_name: str,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    identity = _verifier_identity()
+    store.record_execution_identity_exact_sync(identity, source="verifier-source")
+    altered = replace(identity, **{field_name: f"changed-{field_name}"})
+
+    with pytest.raises(ValueError, match="conflicting exact execution identity"):
+        store.record_execution_identity_exact_sync(
+            altered,
+            source="verifier-source",
+        )
+
+    assert store.get_execution_identity_sync(identity.run_id) == identity
+
+
+@pytest.mark.parametrize("conflict", ["signer", "process_boot_id", "source"])
+def test_exact_execution_identity_sync_rejects_authority_conflicts(
+    tmp_path,
+    conflict: str,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    identity = _verifier_identity()
+    source = "governed_patch.vibe_verifier"
+    store.record_execution_identity_exact_sync(identity, source=source)
+    altered = identity
+    altered_source = source
+    if conflict == "signer":
+        altered = _verifier_identity(signer_public_key="signer-key-two")
+    elif conflict == "process_boot_id":
+        altered = _verifier_identity(process_boot_id="boot-two")
+    else:
+        altered_source = "foreign.verifier"
+
+    with pytest.raises(ValueError, match="conflicting exact execution identity"):
+        store.record_execution_identity_exact_sync(
+            altered,
+            source=altered_source,
+        )
+
+    row = _exact_identity_row(store, identity.run_id)
+    assert row["source"] == f"exact:{source}"
+    assert json.loads(row["metadata_json"]) == identity.metadata
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["gate", "promote"])
+@pytest.mark.parametrize("surface", ["async", "sync"])
+async def test_generic_identity_writer_cannot_overwrite_exact_row(
+    tmp_path,
+    surface: str,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    identity = _verifier_identity()
+    store.record_execution_identity_exact_sync(identity, source="verifier-source")
+    before = dict(_exact_identity_row(store, identity.run_id))
+    altered_metadata = {"signer_public_key": "foreign", "process_boot_id": "foreign"}
+
+    with pytest.raises(ValueError, match="reserved by the exact writer"):
+        if surface == "async":
+            await store.record_execution_identity(
+                identity,
+                source="generic-writer",
+                metadata=altered_metadata,
+            )
+        else:
+            store.record_execution_identity_sync(
+                identity,
+                source="generic-writer",
+                metadata=altered_metadata,
+            )
+
+    assert dict(_exact_identity_row(store, identity.run_id)) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ["async", "sync"])
+async def test_generic_identity_writer_cannot_mint_exact_source_marker(
+    tmp_path,
+    surface: str,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    identity = _verifier_identity()
+
+    with pytest.raises(ValueError, match="reserved marker"):
+        if surface == "async":
+            await store.record_execution_identity(identity, source="exact:foreign")
+        else:
+            store.record_execution_identity_sync(identity, source="exact:foreign")
+
+    assert store.get_execution_identity_sync(identity.run_id) is None
+
+
+@pytest.mark.asyncio
+async def test_exact_execution_identity_sync_concurrent_replay_inserts_once(
+    tmp_path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    store.init_db_sync()
+    identity = _verifier_identity()
+
+    results = await asyncio.gather(
+        *(
+            asyncio.to_thread(
+                RuntimeStateStore(
+                    store.db_path,
+                    include_memory_plane=False,
+                ).record_execution_identity_exact_sync,
+                identity,
+                source="race.verifier",
+            )
+            for _ in range(12)
+        ),
+    )
+
+    assert results == [identity] * 12
+    with sqlite3.connect(store.db_path) as db:
+        count = db.execute(
+            "SELECT COUNT(*) FROM execution_identities WHERE run_id = ?",
+            (identity.run_id,),
+        ).fetchone()[0]
+    assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_exact_execution_identity_sync_conflicting_race_has_one_winner(
+    tmp_path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    store.init_db_sync()
+    contenders = (
+        _verifier_identity(signer_public_key="signer-key-one"),
+        _verifier_identity(signer_public_key="signer-key-two"),
+    )
+
+    results = await asyncio.gather(
+        *(
+            asyncio.to_thread(
+                RuntimeStateStore(
+                    store.db_path,
+                    include_memory_plane=False,
+                ).record_execution_identity_exact_sync,
+                contender,
+                source="race.verifier",
+            )
+            for contender in contenders
+        ),
+        return_exceptions=True,
+    )
+
+    winners = [result for result in results if isinstance(result, ExecutionIdentity)]
+    refusals = [result for result in results if isinstance(result, ValueError)]
+    assert len(winners) == len(refusals) == 1
+    persisted = store.get_execution_identity_sync(contenders[0].run_id)
+    assert persisted == winners[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["proposal", "gate", "promote"])
 async def test_exact_self_mod_happy_path_writes_one_attestation_pair(
     tmp_path,
     stage: str,
@@ -192,19 +426,19 @@ async def test_exact_self_mod_restart_replay_returns_original_receipt(tmp_path) 
     store, identity = await _prepared_store(tmp_path)
     first = await store.commit_self_mod_receipt_exact(
         identity,
-        stage="gate",
+        stage="proposal",
         proposal_id=identity.proposal_id,
-        status="passed",
-        payload={"verdict": "ship"},
+        status="proposed",
+        payload={"candidate_digest": "candidate-1"},
     )
 
     restarted = RuntimeStateStore(store.db_path, include_memory_plane=False)
     replay = await restarted.commit_self_mod_receipt_exact(
         identity,
-        stage="gate",
+        stage="proposal",
         proposal_id=identity.proposal_id,
-        status="passed",
-        payload={"verdict": "ship"},
+        status="proposed",
+        payload={"candidate_digest": "candidate-1"},
     )
 
     assert replay == first
@@ -219,9 +453,9 @@ async def test_exact_self_mod_concurrent_replay_creates_one_pair(tmp_path) -> No
         *(
             RuntimeStateStore(store.db_path, include_memory_plane=False).commit_self_mod_receipt_exact(
                 identity,
-                stage="promote",
+                stage="proposal",
                 proposal_id=identity.proposal_id,
-                status="accepted",
+                status="proposed",
                 payload={"candidate_digest": "candidate-1"},
             )
             for _ in range(12)
@@ -235,6 +469,7 @@ async def test_exact_self_mod_concurrent_replay_creates_one_pair(tmp_path) -> No
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["proposal", "gate"])
 @pytest.mark.parametrize(
     ("status", "payload"),
     [
@@ -244,13 +479,14 @@ async def test_exact_self_mod_concurrent_replay_creates_one_pair(tmp_path) -> No
 )
 async def test_conflicting_replay_fails_without_replacing_original(
     tmp_path,
+    stage: str,
     status: str,
     payload: dict[str, str],
 ) -> None:
     store, identity = await _prepared_store(tmp_path)
     original = await store.commit_self_mod_receipt_exact(
         identity,
-        stage="gate",
+        stage=stage,
         proposal_id=identity.proposal_id,
         status="passed",
         payload={"verdict": "ship"},
@@ -259,14 +495,14 @@ async def test_conflicting_replay_fails_without_replacing_original(
     with pytest.raises(ValueError, match="conflicting exact self-mod receipt"):
         await store.commit_self_mod_receipt_exact(
             identity,
-            stage="gate",
+            stage=stage,
             proposal_id=identity.proposal_id,
             status=status,
             payload=payload,
         )
 
     [persisted] = await store.list_runtime_receipts(
-        receipt_type="self_mod_gate",
+        receipt_type=f"self_mod_{stage}",
         limit=10,
     )
     assert persisted == original
@@ -370,12 +606,17 @@ async def test_nonexact_identity_proposal_binding_fails_before_write(tmp_path) -
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["proposal", "gate"])
 @pytest.mark.parametrize("missing_table", ["receipt", "idempotency"])
-async def test_partial_state_fails_closed(tmp_path, missing_table: str) -> None:
+async def test_partial_state_fails_closed(
+    tmp_path,
+    missing_table: str,
+    stage: str,
+) -> None:
     store, identity = await _prepared_store(tmp_path)
     receipt = await store.commit_self_mod_receipt_exact(
         identity,
-        stage="gate",
+        stage=stage,
         proposal_id=identity.proposal_id,
         status="passed",
         payload={"verdict": "ship"},
@@ -393,7 +634,7 @@ async def test_partial_state_fails_closed(tmp_path, missing_table: str) -> None:
     with pytest.raises(ValueError, match="partial exact self-mod evidence state"):
         await store.commit_self_mod_receipt_exact(
             identity,
-            stage="gate",
+            stage=stage,
             proposal_id=identity.proposal_id,
             status="passed",
             payload={"verdict": "ship"},
@@ -721,7 +962,17 @@ async def test_generic_writer_cannot_replace_exact_pair_by_receipt_id(tmp_path) 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["gate", "self_mod_gate", "promote", "self_mod_promote"])
+@pytest.mark.parametrize(
+    "stage",
+    [
+        "proposal",
+        "self_mod_proposal",
+        "gate",
+        "self_mod_gate",
+        "promote",
+        "self_mod_promote",
+    ],
+)
 async def test_generic_writer_legacy_self_mod_rejects_reserved_stages(tmp_path, stage: str) -> None:
     store, identity = await _prepared_store(tmp_path)
 
@@ -922,7 +1173,7 @@ async def test_generic_idempotency_rejects_disguised_side_effect_key(tmp_path) -
 async def test_other_self_mod_stages_and_slots_remain_compatible(tmp_path) -> None:
     store, identity = await _prepared_store(tmp_path)
 
-    for stage in ("proposal", "apply", "verify", "revert"):
+    for stage in ("apply", "verify", "revert"):
         async_receipt = await store.record_self_mod_receipt(
             identity,
             stage=stage,

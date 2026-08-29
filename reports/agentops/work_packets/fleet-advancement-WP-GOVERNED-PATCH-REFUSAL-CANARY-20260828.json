@@ -1,0 +1,185 @@
+{
+  "allowed_files": [
+    "dharma_swarm/governed_patch_candidate_bundle.py",
+    "dharma_swarm/governed_patch_evidence.py",
+    "dharma_swarm/governed_patch_no_effect.py",
+    "dharma_swarm/mission_control_a2a_candidate.py",
+    "dharma_swarm/mission_control_a2a_io.py",
+    "dharma_swarm/mission_control_a2a_owner_readback.py",
+    "dharma_swarm/mission_control_a2a_owner_snapshot.py",
+    "dharma_swarm/mission_control_a2a_projection.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_lifecycle.py",
+    "dharma_swarm/mission_control_verification_vibe.py",
+    "dharma_swarm/runtime_release_entrypoint.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/runtime_state_exact_identity.py",
+    "docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json",
+    "reports/agentops/work_packets/fleet-advancement-WP-GOVERNED-PATCH-REFUSAL-CANARY-20260828.json",
+    "reports/governance/dharmagraph_parity/PARITY_MATRIX.md",
+    "reports/governance/dharmagraph_parity/builder_receipt.json",
+    "reports/governance/dharmagraph_parity/judge_receipt.json",
+    "reports/governance/dharmagraph_parity/seam_ledger.json",
+    "scripts/runtime/dharma_swarm_release_runner.sh",
+    "scripts/runtime/governed_patch_foundry_verifier.py",
+    "scripts/runtime/governed_patch_foundry_workspace.py",
+    "scripts/runtime/governed_patch_verifier_common.py",
+    "scripts/runtime/governed_patch_vibe_verifier.py",
+    "tests/test_governed_patch_evidence.py",
+    "tests/test_governed_patch_verifier_processes.py",
+    "tests/test_governed_patch_verifiers.py",
+    "tests/test_mission_control.py",
+    "tests/test_mission_control_a2a.py",
+    "tests/test_runtime_release_entrypoint.py",
+    "tests/test_runtime_release_runner.py",
+    "tests/test_runtime_state.py",
+    "tests/test_runtime_state_self_mod_exact.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "a699db5dcf15d67ce537f96e66f2d283114c2131",
+  "branch": "codex/governed-patch-reflex-refusal-readback-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): prove governed patch refusal and store observation"
+  },
+  "forbidden_files": [
+    "dharma_swarm/foundry/**",
+    "tests/test_foundry_*.py",
+    "scripts/foundry/**",
+    "docs/foundry/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/forge_lab/**",
+    "tests/forge_lab_v1/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "deploy/sadhana/**",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "dashboard/src/app/dashboard/sadhana/**",
+    "dashboard/**",
+    "terminal/**",
+    "api/**",
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/mission_control_recovery.py"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_foundry_evaluator.py tests/test_foundry_heldout.py tests/test_foundry_loop.py tests/test_foundry_patches.py tests/test_foundry_runner_isolation.py tests/test_governed_patch_evidence.py tests/test_governed_patch_verifier_processes.py tests/test_governed_patch_verifiers.py tests/test_mission_control.py tests/test_mission_control_a2a.py tests/test_mission_control_verification.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_runtime_state.py tests/test_runtime_state_self_mod_exact.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_store_inventory_census.py tests/test_graph_seam_ledger.py tests/test_dharmagraph_parity_gauntlet.py tests/test_module_coherence_gate.py",
+      "expected_exit": 0,
+      "name": "governed-refusal-store-observation-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/governed_patch_candidate_bundle.py dharma_swarm/governed_patch_evidence.py dharma_swarm/governed_patch_no_effect.py dharma_swarm/mission_control_a2a_candidate.py dharma_swarm/mission_control_a2a_io.py dharma_swarm/mission_control_a2a_owner_readback.py dharma_swarm/mission_control_a2a_owner_snapshot.py dharma_swarm/mission_control_a2a_projection.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_lifecycle.py dharma_swarm/mission_control_verification_vibe.py dharma_swarm/runtime_release_entrypoint.py dharma_swarm/runtime_state.py dharma_swarm/runtime_state_exact_identity.py scripts/runtime/governed_patch_foundry_verifier.py scripts/runtime/governed_patch_foundry_workspace.py scripts/runtime/governed_patch_verifier_common.py scripts/runtime/governed_patch_vibe_verifier.py tests/test_governed_patch_evidence.py tests/test_governed_patch_verifier_processes.py tests/test_governed_patch_verifiers.py tests/test_mission_control.py tests/test_mission_control_a2a.py tests/test_runtime_release_entrypoint.py tests/test_runtime_release_runner.py tests/test_runtime_state.py tests/test_runtime_state_self_mod_exact.py",
+      "expected_exit": 0,
+      "name": "governed-refusal-store-observation-ruff",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "governed-refusal-module-budget",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "git diff --check a699db5dcf15d67ce537f96e66f2d283114c2131",
+      "expected_exit": 0,
+      "name": "governed-refusal-range-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-GOVERNED-PATCH-REFUSAL-CANARY-20260828",
+  "intent": "Add the non-authorizing vertical slice from exact proposal evidence to signed terminal refusal, then join that proposal to one bracketed stable Mission Control owner-store observation. RuntimeState gains atomic collision-safe exact proposal receipts, reserved exact child identities, and a focused exact-identity helper that preserves the public store API while restoring the repo-wide module-size ratchet. Mission Control accepts a candidate only from the exact proposal receipt/idempotency pair and can observe the exact active mission, RUNNING task, canonical parent attempt identity, unique unexpired claim, exact child executor source, task-owned A2A binding, and shape-checked candidate through one joined snapshot of its injected owners. Dedicated snapshot/readback modules keep the copy off the event loop, bind DB/WAL roles by path and inode under a ctime-aware bracket, recover both WALs through explicit read-write snapshot URIs, and reject any terminal/recovery receipt or idempotency intent that contradicts RUNNING state. A shared 900-second lease ceiling is enforced by both lifecycle writers and the readback. The observation explicitly proves neither canonical store custody nor repository-effect authority. The candidate boundary snapshots request, source, diff, and Candidate bytes into an external content-addressed bundle. Release admission runs under env -i before provider or signing credentials are restored, then admitted Foundry and Vibe processes receive mutually exclusive key paths. Distinct processes emit signed non-authorizing receipts. Foundry remains foundry_inconclusive; Vibe is candidate-bound ran=false and unchecked; the result records caller_asserted_no_effect with repository authorization and performed flags false. This packet proves a fail-closed refusal reflex and internally consistent owner-store lineage, not a promotion warrant, canonical store custody, live effect, terminal Mission Control transition, or deployment.",
+  "negative_controls": [
+    {
+      "command": "python3 -m pytest -q tests/test_mission_control_a2a.py -k \"proposal_store or authority or mission_attempt or mission_claim or wal or expired or generic_identity\"",
+      "expected_exit": 0,
+      "name": "proposal-store-observation-fails-closed-on-lineage-and-fence-mismatch",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_governed_patch_evidence.py -k \"verified_candidate_snapshots_survive_later_path_swap or reload_revalidates or cross_candidate or tamper\"",
+      "expected_exit": 0,
+      "name": "candidate-bytes-and-no-effect-evidence-remain-exactly-bound",
+      "timeout_seconds": 180
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_governed_patch_verifier_processes.py tests/test_runtime_release_runner.py -k \"distinct_verifier_processes_close_signed_no_effect_canary or separates_verifier_keys_and_provider_environment\"",
+      "expected_exit": 0,
+      "name": "distinct-secretless-refusal-processes-close-no-effect",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_runtime_state_self_mod_exact.py -k \"generic_identity_writer_cannot_overwrite_exact_row or generic_identity_writer_cannot_mint_exact_source_marker or generic_writer or conflicting_replay\"",
+      "expected_exit": 0,
+      "name": "generic-writers-cannot-mint-exact-authority",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_governed_patch_verifiers.py tests/test_mission_control_a2a.py tests/test_mission_control_verification.py -k \"process_receipt or cannot_satisfy_promotion or missing_durable or nested_live_effect or self_verifier\"",
+      "expected_exit": 0,
+      "name": "signed-refusal-receipts-never-retype-as-promotion",
+      "timeout_seconds": 240
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_a2a_candidate.py",
+      "dharma_swarm/mission_control_a2a_io.py",
+      "dharma_swarm/mission_control_a2a_owner_readback.py",
+      "dharma_swarm/mission_control_a2a_owner_snapshot.py",
+      "dharma_swarm/mission_control_a2a_projection.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_lifecycle.py",
+      "dharma_swarm/mission_control_verification_vibe.py",
+      "dharma_swarm/runtime_state.py",
+      "dharma_swarm/runtime_release_entrypoint.py",
+      "scripts/runtime/dharma_swarm_release_runner.sh"
+    ],
+    "collision": {
+      "checked_at_sha": "a699db5dcf15d67ce537f96e66f2d283114c2131",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The joined snapshot uses MissionControlA2AProjection's injected TaskBoard and RuntimeState paths, but callers can still instantiate those owners. Store-instance pinning, protected supervisor custody, and a cross-store epoch remain unproven, so the result is a non-authorizing store observation.",
+      "The bracketed pair-copy proves both database/WAL file sets stayed stable during copying, not that their two independent commits were globally atomic.",
+      "Two distinct verifier OS processes, PIDs, boot IDs, public keys, and key inodes are observed. Same-user hostile-process independence, supervised provenance, and exclusive private-key custody remain unproven.",
+      "Foundry has no real trial ledger or attested Docker CLI, daemon, image, runtime, cleanup, or ignored-release-path chain, so it emits only foundry_inconclusive.",
+      "Vibe deliberately does not run: its signed candidate-bound receipt is ran=false and unchecked. No independently admissible Vibe verdict or production trust root exists.",
+      "No composition-owned semantic producer emits the exact proposal and candidate bundle under a supervisor-owned store, and Mission Control refuses these process receipts as promotion warrants.",
+      "No sealed effect capability, repository mutation, external-owner terminal receipt, or TaskBoard terminal transition exists in this slice.",
+      "Two clean-restart positive runs with a real provider, exactly one authorized effect, and exactly one terminal receipt per run have not been demonstrated.",
+      "Every stacked PR requires external human approval; passing packet, local, or CI verification does not satisfy that gate."
+    ],
+    "interface_mismatches": [
+      "A2A packet/delivery IDs and Mission Control attempt/claim IDs are distinct modalities and remain separate fields; aliases can never satisfy the owner-store lineage check.",
+      "A stable owner-store observation is not a bearer capability and cannot convert to an EffectWarrant; the effect owner must perform a fresh fence CAS.",
+      "TaskBoard and RuntimeState are independent WAL databases, so the observation explicitly exposes its bracketed snapshot limitation instead of claiming global atomicity.",
+      "Foundry evaluation, Vibe observation, signed evidence, RuntimeState attestation, repository-effect authority, terminal receipt, and TaskBoard projection are distinct authority modalities; no earlier layer may be promoted into a later one.",
+      "A signed process receipt proves key possession for one payload, not exclusive private-key custody or hostile-process independence.",
+      "Runtime receipts record evidence but are not bearer capabilities; an effect evaluator must require a separately sealed nominal capability and exact candidate binding."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "338a226d0eb2e32bb591688567aa3eccb3c175de27d8f1ba98887f7d2a6ef461",
+    "rollback": "Revert this Fleet segment, including exact proposal support, joined owner snapshot/readback modules, the shared Mission Control lease ceiling, RuntimeState exact-identity extraction, candidate/no-effect bundles, admitted verifier commands, exact child-identity reservation, parity reseal, and this packet. External evidence bundles, signed receipts, and RuntimeState rows are append-only evidence and are not deleted or reinterpreted by a Git rollback.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-GOVERNED-PATCH-REFUSAL-CANARY-20260828"
+  },
+  "worktree": "."
+}

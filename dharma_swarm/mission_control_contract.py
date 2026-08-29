@@ -31,8 +31,13 @@ OWNER_TERMINAL_ATTEMPT_STATUSES = frozenset(
 )
 TERMINAL_RECEIPT_TYPE = "mission_attempt_terminal"
 RECOVERY_RECEIPT_TYPE = "mission_attempt_recovery"
+_RECOVERY_RECEIPT_LEGACY_FIELDS = frozenset(
+    {"schema_version", "mission_id", "attempt_id", "recovered_claim_id", "reason"}
+)
+_RECOVERY_RECEIPT_FIELDS = _RECOVERY_RECEIPT_LEGACY_FIELDS | {"expired_stale_after"}
 TASK_SCAN_LIMIT = 10_000
 RUNTIME_SCAN_LIMIT = 10_000
+MAX_LEASE_SECONDS = 15 * 60
 TERMINAL_CAS_STALE_AFTER_SECONDS = 30.0
 
 
@@ -305,9 +310,41 @@ def recovery_receipt_matches_contract(
     receipt: RuntimeReceipt,
     identity: ExecutionIdentity,
     mission_id: str,
+    *,
+    expired_stale_after: datetime | None = None,
 ) -> bool:
-    """Return whether a recovery receipt is canonical for its exact claim."""
-    return (
+    """Return whether a recovery receipt is canonical for its exact claim.
+
+    Pre-upgrade ``dharma.mission_control.v1`` recovery receipts legitimately
+    lack ``expired_stale_after``; this accepts exactly that closed legacy
+    shape as a pinned migration path, never an arbitrary open one.
+    """
+    payload_fields = set(receipt.payload)
+    is_legacy = payload_fields == _RECOVERY_RECEIPT_LEGACY_FIELDS
+    if not is_legacy and payload_fields != _RECOVERY_RECEIPT_FIELDS:
+        return False
+    if is_legacy:
+        if expired_stale_after is not None and expired_stale_after > receipt.created_at:
+            return False
+    else:
+        raw_deadline = receipt.payload.get("expired_stale_after")
+        try:
+            deadline = (
+                datetime.fromisoformat(raw_deadline)
+                if type(raw_deadline) is str
+                else None
+            )
+        except ValueError:
+            deadline = None
+        if (
+            deadline is None
+            or deadline.tzinfo is None
+            or deadline.utcoffset() is None
+            or deadline > receipt.created_at
+            or (expired_stale_after is not None and deadline != expired_stale_after)
+        ):
+            return False
+    return bool(
         receipt_matches_identity(receipt, identity)
         and receipt.receipt_type == RECOVERY_RECEIPT_TYPE
         and receipt.status == "stale_recovered"
@@ -384,6 +421,7 @@ __all__ = [
     "ACTIVE_CLAIM_STATUSES",
     "AgentLeaseView",
     "AttemptView",
+    "MAX_LEASE_SECONDS",
     "MissionControlError",
     "MissionSnapshot",
     "MissionView",

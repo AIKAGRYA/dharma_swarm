@@ -13,7 +13,6 @@ import os
 import re
 import shlex
 import stat
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -88,7 +87,12 @@ def scoped_regular_file(
 
 
 def write_immutable_beneath(root: Path, relative: str, data: bytes) -> Path:
-    """Create or verify one immutable file through no-follow directory handles."""
+    """Create/verify one owner-only content-addressed file via no-follow handles.
+
+    The file is mode 0600 and therefore remains mutable by its owner. Consumers
+    requiring byte stability must carry the verified bounded snapshot forward
+    rather than reopen this path after verification.
+    """
     path = PurePosixPath(relative)
     if (
         not relative
@@ -144,11 +148,20 @@ def write_immutable_beneath(root: Path, relative: str, data: bytes) -> Path:
             try:
                 descriptor = os.open(name, read_flags, dir_fd=directory_fd)
                 with os.fdopen(descriptor, "rb") as handle:
-                    if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                    metadata = os.fstat(handle.fileno())
+                    if (
+                        not stat.S_ISREG(metadata.st_mode)
+                        or stat.S_IMODE(metadata.st_mode) != 0o600
+                        or metadata.st_uid != os.getuid()
+                    ):
                         raise PatchReplayError(
-                            f"immutable artifact is not regular: {relative}"
+                            f"immutable artifact ownership/mode is unsafe: {relative}"
                         )
-                    existing = handle.read()
+                    if metadata.st_size != len(data):
+                        raise PatchReplayError(
+                            f"content-address collision at {relative}"
+                        )
+                    existing = handle.read(len(data) + 1)
             except OSError as exc:
                 raise PatchReplayError(
                     f"immutable artifact is unsafe: {relative}"
@@ -361,37 +374,21 @@ def apply_unified_diff(
     *,
     allowed_paths: Iterable[str],
     check_only: bool = False,
+    expected_identity: tuple[int, int, int] | None = None,
+    expected_root_identity: tuple[int, int] | None = None,
+    operation_id: str | None = None,
 ) -> Path:
-    """Replay ``diff`` exactly, atomically replacing one scoped UTF-8 file."""
-    parsed = parse_unified_diff(diff)
-    target = _scoped_target(Path(root), parsed.path, allowed_paths)
-    try:
-        # ``Path.read_text`` enables universal-newline translation and would
-        # silently rewrite untouched CRLF/mixed-newline lines. Exact replay
-        # keeps the source terminators byte-for-byte unless the diff names them.
-        with target.open("r", encoding="utf-8", newline="") as handle:
-            source = handle.readlines()
-    except UnicodeDecodeError as exc:
-        raise PatchReplayError("binary artifact targets are unsupported") from exc
-    candidate = "".join(_replay(source, parsed))
-    if check_only:
-        return target
+    """Replay one diff through no-follow directory descriptors."""
 
-    descriptor, temporary = tempfile.mkstemp(prefix=".foundry-replay-", dir=target.parent)
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
-            handle.write(candidate)
-            handle.flush()
-            os.fsync(handle.fileno())
-        original_mode = stat.S_IMODE(target.stat().st_mode)
-        os.chmod(temporary_path, original_mode)
-        os.replace(temporary_path, target)
-        directory_fd = os.open(target.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
-    finally:
-        temporary_path.unlink(missing_ok=True)
-    return target
+    parsed = parse_unified_diff(diff)
+    from dharma_swarm.foundry.patches_atomic import apply_parsed_diff_atomic
+
+    return apply_parsed_diff_atomic(
+        Path(root),
+        parsed,
+        allowed_paths=allowed_paths,
+        check_only=check_only,
+        expected_identity=expected_identity,
+        expected_root_identity=expected_root_identity,
+        operation_id=operation_id,
+    )

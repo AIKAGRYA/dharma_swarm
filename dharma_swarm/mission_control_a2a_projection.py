@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,12 @@ from dharma_swarm.mission_control_a2a_evidence import (
     CanonicalA2AEvidenceReader,
     DELIVERY_SCHEMA,
 )
+from dharma_swarm.mission_control_a2a_candidate import (
+    ExactProposalStoreExpectation,
+    ExactProposalStoreObservation,
+    load_exact_proposals,
+    unwrap_exact_proposal,
+)
 from dharma_swarm.mission_control_a2a_io import (
     _read_only_db,
     read_json,
@@ -35,10 +41,13 @@ from dharma_swarm.mission_control_a2a_io import (
     require_mission,
     safe_file,
 )
+from dharma_swarm.mission_control_a2a_owner_readback import (
+    observe_exact_proposal_store as _observe_exact_proposal_store,
+)
 from dharma_swarm.mission_control_contract import MissionControlError
 from dharma_swarm.mission_control_verification import ExpectedPromotionBindings
 from dharma_swarm.models import Task, TaskStatus
-from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore
+from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard
 
@@ -120,56 +129,25 @@ class MissionControlA2AProjection:
             metadata=metadata if isinstance(metadata, dict) else {},
         )
 
-    def _proposals(self, ref: A2ANativeExecutionRef) -> list[RuntimeReceipt]:
-        columns = (
-            "receipt_id, receipt_type, status, run_id, task_id, trace_id, "
-            "correlation_id, causation_id, parent_run_id, agent_id, "
-            "idempotency_key, side_effect_key, payload_json, created_at"
-        )
-        with _read_only_db(self._runtime_db, "RuntimeState") as connection:
-            rows = connection.execute(
-                f"SELECT {columns} FROM runtime_receipts "
-                "WHERE correlation_id = ? AND receipt_type = 'self_mod_proposal' "
-                "ORDER BY created_at ASC LIMIT ?",
-                (ref.correlation_id, _SCAN_LIMIT + 1),
-            ).fetchall()
-        receipts: list[RuntimeReceipt] = []
-        for row in rows:
-            try:
-                payload = json.loads(str(row["payload_json"] or "{}"))
-                created_at = datetime.fromisoformat(str(row["created_at"]))
-            except (ValueError, json.JSONDecodeError) as exc:
-                raise MissionControlError(
-                    "self-mod proposal evidence is malformed",
-                ) from exc
-            if not isinstance(payload, dict):
-                raise MissionControlError("self-mod proposal payload must be an object")
-            receipts.append(
-                RuntimeReceipt(
-                    receipt_id=str(row["receipt_id"]),
-                    receipt_type=str(row["receipt_type"]),
-                    status=str(row["status"]),
-                    run_id=str(row["run_id"] or ""),
-                    task_id=str(row["task_id"] or ""),
-                    trace_id=str(row["trace_id"] or ""),
-                    correlation_id=str(row["correlation_id"] or ""),
-                    causation_id=str(row["causation_id"] or ""),
-                    parent_run_id=str(row["parent_run_id"] or ""),
-                    agent_id=str(row["agent_id"] or ""),
-                    idempotency_key=str(row["idempotency_key"] or ""),
-                    side_effect_key=str(row["side_effect_key"] or ""),
-                    payload=payload,
-                    created_at=created_at,
-                ),
-            )
-        return receipts
-
     def _job(self, ref: A2ANativeExecutionRef) -> dict[str, Any]:
         path = safe_file(
             self._job_root,
             f"{_safe_token(ref.agent_uid, 'agent_uid')}.sqlite3",
         )
         return read_semantic_job(path, ref.packet_id, max_bytes=self._max_bytes)
+
+    async def observe_exact_proposal_store(
+        self,
+        expected: ExactProposalStoreExpectation,
+    ) -> ExactProposalStoreObservation:
+        """Join RUNNING Mission Control lineage without minting effect authority."""
+
+        return await asyncio.to_thread(
+            _observe_exact_proposal_store,
+            self._runtime_db,
+            self._board_db,
+            expected,
+        )
 
     async def observe(
         self,
@@ -252,13 +230,17 @@ class MissionControlA2AProjection:
             processed=processed,
         )
         phase = A2AEvidencePhase.EXECUTED if executed else A2AEvidencePhase.DELIVERED
-        proposals = self._proposals(ref)
+        proposals = load_exact_proposals(
+            self._runtime_db,
+            ref,
+            scan_limit=_SCAN_LIMIT,
+        )
         if len(proposals) > _SCAN_LIMIT:
             raise MissionControlError("self-mod proposal evidence scan saturated")
         proposals = [
             item
             for item in proposals
-            if item.payload.get("proposal_id") == ref.proposal_id
+            if item.receipt.payload.get("proposal_id") == ref.proposal_id
         ]
         proposal_id = proposal_sha = candidate_digest = diff_sha256 = ""
         base_sha = executor_run_id = ""
@@ -272,7 +254,8 @@ class MissionControlA2AProjection:
                 raise MissionControlError(
                     "conflicting or premature patch-candidate evidence"
                 )
-            proposal = proposals[0]
+            proposal_record = proposals[0]
+            proposal = proposal_record.receipt
             executor = self._execution_identity(expected.executor_run_id)
             if executor is None or not _identity_matches_expected(
                 executor,
@@ -282,7 +265,7 @@ class MissionControlA2AProjection:
                 raise MissionControlError(
                     "patch candidate has no exact durable executor identity"
                 )
-            payload = proposal.payload
+            payload = unwrap_exact_proposal(proposal_record, ref, executor)
             required_payload = {
                 "schema_version",
                 "mission_id",
@@ -299,16 +282,6 @@ class MissionControlA2AProjection:
                 "artifact_sha256",
                 "authorized_source_files",
             }
-            receipt_identity = (
-                proposal.run_id == executor.run_id
-                and proposal.task_id == executor.task_id
-                and proposal.trace_id == executor.trace_id
-                and proposal.correlation_id == executor.correlation_id
-                and proposal.causation_id == executor.causation_id
-                and proposal.parent_run_id == executor.parent_run_id
-                and proposal.agent_id == executor.agent_id
-                and proposal.idempotency_key == executor.idempotency_key
-            )
             payload_identity = (
                 payload.get("mission_id") == ref.mission_id
                 and payload.get("task_id") == ref.task_id
@@ -328,10 +301,6 @@ class MissionControlA2AProjection:
             if (
                 set(payload) != required_payload
                 or payload.get("schema_version") != PATCH_CANDIDATE_SCHEMA
-                or proposal.status != "proposed"
-                or proposal.receipt_type != "self_mod_proposal"
-                or not receipt_identity
-                or proposal.side_effect_key != f"self_mod:{ref.proposal_id}:proposal"
                 or not payload_identity
             ):
                 raise MissionControlError(
