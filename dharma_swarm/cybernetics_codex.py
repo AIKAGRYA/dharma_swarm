@@ -57,7 +57,7 @@ OWNED_SURFACES = [
     "scripts/governance/register_cybernetics_codex.py",
     "tests/test_cybernetics_codex.py",
     "reports/loop_closure/cybernetics_codex/**",
-    "/Users/dhyana/cybernetics_codex_note.md",
+    str(Path.home() / "cybernetics_codex_note.md"),
 ]
 
 FORBIDDEN_ACTIONS = [

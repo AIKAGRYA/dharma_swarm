@@ -30,8 +30,7 @@ the gold patch) and must emit a unified diff against the repo.
 
 Run (needs the swebench venv + Docker up; SLOW — ~11 min/instance under qemu):
 
-    PYTHONPATH=/Users/dhyana/ds_forge_v1_scoreboard \
-      /Users/dhyana/dharma_swarm/.venv/bin/python \
+    PYTHONPATH=. .venv/bin/python \
       -m dharma_swarm.forge_v1.run_real --instances django__django-12209 -n 3
 
 Artifacts (full result JSON) go to ~/.dharma/forge_v1/real_run_<ts>.json — never
