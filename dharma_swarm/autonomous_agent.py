@@ -20,10 +20,12 @@ Requires: anthropic>=0.70.0 for Anthropic models, openai>=1.0.0 for OpenRouter.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -31,12 +33,22 @@ from dharma_swarm.agent_memory import AgentMemoryBank
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMResponse, Message, MessagePriority, ProviderType
 from dharma_swarm.runtime_provider import (
+    PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+    RuntimeProviderConfig,
     create_runtime_provider,
     preferred_runtime_provider_configs,
 )
 
 logger = logging.getLogger(__name__)
 _DEFAULT_AGENT_MODEL = canonical_default_model(ProviderType.ANTHROPIC)
+# Wake chain: Max-plan Claude first, then every funded low-cost lane in canonical
+# order. CLAUDE_CODE also closes PREFERRED_LOW_COST_*; dict.fromkeys keeps the
+# first occurrence so the shared claude binary is resolved once.
+_WAKE_PROVIDER_ORDER: tuple[ProviderType, ...] = tuple(dict.fromkeys((
+    ProviderType.ANTHROPIC,
+    ProviderType.CLAUDE_CODE,
+    *PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+)))
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +433,7 @@ class AutonomousAgent:
         self.identity = identity
         self.memory = AgentMemoryBank(identity.name)
         self._model_router = model_router
+        self._last_provider_won: RuntimeProviderConfig | None = None
         self._openai_client: Any = None
         self._message_bus: Any = None
         self._stigmergy: Any = None
@@ -635,11 +648,13 @@ class AutonomousAgent:
 
         # The same Claude model serves via the metered Anthropic API OR — keyless —
         # via the claude_code Max-plan lane (live only when headless `claude -p`
-        # smokes green). Order ANTHROPIC first, then fall back to the KEYLESS claude_code
-        # lane, so this never dies with "configure ANTHROPIC_API_KEY" when dispatch
-        # is actually available with zero keys.
+        # smokes green). Both collapse to one physical claude binary, so the
+        # canonical low-cost lanes follow: a dead Claude lane falls through to a
+        # funded one instead of ending the wake. identity.model is a Claude id and
+        # is applied ONLY to the Claude lanes; every other lane keeps its
+        # model_defaults default.
         configs = preferred_runtime_provider_configs(
-            provider_order=(ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE),
+            provider_order=_WAKE_PROVIDER_ORDER,
             model_overrides={
                 ProviderType.ANTHROPIC: self.identity.model,
                 ProviderType.CLAUDE_CODE: self.identity.model,
@@ -647,10 +662,10 @@ class AutonomousAgent:
         )
         if not configs:
             raise RuntimeError(
-                "No Claude provider available. claude_code is KEYLESS only when "
-                "headless `claude -p` dispatch smokes green — check "
-                "key_oracle.dispatchable_now(); set "
-                "ANTHROPIC_API_KEY only for the metered API path."
+                "No provider available in the wake chain. claude_code is KEYLESS "
+                "only when headless `claude -p` dispatch smokes green — check "
+                "key_oracle.dispatchable_now(); set ANTHROPIC_API_KEY only for "
+                "the metered API path, or fund a low-cost lane via `dkeys add`."
             )
 
         routed_order = (
@@ -673,10 +688,14 @@ class AutonomousAgent:
                 has_tools=bool(tools),
                 available_provider_types=routed_order,
             )
-            _, response = await self._model_router.complete_for_task(
+            decision, response = await self._model_router.complete_for_task(
                 route_req,
                 llm_req,
                 available_provider_types=routed_order,
+            )
+            selected = getattr(decision, "selected_provider", None)
+            self._last_provider_won = next(
+                (c for c in configs if c.provider == selected), None,
             )
             return _llm_response_to_react_shape(response)
 
@@ -694,11 +713,12 @@ class AutonomousAgent:
                         tools=tools,
                     )
                 )
+                self._last_provider_won = config
                 return _llm_response_to_react_shape(response)
             except Exception as exc:
                 last_exc = exc
                 logger.warning(
-                    "[%s] provider %s failed for anthropic lane: %s",
+                    "[%s] provider %s failed in wake chain: %s",
                     self.identity.name,
                     config.provider.value,
                     exc,
@@ -710,7 +730,7 @@ class AutonomousAgent:
 
         if last_exc is not None:
             raise last_exc
-        raise RuntimeError("Anthropic provider chain exhausted without an explicit error")
+        raise RuntimeError("Wake provider chain exhausted without an explicit error")
 
     async def _call_openrouter(
         self, system: str, messages: list[dict], tools: list[dict],
@@ -1480,8 +1500,32 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
 # ---------------------------------------------------------------------------
 
 
-async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None:
+def _wake_receipts_path() -> Path:
+    return Path.home() / ".dharma" / "logs" / "wake_receipts.jsonl"
+
+
+def _append_wake_receipt(row: dict[str, Any]) -> None:
+    try:
+        path = _wake_receipts_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, sort_keys=True) + "\n")
+    except Exception as exc:  # noqa: BLE001 — a receipt failure must never mask the wake's exit code
+        logger.warning("wake receipt not written: %s", exc)
+
+
+async def cli_wake(
+    agent_name: str,
+    task: str,
+    model: str | None = None,
+    provider: str | None = None,
+) -> int:
     """CLI entry point: wake an agent with a task.
+
+    ``provider`` overrides ``identity.provider`` (validated against
+    ``ProviderType`` values; unknown ⇒ message + return 2). Returns 0 iff the
+    wake finished with no errors, else 1, and appends one receipt row to
+    ``~/.dharma/logs/wake_receipts.jsonl``.
 
     Accepted legacy behavior: constructs ``AutonomousAgent`` **without**
     ``model_router``, so completions use direct runtime / SDK paths only (no
@@ -1489,6 +1533,12 @@ async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None
     ``model_router=create_default_router()`` here if CLI should join the
     router substrate.
     """
+    if provider is not None:
+        valid = sorted(p.value for p in ProviderType)
+        if provider not in valid:
+            print(f"Unknown provider {provider!r}. Choose from: {', '.join(valid)}")
+            return 2
+
     if agent_name in PRESET_AGENTS:
         identity = PRESET_AGENTS[agent_name]
     else:
@@ -1503,6 +1553,8 @@ async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None
         # Copy before overriding: presets are shared module state, and mutating
         # them leaks the override into every later wake in the same process.
         identity = replace(identity, model=model)
+    if provider:
+        identity = replace(identity, provider=provider)
 
     agent = AutonomousAgent(identity)
     print(f"Waking {agent_name}...")
@@ -1519,6 +1571,25 @@ async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None
     print(f"{'=' * 60}")
     print(result.summary)
 
+    exit_code = 0 if not result.errors else 1
+    won = agent._last_provider_won
+    _append_wake_receipt({
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "agent": agent_name,
+        "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest()[:12],
+        "provider_requested": provider or identity.provider,
+        "provider_won": won.provider.value if won is not None else None,
+        "model": (won.default_model or identity.model) if won is not None else identity.model,
+        "turns": result.turns,
+        "tokens": result.total_tokens,
+        "errors": {
+            "count": len(result.errors),
+            "first": result.errors[0][:200] if result.errors else None,
+        },
+        "exit_code": exit_code,
+    })
+    return exit_code
+
 
 if __name__ == "__main__":
     import sys
@@ -1528,4 +1599,4 @@ if __name__ == "__main__":
         print(f"Preset agents: {', '.join(PRESET_AGENTS.keys())}")
         sys.exit(1)
 
-    asyncio.run(cli_wake(sys.argv[1], " ".join(sys.argv[2:])))
+    sys.exit(asyncio.run(cli_wake(sys.argv[1], " ".join(sys.argv[2:]))))

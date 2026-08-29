@@ -621,6 +621,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_agent_wake.add_argument("name", help="Agent name (researcher/coder/scout/reviewer/witness or custom)")
     p_agent_wake.add_argument("--task", "-t", required=True, help="Task for the agent")
     p_agent_wake.add_argument("--model", "-m", default=None, help="Override model")
+    p_agent_wake.add_argument(
+        "--provider", "-p", default=None,
+        help="Override provider lane (e.g. openrouter, ollama, claude_code)",
+    )
 
     p_agent_list = agent_sub.add_parser("list", help="List available preset agents")
 
@@ -1607,7 +1611,7 @@ def main() -> None:
         case "agent":
             match args.agent_cmd:
                 case "wake":
-                    _cmd_agent_wake(args.name, args.task, args.model)
+                    _cmd_agent_wake(args.name, args.task, args.model, args.provider)
                 case "list":
                     _cmd_agent_list()
                 case "runs":

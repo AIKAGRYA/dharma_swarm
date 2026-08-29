@@ -250,7 +250,15 @@ async def test_anthropic_direct_attempts_shared_claude_cli_once(monkeypatch) -> 
             [],
         )
 
-    assert attempted == [ProviderType.ANTHROPIC]
+    # anthropic + claude_code collapse to the one shared claude binary: tried
+    # exactly once, first; funded low-cost lanes (env-dependent) may follow.
+    assert attempted[0] == ProviderType.ANTHROPIC
+    claude_lanes = [
+        p for p in attempted
+        if p in (ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE)
+    ]
+    assert claude_lanes == [ProviderType.ANTHROPIC]
+    assert agent._last_provider_won is None
 
 
 @patch(
