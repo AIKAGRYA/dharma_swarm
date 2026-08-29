@@ -6,6 +6,7 @@ import hashlib
 import os
 import secrets
 import sqlite3
+import weakref
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -122,16 +123,27 @@ class GovernedPatchEffectFence:
 
     def _prune_expired_warrants(self) -> None:
         current = _now()
-        for tracked_id, (tracked, _) in list(self._warrants.items()):
-            if tracked.expires_at <= current:
-                del self._warrants[tracked_id]
+        for tracked_id, (tracked_ref, _) in list(self._warrants.items()):
+            tracked = tracked_ref()
+            if tracked is None or tracked.expires_at <= current:
+                self._warrants.pop(tracked_id, None)
 
     def _register_warrant(self, warrant: EffectWarrant) -> EffectWarrant:
         if not self._valid_composition():
             raise ValueError("effect fence cannot register across a process boundary")
         object.__setattr__(warrant, "_seal", self._warrant_sentinel)
         digest = effect_warrant_sha256(warrant)
-        self._warrants[id(warrant)] = (warrant, digest)
+        warrants = self._warrants
+        tracked_id = id(warrant)
+
+        def _on_collected(
+            ref: "weakref.ReferenceType[EffectWarrant]",
+            *, tracked_id: int = tracked_id, warrants: dict = warrants,
+        ) -> None:
+            if warrants.get(tracked_id, (None,))[0] is ref:
+                warrants.pop(tracked_id, None)
+
+        warrants[tracked_id] = (weakref.ref(warrant, _on_collected), digest)
         return warrant
 
     def _valid_warrant(self, warrant: EffectWarrant) -> bool:
@@ -139,7 +151,7 @@ class GovernedPatchEffectFence:
         try:
             return bool(
                 self._valid_composition()
-                and entry is not None and entry[0] is warrant
+                and entry is not None and entry[0]() is warrant
                 and warrant._seal is self._warrant_sentinel  # noqa: SLF001
                 and entry[1] == effect_warrant_sha256(warrant)
             )
@@ -236,6 +248,7 @@ class GovernedPatchEffectFence:
         expected: ExactProposalStoreExpectation, warrant: EffectWarrant,
         candidate: CandidateBundle, *, claimed_by: str,
     ) -> EffectConsumption:
+        self._prune_expired_warrants()
         if (
             not self._valid_composition()
             or not self._valid_warrant(warrant)
