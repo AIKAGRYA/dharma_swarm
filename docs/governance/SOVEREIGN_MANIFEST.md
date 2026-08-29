@@ -158,35 +158,20 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **1,132** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **492 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **399,997** | wc -l across dharma_swarm Python modules |
-| Test files | **1025** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **15,673 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **1,128** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Top-level (flat) modules | **488 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Total Python LOC | **398,651** | wc -l across dharma_swarm Python modules |
+| Test files | **1019** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **15,640 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,539** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **322,476** | wc -l across all tracked .md |
+| Markdown files | **1,527** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **323,690** | wc -l across all tracked .md |
 | Bridge files | **37** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **50** | find dharma_swarm -type f \| rg -i "adapter" |
-| Router files | **23** | find dharma_swarm -type f \| rg -i "rout" |
-| Total Python modules | **1,064** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **471 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **379,860** | wc -l across dharma_swarm Python modules |
-| Test files | **970** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **14,771 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Total Python modules | **1,063** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **470 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **379,481** | wc -l across dharma_swarm Python modules |
-| Test files | **963** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **14,720 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Router files | **22** | find dharma_swarm -type f \| rg -i "rout" |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,480** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **312,291** | wc -l across all tracked .md |
-| Bridge files | **32** | find dharma_swarm -name "*bridge*.py" -type f |
-| Adapter files | **33** | find dharma_swarm -type f \| rg -i "adapter" |
-| Router files | **19** | find dharma_swarm -type f \| rg -i "rout" |
 
 ## SYSTEM TOPOGRAPHY
 
