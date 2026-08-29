@@ -810,8 +810,10 @@ async def run_dgm_evolution_task(
         )
         applied = sum(1 for r in results if r.applied)
         fitness_deltas = [r.fitness_delta for r in results if r.fitness_after > 0]
+        # A generation counts as graded only if it produced a fitness score;
+        # an all-error run must not report success.
         return {
-            "success": True,
+            "success": len(fitness_deltas) > 0 and any(r.error is None for r in results),
             "generations_run": len(results),
             "generations_applied": applied,
             "generations_rolled_back": sum(1 for r in results if r.rolled_back),
