@@ -142,11 +142,27 @@ def _read_crontab_markers() -> dict[str, Any]:
     }
 
 
+def _probe_exists(path: Path, uninspectable: list[str]) -> bool:
+    """Fail-closed existence probe for host paths the runner may not read.
+
+    On a non-root Linux host ``Path.exists()`` under /root raises
+    PermissionError (pathlib only suppresses OSError from 3.14); a read-only
+    doctor view must record that as evidence, never crash.
+    """
+
+    try:
+        return path.exists()
+    except OSError as exc:
+        uninspectable.append(f"legacy_control_path_uninspectable:{path}({type(exc).__name__})")
+        return False
+
+
 def legacy_control_status() -> dict[str, Any]:
     base = Path(os.environ.get("RSI_LAB_ROOT", "/root/rsi-lab"))
     legacy_bin = Path(os.environ.get("RSI_LAB_LEGACY_BIN", base / "bin"))
     cron = _read_crontab_markers()
     legacy_script = legacy_bin / "rsi-keys-refresh"
+    uninspectable: list[str] = []
     split_paths = [
         base / "current-main" / "state" / "rsi_runs",
         base / "current-main" / "state" / ".dharma" / "keys_status.json",
@@ -179,13 +195,16 @@ def legacy_control_status() -> dict[str, Any]:
                 alias_projection_paths.append(str(path))
 
     retirement_hazards: list[str] = []
-    if legacy_script.exists():
+    legacy_script_present = _probe_exists(legacy_script, uninspectable)
+    if legacy_script_present:
         retirement_hazards.append("legacy_rsi_keys_refresh_present")
     if cron["legacy_key_refresh_entries"]:
         retirement_hazards.append("legacy_rsi_keys_refresh_cron_active")
     if cron["current_main_state_entries"]:
         retirement_hazards.append("legacy_cron_logs_to_current_main_state")
-    present_split = [str(path) for path in split_paths if path.exists()]
+    present_split = [
+        str(path) for path in split_paths if _probe_exists(path, uninspectable)
+    ]
     if present_split:
         retirement_hazards.append("legacy_provider_state_split_present")
     if present_receipts:
@@ -200,10 +219,10 @@ def legacy_control_status() -> dict[str, Any]:
         automation_hazards.append(
             f"versioned_provider_refresh_entries:{cron['versioned_refresh_entries']}/1"
         )
-    hazards = retirement_hazards + automation_hazards
+    hazards = uninspectable + retirement_hazards + automation_hazards
     return {
         "ready": not hazards,
-        "legacy_script_present": legacy_script.exists(),
+        "legacy_script_present": legacy_script_present,
         "cron": cron,
         "state_split_paths_present": present_split,
         "legacy_receipt_paths_present": present_receipts,
