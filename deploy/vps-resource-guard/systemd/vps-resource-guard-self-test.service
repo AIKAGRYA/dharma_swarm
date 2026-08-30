@@ -1,0 +1,46 @@
+[Unit]
+Description=Read-only VPS resource guard target self-test
+Documentation=file:/usr/local/share/doc/vps-resource-guard/README.md
+After=local-fs.target docker.service
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/vps-resource-guard/vps_resource_guard.py --config /etc/vps-resource-guard/config.toml --self-test-targets
+TimeoutStartSec=30s
+OOMScoreAdjust=-900
+MemoryAccounting=true
+MemoryHigh=192M
+MemoryMax=256M
+UMask=0077
+Environment=DOCKER_HOST=unix:///run/docker.sock
+Environment=DOCKER_CONFIG=/run/vps-resource-guard-self-test
+Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus
+
+User=root
+Group=root
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=true
+PrivateNetwork=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+# Match the daemon's home-directory isolation without hiding /run/user/0/bus.
+InaccessiblePaths=/home /root
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RuntimeDirectory=vps-resource-guard-self-test
+RuntimeDirectoryMode=0700

@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodically reconcile Meghadharma Docker memory limits
+Documentation=file:/usr/local/share/doc/vps-resource-guard/README.md
+
+[Timer]
+OnBootSec=5s
+OnUnitActiveSec=5s
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=false
+Unit=vps-resource-guard-docker-reconcile.service
+
+[Install]
+WantedBy=timers.target
