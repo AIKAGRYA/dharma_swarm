@@ -221,16 +221,19 @@ def test_verifier_killed_discards_partial_result(mission) -> None:
     assert fresh.green, fresh.reasons
 
 
-def test_no_descendant_survives_complete_run(mission) -> None:
+def test_no_descendant_survives_complete_run(mission, tmp_path: Path) -> None:
     repo, _base, path, state = mission
     result = _complete_run(repo, path, state)
     assert result["terminal"] == "COMPLETE_REPRODUCED"
     import subprocess as sp
 
-    survivors = sp.run(
-        ["/usr/bin/pgrep", "-f", "rudra"], capture_output=True, text=True
-    ).stdout.strip()
-    assert survivors == ""
+    census = sp.run(
+        ["/bin/ps", "-axo", "command="], capture_output=True, text=True
+    ).stdout
+    survivors = [
+        line for line in census.splitlines() if str(tmp_path) in line
+    ]
+    assert survivors == [], f"mission descendants survived: {survivors}"
 
 
 def test_base_git_metadata_unchanged_after_mission(mission) -> None:
