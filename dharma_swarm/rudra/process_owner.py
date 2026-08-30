@@ -159,6 +159,7 @@ class ProcessOwner:
         *,
         env: dict[str, str],
         cwd: Path,
+        stdin: Any = None,
         stdout: Any = subprocess.PIPE,
         stderr: Any = subprocess.PIPE,
     ) -> tuple[subprocess.Popen[Any], ProcessHandle]:
@@ -166,6 +167,7 @@ class ProcessOwner:
             list(argv),
             env=env,
             cwd=str(cwd),
+            stdin=stdin,
             stdout=stdout,
             stderr=stderr,
             start_new_session=True,

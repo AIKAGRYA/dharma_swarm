@@ -9,6 +9,7 @@ line per frame. Steps:
   {"send_raw": "...", "chunks": N, "delay": S}      write raw bytes in chunks
   {"read_error_response": true}                     read one line, must be error
   {"read_request": true}                            read one request, discard
+  {"sleep": S}                                      stay silent for S seconds
   {"exit": true}                                    terminate immediately (EOF)
 """
 
@@ -23,7 +24,9 @@ def main() -> int:
     with open(sys.argv[1]) as fh:
         steps = json.load(fh)
     for step in steps:
-        if "send_raw" in step:
+        if "sleep" in step:
+            time.sleep(float(step["sleep"]))
+        elif "send_raw" in step:
             data = step["send_raw"].encode()
             chunks = int(step.get("chunks", 1))
             delay = float(step.get("delay", 0.0))

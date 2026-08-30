@@ -25,6 +25,9 @@ from dharma_swarm.rudra.contracts import TurnObservation, sha256_json
 MUTATION_METHODS = frozenset({"thread/start", "thread/resume", "turn/start"})
 READ_ONLY_METHODS = frozenset({"initialize", "turn/interrupt", "thread/read"})
 ALLOWED_METHODS = MUTATION_METHODS | READ_ONLY_METHODS
+# Client notifications carry no id and no response; only the protocol
+# handshake notice is ever legitimate from this driver.
+ALLOWED_NOTIFICATIONS = frozenset({"initialized"})
 
 MAX_LINE_BYTES = 1 << 20  # 1 MiB protocol frame ceiling
 
@@ -60,6 +63,11 @@ class JsonRpcPeer:
         self.reader = reader
         self.writer = writer
         self.max_line_bytes = max_line_bytes
+        # Framing runs over the raw stream with our own byte buffer: a
+        # BufferedReader prefetches frames into userspace where select(2)
+        # can never see them, which deadlocks back-to-back frames.
+        self._raw: IO[bytes] = getattr(reader, "raw", reader)
+        self._buffer = bytearray()
         self.bytes_written = 0
         self.seq = 0
         # Witness log for undeliverable error replies (dead peer); recorded,
@@ -72,6 +80,23 @@ class JsonRpcPeer:
         line = (
             json.dumps(
                 {"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params},
+                separators=(",", ":"),
+            )
+            + "\n"
+        ).encode()
+        if len(line) > self.max_line_bytes:
+            raise ProtocolError("outgoing frame exceeds line ceiling")
+        self.writer.write(line)
+        self.writer.flush()
+        self.bytes_written += len(line)
+
+    def send_notification(self, method: str, params: dict[str, Any]) -> None:
+        """One id-less client notification; the same allowlist posture."""
+        if method not in ALLOWED_NOTIFICATIONS:
+            raise ProtocolError(f"notification {method!r} not in RUDRA allowlist")
+        line = (
+            json.dumps(
+                {"jsonrpc": "2.0", "method": method, "params": params},
                 separators=(",", ":"),
             )
             + "\n"
@@ -100,20 +125,30 @@ class JsonRpcPeer:
             self.error_response_failures.append(f"{msg_id!r}: {exc!r}")
 
     def read_message(self, deadline: float) -> dict[str, Any]:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise ProtocolError("protocol deadline exceeded")
-        fd = self.reader.fileno()
-        ready, _, _ = select.select([fd], [], [], remaining)
-        if not ready:
-            raise ProtocolError("protocol read timeout")
-        line = self.reader.readline(self.max_line_bytes + 1)
-        if line == b"":
-            raise ProtocolError("EOF on protocol channel")
+        while True:
+            newline = self._buffer.find(b"\n")
+            if newline >= 0:
+                line = bytes(self._buffer[: newline + 1])
+                del self._buffer[: newline + 1]
+                break
+            if len(self._buffer) > self.max_line_bytes:
+                raise ProtocolError("oversized protocol frame")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ProtocolError("protocol deadline exceeded")
+            ready, _, _ = select.select([self._raw.fileno()], [], [], remaining)
+            if not ready:
+                raise ProtocolError("protocol read timeout")
+            chunk = self._raw.read(
+                min(1 << 16, self.max_line_bytes + 1 - len(self._buffer))
+            )
+            if chunk == b"":
+                if self._buffer:
+                    raise ProtocolError("partial frame at EOF")
+                raise ProtocolError("EOF on protocol channel")
+            self._buffer += chunk
         if len(line) > self.max_line_bytes:
             raise ProtocolError("oversized protocol frame")
-        if not line.endswith(b"\n"):
-            raise ProtocolError("partial frame at deadline")
         try:
             message = json.loads(line)
         except json.JSONDecodeError as exc:
