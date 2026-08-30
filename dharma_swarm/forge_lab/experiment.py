@@ -10,128 +10,68 @@ fresh task slice from the taskbed → one parent sampled PER CHILD SLOT from the
 full graded archive (novelty-pressure weighted) → mutate (LLM-proposed by
 default) → dedup by content-addressed id → grade on the explore-fast tier →
 append (immediately durable) → generation receipt → honest closeout.
+
+Decomposition (leaf modules, one-directional):
+  experiment_config    — ExperimentConfig, Seams, cost estimate
+  experiment_git       — source-git identity probes for receipts
+  experiment_preflight — membrane facts, scratch admission, run manifest
+  experiment_closeout  — terminal state decision and closeout receipt
+This module keeps the public API stable by re-exporting those leaves.
 """
 
 from __future__ import annotations
 
 import asyncio
 import random
-import subprocess
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
-from dharma_swarm.evolution_safety import evaluate_mutation, model_spend_allowed, safety_summary
-from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection, worktree
+from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection
 from dharma_swarm.forge_lab.candidate_store import CandidateStore
+from dharma_swarm.forge_lab.experiment_closeout import finalize_closeout
+from dharma_swarm.forge_lab.experiment_config import (
+    ExperimentConfig,
+    Seams,
+    _cost_estimate,
+)
+from dharma_swarm.forge_lab.experiment_git import (
+    _git as _git,
+    _git_identity,
+    _git_sha as _git_sha,
+)
+from dharma_swarm.forge_lab.experiment_preflight import (
+    RUN_MANIFEST_SCHEMA as RUN_MANIFEST_SCHEMA,
+    admit_scratch_worktree,
+    initial_membrane,
+    write_run_manifest,
+)
 from dharma_swarm.forge_lab.freeform_explore import (
-    MEMBRANE_REQUIREMENTS,
     FreeformExploreEnvelope,
     validate_freeform_explore_envelope,
 )
 from dharma_swarm.forge_lab.genome_spec import check_genome, merged_with_defaults
-from dharma_swarm.forge_lab.state_io import dharma_home
 from dharma_swarm.forge_lab.run_receipts import (
     AFTER_RUN_NOTES_SCHEMA,
     EXPLORE_CLOSEOUTS,
     GENERATION_RECEIPT_SCHEMA,
     RESULT_ROW_SCHEMA,
     _append_result_row,
-    _closeout,
+    _closeout as _closeout,
     _now,
     _result_row,
     _result_summary,
     _write_json,
 )
 
-RUN_MANIFEST_SCHEMA = "forge_lab.run_manifest.v0"
-
-
-@dataclass
-class ExperimentConfig:
-    generations: int = 2
-    children: int = 3  # TOTAL per generation
-    tasks_per_generation: int = 3
-    novelty_pressure: float = 0.7
-    solver_model: str = ""
-    verifier_model: str = ""
-    mutator_model: str = ""
-    seed_genome: dict[str, Any] | None = None
-    budget_cap_tokens: int = 120_000  # per candidate-grade
-    budget_cap_usd: float = 2.0
-    soft_token_cap: bool = True
-    require_valid_seed: bool = True
-    max_experiment_tokens: int = 600_000
-    propose_timeout_s: int = 240
-    grade_timeout_s: int = 600
-    rng_seed: int = 20260706
-    lane_id: str = "forge_lab_chassis_v0"
-    category: str = "agent_evolution"
-    benchmark: str = "taskbed-explore-fresh-pr-suite"
-    dry_run: bool = False
-    keep_worktree: bool = False
-    # The bounded unattended lane owns a fixed logical-call proof and therefore
-    # cannot allow the RNG to silently replace its one mutation-model call with
-    # a parametric or crossover operator. Interactive EXPLORE keeps the wild
-    # stochastic policy by default.
-    force_single_llm_mutation: bool = False
-    source_repo: Path = field(default_factory=lambda: Path.home() / "dharma_swarm")
-    state_root: Path = field(default_factory=lambda: dharma_home() / "evolution_archive")
-
-
-@dataclass
-class Seams:
-    """Every external effect, injectable. Production defaults built lazily."""
-
-    grade: grade_explore.GradeSeams | None = None
-    pull_task_context: Callable[[str], tuple[dict, dict]] | None = None
-    allocate_explore: Callable[..., dict[str, Any]] | None = None
-    mutate_complete: Callable[[str], tuple[str, int]] | None = None
-    make_worktree: Callable[..., Path] | None = None
-    remove_worktree: Callable[..., None] | None = None
-
-    def resolved(self, cfg: ExperimentConfig) -> "Seams":
-        if cfg.dry_run:
-            return self
-        from dharma_swarm.api_keys import bootstrap_runtime_env
-
-        bootstrap_runtime_env()
-        grade = self.grade or grade_explore.production_seams()
-        if self.pull_task_context is None or self.allocate_explore is None:
-            from dharma_swarm.forge_v1.forge_v2.runner import _pull_task_context
-            from dharma_swarm.forge_v1.forge_v2.taskbed_ledger import allocate_explore
-
-            pull = self.pull_task_context or _pull_task_context
-            alloc = self.allocate_explore or allocate_explore
-        else:
-            pull, alloc = self.pull_task_context, self.allocate_explore
-        mutate = self.mutate_complete
-        if mutate is None:
-            from dharma_swarm.forge_v1.providers import PoolCompletion
-
-            completion = PoolCompletion(cfg.mutator_model)
-            mutate = completion.complete
-        return Seams(
-            grade=grade,
-            pull_task_context=pull,
-            allocate_explore=alloc,
-            mutate_complete=mutate,
-            make_worktree=self.make_worktree or worktree.create_marked_scratch_worktree,
-            remove_worktree=self.remove_worktree or worktree.remove_scratch_worktree,
-        )
-
-
-def _cost_estimate(cfg: ExperimentConfig) -> dict[str, Any]:
-    candidate_grades = 1 + (cfg.children + 1) * cfg.generations
-    observations = candidate_grades * cfg.tasks_per_generation
-    return {
-        "planned_candidate_grades": candidate_grades,
-        "planned_observations": observations,
-        "est_llm_calls_min": observations + cfg.children * cfg.generations,
-        "est_wall_minutes_rough": round(observations * 1.5, 1),
-        "token_ceiling": cfg.max_experiment_tokens,
-    }
+__all__ = [
+    "ExperimentConfig",
+    "Seams",
+    "run_experiment",
+    "EXPLORE_CLOSEOUTS",
+    "RESULT_ROW_SCHEMA",
+    "GENERATION_RECEIPT_SCHEMA",
+    "AFTER_RUN_NOTES_SCHEMA",
+]
 
 
 async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> dict[str, Any]:
@@ -150,72 +90,30 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     results_path = exp_dir / "results.jsonl"
 
     # ---- preflight (§7a): fail-closed, each fact recorded -------------------
-    membrane = {name: False for name in MEMBRANE_REQUIREMENTS}
-    membrane["no_live_daemon_mutation"] = True  # chassis has no daemon surface
-    membrane["no_secret_wallet_or_prod_access"] = True  # keys only via provider layer
-    membrane["no_evaluator_grader_safety_or_archive_tamper"] = True  # read-only imports
-    membrane["budget_cap_recorded"] = True
-    membrane["lineage_recorded"] = True
-
-    scratch: Path | None = None
-    if cfg.dry_run:
-        membrane["marked_scratch_worktree"] = True  # recorded as dry_run below
-        membrane["container_or_equivalent_sandbox"] = True
-    else:
-        spend_ok, spend_reason = model_spend_allowed()
-        if not spend_ok:
-            closeout = _closeout(
-                exp_dir, exp_id, "blocked_with_evidence",
-                reasons=[f"spend_gate:{spend_reason}"], started_at=started_at,
-                stats={}, merkle_root=None, wall_seconds=0.0,
-                scratch_worktree={"path": None, "state": "not_created", "removed": None},
-            )
-            return closeout
-        scratch = seams.make_worktree(
-            source_repo=cfg.source_repo,
-            experiment_id=exp_id,
-            archive_path=archive_path,
-            category=cfg.category,
-        )
-        decision = evaluate_mutation(
-            target_workspace=scratch, requested_live=False, runtime_state_available=False
-        )
-        if not (decision.allowed and decision.effective_shadow):
-            raise RuntimeError(f"membrane refused scratch worktree: {decision.denial_reason}")
-        membrane["marked_scratch_worktree"] = True
-        # Production seams admit official SWE-bench Docker grading only.  PR
-        # suite tasks are recorded InconclusiveInfrastructure until their
-        # brokerless container grader exists; host pytest is never executed.
-        membrane["container_or_equivalent_sandbox"] = True
+    membrane = initial_membrane()
+    scratch, early_closeout = admit_scratch_worktree(
+        cfg,
+        exp_id=exp_id,
+        exp_dir=exp_dir,
+        archive_path=archive_path,
+        seams=seams,
+        started_at=started_at,
+        membrane=membrane,
+    )
+    if early_closeout is not None:
+        return early_closeout
 
     estimate = _cost_estimate(cfg)
-    manifest = {
-        "schema": RUN_MANIFEST_SCHEMA,
-        "experiment_id": exp_id,
-        "category": cfg.category,
-        "benchmark": cfg.benchmark,
-        # Historical field retained for readers; it is now the actual source
-        # HEAD used to run the experiment, not origin/main.
-        "git_base_sha": base_sha,
-        "git_identity": git_identity,
-        "mode": "shadow",
-        "dry_run": cfg.dry_run,
-        "started_at": started_at,
-        "config": {
-            k: str(v) if isinstance(v, Path) else v for k, v in vars(cfg).items() if k != "seed_genome"
-        },
-        "seed_genome": cfg.seed_genome,
-        "membrane": membrane,
-        "safety": {} if cfg.dry_run else safety_summary(repo_path=scratch),
-        "archive_fitness_authority": "one_wire_disabled_explicit_lab_shadow",
-        "cost_estimate": estimate,
-        "caveats": [
-            "explore grading: official SWE-bench Docker; host PR-suite grading is refused as infrastructure-inconclusive",
-            "fuel is single-repo (pallets/click) until harvest scales — fitness is click-domain",
-            "explore closeouts can never be positive_lift_candidate",
-        ],
-    }
-    _write_json(exp_dir / "run_manifest.json", manifest)
+    write_run_manifest(
+        cfg,
+        exp_id=exp_id,
+        exp_dir=exp_dir,
+        git_identity=git_identity,
+        started_at=started_at,
+        membrane=membrane,
+        scratch=scratch,
+        estimate=estimate,
+    )
     print(f"[forge_lab] {exp_id}: estimate={estimate}")
 
     store = CandidateStore(archive_path, experiment_id=exp_id, category=cfg.category)
@@ -579,118 +477,21 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         })
 
     # ---- honest closeout ------------------------------------------------------
-    graded = await store.graded_entries()
-    rows = [CandidateStore._row(e) for e in graded]
-    seed_rate = next((r.get("pass_rate", 0.0) for r in rows if r.get("role") == "seed_baseline"), 0.0)
-    best_rate = max((r.get("pass_rate", 0.0) for r in rows), default=0.0)
-    if counters["graded"] == 0:
-        state = "blocked_with_evidence"
-    elif infrastructure_observations_total:
-        state = "inconclusive_infrastructure"
-    elif comparable_observations_total == 0 and budget_observations_total:
-        state = "inconclusive_budget"
-    elif comparable_observations_total == 0 and generation_observations_total:
-        state = "inconclusive_generation"
-    elif comparable_observations_total > 0 and best_rate <= seed_rate and best_rate == 0.0:
-        state = "measured_negative"
-    else:
-        state = "inconclusive_low_power"  # explore can never claim positive lift
-    chain_ok, chain_info = store.archive.merkle_log.verify_chain()
-    scratch_worktree = {
-        "path": str(scratch) if scratch is not None else None,
-        "keep_worktree": cfg.keep_worktree,
-        "state": "not_created" if scratch is None else "kept" if cfg.keep_worktree else "pending_cleanup",
-        "removed": None if scratch is None or cfg.keep_worktree else False,
-    }
-    if scratch is not None and not cfg.keep_worktree:
-        try:
-            seams.remove_worktree(source_repo=cfg.source_repo, repo=scratch, experiment_id=exp_id)
-        except Exception as exc:
-            scratch_worktree.update(
-                {"state": "cleanup_error", "removed": False, "error": f"{type(exc).__name__}:{exc}"}
-            )
-        else:
-            removed = not scratch.exists()
-            scratch_worktree.update(
-                {"state": "removed" if removed else "remove_unconfirmed", "removed": removed}
-            )
-    closeout = _closeout(
-        exp_dir, exp_id, state,
-        reasons=[stopped_early] if stopped_early else [],
+    return await finalize_closeout(
+        cfg,
+        exp_id=exp_id,
+        exp_dir=exp_dir,
+        store=store,
+        seams=seams,
+        counters=counters,
+        stopped_early=stopped_early,
         started_at=started_at,
-        stats={
-            "counters": counters,
-            "seed_pass_rate": seed_rate,
-            "best_pass_rate": best_rate,
-            "tokens_spent_total": tokens_spent_total,
-            "comparable_observations_total": comparable_observations_total,
-            "infrastructure_observations_total": infrastructure_observations_total,
-            "generation_observations_total": generation_observations_total,
-            "budget_observations_total": budget_observations_total,
-            "n_tasks_per_generation": cfg.tasks_per_generation,
-            "seed_soft_token_cap_exceeded": seed_soft_cap_exceeded,
-            "soft_token_cap": cfg.soft_token_cap,
-            "require_valid_seed": cfg.require_valid_seed,
-            "note": "n is far below any powered claim; ranking signal only",
-        },
-        merkle_root={"verified": bool(chain_ok), "info": str(chain_info)},
-        wall_seconds=round(time.monotonic() - started_mono, 1),
-        scratch_worktree=scratch_worktree,
+        started_mono=started_mono,
+        scratch=scratch,
+        tokens_spent_total=tokens_spent_total,
+        comparable_observations_total=comparable_observations_total,
+        infrastructure_observations_total=infrastructure_observations_total,
+        generation_observations_total=generation_observations_total,
+        budget_observations_total=budget_observations_total,
+        seed_soft_cap_exceeded=seed_soft_cap_exceeded,
     )
-    return closeout
-
-
-def _git(repo: Path, *args: str) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(repo), *args],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return proc.stdout.strip() if proc.returncode == 0 else ""
-
-
-def _git_identity(repo: Path, *, dry_run: bool = False) -> dict[str, Any]:
-    """Source-code identity for run receipts.
-
-    This is evidence metadata, not promotion authority.  Earlier forge_lab runs
-    recorded ``origin/main`` as ``git_base_sha`` even when the operator was
-    executing branch code via PYTHONPATH.  That made later receipts ambiguous.
-    Record the actual source HEAD first, plus origin/main only as comparison.
-    """
-
-    if dry_run:
-        return {
-            "repo": str(repo),
-            "head_sha": "dryrun",
-            "branch": "dryrun",
-            "dirty": False,
-            "dirty_short": "",
-            "origin_main_sha": "",
-        }
-    dirty_short = _git(repo, "status", "--short")
-    return {
-        "repo": str(repo),
-        "head_sha": _git(repo, "rev-parse", "HEAD") or "unknown",
-        "branch": _git(repo, "branch", "--show-current") or "detached",
-        "dirty": bool(dirty_short.strip()),
-        "dirty_short": dirty_short,
-        "origin_main_sha": _git(repo, "rev-parse", "origin/main"),
-    }
-
-
-def _git_sha(repo: Path) -> str:
-    """Compatibility wrapper: return the actual source HEAD used for the run."""
-
-    return str(_git_identity(repo).get("head_sha") or "unknown")
-
-
-__all__ = [
-    "ExperimentConfig",
-    "Seams",
-    "run_experiment",
-    "EXPLORE_CLOSEOUTS",
-    "RESULT_ROW_SCHEMA",
-    "GENERATION_RECEIPT_SCHEMA",
-    "AFTER_RUN_NOTES_SCHEMA",
-]
