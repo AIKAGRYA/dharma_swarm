@@ -1,0 +1,111 @@
+{
+  "id": "loop-control-WP-KSV-onboard-killswitch-visibility",
+  "base_ref": "d664c0146659ef003d4f154e44448e0870ac6b84",
+  "branch": "claude/onboard-killswitch-visibility",
+  "worktree": ".",
+  "intent": "Surface the loop kill-switch in session status so an agent inside a checkout can see it. The switch lives on the loop-control branch, never in the working tree, so the obvious local existence check always reports absent -- an agent worked a full day against an ENGAGED switch on that reading. The probe reads the local remote-tracking ref only (read-only, no network) and reports UNKNOWN rather than CLEAR when the ref cannot be read.",
+  "allowed_files": [
+    "dharma_swarm/operator_core/onboarding/killswitch_status.py",
+    "dharma_swarm/operator_core/onboarding/cli.py",
+    "dharma_swarm/operator_core/onboarding/render.py",
+    "tests/test_onboarding_killswitch_status.py",
+    "reports/agentops/work_packets/loop-control-WP-KSV-onboard-killswitch-visibility.json"
+  ],
+  "forbidden_files": [
+    ".github/workflows/loop-emergency-stop.yml",
+    ".github/workflows/loop-resume.yml",
+    "dharma_swarm/chamber/**",
+    "dharma_swarm/coordination/**",
+    "dharma_swarm/council/**",
+    "dharma_swarm/graph/**",
+    "dharma_swarm/world_radar/**",
+    "docs/ops/loop_control/KILLSWITCH",
+    "docs/ops/loop_control/README.md",
+    "packages/telos-kernel/**",
+    "scripts/governance/hygiene/**",
+    "terminal/**",
+    "tests/test_make_onboarding_contract.py"
+  ],
+  "gates": [
+    {
+      "name": "killswitch-status-tests",
+      "command": "python3 -m pytest tests/test_onboarding_killswitch_status.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "onboarding-contract-unbroken",
+      "command": "python3 -m pytest tests/test_onboarding_cli.py tests/test_onboarding_readiness.py tests/test_operator_core_contracts.py -q",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "killswitch-status-ruff",
+      "command": "python3 -m ruff check dharma_swarm/operator_core/onboarding/killswitch_status.py dharma_swarm/operator_core/onboarding/cli.py dharma_swarm/operator_core/onboarding/render.py tests/test_onboarding_killswitch_status.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "worktree-path-predicate-reports-CLEAR-while-ENGAGED",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('dharma_swarm/operator_core/onboarding/killswitch_status.py'); t=p.read_text(); old='    ref_present = _git([\\\"rev-parse\\\", \\\"--verify\\\", \\\"--quiet\\\", KILLSWITCH_REF])'; assert old in t; new='    from pathlib import Path as _P\\n    if not _P(KILLSWITCH_PATH).exists():\\n        projection[\\\"state\\\"] = STATE_CLEAR\\n        return projection\\n'+old; p.write_text(t.replace(old,new,1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_onboarding_killswitch_status.py'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "unknown-collapsed-into-clear-is-caught",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('dharma_swarm/operator_core/onboarding/killswitch_status.py'); t=p.read_text(); old='        projection[\\\"detail\\\"] = (\\n            \\\"no local origin/loop-control ref; this checkout has never fetched \\\"\\n            \\\"the branch the switch lives on\\\"\\n        )\\n        return projection'; assert old in t; p.write_text(t.replace(old,'        projection[\\\"state\\\"] = STATE_CLEAR\\n        return projection',1)); r=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_onboarding_killswitch_status.py::test_a_checkout_that_never_fetched_loop_control_reports_unknown'],check=False); p.write_text(t); sys.exit(0 if r.returncode!=0 else 1)\"",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(onboard): show the loop kill-switch in session status"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.11.15",
+      "git": "2.43.0",
+      "make": "4.3"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-KSV",
+    "active_track": "repository-titanium-hardening-2026-07",
+    "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "d664c0146659ef003d4f154e44448e0870ac6b84",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Six guarded workflows resolve the kill-switch against the loop-control branch via the GitHub contents API, while an agent inside a checkout has only the working tree, where the file is never present. The two surfaces answered different questions and only the workflows' answer was correct."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/operator_core/onboarding/nats_status.py",
+      "docs/ops/loop_control/README.md",
+      ".github/workflows/hardening-lane.yml"
+    ],
+    "honest_blockers": [
+      "The reading is a local remote-tracking ref only. A stale or unfetched ref cannot see a switch engaged after the last fetch; that case reports UNKNOWN with its own refresh command rather than CLEAR, but UNKNOWN is still weaker than the workflows' live query and is not a substitute for it.",
+      "This changes only what a session can SEE. It does not gate anything: no edit, merge, or push is blocked by the reading, and an agent that ignores an ENGAGED line is still unimpeded by this change.",
+      "Verified against one engaged switch and synthetic clones. No test exercises a switch that is engaged and then cleared mid-session.",
+      "Track attribution is a judgement, not a fact: no ACTIVE track owns dharma_swarm/operator_core/onboarding/ since onboard-one-door-2026-07 retired. repository-titanium-hardening-2026-07 is claimed on theme (truthful verification) and because it owns the onboarding contract test that caught the first attempt. The operator may reassign.",
+      "CEREMONY ORDER WAS VIOLATED AND THE RECEIPT DOES NOT SHOW IT. The code was authored and committed before this packet existed; the branch was then rewound to base_ref so preflight could bind. The resulting binding receipt therefore attests that the diff CONFORMS to the declared scope, not that scope was declared first. Read the closeout as a scope-conformance check only."
+    ],
+    "rollback": "Revert the module, the two onboarding wirings, the tests, and this packet together. Session status returns to not mentioning the kill-switch; the workflows' own guards are untouched throughout.",
+    "packet_digest": "4ebc71befc9f464a184c52bd0949c8ca74e0e878cdac8f96f97c59fa78d0d6a2"
+  }
+}

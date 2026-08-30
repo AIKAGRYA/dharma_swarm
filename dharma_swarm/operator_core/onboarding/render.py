@@ -2,8 +2,9 @@
 
 Rendering only — no collection, no policy, no I/O.  The compact human view is
 hard-bounded to 40–70 lines; ``--json`` is a deterministic projection of the
-verdict and stable core plus one explicitly bounded local NATS observation.
-No other volatile receipt field is projected.
+verdict and stable core plus two explicitly bounded local observations (NATS
+substrate and the loop kill-switch). No other volatile receipt field is
+projected.
 """
 
 from __future__ import annotations
@@ -15,8 +16,9 @@ HUMAN_MIN_LINES = 40
 HUMAN_MAX_LINES = 70
 
 # Fields the machine projection deliberately carries: no observed_at, ages,
-# durations, absolute host paths, cache bookkeeping, or delta. NATS status is
-# the one explicit live observation and carries no admission authority.
+# durations, absolute host paths, cache bookkeeping, or delta. NATS status and
+# the loop kill-switch are the explicit local observations; neither carries
+# admission authority.
 _JSON_PROJECTION_KEYS = (
     "schema",
     "verdict",
@@ -24,6 +26,7 @@ _JSON_PROJECTION_KEYS = (
     "stable_core",
     "conditions",
     "nats_substrate",
+    "loop_killswitch",
 )
 
 
@@ -48,6 +51,9 @@ def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
     nats_substrate = receipt.get("extensions", {}).get("nats_substrate", {})
     if not isinstance(nats_substrate, Mapping):
         nats_substrate = {}
+    loop_killswitch = receipt.get("extensions", {}).get("loop_killswitch", {})
+    if not isinstance(loop_killswitch, Mapping):
+        loop_killswitch = {}
     projection = {
         "schema": "dharma_swarm.onboard_json.v1",
         "verdict": str(receipt.get("primary_verdict", "")),
@@ -55,6 +61,7 @@ def machine_projection(receipt: Mapping[str, Any]) -> dict[str, Any]:
         "stable_core": stable_core,
         "conditions": sorted(conditions, key=lambda row: row["id"]),
         "nats_substrate": dict(nats_substrate),
+        "loop_killswitch": dict(loop_killswitch),
     }
     assert tuple(projection) == _JSON_PROJECTION_KEYS
     return projection
@@ -73,6 +80,45 @@ def render_json(receipt: Mapping[str, Any]) -> str:
 def _pad_to_minimum(lines: list[str]) -> list[str]:
     while len(lines) < HUMAN_MIN_LINES:
         lines.append("")
+    return lines
+
+
+def _killswitch_lines(killswitch: Mapping[str, Any]) -> list[str]:
+    """Format the loop kill-switch observation. Pure formatting, no probe.
+
+    Lives here rather than beside the collector because this module declares
+    itself "Rendering only — no collection, no policy, no I/O" (see the module
+    docstring); importing a collector into it would contradict that in the
+    first line of the file.
+
+    Honest note on how this landed: an earlier revision DID import the
+    collector here, and `make onboard` failed under
+    tests/test_make_onboarding_contract.py with "cannot import name
+    killswitch_status ... (unknown location)". I attributed that to the
+    namespace-package bootstrap in agent_onboard.py. It was not — that test
+    clones the TRACKED tree, and the new module was simply unstaged. The
+    separation is kept because the module contract asks for it, not because
+    the import was broken.
+
+    ENGAGED and UNKNOWN both announce themselves; only CLEAR is one quiet line.
+    """
+    state = str(killswitch.get("state", "UNKNOWN"))
+    if state == "CLEAR":
+        return [f"Loop kill-switch: CLEAR ({killswitch.get('detail', '')})"]
+
+    marker = "HALTED" if state == "ENGAGED" else "state unknown"
+    lines = [f"Loop kill-switch: {state} — {marker}"]
+    for key in ("stamp", "detail"):
+        value = str(killswitch.get(key, ""))
+        if value:
+            lines.append(f"  {value}")
+    if state == "UNKNOWN":
+        refresh = str(killswitch.get("refresh_command", ""))
+        if refresh:
+            lines.append(f"  refresh: {refresh}")
+    lines.append(
+        f"  authority (not this reading): {killswitch.get('spec_path', '?')}"
+    )
     return lines
 
 
@@ -105,6 +151,9 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
     )
     lines.append("View:    read-only session status")
     lines.append("Authority: none — no edit, merge, or deploy permission")
+    killswitch = receipt.get("extensions", {}).get("loop_killswitch", {})
+    if isinstance(killswitch, Mapping) and killswitch:
+        lines.extend(_killswitch_lines(killswitch))
     lines.append("")
     if failing:
         lines.append(f"Primary blocker: {failing[0].get('id')}")

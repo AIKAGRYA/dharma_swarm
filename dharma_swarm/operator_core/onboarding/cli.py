@@ -26,7 +26,14 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from . import evidence, nats_status, readiness, render, repository_identity
+from . import (
+    evidence,
+    killswitch_status,
+    nats_status,
+    readiness,
+    render,
+    repository_identity,
+)
 from .models import ConfigError, RECEIPT_SCHEMA_V1, RECEIPT_SCHEMA_V2
 from .receipt import (
     build_input_manifest,
@@ -50,6 +57,7 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "scripts/governance/agent_onboard.py",
         "dharma_swarm/operator_core/onboarding/cli.py",
         "dharma_swarm/operator_core/onboarding/evidence.py",
+        "dharma_swarm/operator_core/onboarding/killswitch_status.py",
         "dharma_swarm/operator_core/onboarding/nats_status.py",
         "dharma_swarm/operator_core/onboarding/readiness.py",
         "dharma_swarm/operator_core/onboarding/repository_identity.py",
@@ -322,6 +330,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
     nats_projection = nats_status.collect_nats_substrate_status()
+    killswitch_projection = killswitch_status.collect_killswitch_status()
     conditions.extend(_collect_conditions(
         live_state, toolchain, stable_core.get("orientation", {}),
         net=bool(args.net), probe_errors=probe_errors,
@@ -382,6 +391,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
                     now, stable_core, live_state, conditions, manifest, key,
                     freshness, previous, toolchain=toolchain,
                     nats_projection=nats_projection,
+                    killswitch_projection=killswitch_projection,
                     require_live=bool(args.require_live),
                     cache_hit=cache_hit, miss_reasons=miss_reasons,
                 )
@@ -414,6 +424,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         now, stable_core, live_state, conditions, manifest, key,
         freshness, previous, toolchain=toolchain,
         nats_projection=nats_projection,
+        killswitch_projection=killswitch_projection,
         require_live=bool(args.require_live),
         cache_hit=cache_hit, miss_reasons=miss_reasons,
     )
@@ -440,6 +451,7 @@ def _assemble_v2(
     *,
     toolchain: Mapping[str, str],
     nats_projection: Mapping[str, Any],
+    killswitch_projection: Mapping[str, Any],
     require_live: bool,
     cache_hit: bool = False,
     miss_reasons: Sequence[str] | None = None,
@@ -470,7 +482,10 @@ def _assemble_v2(
         },
         "delta": compute_delta(previous, core, condition_rows),
         "legacy_v1": _legacy_v1_payload(now, core),
-        "extensions": {"nats_substrate": dict(nats_projection)},
+        "extensions": {
+            "nats_substrate": dict(nats_projection),
+            "loop_killswitch": dict(killswitch_projection),
+        },
         "stable_digest": compute_stable_digest(core),
     }
 
