@@ -1,0 +1,70 @@
+{
+  "schema": "dharma_swarm.trust_gate_status.v1",
+  "generated_at": "2026-08-30T16:18:41Z",
+  "fact_owner": "docs/vision_maps/NORTH_STAR.md \u00a78",
+  "authority": "projection_only",
+  "gate_open": false,
+  "conditions": [
+    {
+      "id": "C1",
+      "condition": "Pointed audit reports a clean working repo, high-quality code, and deep flow understanding",
+      "evidence": [
+        "runtime tree /home/runner/dharma_swarm_live not found \u2014 measured /home/runner/work/dharma_swarm/dharma_swarm instead",
+        "git -C /home/runner/work/dharma_swarm/dharma_swarm status --porcelain -> 0 dirty entries",
+        "latest pointed audit: reports/anatomy_altitude_2026-06-10 (dated 2026-06-10, 81d old)",
+        "flow-chain verification (GO intake -> ... -> semantic ontology) not yet a measured artifact \u2014 capped at AMBER"
+      ],
+      "score": 0.55,
+      "verdict": "AMBER",
+      "owner_of_truth": "git status (runtime tree) + reports/anatomy_*/"
+    },
+    {
+      "id": "C2",
+      "condition": "Swarm scores higher than single models on coding benchmarks (published bar: DGM 20%->50% SWE-bench)",
+      "evidence": [
+        "published bar (NORTH_STAR \u00a78): DGM self-improved 20%->50% SWE-bench (arXiv:2505.22954)",
+        "admissibility: hermetic arena lift (reports/governance/arena/, fixture-constructed routing win) is NOT commensurable with this condition and is never read here; C2 moves only on live runs with >=2 model families under the same budget-parity + significance controls",
+        "latest measured lift = -0.1 (reports/anatomy_altitude_2026-06-10/lane_E_organism_vision.md)",
+        "swarm currently loses to its best single agent"
+      ],
+      "score": 0.05,
+      "verdict": "RED",
+      "owner_of_truth": "reports/anatomy_*/ (forge arena measurement) + NORTH_STAR \u00a78 bar"
+    },
+    {
+      "id": "C3",
+      "condition": "A full venture-cell build, end to end, verifiably competitive with the field",
+      "evidence": [
+        "11 cells declared; ACTIVE-class: ['darshan-publication', 'goodworks-dgm']",
+        "recorded revenue_usd: 0",
+        "ACTIVE cells exist but no external receipts recorded \u2014 not end-to-end yet"
+      ],
+      "score": 0.3,
+      "verdict": "RED",
+      "owner_of_truth": "docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
+    },
+    {
+      "id": "C4",
+      "condition": "All seeded parts wired in and functioning consistently",
+      "evidence": [
+        "BROKEN_REGISTER: total=22 open-like=9 closed-like=13",
+        "remote heads: 666 total; seed/gold/vault-pattern unmerged-to-main candidates: 32",
+        "pattern branches: ['agent/artha-cream-seed', 'agent/magpie-seed', 'canary/seeded-20260810T152158Z', 'canary/seeded-20260818T094916Z', 'cleanup/action-authority-salvage-2026-05-13']"
+      ],
+      "score": 0.311,
+      "verdict": "RED",
+      "owner_of_truth": "git ls-remote --heads origin + docs/state/BROKEN_REGISTER.md"
+    },
+    {
+      "id": "C5",
+      "condition": "Agents orient from the memory kernel first (first-token orientation: operator, system, telos, code, agents)",
+      "evidence": [
+        "memory-kernel section wired into dispatch bundles but 3 sections render before it (dharma_swarm/context_compiler.py) \u2014 not first-token default",
+        "cross-check: reports/swarm_genome/2026-06-11/SYNTHESIS.md \u00a7Organ Health (MemoryKernel row)"
+      ],
+      "score": 0.2,
+      "verdict": "RED",
+      "owner_of_truth": "dharma_swarm/context_compiler.py (section order) + reports/swarm_genome/"
+    }
+  ]
+}

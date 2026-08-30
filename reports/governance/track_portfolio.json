@@ -1,0 +1,609 @@
+{
+  "generated_at": "2026-08-30T16:18:40+00:00",
+  "schema_version": 2,
+  "active_track_id": "fleet-advancement-2026-08",
+  "shippable": false,
+  "prerequisites_ok": true,
+  "completion_progress": {
+    "passed": 3,
+    "total": 3
+  },
+  "criteria": [
+    {
+      "id": "focus_reset_receipt_valid",
+      "kind": "receipt_valid",
+      "passed": true,
+      "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+      "executed": true
+    },
+    {
+      "id": "mission_control_contract_tests_pass",
+      "kind": "test_passes",
+      "passed": true,
+      "detail": "pytest tests/test_mission_control.py: PASS \u2014 63 passed in 21.16s",
+      "executed": true
+    },
+    {
+      "id": "cockpit_route_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "dashboard/src/app/dashboard/cockpit/page.tsx present",
+      "executed": true
+    },
+    {
+      "id": "helm_shell_contract_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "terminal/tests/nihongaShell.test.ts present",
+      "executed": true
+    }
+  ],
+  "portfolio_summary": {
+    "active": 4,
+    "max_active": 10,
+    "warn_active": 5,
+    "scoped_wip": {
+      "mac_build": {
+        "active": 4,
+        "max_active": 4,
+        "warn_active": 4,
+        "scope": "Mac build admission only"
+      }
+    },
+    "shippable": 0
+  },
+  "spine_objectives": [
+    {
+      "id": "substrate-nativeness",
+      "name": "Substrate nativeness \u2014 runtime flows through the ontology/spine, not around it",
+      "ref": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "measure": "~10-15% native today; target 30%+ (reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md)"
+    },
+    {
+      "id": "revenue-external-humans-served",
+      "name": "Revenue & external humans served \u2014 value leaves the house and someone acts on it",
+      "ref": "docs/governance/VENTURE_CELL_PORTFOLIO.yaml",
+      "measure": "external humans who read/replied/acted; first cash receipt"
+    },
+    {
+      "id": "research-depth",
+      "name": "Research depth \u2014 the contemplative-mechanistic bridge (R_V, geometric lens) deepens",
+      "ref": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "measure": "verified MI results; paper-grade claims"
+    }
+  ],
+  "spine_coverage": {
+    "substrate-nativeness": true,
+    "revenue-external-humans-served": true,
+    "research-depth": true
+  },
+  "vital_signs": {
+    "source": "dharma_swarm/harness_audit.py",
+    "dashboard_route": "/dashboard/audit",
+    "dimensions": [
+      "tool_coverage",
+      "context_efficiency",
+      "quality_gates",
+      "memory_persistence",
+      "eval_coverage",
+      "security_guardrails",
+      "cost_efficiency"
+    ]
+  },
+  "active_tracks": [
+    {
+      "id": "fleet-advancement-2026-08",
+      "name": "Fleet advancement \u2014 Fleet Hub, Mission Control, and HELM operator surfaces",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "sadhana-10-day-program-2026-08",
+        "rsi-lab-meghadharma-2026-08",
+        "sublimation-forge-2026-08"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "admission_scopes": [
+        "mac_build"
+      ],
+      "owned_surfaces": [
+        "dharma_swarm/mission_control*.py",
+        "tests/test_mission_control.py",
+        "dashboard/src/app/dashboard/cockpit/**",
+        "dashboard/src/components/cockpit/**",
+        "dashboard/src/components/operator-coherence/v2/**",
+        "terminal/**",
+        "docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md",
+        "specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md"
+      ],
+      "moves_vital_signs": [
+        "tool_coverage",
+        "context_efficiency",
+        "quality_gates",
+        "security_guardrails"
+      ],
+      "verified_at": "2026-08-27",
+      "ttl_days": 14,
+      "owner": "@dhyana",
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "2 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "Fleet Hub, Mission Control, and HELM are bounded prototype deliverables inside this one program lane. A prototype, local process, or attempt record does not prove a production adapter, command authority, or executor liveness.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 3,
+        "total": 3
+      },
+      "prerequisites": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        }
+      ],
+      "completion_criteria": [
+        {
+          "id": "mission_control_contract_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_mission_control.py: PASS \u2014 63 passed in 21.16s",
+          "executed": true
+        },
+        {
+          "id": "cockpit_route_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dashboard/src/app/dashboard/cockpit/page.tsx present",
+          "executed": true
+        },
+        {
+          "id": "helm_shell_contract_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "terminal/tests/nihongaShell.test.ts present",
+          "executed": true
+        }
+      ],
+      "criteria": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        },
+        {
+          "id": "mission_control_contract_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_mission_control.py: PASS \u2014 63 passed in 21.16s",
+          "executed": true
+        },
+        {
+          "id": "cockpit_route_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dashboard/src/app/dashboard/cockpit/page.tsx present",
+          "executed": true
+        },
+        {
+          "id": "helm_shell_contract_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "terminal/tests/nihongaShell.test.ts present",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "sadhana-10-day-program-2026-08",
+      "name": "SADHANA \u2014 governed 10-day program",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "revenue-external-humans-served",
+      "complements": [
+        "fleet-advancement-2026-08",
+        "rsi-lab-meghadharma-2026-08"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "admission_scopes": [
+        "mac_build"
+      ],
+      "owned_surfaces": [
+        "deploy/sadhana/**",
+        "scripts/runtime/sadhana_release.py",
+        "tests/test_sadhana_release.py",
+        "dashboard/src/app/dashboard/sadhana/**"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage",
+        "security_guardrails"
+      ],
+      "verified_at": "2026-08-27",
+      "ttl_days": 10,
+      "owner": "@dhyana",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "2 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S0_EXISTS < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "The provisional release package is preserved at /Users/dhyana/ds_sadhana_10day_release_final_20260827 and on draft PR #1453. Custody, tests in that worktree, and code volume do not prove the package is landed or a participant journey, release, or program outcome is live.",
+      "has_rigorous_evidence": false,
+      "strongest_grade": 0,
+      "strongest_grade_name": "S0_EXISTS",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 0,
+        "total": 2
+      },
+      "prerequisites": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        }
+      ],
+      "completion_criteria": [
+        {
+          "id": "sadhana_release_contract_landed",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "scripts/runtime/sadhana_release.py MISSING",
+          "executed": true
+        },
+        {
+          "id": "sadhana_release_tests_landed",
+          "kind": "test_passes",
+          "passed": false,
+          "detail": "pytest tests/test_sadhana_release.py: FAIL \u2014 ERROR: file or directory not found: tests/test_sadhana_release.py",
+          "executed": true
+        }
+      ],
+      "criteria": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        },
+        {
+          "id": "sadhana_release_contract_landed",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "scripts/runtime/sadhana_release.py MISSING",
+          "executed": true
+        },
+        {
+          "id": "sadhana_release_tests_landed",
+          "kind": "test_passes",
+          "passed": false,
+          "detail": "pytest tests/test_sadhana_release.py: FAIL \u2014 ERROR: file or directory not found: tests/test_sadhana_release.py",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "rsi-lab-meghadharma-2026-08",
+      "name": "RSI Lab \u2014 exact-code Mac and Meghadharma campaign lane",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "research-depth",
+      "complements": [
+        "fleet-advancement-2026-08",
+        "sadhana-10-day-program-2026-08",
+        "sublimation-forge-2026-08"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "admission_scopes": [
+        "mac_build"
+      ],
+      "owned_surfaces": [
+        "dharma_swarm/forge_lab/**",
+        "scripts/forge_lab/**",
+        "tests/forge_lab_v1/**",
+        "docs/ops/RSI_LAB_SYNC.md"
+      ],
+      "moves_vital_signs": [
+        "eval_coverage",
+        "memory_persistence",
+        "cost_efficiency",
+        "security_guardrails"
+      ],
+      "verified_at": "2026-08-27",
+      "ttl_days": 14,
+      "owner": "@dhyana",
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "1 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "The rsi sync owner proves exact code identity only. Commit b148f55e is active and ready on Mac and Meghadharma under plan digest sha256:38410a2e9b3caaae29f37b9492d01261560865f452210c7c3ef582b6e6da3db7; state, secrets, provider credentials, and research quality remain separate claims.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 3,
+        "total": 3
+      },
+      "prerequisites": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        }
+      ],
+      "completion_criteria": [
+        {
+          "id": "exact_sync_observation_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json valid (8 keys present, digest intact, fresh)",
+          "executed": true
+        },
+        {
+          "id": "exact_sync_host_commits_match",
+          "kind": "json_collection_values_match",
+          "passed": true,
+          "detail": "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json.host_observations 2 expected commit value(s) matched",
+          "executed": true
+        },
+        {
+          "id": "exact_sync_host_trees_match",
+          "kind": "json_collection_values_match",
+          "passed": true,
+          "detail": "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json.host_observations 2 expected tree value(s) matched",
+          "executed": true
+        }
+      ],
+      "criteria": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        },
+        {
+          "id": "exact_sync_observation_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json valid (8 keys present, digest intact, fresh)",
+          "executed": true
+        },
+        {
+          "id": "exact_sync_host_commits_match",
+          "kind": "json_collection_values_match",
+          "passed": true,
+          "detail": "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json.host_observations 2 expected commit value(s) matched",
+          "executed": true
+        },
+        {
+          "id": "exact_sync_host_trees_match",
+          "kind": "json_collection_values_match",
+          "passed": true,
+          "detail": "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json.host_observations 2 expected tree value(s) matched",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    },
+    {
+      "id": "sublimation-forge-2026-08",
+      "name": "Sublimation Forge \u2014 offline-first governed foundry",
+      "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "CLOSED_NOT_PROD",
+      "graduation_profile": "generic",
+      "serves": "research-depth",
+      "complements": [
+        "fleet-advancement-2026-08",
+        "rsi-lab-meghadharma-2026-08"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "admission_scopes": [
+        "mac_build"
+      ],
+      "owned_surfaces": [
+        "dharma_swarm/foundry/__init__.py",
+        "dharma_swarm/foundry/army.py",
+        "dharma_swarm/foundry/artifacts.py",
+        "dharma_swarm/foundry/campaign.py",
+        "dharma_swarm/foundry/daemon.py",
+        "dharma_swarm/foundry/elite_grid.py",
+        "dharma_swarm/foundry/evaluator.py",
+        "dharma_swarm/foundry/heldout.py",
+        "dharma_swarm/foundry/kill_metrics.py",
+        "dharma_swarm/foundry/killswitch.py",
+        "dharma_swarm/foundry/loop.py",
+        "dharma_swarm/foundry/patches.py",
+        "dharma_swarm/foundry/receipts.py",
+        "dharma_swarm/foundry/report_card.py",
+        "dharma_swarm/foundry/runner_isolation.py",
+        "dharma_swarm/foundry/shakti_local_world.py",
+        "dharma_swarm/foundry/shakti_system.py",
+        "dharma_swarm/foundry/target_ingest.py",
+        "dharma_swarm/foundry/targets.py",
+        "dharma_swarm/foundry/tripwires.py",
+        "scripts/foundry/**",
+        "tests/test_foundry_army.py",
+        "tests/test_foundry_artifacts.py",
+        "tests/test_foundry_campaign.py",
+        "tests/test_foundry_daemon.py",
+        "tests/test_foundry_evaluator.py",
+        "tests/test_foundry_heldout.py",
+        "tests/test_foundry_kill_metrics.py",
+        "tests/test_foundry_killswitch.py",
+        "tests/test_foundry_loop.py",
+        "tests/test_foundry_patches.py",
+        "tests/test_foundry_receipts.py",
+        "tests/test_foundry_report_card.py",
+        "tests/test_foundry_runner_isolation.py",
+        "tests/test_foundry_shakti_system.py",
+        "tests/test_foundry_target_ingest.py",
+        "tests/test_foundry_tripwires.py",
+        "docs/foundry/**",
+        "dharma_swarm/rudra/**",
+        "dharma_swarm/terminal_commands/rudra.py",
+        "tests/test_rudra_*.py",
+        "tests/fixtures/rudra/**",
+        "reports/rudra/**",
+        "docs/plans/rudra_v0/**"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage",
+        "cost_efficiency"
+      ],
+      "verified_at": "2026-08-27",
+      "ttl_days": 14,
+      "owner": "@dhyana",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "2 open blocker next-item(s)"
+      ],
+      "final_boss_blocks": [],
+      "underclaims": [],
+      "claim_boundary": "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion. RUDRA v0 carve-out (amended 2026-08-28, operator RUDRA ASCENT campaign): the RUDRA v0 release proof \u2014 and only that proof, on operator-authored mission contracts under docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md \u2014 may drive the operator-authenticated Codex app-server executor with provider egress to the configured model service only and tool network denied. This is not a standing license for track agents: every live-executor run requires its own admitted mission contract, and COMPLETE_REPRODUCED grants no push, merge, deploy, publish, or spend authority. Custody ruling 2026-08-30 (ONE_WORLD unification program, docs/plans/ONE_WORLD_2026-08-30.md; PR #1493): the guardian-feed surface \u2014 dharma_swarm/foundry/guardian_feed.py and tests/test_foundry_guardian_feed.py \u2014 is ceded from this track's owned_surfaces. The ONE_WORLD integration reconciles the Mac silvering (efca57e40: operator_approved flag replacing One Wire quorum arithmetic) with the quorum-pinning guardian-feed tests, and that reconciliation content is already CI-green on #1493; the sole red check was the fail-closed AgentOps packet-scope union of this track's immutable merge-base ownership, which no integration packet could satisfy while the foundry globs stood. Every other foundry and RUDRA surface remains owned by this track; the ceded globs are now explicit file lists, so any NEW foundry file or foundry test is unowned until a future track amendment re-admits it.",
+      "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 2,
+        "total": 3
+      },
+      "prerequisites": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        }
+      ],
+      "completion_criteria": [
+        {
+          "id": "foundry_loop_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_foundry_loop.py: PASS \u2014 20 passed in 0.57s",
+          "executed": true
+        },
+        {
+          "id": "foundry_heldout_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_foundry_heldout.py: PASS \u2014 23 passed in 0.53s",
+          "executed": true
+        },
+        {
+          "id": "rudra_ab_proof_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": false,
+          "detail": "receipt reports/rudra/AB_PROOF_V0.json MISSING",
+          "executed": true
+        }
+      ],
+      "criteria": [
+        {
+          "id": "focus_reset_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": true,
+          "detail": "receipt reports/governance/mac_active_programs/2026-08-27-focus-reset.json valid (6 keys present, fresh)",
+          "executed": true
+        },
+        {
+          "id": "foundry_loop_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_foundry_loop.py: PASS \u2014 20 passed in 0.57s",
+          "executed": true
+        },
+        {
+          "id": "foundry_heldout_tests_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_foundry_heldout.py: PASS \u2014 23 passed in 0.53s",
+          "executed": true
+        },
+        {
+          "id": "rudra_ab_proof_receipt_valid",
+          "kind": "receipt_valid",
+          "passed": false,
+          "detail": "receipt reports/rudra/AB_PROOF_V0.json MISSING",
+          "executed": true
+        }
+      ],
+      "ship_vetoes": []
+    }
+  ],
+  "findings": [
+    {
+      "severity": "INFO",
+      "check": "track-provisional:fleet-advancement-2026-08",
+      "message": "[fleet-advancement-2026-08] 3/3 criteria pass but NOT shippable under the rigorous bar: 2 open blocker next-item(s). Criteria passing is not closure, and a valid receipt is not a passing outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:sadhana-10-day-program-2026-08",
+      "message": "[sadhana-10-day-program-2026-08] 0/2 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-provisional:rsi-lab-meghadharma-2026-08",
+      "message": "[rsi-lab-meghadharma-2026-08] 3/3 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s). Criteria passing is not closure, and a valid receipt is not a passing outcome (see REALITY_DEBT_LEDGER.md / the Final Boss closure gauntlet).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:sublimation-forge-2026-08",
+      "message": "[sublimation-forge-2026-08] 2/3 completion criteria pass.",
+      "criterion_id": null
+    }
+  ]
+}
