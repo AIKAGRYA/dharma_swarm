@@ -62,6 +62,9 @@ class JsonRpcPeer:
         self.max_line_bytes = max_line_bytes
         self.bytes_written = 0
         self.seq = 0
+        # Witness log for undeliverable error replies (dead peer); recorded,
+        # never swallowed silently.
+        self.error_response_failures: list[str] = []
 
     def send_request(self, method: str, params: dict[str, Any], msg_id: str) -> None:
         if method not in ALLOWED_METHODS:
@@ -91,8 +94,10 @@ class JsonRpcPeer:
         try:
             self.writer.write(line)
             self.writer.flush()
-        except (BrokenPipeError, OSError):
-            pass
+        except (BrokenPipeError, OSError) as exc:
+            # The peer is already gone, so the error reply is undeliverable;
+            # keep the failure as evidence instead of dropping it.
+            self.error_response_failures.append(f"{msg_id!r}: {exc!r}")
 
     def read_message(self, deadline: float) -> dict[str, Any]:
         remaining = deadline - time.monotonic()

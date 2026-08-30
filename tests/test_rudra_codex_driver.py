@@ -41,10 +41,12 @@ class FakeAppServer:
         self.peer = JsonRpcPeer(self.proc.stdout, self.proc.stdin)
 
     def stop(self) -> None:
+        self.stdin_close_error: Exception | None = None
         try:
             self.proc.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass
+        except (BrokenPipeError, OSError) as exc:
+            # The fake server may already have exited; keep the witness.
+            self.stdin_close_error = exc
         try:
             self.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:

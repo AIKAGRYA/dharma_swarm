@@ -5,49 +5,53 @@ Normative source: docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md sections 8-9.
 GoalGate is the sole completion constructor: ``ReproducedCompletion`` exists
 only when ``promote`` binds a fresh ``GoalGatePassed`` produced against the
 exact candidate commit in a fresh detached verification workcell.
+
+Decomposition (leaf modules, one-directional):
+  goal_gate_admission — GoalGateError, AdmittedMission, admission mixin,
+                        shared hashing/git helpers
+  goal_gate_verify    — candidate freeze, fresh detached verification,
+                        promote (the spec section 9 type edge)
+This module keeps the gate core (scope inventory, verifier execution,
+evaluation) and re-exports both leaves so every public name stays here.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-import os
 import re
-import stat
 import subprocess
 import time
 import uuid
 import xml.etree.ElementTree as ET
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import ClassVar, Sequence
-
-from pydantic import BaseModel, ConfigDict
+from typing import Sequence
 
 from dharma_swarm.rudra.contracts import (
     AdmissionError,
     AdmissionReject,
     GateResult,
-    GoalGatePassed,
-    ReportedCompletion,
-    ReproducedCompletion,
-    RudraMissionContract,
+    GoalGatePassed as GoalGatePassed,
     VerifierCommand,
     VerifierReceipt,
-    _GATE_TOKEN,
-    derive_attempt_key,
-    derive_mission_key,
-    parse_mission,
     sha256_json,
 )
+from dharma_swarm.rudra.goal_gate_admission import (
+    AdmittedMission as AdmittedMission,
+    GoalGateAdmission,
+    GoalGateError as GoalGateError,
+    _fsync_file as _fsync_file,
+    _git,
+    sha256_file,
+)
+from dharma_swarm.rudra.goal_gate_verify import (
+    CandidateRejected as CandidateRejected,
+    GoalGateVerify,
+    PromotionRejected as PromotionRejected,
+)
 from dharma_swarm.rudra.workcell import (
-    Journal,
     ProcessOwner,
     Workcell,
-    WorkcellError,
     hermetic_git_env,
-    init_private_git,
-    require_git_ok,
     rudra_state_root,
     run_git,
 )
@@ -61,66 +65,7 @@ _SECRET_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
 _FIXED_VERIFIER_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 
 
-class PromotionRejected(ValueError):
-    pass
-
-
-class CandidateRejected(ValueError):
-    """Final verification red; the candidate is preserved as evidence."""
-
-
-class AdmittedMission(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
-
-    contract: RudraMissionContract
-    contract_digest: str
-    mission_key: str
-    attempt_key: str
-    attempt_uuid: str
-    mission_dir: str
-    attempt_dir: str
-    base_digests: dict[str, str]
-    git_pointer_sha256: str
-    baseline: GateResult | None = None
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _fsync_file(path: Path) -> None:
-    fd = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-
-
-def _version_output(path: Path) -> str:
-    proc = subprocess.run(
-        [str(path), "--version"], capture_output=True, text=True, timeout=15,
-    )
-    return (proc.stdout or proc.stderr).strip()
-
-
-def _git(root: Path, env: dict[str, str], *args: str, timeout: float = 60.0) -> str:
-    try:
-        return require_git_ok(
-            run_git(list(args), cwd=root, env=env, timeout=timeout), args[0]
-        )
-    except WorkcellError as exc:
-        raise GoalGateError(str(exc)) from exc
-
-
-class GoalGateError(RuntimeError):
-    pass
-
-
-class GoalGate:
+class GoalGate(GoalGateAdmission, GoalGateVerify):
     """Admission + evaluation. Never trusts executor claims."""
 
     def __init__(
@@ -140,168 +85,6 @@ class GoalGate:
         self.git_home.mkdir(parents=True, exist_ok=True)
         self.env = hermetic_git_env(self.git_home)
         self.owner = process_owner or ProcessOwner()
-
-    # --- Admission (spec 8 steps 1-10) -------------------------------------
-
-    def admit(self, proposal_text: str) -> AdmittedMission:
-        contract = parse_mission(proposal_text)
-        self._bind_repository(contract)
-        self._bind_toolchain(contract)
-        self._bind_verifier_executables(contract)
-        contract_digest = contract.digest()
-        mission_key = derive_mission_key(
-            contract.repository.canonical_remote,
-            contract.repository.base_sha,
-            contract_digest,
-        )
-        attempt_uuid = str(uuid.uuid4())
-        attempt_key = derive_attempt_key(mission_key, attempt_uuid)
-        mission_dir = self.state_root / "missions" / mission_key
-        attempt_dir = mission_dir / "attempts" / attempt_key
-        attempt_dir.mkdir(parents=True, exist_ok=False)
-        (mission_dir / "identity.json").write_text(contract.canonical_json() + "\n")
-        proposal_path = mission_dir / "proposal.json"
-        proposal_path.write_text(contract.canonical_json() + "\n")
-        _fsync_file(proposal_path)
-        journal = Journal(attempt_dir / "run.jsonl", mission_key, attempt_key)
-        journal.append("PROPOSAL_VALIDATED", {"contract_digest": contract_digest})
-
-        workcell = Workcell(
-            attempt_dir, self.repo_path, contract.repository.base_sha, self.state_root
-        )
-        base_digests = self.base_digests()
-        journal.effect_intent("workcell-create", {"base": contract.repository.base_sha})
-        workcell.create()
-        pointer_sha = sha256_file(workcell.worktree / ".git")
-        journal.effect_result(
-            "workcell-create",
-            {"worktree": str(workcell.worktree), "pointer_sha256": pointer_sha},
-        )
-        admitted = AdmittedMission(
-            contract=contract,
-            contract_digest=contract_digest,
-            mission_key=mission_key,
-            attempt_key=attempt_key,
-            attempt_uuid=attempt_uuid,
-            mission_dir=str(mission_dir),
-            attempt_dir=str(attempt_dir),
-            base_digests=base_digests,
-            git_pointer_sha256=pointer_sha,
-        )
-        baseline = self.evaluate(admitted, baseline=True)
-        if baseline.green and contract.result.require_baseline_red:
-            journal.append(
-                "ADMISSION_REJECTED", {"code": str(AdmissionReject.ALREADY_SATISFIED)}
-            )
-            workcell.quarantine("baseline green under require_baseline_red")
-            raise AdmissionError(
-                AdmissionReject.ALREADY_SATISFIED,
-                "gate is green at base; not a RUDRA success",
-            )
-        admitted_path = mission_dir / "admitted.json"
-        admitted_path.write_text(contract.canonical_json() + "\n")
-        _fsync_file(admitted_path)
-        (attempt_dir / "attempt.json").write_text(
-            json.dumps(
-                {
-                    "attempt_uuid": attempt_uuid,
-                    "git_pointer_sha256": pointer_sha,
-                    "base_digests": base_digests,
-                },
-                sort_keys=True,
-            )
-            + "\n"
-        )
-        _fsync_file(attempt_dir / "attempt.json")
-        fd = os.open(mission_dir, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-        journal.append("ADMITTED", {"contract_digest": contract_digest})
-        return admitted.model_copy(update={"baseline": baseline})
-
-    def rehash_admitted(self, admitted: AdmittedMission) -> None:
-        """The admitted copy is rehashed before every effect (invariant 2)."""
-        raw = (Path(admitted.mission_dir) / "admitted.json").read_bytes().strip()
-        if hashlib.sha256(raw).hexdigest() != admitted.contract_digest:
-            raise GoalGateError("admitted.json digest drift")
-
-    def base_digests(self) -> dict[str, str]:
-        head = (self.repo_path / ".git" / "HEAD").read_bytes()
-        index = self.repo_path / ".git" / "index"
-        status = _git(self.repo_path, self.env, "status", "--porcelain=v1", "-z")
-        listing = _git(self.repo_path, self.env, "ls-files", "--stage", "-z")
-        return {
-            "head_sha256": hashlib.sha256(head).hexdigest(),
-            "index_sha256": hashlib.sha256(index.read_bytes()).hexdigest()
-            if index.exists() else "",
-            "status_sha256": hashlib.sha256(status.encode()).hexdigest(),
-            "lsfiles_sha256": hashlib.sha256(listing.encode()).hexdigest(),
-        }
-
-    def prove_base_preserved(self, admitted: AdmittedMission) -> bool:
-        return self.base_digests() == admitted.base_digests
-
-    # --- Binding (spec 8 steps 2, 5) ---------------------------------------
-
-    def _bind_repository(self, contract: RudraMissionContract) -> None:
-        actual = _git(self.repo_path, self.env, "config", "--get", "remote.origin.url").strip()
-        expected = contract.repository.canonical_remote
-        if actual.removesuffix(".git") != expected.removesuffix(".git"):
-            # A match only under case folding is rejected as a collision too.
-            raise AdmissionError(
-                AdmissionReject.REJECT_INVALID,
-                f"canonical remote mismatch: {actual!r} != {expected!r}",
-            )
-        probe = run_git(
-            ["cat-file", "-e", f"{contract.repository.base_sha}^{{commit}}"],
-            cwd=self.repo_path, env=self.env, timeout=15,
-        )
-        if probe.returncode != 0:
-            raise AdmissionError(
-                AdmissionReject.REJECT_INVALID,
-                f"base {contract.repository.base_sha} not present locally",
-            )
-
-    def _bind_toolchain(self, contract: RudraMissionContract) -> None:
-        lock = self.repo_path / contract.toolchain.lockfile.path
-        if not lock.exists() or sha256_file(lock) != contract.toolchain.lockfile.sha256:
-            raise AdmissionError(
-                AdmissionReject.REJECT_INVALID, "lockfile digest mismatch"
-            )
-        for name, binding in contract.toolchain.executables.items():
-            path = Path(binding.path)
-            if not path.is_absolute():
-                raise AdmissionError(
-                    AdmissionReject.REJECT_INVALID, f"{name} path must be absolute"
-                )
-            if not path.exists():
-                raise AdmissionError(
-                    AdmissionReject.BLOCKED_ENVIRONMENT,
-                    f"executable missing: {path}",
-                )
-            if sha256_file(path) != binding.sha256:
-                raise AdmissionError(
-                    AdmissionReject.REJECT_INVALID,
-                    f"executable digest mismatch for {name}",
-                )
-            version = _version_output(path)
-            if version != binding.version:
-                raise AdmissionError(
-                    AdmissionReject.BLOCKED_ENVIRONMENT,
-                    f"executable {name} version drift: {version!r}",
-                )
-
-    def _bind_verifier_executables(self, contract: RudraMissionContract) -> None:
-        bound = {b.path for b in contract.toolchain.executables.values()}
-        for command in contract.acceptance.commands:
-            argv0 = command.argv[0]
-            if not Path(argv0).is_absolute() or argv0 not in bound:
-                raise AdmissionError(
-                    AdmissionReject.REJECT_INVALID,
-                    f"verifier {command.id} executable not bound in toolchain",
-                )
 
     # --- Scope inventory (spec 8) -------------------------------------------
 
@@ -583,151 +366,4 @@ class GoalGate:
             receipts=receipts,
             reasons=reasons,
             verifier_run_id=run_id,
-        )
-
-    # --- Candidate freeze and terminal evaluation (spec 8) ------------------
-
-    def freeze_candidate(self, admitted: AdmittedMission, gate: GateResult) -> str:
-        """Stage only admitted changed paths in the private gitdir; commit on
-        the private candidate ref with hooks and signing disabled."""
-        contract = admitted.contract
-        workcell = Workcell(
-            Path(admitted.attempt_dir), self.repo_path,
-            contract.repository.base_sha, self.state_root,
-        )
-        root = workcell.worktree
-        if not gate.changed_paths:
-            raise GoalGateError("cannot freeze an empty change set")
-        attrs = _git(root, self.env, "check-attr", "filter", "--", *gate.changed_paths)
-        lines = [ln for ln in attrs.splitlines() if ln.strip()]
-        if len(lines) != len(gate.changed_paths) or any(
-            not ln.endswith("filter: unspecified") for ln in lines
-        ):
-            raise GoalGateError("clean/smudge filter present in changed paths")
-        workcell.git("add", "--", *gate.changed_paths)
-        staged = workcell.git("diff", "--cached", "--name-only", "-z")
-        if {p for p in staged.split("\0") if p} != set(gate.changed_paths):
-            raise GoalGateError("staged set differs from admitted changed paths")
-        workcell.git(
-            "-c", "user.name=RUDRA", "-c", "user.email=rudra@localhost",
-            "commit", "--no-verify", "--no-gpg-sign", "-q",
-            "-m", f"rudra candidate {admitted.attempt_key}",
-        )
-        candidate = workcell.head_sha()
-        workcell.git(
-            "--git-dir", str(workcell.private_git), "update-ref",
-            "refs/rudra/candidate", candidate,
-        )
-        ancestor = run_git(
-            ["merge-base", "--is-ancestor", contract.repository.base_sha, candidate],
-            cwd=root, env=self.env,
-        )
-        if ancestor.returncode != 0:
-            raise GoalGateError("candidate does not descend from the admitted base")
-        if self._porcelain_paths(root):
-            raise GoalGateError("workcell not clean after candidate commit")
-        return candidate
-
-    def verify_candidate(
-        self, admitted: AdmittedMission, candidate_sha: str
-    ) -> GoalGatePassed:
-        """Fresh detached verification workcell at the candidate; full gate;
-        any repository write invalidates the result."""
-        contract = admitted.contract
-        run_id = uuid.uuid4().hex
-        attempt_dir = Path(admitted.attempt_dir)
-        vroot = attempt_dir / "verification" / run_id / "repo"
-        vgit = attempt_dir / "verification" / run_id / "private.git"
-        vroot.mkdir(parents=True)
-        vgit.mkdir(parents=True)
-        mutation = Workcell(
-            attempt_dir, self.repo_path, contract.repository.base_sha, self.state_root
-        )
-        # Fresh detached verification gitdir at the candidate, built per run;
-        # the mutation gitdir is never reused for final verification (R7/R8).
-        init_private_git(
-            vgit,
-            vroot,
-            alternates=[
-                f"{mutation.private_git}/objects",
-                f"{self.repo_path}/.git/objects",
-            ],
-            ref_steps=[["update-ref", "--no-deref", "HEAD", candidate_sha]],
-            env=self.env,
-        )
-        vpointer_sha = sha256_file(vroot / ".git")
-        self._chmod_tree(vroot, read_only=True)
-        try:
-            tree_before = _git(vroot, self.env, "rev-parse", "HEAD^{tree}").strip()
-            if self._porcelain_paths(vroot):
-                raise GoalGateError("verification workcell not clean at start")
-            gate = self.evaluate(
-                admitted, root=vroot, gate_run_id=run_id, pointer_sha256=vpointer_sha
-            )
-            if self._porcelain_paths(vroot):
-                raise GoalGateError("verification workcell mutated by a verifier")
-            if sha256_file(vroot / ".git") != vpointer_sha:
-                raise GoalGateError("verification workcell .git pointer mutated")
-            if _git(vroot, self.env, "rev-parse", "HEAD^{tree}").strip() != tree_before:
-                raise GoalGateError("verification workcell tree digest drifted")
-        finally:
-            self._chmod_tree(vroot, read_only=False)
-        if not gate.green:
-            raise CandidateRejected("; ".join(gate.reasons))
-        return GoalGatePassed(
-            mission_id=contract.mission_id,
-            attempt_id=admitted.attempt_key,
-            base_sha=contract.repository.base_sha,
-            candidate_sha=candidate_sha,
-            contract_digest=admitted.contract_digest,
-            verification_workcell_id=run_id,
-            workspace_digest=gate.subject_digest,
-            changed_path_digest=sha256_json(gate.changed_paths),
-            verifier_run_id=gate.verifier_run_id,
-            ordered_verifier_receipt_digests=[
-                sha256_json(r.model_dump(mode="json")) for r in gate.receipts
-            ],
-            codex_version=contract.executor.binary.version,
-            schema_digest=contract.executor.protocol_schema_sha256,
-            completed_at=time.time(),
-        )
-
-    def _chmod_tree(self, root: Path, *, read_only: bool) -> None:
-        for dirpath, dirnames, filenames in os.walk(root):
-            for name in (*dirnames, *filenames):
-                path = Path(dirpath) / name
-                restore = 0o700 if path.is_dir() else 0o200
-                try:
-                    mode = stat.S_IMODE(path.stat().st_mode)
-                    path.chmod(mode & ~0o222 if read_only else mode | restore)
-                except OSError:
-                    pass
-
-    # --- The one epistemic type edge (spec 9) -------------------------------
-
-    def promote(
-        self,
-        reported: ReportedCompletion | None,
-        passed: GoalGatePassed,
-        admitted: AdmittedMission,
-        current_workspace_digest: str,
-    ) -> ReproducedCompletion:
-        """Sole constructor of reproduced completion. No conversion method
-        exists on ReportedCompletion; this boundary is the obligation."""
-        if passed.contract_digest != admitted.contract_digest:
-            raise PromotionRejected("contract digest mismatch")
-        if passed.workspace_digest != current_workspace_digest:
-            raise PromotionRejected("workspace digest is not current")
-        if reported is not None and reported.candidate_sha != passed.candidate_sha:
-            raise PromotionRejected("reported candidate differs from proven candidate")
-        return ReproducedCompletion(
-            _gate_token=_GATE_TOKEN,
-            mission_id=passed.mission_id,
-            attempt_id=passed.attempt_id,
-            base_sha=passed.base_sha,
-            candidate_sha=passed.candidate_sha,
-            contract_digest=passed.contract_digest,
-            workspace_digest=passed.workspace_digest,
-            verifier_run_id=passed.verifier_run_id,
-            gate_passed_digest=sha256_json(passed.model_dump(mode="json")),
         )
