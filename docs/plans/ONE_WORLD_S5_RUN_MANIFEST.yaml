@@ -1,7 +1,10 @@
 # ONE_WORLD S5 campaign run manifest — RUDRA v0 real-task A/B
 # Role: working_plan (per docs/AGENTS.md prose-layer roles; subordinate to
 # docs/plans/ONE_WORLD_S5_CAMPAIGN_PREREG.md, whose frozen sections govern).
-# Status: DRAFT — frozen at launch once the live-driver digest lands.
+# Status: FROZEN 2026-08-30 — all PINNED_AT_FREEZE fields resolved.
+# Arms await exactly two operator acts (launch gates below): the §18 ceiling
+# ruling and the Titanium scope admission. No field may change after this
+# freeze except by operator amendment recorded in the prereg.
 # Preregistration: docs/plans/ONE_WORLD_S5_CAMPAIGN_PREREG.md (frozen sections govern;
 # this manifest may not contradict them). Protocol: docs/plans/rudra_v0/TEST_AND_BURNIN_PLAN.md §5.
 # World-locus: drafted 2026-08-30 · host Mac · branch chore/silvering-cleanup-2026-08-28 ·
@@ -10,8 +13,10 @@
 schema_version: rudra.runmanifest.v0
 campaign_id: one-world-s5-rudra-ab-2026-08-30
 pinned_release:
-  tag: one-world/2026-08-30
-  commit: a9282490dc6c57442807ac567461eb99457d2dde
+  tag: one-world/2026-08-30-r1
+  commit: 5301bdc57a07cc115296467285a910c92fd4536e
+  lineage: one-world/2026-08-30 (a9282490d) + live driver merge #1500
+  baseline_red_reverified_at_base: tests/test_lane_deliver.py::test_orphan_rollback_deletes_under_an_atomic_lease FAILS (0.23s, 2026-08-30)
   toolchain: /Users/dhyana/dharma_swarm/.venv/bin/python (CPython 3.13.12)  # interpreter-pinned: fixture redness depends on it
   repository: https://github.com/AIKAGRYA/dharma_swarm.git
 
@@ -39,7 +44,7 @@ arms:
   count_per_side: 3
   rudra_arm:
     runner: dgc rudra run (MissionRunner + GoalGate)
-    driver: LIVE_CODEX_APP_SERVER  # digest pinned at freeze — see driver_digest below
+    driver: codex_app_server_stdio  # merged #1500; see driver_digest below
   control_arm:
     definition: >-
       exactly one bare app-server trajectory with the same frozen objective and
@@ -48,11 +53,11 @@ arms:
   shared_conditions:  # identical across arms, per frozen §5
     base: a9282490dc6c57442807ac567461eb99457d2dde
     workcell: fresh private Git workcell per arm
-    model: PINNED_AT_FREEZE
-    reasoning_effort: PINNED_AT_FREEZE
-    service_tier: PINNED_AT_FREEZE
+    model: gpt-5.6-sol          # MISSION_CONTRACT_V0.yaml executor spec
+    reasoning_effort: high      # MISSION_CONTRACT_V0.yaml
+    service_tier: priority      # MISSION_CONTRACT_V0.yaml
     sandbox: spec §11 sandboxPolicy (as bound in the live driver)
-    network: PINNED_AT_FREEZE
+    network: disabled (spec §11 sandboxPolicy, networkAccess false)
     objective: fixture.objective (verbatim, both arms)
     final_gate: GoalGate (same admitted verifiers, same digests)
     order: randomized; seed 0x5EED20260830  # arms interleaved A/B/B/A/A/B from this seed
@@ -68,7 +73,12 @@ arms:
     cpu_seconds: 2700
     memory_mb: 4096
     processes: 64
-  driver_digest: PINNED_AT_FREEZE  # live app-server binary + contract/workspace/gate digests
+  driver_digest:
+    binary_path: /Users/dhyana/.npm-global/bin/codex
+    binary_sha256: 134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477
+    binary_version: codex-cli 0.151.0
+    protocol_schema_sha256: f3dec1e031d99a420b137b903f02196d4325eece57620c925bb7130b25f168d2
+    activation: DHARMA_RUDRA_LIVE_DRIVER=1 AND contract executor.driver == codex_app_server_stdio
 
 verification:
   final_gate_invocation: fresh detached verification workcell, independent, per arm
@@ -80,7 +90,7 @@ verification:
     ONE_WORLD scoreboard verification log with world-locus
 
 gates_before_launch:
-  - live_driver_binding_merged  # feat/rudra-live-driver → main
-  - operator_§18_ceiling_ruling  # DELETION_REVIEW_2026-08-30.md options
-  - titanium_scope_admission  # fixture.titanium_scope_admission
-  - this_manifest_frozen  # all PINNED_AT_FREEZE fields resolved
+  live_driver_binding_merged: done  # #1500 → 5301bdc57 on main
+  this_manifest_frozen: done  # 2026-08-30; all PINNED_AT_FREEZE resolved
+  operator_§18_ceiling_ruling: owed  # DELETION_REVIEW_2026-08-30.md options
+  titanium_scope_admission: owed  # fixture.titanium_scope_admission
