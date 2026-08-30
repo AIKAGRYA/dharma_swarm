@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from dharma_swarm.operator_bridge import OperatorBridge
+from dharma_swarm.runtime_activity import (
+    ACTIVITY_SEMANTICS,
+    RuntimeActivitySnapshot,
+    load_runtime_activity,
+)
 from dharma_swarm.runtime_agent_server_views import RuntimeAgentServerViews
 from dharma_swarm.runtime_graph_views import RuntimeGraphViews
 from dharma_swarm.runtime_platform_views import RuntimePlatformViews
@@ -45,6 +50,15 @@ class RuntimeOverview:
     promoted_facts: int
     context_bundles: int
     operator_actions: int
+    active_sessions: int
+    current_lease_claims: int
+    observed_nonterminal_claims: int
+    observed_nonterminal_runs: int
+    expired_or_unproven_runs: int
+    terminal_evidence_conflicts: int
+    activity_observed_at: str
+    activity_semantics: str = ACTIVITY_SEMANTICS
+    proves_executor_liveness: bool = False
 
 
 class OperatorViews:
@@ -59,8 +73,17 @@ class OperatorViews:
         self.runtime_state = runtime_state
         self.bridge = bridge
 
-    async def runtime_overview(self, *, session_id: str | None = None) -> RuntimeOverview:
+    async def runtime_overview(
+        self,
+        *,
+        session_id: str | None = None,
+        activity: RuntimeActivitySnapshot | None = None,
+    ) -> RuntimeOverview:
         await self.runtime_state.init_db()
+        activity = activity or load_runtime_activity(
+            self.runtime_state.db_path, session_id=session_id
+        )
+        activity_summary = activity.summary()
         clauses: list[str] = []
         params: list[Any] = []
         if session_id is not None:
@@ -71,25 +94,24 @@ class OperatorViews:
         with sqlite3.connect(str(self.runtime_state.db_path)) as db:
             sessions = self._count(db, "sessions", where, params)
             claims = self._count(db, "task_claims", where, params)
-            active_claims = self._count(
+            observed_nonterminal_claims = self._count(
                 db,
                 "task_claims",
-                self._augment_where(where, "status IN ('claimed','in_progress')"),
+                self._augment_where(
+                    where,
+                    "lower(status) NOT IN "
+                    "('cancelled','canceled','completed','error','errored','failed',"
+                    "'stale_recovered','succeeded','success') AND recovered_at IS NULL",
+                ),
                 params,
             )
             acknowledged_claims = self._count(
                 db,
                 "task_claims",
-                self._augment_where(where, "status = 'acknowledged'"),
+                self._augment_where(where, "acked_at IS NOT NULL"),
                 params,
             )
             runs = self._count(db, "delegation_runs", where, params)
-            active_runs = self._count(
-                db,
-                "delegation_runs",
-                self._augment_where(where, "status NOT IN ('completed','failed','stale_recovered')"),
-                params,
-            )
             artifacts = self._count(db, "artifact_records", where, params)
             promoted_facts = self._count(
                 db,
@@ -102,14 +124,29 @@ class OperatorViews:
         return RuntimeOverview(
             sessions=sessions,
             claims=claims,
-            active_claims=active_claims,
+            active_claims=int(activity_summary["current_lease_claim_count"]),
             acknowledged_claims=acknowledged_claims,
             runs=runs,
-            active_runs=active_runs,
+            active_runs=int(activity_summary["current_lease_run_count"]),
             artifacts=artifacts,
             promoted_facts=promoted_facts,
             context_bundles=context_bundles,
             operator_actions=operator_actions,
+            active_sessions=int(activity_summary["active_session_count"]),
+            current_lease_claims=int(
+                activity_summary["current_lease_claim_count"]
+            ),
+            observed_nonterminal_claims=observed_nonterminal_claims,
+            observed_nonterminal_runs=int(
+                activity_summary["observed_nonterminal_run_count"]
+            ),
+            expired_or_unproven_runs=int(
+                activity_summary["expired_or_unproven_run_count"]
+            ),
+            terminal_evidence_conflicts=int(
+                activity_summary["terminal_evidence_conflict_count"]
+            ),
+            activity_observed_at=str(activity_summary["activity_observed_at"]),
         )
 
     async def active_runs(
@@ -117,16 +154,35 @@ class OperatorViews:
         *,
         session_id: str | None = None,
         limit: int = 20,
+        activity: RuntimeActivitySnapshot | None = None,
     ) -> list[DelegationRun]:
-        runs = await self.runtime_state.list_delegation_runs(
-            session_id=session_id,
-            limit=limit * 2,
+        await self.runtime_state.init_db()
+        activity = activity or load_runtime_activity(
+            self.runtime_state.db_path, session_id=session_id
         )
-        return [
-            run
-            for run in runs
-            if run.status not in {"completed", "failed", "stale_recovered"}
-        ][: max(1, limit)]
+        return list(activity.current_runs[: max(1, limit)])
+
+    async def operator_activity_snapshot(
+        self,
+        *,
+        session_id: str | None = None,
+        limit: int = 20,
+    ) -> tuple[RuntimeOverview, list[DelegationRun]]:
+        """Return counters and current-run rows from one activity observation."""
+
+        await self.runtime_state.init_db()
+        activity = load_runtime_activity(
+            self.runtime_state.db_path, session_id=session_id
+        )
+        overview = await self.runtime_overview(
+            session_id=session_id, activity=activity
+        )
+        runs = await self.active_runs(
+            session_id=session_id,
+            limit=limit,
+            activity=activity,
+        )
+        return overview, runs
 
     async def runtime_graph(
         self,

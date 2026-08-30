@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from dharma_swarm.runtime_activity import load_runtime_activity
 from dharma_swarm.runtime_state import (
     DelegationRun,
     RuntimeReceipt,
@@ -65,9 +66,16 @@ class RuntimeGraphViews:
             runs_by_id,
             receipts,
         )
-        active_agents = sorted(
+        topology_active_agents = sorted(
             {state.active_agent for state in topology_states if state.active_agent}
         )
+        activity = load_runtime_activity(
+            self.runtime_state.db_path,
+            run_ids=tuple(runs_by_id),
+        )
+        activity_by_run = activity.by_run_id
+        activity_summary = activity.summary()
+        active_agents = sorted(activity.current_agent_ids)
         checkpoints = [
             {
                 "checkpoint_id": state.checkpoint_id,
@@ -81,7 +89,11 @@ class RuntimeGraphViews:
             for state in topology_states
             if state.checkpoint_id
         ]
-        run_views = [self._run_to_dict(run) for run in runs_by_id.values()]
+        run_views = []
+        for run in runs_by_id.values():
+            observation = activity_by_run.get(run.run_id)
+            observed_run = observation.run_record if observation is not None else run
+            run_views.append(self._run_to_dict(observed_run, observation))
         receipt_views = [self._receipt_to_dict(receipt) for receipt in receipts]
         topology_views = [self._topology_to_dict(state) for state in topology_states]
         return {
@@ -98,18 +110,30 @@ class RuntimeGraphViews:
             "summary": {
                 "topology_state_count": len(topology_views),
                 "run_count": len(run_views),
-                "active_run_count": sum(
-                    1
-                    for run in run_views
-                    if run["status"] not in {"completed", "failed", "stale_recovered"}
-                ),
+                "active_run_count": activity_summary["current_lease_run_count"],
+                "current_lease_run_count": activity_summary[
+                    "current_lease_run_count"
+                ],
+                "observed_nonterminal_run_count": activity_summary[
+                    "observed_nonterminal_run_count"
+                ],
+                "expired_or_unproven_run_count": activity_summary[
+                    "expired_or_unproven_run_count"
+                ],
+                "terminal_evidence_conflict_count": activity_summary[
+                    "terminal_evidence_conflict_count"
+                ],
+                "activity_semantics": activity.semantics,
+                "proves_executor_liveness": False,
                 "receipt_count": len(receipt_views),
                 "node_count": len(nodes),
                 "edge_count": len(edges),
                 "checkpoint_count": len(checkpoints),
                 "active_agent_count": len(active_agents),
+                "topology_active_agent_count": len(topology_active_agents),
             },
             "active_agents": active_agents,
+            "topology_active_agents": topology_active_agents,
             "checkpoints": checkpoints,
             "topology_states": topology_views,
             "runs": run_views,
@@ -303,7 +327,7 @@ class RuntimeGraphViews:
                 "agent",
                 state.active_agent,
                 agent_id=state.active_agent,
-                active=True,
+                topology_active=True,
             )
             add_edge(
                 f"active_agent:{state.run_id}:{state.active_agent}",
@@ -398,8 +422,8 @@ class RuntimeGraphViews:
                 )
 
     @staticmethod
-    def _run_to_dict(run: DelegationRun) -> dict[str, Any]:
-        return {
+    def _run_to_dict(run: DelegationRun, activity: Any | None = None) -> dict[str, Any]:
+        payload = {
             "run_id": run.run_id,
             "session_id": run.session_id,
             "task_id": run.task_id,
@@ -415,6 +439,17 @@ class RuntimeGraphViews:
             "failure_code": run.failure_code,
             "metadata": run.metadata,
         }
+        payload["activity"] = (
+            activity.to_dict()
+            if activity is not None
+            else {
+                "semantics": "runtime_activity.v1",
+                "state": "expired_or_unproven",
+                "reason_codes": ["activity_observation_missing"],
+                "proves_executor_liveness": False,
+            }
+        )
+        return payload
 
     @staticmethod
     def _topology_to_dict(state: TopologyStateRecord) -> dict[str, Any]:

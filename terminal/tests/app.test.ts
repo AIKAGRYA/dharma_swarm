@@ -2068,6 +2068,77 @@ describe("commandResultActionsForBridgeEvent", () => {
     );
   });
 
+  test("session bootstrap fails closed on an untyped conflicting runtime preview", () => {
+    const adversarialRuntimePreview: TabPreview = {
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v1",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 ActivitySemantics=runtime_activity.v2 Sessions=8 Claims=3 Runs=4 ActiveRuns=9 ExecutorLiveness=proven",
+      "Session state": "8 sessions | 9 active claims",
+      "Run state": "9 active runs | executor liveness proven",
+      "Active runs detail": "9 active agents",
+      "Executor liveness": "proven",
+      "Runtime summary": "/tmp/runtime.db | 9 active runs | executor liveness proven",
+    };
+
+    const state = applyActions(
+      initialState,
+      snapshotActionsForBridgeEvent({
+        type: "session.bootstrap.result",
+        runtime_preview: adversarialRuntimePreview,
+      }),
+    );
+    const rendered = state.tabs
+      .find((tab) => tab.id === "control")
+      ?.lines.map((line) => line.text)
+      .join("\n") ?? "";
+
+    expect(state.liveControlPreview?.["Activity semantics"]).toBe("conflicting_activity_semantics");
+    expect(state.liveControlPreview?.["Executor liveness"]).toBe("unproven");
+    expect(state.liveControlPreview?.["Runtime activity"]).not.toContain("ActiveRuns=");
+    expect(state.liveControlPreview?.["Runtime activity"]).not.toContain("ExecutorLiveness=proven");
+    expect(Object.values(state.liveControlPreview ?? {}).join("\n")).not.toMatch(
+      /\bactive (?:claims|runs|agents)\b/i,
+    );
+    expect(rendered).toContain("Activity semantics: conflicting_activity_semantics");
+    expect(rendered).toContain("Executor liveness: unproven");
+    expect(rendered).not.toMatch(/\bactive (?:claims|runs|agents)\b/i);
+    expect(rendered).not.toMatch(/executor liveness proven/i);
+  });
+
+  test("session bootstrap installs markerless current-lease previews through the truth boundary", () => {
+    const markerlessRuntimePreview: TabPreview = {
+      "Runtime DB": "/tmp/runtime.db",
+      "Runtime activity":
+        "Sessions=8 CurrentSessions=1 Claims=3 CurrentClaims=1 Runs=4 CurrentLeases=1 ExecutorLiveness=proven",
+      "Session state": "8 sessions | 1 active session | 3 active claims",
+      "Run state": "4 runs | 1 active run | executor liveness proven",
+      "Current lease runs detail": "agent-a | liveness proven",
+      "Executor liveness": "proven",
+      "Runtime summary": "/tmp/runtime.db | 1 active run | executor liveness proven",
+    };
+
+    const state = applyActions(
+      initialState,
+      snapshotActionsForBridgeEvent({
+        type: "session.bootstrap.result",
+        runtime_preview: markerlessRuntimePreview,
+      }),
+    );
+
+    expect(state.liveControlPreview?.["Activity semantics"]).toBe("runtime_activity.v1");
+    expect(state.liveControlPreview?.["Executor liveness"]).toBe("unproven");
+    expect(state.liveControlPreview?.["Session state"]).toContain("1 current lease sessions");
+    expect(state.liveControlPreview?.["Run state"]).toContain("1 current leases");
+    expect(state.liveControlPreview?.["Current lease runs detail"]).toBeUndefined();
+    expect(Object.values(state.liveControlPreview ?? {}).join("\n")).not.toMatch(
+      /\bactive (?:claims|runs|sessions|agents)\b/i,
+    );
+    expect(Object.values(state.liveControlPreview ?? {}).join("\n")).not.toMatch(
+      /(?:executor\s*)?liveness\s*(?::|=|\s)\s*proven/i,
+    );
+  });
+
   test("prefers pending operator pane fallbacks over stale chat targets for sparse slash command results", () => {
     expect(commandResultActionsForBridgeEvent(
       {
@@ -2207,6 +2278,145 @@ test("operator summary surfaces live loop, verification, and runtime state from 
     {label: "approvals", value: "1 pending", tone: "warn"},
     {label: "sessions", value: "22", tone: "live"},
   ]);
+});
+
+test("operator summary keeps runtime_activity.v1 lease truth above stale legacy runtime summaries", () => {
+  const semanticPreview: TabPreview = {
+    "Activity semantics": "runtime_activity.v1",
+    "Executor liveness": "unproven",
+    "Runtime activity":
+      "ActivitySemantics=runtime_activity.v1 Sessions=18 CurrentSessions=2 Claims=4 CurrentClaims=2 ObservedNonterminalClaims=3 AckedClaims=2 Runs=7 CurrentLeases=1 ObservedNonterminalRuns=2 ExpiredOrUnproven=1 ExecutorLiveness=unproven",
+    "Runtime summary": "/tmp/runtime.db | 18 sessions | 4 active runs",
+  };
+  const state: AppState = {
+    ...initialState,
+    tabs: initialState.tabs.map((tab) => tab.id === "control" ? {...tab, preview: semanticPreview} : tab),
+    liveControlPreview: {
+      "Runtime activity": "Sessions=18 Runs=7 ActiveRuns=4",
+      "Runtime summary": "/tmp/runtime.db | 18 sessions | 4 active runs",
+    },
+  };
+
+  expect(buildOperatorSummaryItems(state)).toEqual(
+    expect.arrayContaining([{
+      label: "runtime",
+      value:
+        "18 sessions | 1 current leases | 2 observed nonterminal | 1 expired/unproven | executor liveness unproven",
+      tone: "critical",
+    }]),
+  );
+});
+
+test("operator summary fails closed for unknown runtime activity semantics", () => {
+  const state: AppState = {
+    ...initialState,
+    liveControlPreview: {
+      "Activity semantics": "runtime_activity.v2",
+      "Executor liveness": "proven",
+      "Runtime activity": "ActivitySemantics=runtime_activity.v2 Sessions=18 Runs=7 ActiveRuns=4 ExecutorLiveness=proven",
+      "Runtime summary": "/tmp/runtime.db | 4 active runs",
+    },
+  };
+
+  expect(buildOperatorSummaryItems(state)).toEqual(
+    expect.arrayContaining([{
+      label: "runtime",
+      value:
+        "activity semantics runtime_activity.v2 unrecognized | lease classification unavailable | executor liveness unproven",
+      tone: "warn",
+    }]),
+  );
+});
+
+test("operator summary preserves explicit legacy_status_counts Active metrics", () => {
+  const state: AppState = {
+    ...initialState,
+    liveControlPreview: {
+      "Activity semantics": "legacy_status_counts",
+      "Runtime activity": "ActivitySemantics=legacy_status_counts Sessions=3 Runs=2 ActiveRuns=1",
+    },
+  };
+
+  expect(buildOperatorSummaryItems(state)).toEqual(
+    expect.arrayContaining([{label: "runtime", value: "3 sessions | 2 runs | 1 active", tone: "live"}]),
+  );
+});
+
+test("operator summary replaces stale v1 lease authority on an explicit legacy transition", () => {
+  const state: AppState = {
+    ...initialState,
+    liveControlPreview: undefined,
+    tabs: initialState.tabs.map((tab) => {
+      if (tab.id === "control") {
+        return {
+          ...tab,
+          preview: {
+            "Activity semantics": "runtime_activity.v1",
+            "Executor liveness": "unproven",
+            "Runtime activity":
+              "ActivitySemantics=runtime_activity.v1 Sessions=18 Runs=7 CurrentLeases=1 ExpiredOrUnproven=1 ExecutorLiveness=unproven",
+            "Runtime summary": "/tmp/runtime.db | 1 current leases | executor liveness unproven",
+          },
+        };
+      }
+      if (tab.id === "runtime") {
+        return {
+          ...tab,
+          preview: {
+            "Activity semantics": "legacy_status_counts",
+            "Runtime activity": "ActivitySemantics=legacy_status_counts Sessions=3 Runs=2 ActiveRuns=1",
+            "Runtime summary": "/tmp/runtime.db | 3 sessions | 2 runs | 1 active run",
+          },
+        };
+      }
+      return tab;
+    }),
+  };
+
+  expect(buildOperatorSummaryItems(state)).toEqual(
+    expect.arrayContaining([{
+      label: "runtime",
+      value: "/tmp/runtime.db | 3 sessions | 2 runs | 1 active run",
+      tone: "live",
+    }]),
+  );
+});
+
+test("typed legacy runtime payloads retain their explicit semantics marker in app state", () => {
+  const runtimePayload = {
+    version: "v1" as const,
+    domain: "runtime_snapshot" as const,
+    snapshot: {
+      snapshot_id: "legacy-app-transition",
+      created_at: "2026-04-03T02:16:08Z",
+      repo_root: REPO_ROOT,
+      runtime_db: "/tmp/runtime.db",
+      health: "healthy",
+      bridge_status: "connected",
+      active_session_count: 3,
+      active_run_count: 1,
+      artifact_count: 0,
+      context_bundle_count: 0,
+      anomaly_count: 0,
+      verification_status: "unknown",
+      warnings: [],
+      metrics: {claims: "2", active_claims: "1", acknowledged_claims: "1"},
+      metadata: {activity_semantics: "legacy_status_counts", overview: {runs: 2}},
+    },
+  };
+  const actions = snapshotActionsForBridgeEvent({
+    type: "session.bootstrap.result",
+    runtime_payload: runtimePayload,
+  });
+  const liveControl = actions.find((action) => action.type === "live.control.set");
+
+  expect(liveControl?.type).toBe("live.control.set");
+  if (liveControl?.type === "live.control.set") {
+    expect(liveControl.preview["Activity semantics"]).toBe("legacy_status_counts");
+    expect(liveControl.preview["Runtime activity"]).toContain("ActivitySemantics=legacy_status_counts");
+    expect(liveControl.preview["Runtime summary"]).toMatch(/\b1 active runs?\b/);
+    expect(liveControl.preview["Runtime summary"]).not.toContain("current lease");
+  }
 });
 
 test("operator summary falls back to neutral loop and runtime state when control preview is not ready", () => {

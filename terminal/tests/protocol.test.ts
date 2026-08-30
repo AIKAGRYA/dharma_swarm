@@ -9,6 +9,7 @@ import {
   agentRoutesToPreview,
   commandGraphToLines,
   commandGraphToPreview,
+  canonicalRuntimePreviewForRendering,
   resolveCommandTargetPane,
   commandTargetTab,
   evolutionSurfaceToLines,
@@ -554,6 +555,179 @@ describe("typed runtime helpers", () => {
       "cycle 9 running | updated 2026-04-01T00:04:00Z | verify tsc=ok | cycle_acceptance=ok",
     );
     expect(preview["Control pulse preview"]).toContain("cycle 9 running");
+  });
+
+  test("renders runtime_activity.v1 as lease evidence and rejects stale active summaries", () => {
+    const preview = runtimePayloadToPreview(
+      {
+        version: "v1",
+        domain: "runtime_snapshot",
+        snapshot: {
+          snapshot_id: "runtime-lease-truth-1",
+          created_at: "2026-08-28T00:00:00Z",
+          repo_root: "/repo",
+          runtime_db: "/tmp/runtime.db",
+          health: "degraded",
+          bridge_status: "connected",
+          active_session_count: 1,
+          active_run_count: 1,
+          artifact_count: 5,
+          context_bundle_count: 2,
+          anomaly_count: 2,
+          verification_status: "unknown",
+          runtime_summary: "stale: 1 active run and 1 active claim",
+          summary: "1 current lease, executor liveness unproven",
+          warnings: [],
+          metrics: {
+            claims: "3",
+            active_claims: "1",
+            acknowledged_claims: "2",
+            observed_nonterminal_claims: "3",
+            observed_nonterminal_runs: "3",
+            expired_or_unproven_runs: "2",
+            operator_actions: "6",
+            promoted_facts: "2",
+          },
+          metadata: {
+            activity_semantics: "runtime_activity.v1",
+            proves_executor_liveness: false,
+            overview: {
+              activity_semantics: "runtime_activity.v1",
+              sessions: 4169,
+              active_sessions: 1,
+              claims: 3,
+              current_lease_claims: 1,
+              observed_nonterminal_claims: 3,
+              runs: 3,
+              observed_nonterminal_runs: 3,
+              expired_or_unproven_runs: 2,
+            },
+            supervisor_preview: {
+              "Runtime summary": "persisted: 1 active run and 1 active claim",
+            },
+          },
+        },
+      },
+      null,
+    );
+
+    expect(preview["Activity semantics"]).toBe("runtime_activity.v1");
+    expect(preview["Executor liveness"]).toBe("unproven");
+    expect(preview["Session state"]).toBe(
+      "4169 sessions | 1 current lease sessions | 3 claims | 1 current lease claims | 3 observed nonterminal claims | 2 acked claims",
+    );
+    expect(preview["Run state"]).toBe(
+      "3 runs | 1 current leases | 3 observed nonterminal runs | 2 expired/unproven runs | executor liveness unproven",
+    );
+    expect(preview["Runtime activity"]).toContain("CurrentLeases=1");
+    expect(preview["Runtime summary"]).not.toMatch(/\bactive (?:claim|run)/i);
+    expect(preview["Runtime summary"]).toContain("1 current leases");
+    expect(preview["Runtime summary"]).toContain("executor liveness unproven");
+  });
+
+  test("fails closed for an unrecognized runtime activity semantic marker", () => {
+    const preview = runtimePayloadToPreview(
+      {
+        version: "v1",
+        domain: "runtime_snapshot",
+        snapshot: {
+          snapshot_id: "runtime-unknown-semantics-1",
+          created_at: "2026-08-28T00:00:00Z",
+          repo_root: "/repo",
+          health: "unknown",
+          bridge_status: "connected",
+          active_session_count: 7,
+          active_run_count: 4,
+          artifact_count: 0,
+          context_bundle_count: 0,
+          anomaly_count: 0,
+          verification_status: "unknown",
+          warnings: [],
+          metrics: {claims: "5", active_claims: "4"},
+          metadata: {activity_semantics: "runtime_activity.v2", overview: {sessions: 9, runs: 8}},
+        },
+      },
+      null,
+    );
+
+    expect(preview["Activity semantics"]).toBe("runtime_activity.v2");
+    expect(preview["Run state"]).toContain("lease classification unavailable");
+    expect(preview["Run state"]).not.toContain("active");
+    expect(preview.Alerts).toContain("unrecognized runtime activity semantics");
+  });
+
+  test("fails closed when typed runtime activity semantic markers conflict", () => {
+    const preview = runtimePayloadToPreview(
+      {
+        version: "v1",
+        domain: "runtime_snapshot",
+        snapshot: {
+          snapshot_id: "runtime-conflicting-semantics-1",
+          created_at: "2026-08-28T00:00:00Z",
+          repo_root: "/repo",
+          health: "unknown",
+          bridge_status: "connected",
+          active_session_count: 2,
+          active_run_count: 2,
+          artifact_count: 0,
+          context_bundle_count: 0,
+          anomaly_count: 0,
+          verification_status: "unknown",
+          warnings: [],
+          metrics: {claims: "4", active_claims: "2"},
+          metadata: {
+            activity_semantics: "runtime_activity.v2",
+            overview: {
+              activity_semantics: "runtime_activity.v1",
+              sessions: 9,
+              runs: 8,
+              current_lease_claims: 2,
+            },
+          },
+        },
+      },
+      null,
+    );
+
+    expect(preview["Activity semantics"]).toBe("conflicting_activity_semantics");
+    expect(preview["Run state"]).toContain("lease classification unavailable");
+    expect(preview["Runtime activity"]).not.toContain("CurrentLeases");
+    expect(Object.values(preview).join("\n")).not.toMatch(/\bactive (?:claim|claims|run|runs)\b/i);
+    expect(preview.Alerts).toContain("conflicting runtime activity semantics");
+  });
+
+  test("preserves an explicit typed legacy status-count marker", () => {
+    const preview = runtimePayloadToPreview(
+      {
+        version: "v1",
+        domain: "runtime_snapshot",
+        snapshot: {
+          snapshot_id: "runtime-explicit-legacy-1",
+          created_at: "2026-08-28T00:00:00Z",
+          repo_root: "/repo",
+          health: "ok",
+          bridge_status: "connected",
+          active_session_count: 2,
+          active_run_count: 1,
+          artifact_count: 0,
+          context_bundle_count: 0,
+          anomaly_count: 0,
+          verification_status: "unknown",
+          warnings: [],
+          metrics: {claims: "3", active_claims: "1"},
+          metadata: {
+            activity_semantics: "legacy_status_counts",
+            overview: {sessions: 2, runs: 1},
+          },
+        },
+      },
+      null,
+    );
+
+    expect(preview["Activity semantics"]).toBe("legacy_status_counts");
+    expect(preview["Runtime activity"]).toContain("ActivitySemantics=legacy_status_counts");
+    expect(preview["Session state"]).toContain("1 active claims");
+    expect(preview["Run state"]).toContain("1 active run");
   });
 
   test("unwraps nested runtime snapshot payloads from refresh envelopes", () => {
@@ -2474,6 +2648,49 @@ describe("operatorSnapshot helpers", () => {
     expect(preview["Active runs"]).toBe("2");
     expect(preview.Agents).toContain("agent-alpha");
   });
+
+  test("renders runtime_activity.v1 operator snapshots without promoting leases to liveness", () => {
+    const payload = {
+      snapshot: {
+        runtime_db: "/tmp/runtime.db",
+        overview: {
+          activity_semantics: "runtime_activity.v1",
+          proves_executor_liveness: false,
+          sessions: 10,
+          active_sessions: 1,
+          claims: 3,
+          active_claims: 1,
+          current_lease_claims: 1,
+          acknowledged_claims: 2,
+          observed_nonterminal_claims: 3,
+          runs: 3,
+          active_runs: 1,
+          observed_nonterminal_runs: 3,
+          expired_or_unproven_runs: 2,
+          artifacts: 0,
+          promoted_facts: 0,
+          context_bundles: 0,
+          operator_actions: 0,
+        },
+        runs: [{assigned_to: "agent-alpha", status: "running", task_id: "task-123", run_id: "run-123"}],
+        actions: [],
+      },
+    };
+
+    const lines = operatorSnapshotToLines(payload).map((line) => line.text);
+    const preview = operatorSnapshotToPreview(payload);
+
+    expect(lines).toContain("## Current lease runs");
+    expect(lines.some((line) => line.includes("current lease") && line.includes("executor liveness unproven"))).toBe(true);
+    expect(preview["Session state"]).toContain("1 current lease claims");
+    expect(preview["Run state"]).toContain("2 expired/unproven runs");
+    expect(preview["Current leases"]).toBe("1");
+    expect(preview["Current lease runs detail"]).toContain("agent-alpha");
+    expect(preview["Lease assignees"]).toContain("agent-alpha");
+    expect(preview["Active runs"]).toBeUndefined();
+    expect(preview.Agents).toBeUndefined();
+    expect(preview["Executor liveness"]).toBe("unproven");
+  });
 });
 
 describe("modelPolicy helpers", () => {
@@ -3290,6 +3507,90 @@ describe("runtimeSnapshotToLines", () => {
     expect(lines).toContain("Alerts: none");
   });
 
+  test("preserves both runtime_activity.v1 evidence lines from runtime status text", () => {
+    const content = `--- Runtime Control Plane ---
+  Runtime DB: /Users/dhyana/.dharma/state/runtime.db
+  Sessions=4169  CurrentSessions=1  Claims=3  CurrentClaims=1  AckedClaims=2  Runs=3  CurrentLeases=1
+  ObservedNonterminal=3  ExpiredOrUnproven=2  ExecutorLiveness=unproven
+  Artifacts=7  PromotedFacts=2  ContextBundles=1  OperatorActions=3`;
+
+    const preview = runtimeSnapshotToPreview(content);
+    const lines = runtimeSnapshotToLines(content).map((line) => line.text);
+
+    expect(preview["Activity semantics"]).toBe("runtime_activity.v1");
+    expect(preview["Session state"]).toBe(
+      "4169 sessions | 1 current lease sessions | 3 claims | 1 current lease claims | 2 acked claims",
+    );
+    expect(preview["Run state"]).toBe(
+      "3 runs | 1 current leases | 3 observed nonterminal runs | 2 expired/unproven runs | executor liveness unproven",
+    );
+    expect(preview["Runtime activity"]).toContain("ObservedNonterminalRuns=3");
+    expect(lines).toContain("Current lease runs detail: none");
+    expect(lines).toContain("Executor liveness: unproven");
+    expect(lines.some((line) => /active (?:claims|runs)/i.test(line))).toBe(false);
+  });
+
+  test("fails closed on unknown and incomplete explicit text activity semantics", () => {
+    const unknownContent = `--- Runtime Control Plane ---
+  Runtime DB: /tmp/runtime.db
+  ActivitySemantics=runtime_activity.v2  Sessions=8  Claims=3  ActiveClaims=2  Runs=4  ActiveRuns=2  ExecutorLiveness=proven
+  Artifacts=0  ContextBundles=0`;
+    const unknownPreview = runtimeSnapshotToPreview(unknownContent);
+    const unknownLines = runtimeSnapshotToLines(unknownContent).map((line) => line.text);
+
+    expect(unknownPreview["Activity semantics"]).toBe("runtime_activity.v2");
+    expect(unknownPreview["Run state"]).toContain("lease classification unavailable");
+    expect(unknownPreview["Executor liveness"]).toBe("unproven");
+    expect(unknownPreview["Runtime activity"]).not.toMatch(/Active(?:Claims|Runs)=/);
+    expect(unknownLines.join("\n")).not.toMatch(/\bactive (?:claims|runs)\b/i);
+    expect(unknownLines.join("\n")).not.toMatch(/Active(?:Claims|Runs)=/);
+    expect(unknownLines.join("\n")).not.toContain("ExecutorLiveness=proven");
+
+    const incompleteV1Content = `--- Runtime Control Plane ---
+  Runtime DB: /tmp/runtime.db
+  ActivitySemantics=runtime_activity.v1  Sessions=8  Claims=3  ActiveClaims=2  Runs=4  ActiveRuns=2  ExecutorLiveness=proven
+  Artifacts=0  ContextBundles=0`;
+    const incompleteV1 = runtimeSnapshotToPreview(incompleteV1Content);
+
+    expect(incompleteV1["Activity semantics"]).toBe("runtime_activity.v1");
+    expect(incompleteV1["Session state"]).toContain("current lease claim count unavailable");
+    expect(incompleteV1["Run state"]).toContain("current lease count unavailable");
+    expect(incompleteV1["Executor liveness"]).toBe("unproven");
+    expect(incompleteV1["Runtime activity"]).not.toContain("ExecutorLiveness=proven");
+    expect(Object.values(incompleteV1).join("\n")).not.toMatch(/\bactive (?:claims|runs)\b/i);
+  });
+
+  test("does not replay prose-shaped activity or liveness claims under nonlegacy semantics", () => {
+    const content = `--- Runtime Control Plane ---
+  Runtime DB: /tmp/runtime.db
+  ActivitySemantics=runtime_activity.v2  Sessions=8  Claims=3  Runs=4
+  Active runs: 9 | executor liveness proven
+  Artifacts=0  ContextBundles=0`;
+
+    const lines = runtimeSnapshotToLines(content).map((line) => line.text);
+    const rendered = lines.join("\n");
+
+    expect(rendered).toContain("Activity semantics: runtime_activity.v2");
+    expect(rendered).toContain("Executor liveness: unproven");
+    expect(rendered).not.toContain("Active runs: 9");
+    expect(rendered).not.toMatch(/executor liveness proven/i);
+  });
+
+  test("fails closed when text activity semantic markers conflict", () => {
+    const content = `--- Runtime Control Plane ---
+  Runtime DB: /tmp/runtime.db
+  ActivitySemantics=runtime_activity.v2  Sessions=8  Claims=3  Runs=4  ActiveRuns=2
+  ActivitySemantics=runtime_activity.v1  CurrentClaims=1  CurrentLeases=1
+  Artifacts=0  ContextBundles=0`;
+    const preview = runtimeSnapshotToPreview(content);
+
+    expect(preview["Activity semantics"]).toBe("conflicting_activity_semantics");
+    expect(preview["Session state"]).toContain("activity semantics conflict");
+    expect(preview["Run state"]).toContain("lease classification unavailable");
+    expect(preview.Alerts).toContain("conflicting runtime activity semantics");
+    expect(Object.values(preview).join("\n")).not.toMatch(/\bactive (?:claims|runs)\b/i);
+  });
+
   test("appends durable loop and verification state when supervisor data is present", () => {
     const content = `--- Runtime Control Plane ---
   Runtime DB: /Users/dhyana/.dharma/state/runtime.db
@@ -3385,6 +3686,54 @@ describe("runtimePreviewToLines", () => {
       "Updated: 2026-03-31T22:46:35.466340+00:00",
       "Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260331T223607Z/state",
     ]);
+  });
+
+  test("canonicalizes conflicting raw preview markers before rendering", () => {
+    const lines = runtimePreviewToLines({
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v1",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 ActivitySemantics=runtime_activity.v2 Sessions=8 Claims=3 Runs=4 ActiveRuns=9 ExecutorLiveness=proven",
+      "Session state": "8 sessions | 9 active claims",
+      "Run state": "9 active runs | executor liveness proven",
+      "Active runs detail": "9 active agents",
+      "Executor liveness": "proven",
+      "Runtime summary": "/tmp/runtime.db | 9 active runs | executor liveness proven",
+    }).map((line) => line.text);
+    const rendered = lines.join("\n");
+
+    expect(rendered).toContain("Activity semantics: conflicting_activity_semantics");
+    expect(rendered).toContain("Executor liveness: unproven");
+    expect(rendered).toContain("Run state: 4 runs | lease classification unavailable | executor liveness unproven");
+    expect(rendered).not.toMatch(/\bactive (?:claims|runs|agents)\b/i);
+    expect(rendered).not.toContain("ExecutorLiveness=proven");
+    expect(rendered).not.toMatch(/executor liveness proven/i);
+  });
+
+  test("rejects every non-unproven liveness delimiter in current-lease detail", () => {
+    const variants = [
+      "liveness proven",
+      "liveness: proven",
+      "liveness=proven",
+      "liveness\tproven",
+      "ExecutorLiveness: proven",
+      "executor liveness=proven",
+      "liveness unknown",
+    ];
+
+    for (const detail of variants) {
+      const canonical = canonicalRuntimePreviewForRendering({
+        "Activity semantics": "runtime_activity.v1",
+        "Runtime activity":
+          "ActivitySemantics=runtime_activity.v1 Sessions=8 CurrentSessions=1 Claims=3 CurrentClaims=1 Runs=4 CurrentLeases=1 ExecutorLiveness=unproven",
+        "Current lease runs detail": `agent-a | ${detail}`,
+      });
+
+      expect(canonical["Current lease runs detail"]).toBeUndefined();
+      expect(Object.values(canonical).join("\n")).not.toMatch(
+        /(?:executor\s*)?liveness\s*(?::|=|\s)\s*(?:proven|unknown)/i,
+      );
+    }
   });
 });
 

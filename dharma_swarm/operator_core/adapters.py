@@ -224,7 +224,15 @@ def runtime_snapshot_from_operator_snapshot(
             run for run in runs if isinstance(run, dict) and str(run.get("failure_code", "") or "").strip()
         ]
         if failed:
-            warnings.append(f"{len(failed)} active runs report failure codes")
+            warnings.append(f"{len(failed)} current-lease runs report failure codes")
+
+    expired_or_unproven = _coerce_int(
+        overview.get("expired_or_unproven_runs")
+    )
+    if expired_or_unproven:
+        warnings.append(
+            f"{expired_or_unproven} nonterminal runs are expired or unproven"
+        )
 
     verification_status = (
         _preview_string(supervisor_preview, "Verification status", "verification_status")
@@ -233,8 +241,14 @@ def runtime_snapshot_from_operator_snapshot(
     next_task = _preview_string(supervisor_preview, "Next task", "next_task")
     active_task = _preview_string(supervisor_preview, "Active task", "active_task")
 
+    activity_semantics = str(overview.get("activity_semantics", "") or "")
+    active_sessions = (
+        _coerce_int(overview.get("active_sessions"))
+        if activity_semantics
+        else _coerce_int(overview.get("sessions"))
+    )
     summary = (
-        f"{_coerce_int(overview.get('active_runs'))} active runs, "
+        f"{_coerce_int(overview.get('active_runs'))} current leases, "
         f"{_coerce_int(overview.get('context_bundles'))} context bundles, "
         f"{_coerce_int(overview.get('artifacts'))} artifacts"
     )
@@ -245,7 +259,7 @@ def runtime_snapshot_from_operator_snapshot(
         runtime_db=str(snapshot.get("runtime_db", "") or "") or None,
         health=_coerce_runtime_health(snapshot),
         bridge_status=bridge_status,
-        active_session_count=_coerce_int(overview.get("sessions")),
+        active_session_count=active_sessions,
         active_run_count=_coerce_int(overview.get("active_runs")),
         artifact_count=_coerce_int(overview.get("artifacts")),
         context_bundle_count=_coerce_int(overview.get("context_bundles")),
@@ -259,10 +273,23 @@ def runtime_snapshot_from_operator_snapshot(
             "claims": str(_coerce_int(overview.get("claims"))),
             "active_claims": str(_coerce_int(overview.get("active_claims"))),
             "acknowledged_claims": str(_coerce_int(overview.get("acknowledged_claims"))),
+            "observed_nonterminal_claims": str(
+                _coerce_int(overview.get("observed_nonterminal_claims"))
+            ),
+            "observed_nonterminal_runs": str(
+                _coerce_int(overview.get("observed_nonterminal_runs"))
+            ),
+            "expired_or_unproven_runs": str(expired_or_unproven),
+            "terminal_evidence_conflicts": str(
+                _coerce_int(overview.get("terminal_evidence_conflicts"))
+            ),
             "operator_actions": str(_coerce_int(overview.get("operator_actions"))),
             "promoted_facts": str(_coerce_int(overview.get("promoted_facts"))),
+            "proves_executor_liveness": "false",
         },
         metadata={
+            "activity_semantics": activity_semantics or "legacy_status_counts",
+            "proves_executor_liveness": False,
             "overview": overview,
             "runs": runs if isinstance(runs, list) else [],
             "actions": snapshot.get("actions", []),

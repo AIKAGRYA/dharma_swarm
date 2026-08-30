@@ -1,0 +1,154 @@
+{
+  "id": "fleet-advancement-WP-TRUST-HARDENING-IMPLEMENTATION-R4-20260828",
+  "base_ref": "b421129779484b04df2ae0a9d74dce20fc5e0f1a",
+  "branch": "codex/trust-hardening-routing-auth-20260827",
+  "worktree": ".",
+  "intent": "Close the native dgc chat routing and execution-boundary bypasses, replace status-only runtime activity claims with one identity-bound lease-aware read model, and preserve runtime_activity.v1 semantics through every terminal projection and persisted preview without claiming executor liveness.",
+  "allowed_files": [
+    "CLAUDE.md",
+    "dharma_swarm/runtime_activity/__init__.py",
+    "dharma_swarm/runtime_activity/store.py",
+    "dharma_swarm/operator_core/adapters.py",
+    "dharma_swarm/operator_views.py",
+    "dharma_swarm/runtime_agent_server_views.py",
+    "dharma_swarm/runtime_graph_views.py",
+    "dharma_swarm/runtime_platform_views.py",
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_commands/surfaces.py",
+    "dharma_swarm/tui_helpers.py",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/architecture/NAVIGATION.md",
+    "reports/agentops/work_packets/fleet-advancement-WP-TRUST-HARDENING-IMPLEMENTATION-R4-20260828.json",
+    "terminal/src/app.tsx",
+    "terminal/src/components/ControlPane.tsx",
+    "terminal/src/components/RepoPane.tsx",
+    "terminal/src/components/Sidebar.tsx",
+    "terminal/src/persistence.ts",
+    "terminal/src/protocol.ts",
+    "terminal/src/repoControlPreview.ts",
+    "terminal/tests/app.test.ts",
+    "terminal/tests/controlPane.test.ts",
+    "terminal/tests/persistence.test.ts",
+    "terminal/tests/protocol.test.ts",
+    "terminal/tests/repoControlPreview.test.ts",
+    "terminal/tests/repoPane.test.ts",
+    "terminal/tests/sidebar.test.ts",
+    "tests/test_mission_control.py",
+    "tests/test_operator_core_adapters.py",
+    "tests/test_operator_views.py",
+    "tests/test_routing_surface_inventory.py",
+    "tests/test_runtime_activity.py",
+    "tests/test_runtime_graph_api.py",
+    "tests/test_terminal_surfaces.py",
+    "tests/test_tui_helpers.py"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/mission_control*.py",
+    "dharma_swarm/provider_policy.py",
+    "dharma_swarm/runtime_provider.py",
+    "dharma_swarm/runtime_state.py",
+    "scripts/**",
+    "Makefile",
+    "packages/**",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "name": "routing-runtime-and-projection-contracts",
+      "command": "python3 -m pytest -q tests/test_mission_control.py tests/test_operator_core_adapters.py tests/test_operator_views.py tests/test_routing_surface_inventory.py tests/test_runtime_activity.py tests/test_runtime_graph_api.py tests/test_terminal_surfaces.py tests/test_tui_helpers.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "touched-python-ruff",
+      "command": "python3 -m ruff check dharma_swarm/runtime_activity/__init__.py dharma_swarm/runtime_activity/store.py dharma_swarm/operator_core/adapters.py dharma_swarm/operator_views.py dharma_swarm/runtime_agent_server_views.py dharma_swarm/runtime_graph_views.py dharma_swarm/runtime_platform_views.py dharma_swarm/terminal_bridge.py dharma_swarm/terminal_commands/surfaces.py dharma_swarm/tui_helpers.py tests/test_mission_control.py tests/test_operator_core_adapters.py tests/test_operator_views.py tests/test_routing_surface_inventory.py tests/test_runtime_activity.py tests/test_runtime_graph_api.py tests/test_terminal_surfaces.py tests/test_tui_helpers.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "path-searching-chat-bypass-must-fail",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('dharma_swarm/terminal_commands/surfaces.py'); t=p.read_text(); a='        os.execve(executable, command, env)'; a in t or sys.exit(3); p.write_text(t.replace(a, '        os.execvpe(\\\"claude\\\", command, env)', 1)); sys.exit(subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_routing_surface_inventory.py', '-k', 'dgc_chat_native_provider_exec']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "lease-semantics-downgrade-must-fail",
+      "command": "python3 -c \"import pathlib, subprocess, sys; p=pathlib.Path('terminal/src/protocol.ts'); t=p.read_text(); a='  return activitySemantics === RUNTIME_ACTIVITY_SEMANTICS;'; a in t or sys.exit(3); p.write_text(t.replace(a, '  return false;', 1)); sys.exit(subprocess.run(['bun', 'test', 'terminal/tests/protocol.test.ts', '--test-name-pattern', 'runtime_activity.v1']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix: close trust-hardening CI gaps"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-TRUST-HARDENING-IMPLEMENTATION-R4-20260828",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "b421129779484b04df2ae0a9d74dce20fc5e0f1a",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The Claude Code native UI is interactive while the canonical provider factory is headless; the command must consume canonical policy and runtime configuration, then replace the process through one absolute no-PATH-search execve boundary.",
+      "Persisted run status is an observation, not a lease. Current lease requires matching execution identity and claim, acknowledgement, heartbeat, owner-policy-valid freshness, and absence of terminal, ambiguous, competing, or superseding evidence.",
+      "Generic orchestration and Mission Control own different expiry rules; the shared projection must label the owning lease policy and apply it conservatively.",
+      "Legacy terminal payloads use active names for status counts, while runtime_activity.v1 retains those fields only as compatibility aliases for current identity-bound leases.",
+      "Persisted summaries, compact app rows, repo/control parsers, and component inventory fallbacks can reintroduce false active or liveness claims unless the semantic marker is preserved and consumed end to end.",
+      "Topology active_agent and stored session status are owner-provided pointers, not process-liveness evidence, and remain separately labeled from lease-current agents and sessions."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/provider_policy.py",
+      "dharma_swarm/runtime_provider.py",
+      "dharma_swarm/terminal_commands/surfaces.py",
+      "dharma_swarm/runtime_activity/__init__.py",
+      "dharma_swarm/operator_views.py",
+      "dharma_swarm/mission_control_contract.py",
+      "terminal/src/protocol.ts",
+      "terminal/src/persistence.ts",
+      "terminal/src/repoControlPreview.ts"
+    ],
+    "honest_blockers": [
+      "No generic read model can prove executor process liveness from persisted lease evidence; every runtime_activity.v1 projection carries proves_executor_liveness=false or an equivalent unproven label.",
+      "The effective Claude model and authentication substrate remain unknown before the native CLI starts; this packet proves transport selection, explicit-model consistency, the child-environment boundary, and absolute executable identity only.",
+      "Legacy rows lacking complete identity or lease evidence intentionally move from active counts to expired_or_unproven without database mutation or deletion.",
+      "The terminal can preserve lease evidence and liveness uncertainty but cannot probe operating-system process liveness.",
+      "Credential revocation and provider-side rotation remain external operator actions and are not performed by this repository packet.",
+      "This packet does not restart terminals, Mission Control servers, autonomous workers, or dashboards, and does not reconcile live runtime rows."
+    ],
+    "rollback": "Revert the pull request. This restores the previous routing and projection behavior but does not re-enable the independently quarantined GitHub MCP, rotate credentials, or mutate any runtime database.",
+    "packet_digest": "91204a527b9e95e9675b74e84902d684cabecaf9796deb81721b96fcf8bbcde2"
+  }
+}

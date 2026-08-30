@@ -34,12 +34,16 @@ connected_python_files:
 - dharma_swarm/config.py
 - dharma_swarm/telos_gates.py
 - dharma_swarm/providers.py
+- dharma_swarm/runtime_activity/__init__.py
+- dharma_swarm/runtime_activity/store.py
 - garden_daemon.py
 connected_python_modules:
 - dharma_swarm.models
 - dharma_swarm.config
 - dharma_swarm.telos_gates
 - dharma_swarm.providers
+- dharma_swarm.runtime_activity
+- dharma_swarm.runtime_activity.store
 - garden_daemon
 connected_relevant_files:
 - CLAUDE.md
@@ -101,6 +105,7 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | Understand model routing | [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md) — 18 providers, 3 calling surfaces, 5 inconsistencies, HuggingFace fix |
 | Run the live orchestrator | `dgc orchestrate-live` (or `--background`) |
 | Check system health | `dgc status` / `dgc health` |
+| Interpret persisted runtime activity | `dharma_swarm/runtime_activity/` — typed, read-only lease evidence; never executor-liveness proof |
 | Run all tests | `python3 -m pytest tests/ -q` (~6 min) |
 | Run one test file | `python3 -m pytest tests/test_foo.py -q` |
 | Start/stop daemon | `dgc up [--background]` / `dgc down` |
@@ -121,6 +126,17 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | Add a new provider | `dharma_swarm/providers.py` |
 | Understand the pillar foundations | `foundations/PILLAR_*.md` |
 | See spec-forge specs | `spec-forge/` |
+
+---
+
+## Runtime Activity Evidence Seam
+
+Purpose: give Mission Control, operator views, graph/platform/server projections, and terminal surfaces one read-only interpretation of persisted delegation rows. The seam distinguishes `current_lease`, `observed_nonterminal`, `expired_or_unproven`, terminal evidence, and identity mismatches instead of treating a stored status as proof of activity.
+
+- Entry point: `dharma_swarm/runtime_activity/__init__.py`; use `load_runtime_activity()` for a snapshot or `classify_runtime_activity()` for an already-hydrated run.
+- Storage adapter: `dharma_swarm/runtime_activity/store.py` reads the canonical runtime SQLite schema and hydrates domain records. It does not write, repair, expire, or reconcile runtime state.
+- Boundary constraints: current-lease evidence requires a correlated execution identity and claim plus acknowledgement, heartbeat, and owner-policy-valid freshness. A current lease never proves that an executor process is alive, responsive, correct, or making progress.
+- Consumer contract: `runtime_activity.v1` projections must preserve the semantic marker and liveness uncertainty end to end. Unknown or conflicting semantics fail closed; explicitly typed legacy status counts remain isolated compatibility evidence.
 
 ---
 

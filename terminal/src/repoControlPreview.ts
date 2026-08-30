@@ -11,7 +11,16 @@ export type RepoControlSegmentKey =
   | "hotspot"
   | "path"
   | "dep"
-  | "inbound";
+  | "inbound"
+  | "semantics"
+  | "liveness";
+
+export const RUNTIME_ACTIVITY_SEMANTICS = "runtime_activity.v1";
+export const LEGACY_RUNTIME_ACTIVITY_SEMANTICS = "legacy_status_counts";
+
+export type RuntimeActivitySemanticsState = "legacy" | "current" | "unknown";
+
+export const CONFLICTING_RUNTIME_ACTIVITY_SEMANTICS = "conflicting_activity_semantics";
 
 export type ParsedRepoTruthPreview = {
   raw: string;
@@ -63,18 +72,25 @@ export type ParsedRepoControlPreview = {
   hotspotDependency: string;
   hotspotInbound: string;
   runtimeDb: string;
+  activitySemantics: string;
+  executorLiveness: string;
   runtimeActivity: string;
   artifactState: string;
   runtimeSummary: string;
   runtimeSessions: string;
   runtimeRuns: string;
   runtimeActiveRuns: string;
+  runtimeCurrentLeases: string;
+  runtimeObservedNonterminalRuns: string;
+  runtimeExpiredOrUnprovenRuns: string;
   runtimeArtifacts: string;
   runtimeContextBundles: string;
 };
 
 export const REPO_CONTROL_SEGMENT_BOUNDARY =
-  "(?:warn|peers|peer|drift|markers|divergence|detached|hotspot|path|dep|inbound|staged|unstaged|untracked|cycle\\s+\\d+|updated\\s+|verify\\s+|db\\s+|activity\\s+|artifacts\\s+|next\\s+)";
+  "(?:warn|peers|peer|drift|markers|divergence|detached|hotspot|path|dep|inbound|staged|unstaged|untracked|cycle\\s+\\d+|updated\\s+|verify\\s+|db\\s+|semantics\\s+|liveness(?:\\s*[:=]\\s*|\\s+)|activity\\s+|artifacts\\s+|next\\s+)";
+
+const COMPACT_LIVENESS_PREFIX = /^liveness(?:\s*[:=]\s*|\s+)/i;
 
 const KNOWN_SEGMENT_PREFIXES = [
   "task ",
@@ -99,6 +115,8 @@ const KNOWN_SEGMENT_PREFIXES = [
   "updated ",
   "verify ",
   "db ",
+  "semantics ",
+  "liveness ",
   "activity ",
   "artifacts ",
   "next ",
@@ -124,6 +142,9 @@ function findWarning(segments: string[]): string {
       return false;
     }
     if (segment.includes("=") || index === 0) {
+      return false;
+    }
+    if (segment.toLowerCase().includes("liveness")) {
       return false;
     }
     const priorSegments = segments.slice(0, index).map((entry) => entry.toLowerCase());
@@ -201,6 +222,115 @@ function parseHotspotSegment(value: string, key: "path" | "dep" | "inbound"): st
 
 function parseMetric(value: string, label: string): string {
   return value.match(new RegExp(`\\b${label}=(\\d+)\\b`, "i"))?.[1] ?? "n/a";
+}
+
+function parseRuntimeToken(value: string, label: string): string {
+  return value.match(new RegExp(`\\b${label}=([^\\s|]+)`, "i"))?.[1]?.trim() ?? "";
+}
+
+function parseRuntimeTokens(value: string, label: string): string[] {
+  return Array.from(
+    value.matchAll(new RegExp(`\\b${label}=([^\\s|]+)`, "gi")),
+    (match) => match[1]?.trim() ?? "",
+  ).filter((entry) => entry.length > 0);
+}
+
+function meaningfulRuntimeDeclarations(values: string[]): string[] {
+  return values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0 && !/^(?:n\/a|none)$/i.test(value));
+}
+
+function resolveRuntimeActivitySemanticMarkers(markers: string[]): string {
+  const declared = meaningfulRuntimeDeclarations(markers);
+  if (new Set(declared).size > 1) {
+    return CONFLICTING_RUNTIME_ACTIVITY_SEMANTICS;
+  }
+  return declared[0] ?? "";
+}
+
+export function resolveRuntimeActivitySemantics(explicit: string, inline: string): string {
+  return resolveRuntimeActivitySemanticMarkers([explicit, inline]);
+}
+
+export function runtimeActivitySemanticsFromPreview(preview: TabPreview | undefined): string {
+  const explicit = preview?.["Activity semantics"]?.trim() ?? "";
+  const inlineMarkers = parseRuntimeTokens(preview?.["Runtime activity"] ?? "", "ActivitySemantics");
+  return resolveRuntimeActivitySemanticMarkers([explicit, ...inlineMarkers]);
+}
+
+export function runtimeActivitySemanticsState(preview: TabPreview | undefined): RuntimeActivitySemanticsState {
+  const semantics = runtimeActivitySemanticsFromPreview(preview);
+  if (!semantics || semantics === LEGACY_RUNTIME_ACTIVITY_SEMANTICS) {
+    return "legacy";
+  }
+  return semantics === RUNTIME_ACTIVITY_SEMANTICS ? "current" : "unknown";
+}
+
+export function runtimeActivityMetric(value: string, ...labels: string[]): string {
+  for (const label of labels) {
+    const metric = parseMetric(value, label);
+    if (metric !== "n/a") {
+      return metric;
+    }
+  }
+  return "n/a";
+}
+
+export function executorLivenessFromPreview(preview: TabPreview | undefined): string {
+  const semanticsState = runtimeActivitySemanticsState(preview);
+  if (semanticsState !== "legacy") {
+    return "unproven";
+  }
+  const explicit = preview?.["Executor liveness"]?.trim() ?? "";
+  if (explicit) {
+    return explicit;
+  }
+  return parseRuntimeToken(preview?.["Runtime activity"] ?? "", "ExecutorLiveness");
+}
+
+export function hasUnsafeRuntimeLivenessDeclaration(value: string): boolean {
+  const tokens = value
+    .replace(/liveness/gi, " liveness ")
+    .replace(/[^A-Za-z0-9]+/g, " ")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index] === "liveness" && tokens[index + 1] !== "unproven") {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function qualifyRuntimeActivityValue(value: string, semantics: string): string {
+  const normalizedSemantics = semantics.trim();
+  const legacySemantics =
+    !normalizedSemantics ||
+    normalizedSemantics === "n/a" ||
+    normalizedSemantics === LEGACY_RUNTIME_ACTIVITY_SEMANTICS;
+  if (legacySemantics) {
+    return value;
+  }
+
+  if (normalizedSemantics !== RUNTIME_ACTIVITY_SEMANTICS) {
+    return `ActivitySemantics=${normalizedSemantics} lease classification unavailable`;
+  }
+
+  if (hasUnsafeRuntimeLivenessDeclaration(value)) {
+    return `ActivitySemantics=${normalizedSemantics} lease-qualified evidence unavailable | liveness unproven`;
+  }
+
+  const canonicalValue = value
+    .replace(/\bActivitySemantics=[^\s|]+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b|\bActive(?:Claims|Runs|Sessions)=/i.test(canonicalValue)) {
+    return `ActivitySemantics=${normalizedSemantics} lease-qualified evidence unavailable`;
+  }
+  return [`ActivitySemantics=${normalizedSemantics}`, canonicalValue].filter((part) => part.length > 0).join(" ");
 }
 
 function collectDirtyState(segments: string[]): string {
@@ -449,6 +579,7 @@ export function classifyTopologyWarningSeverity(value: string): string {
 }
 
 export function parseRepoControlPreview(previewOrRaw?: TabPreview | string): ParsedRepoControlPreview | null {
+  const sourcePreview = typeof previewOrRaw === "string" ? undefined : previewOrRaw;
   const raw =
     typeof previewOrRaw === "string"
       ? previewOrRaw
@@ -466,7 +597,11 @@ export function parseRepoControlPreview(previewOrRaw?: TabPreview | string): Par
   const verificationSegments: string[] = [];
   if (verificationIndex >= 0) {
     for (const [index, segment] of segments.slice(verificationIndex).entries()) {
-      if (index > 0 && /^(next|db|activity|artifacts)\s+/i.test(segment)) {
+      if (
+        index > 0 &&
+        (/^(next|db|semantics|activity|artifacts)\s+/i.test(segment) ||
+          COMPACT_LIVENESS_PREFIX.test(segment))
+      ) {
         break;
       }
       verificationSegments.push(index === 0 ? segment.replace(/^verify\s+/i, "").trim() : segment);
@@ -496,7 +631,37 @@ export function parseRepoControlPreview(previewOrRaw?: TabPreview | string): Par
   const dirtyState = collectDirtyState(segments);
   const hotspot = joinPrefixedSegments(segments, ["hotspot ", "path ", "dep ", "inbound "]);
   const runtimeDb = segments.find((segment) => /^db\s+/i.test(segment))?.replace(/^db\s+/i, "").trim() ?? "n/a";
-  const runtimeActivity = segments.find((segment) => /^activity\s+/i.test(segment))?.replace(/^activity\s+/i, "").trim() ?? "n/a";
+  const compactSemantics = segments
+    .filter((segment) => /^semantics\s+/i.test(segment))
+    .map((segment) => segment.replace(/^semantics\s+/i, "").trim());
+  const activitySemantics =
+    resolveRuntimeActivitySemanticMarkers([
+      sourcePreview?.["Activity semantics"] ?? "",
+      ...parseRuntimeTokens(sourcePreview?.["Runtime activity"] ?? "", "ActivitySemantics"),
+      ...compactSemantics,
+      ...parseRuntimeTokens(raw, "ActivitySemantics"),
+    ]) || "n/a";
+  const compactLiveness = segments
+    .filter((segment) => COMPACT_LIVENESS_PREFIX.test(segment))
+    .map((segment) => segment.replace(COMPACT_LIVENESS_PREFIX, "").trim());
+  const livenessDeclarations = meaningfulRuntimeDeclarations([
+    sourcePreview?.["Executor liveness"] ?? "",
+    ...parseRuntimeTokens(sourcePreview?.["Runtime activity"] ?? "", "ExecutorLiveness"),
+    ...compactLiveness,
+    ...parseRuntimeTokens(raw, "ExecutorLiveness"),
+  ]);
+  const executorLiveness =
+    activitySemantics !== "n/a" && activitySemantics !== LEGACY_RUNTIME_ACTIVITY_SEMANTICS
+      ? "unproven"
+      : new Set(livenessDeclarations).size > 1
+        ? "unproven"
+        : livenessDeclarations[0] ?? "n/a";
+  const rawRuntimeActivity =
+    segments.find((segment) => /^activity\s+/i.test(segment))?.replace(/^activity\s+/i, "").trim() ?? "n/a";
+  const runtimeActivity =
+    rawRuntimeActivity === "n/a" || rawRuntimeActivity === "none"
+      ? rawRuntimeActivity
+      : qualifyRuntimeActivityValue(rawRuntimeActivity, activitySemantics);
   const artifactState = segments.find((segment) => /^artifacts\s+/i.test(segment))?.replace(/^artifacts\s+/i, "").trim() ?? "n/a";
   const runtimeSummary =
     [runtimeDb, runtimeActivity, artifactState].filter((value) => value !== "n/a" && value !== "none").join(" | ") || "n/a";
@@ -560,12 +725,28 @@ export function parseRepoControlPreview(previewOrRaw?: TabPreview | string): Par
     hotspotDependency: parseHotspotSegment(hotspot, "dep"),
     hotspotInbound: parseHotspotSegment(hotspot, "inbound"),
     runtimeDb,
+    activitySemantics,
+    executorLiveness,
     runtimeActivity,
     artifactState,
     runtimeSummary,
     runtimeSessions: parseMetric(runtimeActivity, "Sessions"),
     runtimeRuns: parseMetric(runtimeActivity, "Runs"),
-    runtimeActiveRuns: parseMetric(runtimeActivity, "ActiveRuns"),
+    runtimeActiveRuns:
+      activitySemantics === "n/a" || activitySemantics === LEGACY_RUNTIME_ACTIVITY_SEMANTICS
+        ? parseMetric(runtimeActivity, "ActiveRuns")
+        : "n/a",
+    runtimeCurrentLeases: runtimeActivityMetric(runtimeActivity, "CurrentLeases"),
+    runtimeObservedNonterminalRuns: runtimeActivityMetric(
+      runtimeActivity,
+      "ObservedNonterminalRuns",
+      "ObservedNonterminal",
+    ),
+    runtimeExpiredOrUnprovenRuns: runtimeActivityMetric(
+      runtimeActivity,
+      "ExpiredOrUnprovenRuns",
+      "ExpiredOrUnproven",
+    ),
     runtimeArtifacts: parseMetric(artifactState, "Artifacts"),
     runtimeContextBundles: parseMetric(artifactState, "ContextBundles"),
   };

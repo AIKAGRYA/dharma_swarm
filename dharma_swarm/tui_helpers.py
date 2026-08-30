@@ -185,22 +185,41 @@ def build_runtime_status_data(
         return result
 
     try:
+        from dharma_swarm.runtime_activity import load_runtime_activity
+
+        activity = load_runtime_activity(db_path)
+        activity_summary = activity.summary()
         with sqlite3.connect(str(db_path)) as db:
             db.row_factory = sqlite3.Row
             result["counts"] = {
                 "sessions": _count_rows(db, "sessions"),
+                "active_sessions": activity_summary["active_session_count"],
                 "claims": _count_rows(db, "task_claims"),
-                "active_claims": _count_rows(
-                    db, "task_claims", " WHERE status IN ('claimed','in_progress')",
+                "active_claims": activity_summary["current_lease_claim_count"],
+                "current_lease_claims": activity_summary[
+                    "current_lease_claim_count"
+                ],
+                "observed_nonterminal_claims": _count_rows(
+                    db,
+                    "task_claims",
+                    " WHERE lower(status) NOT IN "
+                    "('cancelled','canceled','completed','error','errored','failed',"
+                    "'stale_recovered','succeeded','success') AND recovered_at IS NULL",
                 ),
                 "acknowledged_claims": _count_rows(
-                    db, "task_claims", " WHERE status = 'acknowledged'",
+                    db, "task_claims", " WHERE acked_at IS NOT NULL",
                 ),
                 "runs": _count_rows(db, "delegation_runs"),
-                "active_runs": _count_rows(
-                    db, "delegation_runs",
-                    " WHERE status NOT IN ('completed','failed','stale_recovered')",
-                ),
+                "active_runs": activity_summary["current_lease_run_count"],
+                "observed_nonterminal_runs": activity_summary[
+                    "observed_nonterminal_run_count"
+                ],
+                "expired_or_unproven_runs": activity_summary[
+                    "expired_or_unproven_run_count"
+                ],
+                "terminal_evidence_conflicts": activity_summary[
+                    "terminal_evidence_conflict_count"
+                ],
                 "artifacts": _count_rows(db, "artifact_records"),
                 "promoted_facts": _count_rows(
                     db, "memory_facts", " WHERE truth_state = 'promoted'",
@@ -208,22 +227,19 @@ def build_runtime_status_data(
                 "context_bundles": _count_rows(db, "context_bundles"),
                 "operator_actions": _count_rows(db, "operator_actions"),
             }
-            result["active_runs"] = [
-                {
-                    "run_id": str(r["run_id"]),
-                    "task_id": str(r["task_id"]),
-                    "assigned_to": r["assigned_to"],
-                    "status": r["status"],
-                    "current_artifact_id": str(r["current_artifact_id"] or ""),
-                }
-                for r in db.execute(
-                    "SELECT run_id, task_id, assigned_to, status, current_artifact_id"
-                    " FROM delegation_runs"
-                    " WHERE status NOT IN ('completed','failed','stale_recovered')"
-                    " ORDER BY started_at DESC LIMIT ?",
-                    (max(1, limit),),
-                ).fetchall()
-            ]
+            result["active_runs"] = []
+            for observation in activity.current_leases[: max(1, limit)]:
+                run = observation.run_record
+                result["active_runs"].append(
+                    {
+                        "run_id": run.run_id,
+                        "task_id": run.task_id,
+                        "assigned_to": run.assigned_to,
+                        "status": run.status,
+                        "current_artifact_id": run.current_artifact_id,
+                        "activity": observation.to_dict(),
+                    }
+                )
             result["recent_artifacts"] = [
                 {
                     "artifact_id": str(r["artifact_id"]),
@@ -254,6 +270,9 @@ def build_runtime_status_data(
     except sqlite3.Error as exc:
         result["error"] = str(exc)
 
+    result["activity_semantics"] = "runtime_activity.v1"
+    result["proves_executor_liveness"] = False
+
     result["toolchain"] = {
         prog: shutil.which(prog) or None
         for prog in ("claude", "python3", "node")
@@ -272,30 +291,40 @@ def build_runtime_status_text(
 
     if db_path.exists():
         try:
+            from dharma_swarm.runtime_activity import load_runtime_activity
+
+            activity = load_runtime_activity(db_path)
+            activity_summary = activity.summary()
             with sqlite3.connect(str(db_path)) as db:
                 db.row_factory = sqlite3.Row
                 lines.append(f"  Runtime DB: {db_path}")
                 lines.append(
-                    "  Sessions={sessions}  Claims={claims}  ActiveClaims={active_claims}  "
-                    "AckedClaims={acknowledged_claims}  Runs={runs}  ActiveRuns={active_runs}".format(
+                    "  Sessions={sessions}  CurrentSessions={active_sessions}  "
+                    "Claims={claims}  CurrentClaims={active_claims}  "
+                    "AckedClaims={acknowledged_claims}  Runs={runs}  "
+                    "CurrentLeases={active_runs}".format(
                         sessions=_count_rows(db, "sessions"),
+                        active_sessions=activity_summary["active_session_count"],
                         claims=_count_rows(db, "task_claims"),
-                        active_claims=_count_rows(
-                            db,
-                            "task_claims",
-                            " WHERE status IN ('claimed','in_progress')",
-                        ),
+                        active_claims=activity_summary["current_lease_claim_count"],
                         acknowledged_claims=_count_rows(
                             db,
                             "task_claims",
-                            " WHERE status = 'acknowledged'",
+                            " WHERE acked_at IS NOT NULL",
                         ),
                         runs=_count_rows(db, "delegation_runs"),
-                        active_runs=_count_rows(
-                            db,
-                            "delegation_runs",
-                            " WHERE status NOT IN ('completed','failed','stale_recovered')",
-                        ),
+                        active_runs=activity_summary["current_lease_run_count"],
+                    )
+                )
+                lines.append(
+                    "  ObservedNonterminal={observed}  ExpiredOrUnproven={unproven}  "
+                    "ExecutorLiveness=unproven".format(
+                        observed=activity_summary[
+                            "observed_nonterminal_run_count"
+                        ],
+                        unproven=activity_summary[
+                            "expired_or_unproven_run_count"
+                        ],
                     )
                 )
                 lines.append(
@@ -312,24 +341,21 @@ def build_runtime_status_text(
                     )
                 )
 
-                runs = db.execute(
-                    "SELECT run_id, task_id, assigned_to, status, current_artifact_id"
-                    " FROM delegation_runs"
-                    " WHERE status NOT IN ('completed','failed','stale_recovered')"
-                    " ORDER BY started_at DESC LIMIT ?",
-                    (max(1, limit),),
-                ).fetchall()
+                runs = [
+                    observation.run_record
+                    for observation in activity.current_leases[: max(1, limit)]
+                ]
                 if runs:
-                    lines.append(f"  [{AI_DEEP}]Active runs[/{AI_DEEP}]")
+                    lines.append(f"  [{AI_DEEP}]Current lease runs[/{AI_DEEP}]")
                     for row in runs:
-                        artifact_id = str(row["current_artifact_id"] or "")
+                        artifact_id = row.current_artifact_id
                         artifact_label = artifact_id[:8] if artifact_id else "-"
                         lines.append(
                             "    "
-                            f"{str(row['run_id'])[:8]}  "
-                            f"{row['assigned_to']}  "
-                            f"{row['status']}  "
-                            f"task={str(row['task_id'])[:12]}  "
+                            f"{row.run_id[:8]}  "
+                            f"{row.assigned_to}  "
+                            f"{row.status}  "
+                            f"task={row.task_id[:12]}  "
                             f"artifact={artifact_label}"
                         )
 

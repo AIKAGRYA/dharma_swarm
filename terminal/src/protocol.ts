@@ -2,6 +2,7 @@ import {COMMAND_TAB_REGISTRY} from "./commandRegistry";
 import {freshnessToken, parseControlPulsePreview, parseRuntimeFreshness} from "./freshness";
 import {normalizeCommandOutcome} from "./commandOutcome";
 import {stripHelmDirectives} from "./uiIntents";
+import {hasUnsafeRuntimeLivenessDeclaration} from "./repoControlPreview";
 export {
   agentRoutesPayloadFromEvent,
   agentRoutesToLines,
@@ -36,6 +37,51 @@ import type {
   WorkspaceSnapshotPayload,
 } from "./types";
 import {buildVerificationSummaryRows, parseVerificationBundle, verificationBundleLabel} from "./verification";
+
+const RUNTIME_ACTIVITY_SEMANTICS = "runtime_activity.v1";
+const LEGACY_ACTIVITY_SEMANTICS = "legacy_status_counts";
+const CONFLICTING_ACTIVITY_SEMANTICS = "conflicting_activity_semantics";
+
+type RuntimeActivitySemanticsResolution = {
+  kind: "current" | "legacy" | "unknown";
+  marker: string;
+  detail: string;
+};
+
+function runtimeActivitySemantics(value: Record<string, unknown>): string {
+  return stringField(value, "activity_semantics");
+}
+
+function usesRuntimeActivitySemantics(value: Record<string, unknown>): boolean {
+  const activitySemantics = runtimeActivitySemantics(value);
+  return activitySemantics === RUNTIME_ACTIVITY_SEMANTICS;
+}
+
+function resolveRuntimeActivitySemantics(
+  ...values: Record<string, unknown>[]
+): RuntimeActivitySemanticsResolution {
+  const markers = values.map(runtimeActivitySemantics).filter((value) => value.length > 0);
+  const uniqueMarkers = Array.from(new Set(markers));
+  if (uniqueMarkers.length > 1) {
+    return {
+      kind: "unknown",
+      marker: CONFLICTING_ACTIVITY_SEMANTICS,
+      detail: `conflicting runtime activity semantics: ${uniqueMarkers.join(" vs ")}`,
+    };
+  }
+  const marker = uniqueMarkers[0] ?? "";
+  if (!marker || marker === LEGACY_ACTIVITY_SEMANTICS) {
+    return {kind: "legacy", marker, detail: ""};
+  }
+  if (marker === RUNTIME_ACTIVITY_SEMANTICS) {
+    return {kind: "current", marker, detail: ""};
+  }
+  return {
+    kind: "unknown",
+    marker,
+    detail: `unrecognized runtime activity semantics: ${marker}`,
+  };
+}
 
 const RUNTIME_SUPERVISOR_AUTHORITATIVE_FIELDS = new Set([
   "Loop state",
@@ -1264,10 +1310,162 @@ function extractRuntimeMetricLine(content: string, prefix: string): string {
   );
 }
 
+function isRuntimeActivityMetricLine(line: string): boolean {
+  return /(?:^|\s)(?:ActivitySemantics|Sessions|CurrentSessions|Claims|CurrentClaims|ActiveClaims|AckedClaims|Runs|CurrentLeases|ActiveRuns|ObservedNonterminal(?:Claims|Runs)?|ExpiredOrUnproven(?:Runs)?|ExecutorLiveness)=/i.test(
+    line,
+  );
+}
+
+function extractRuntimeActivityMetricLines(content: string): string[] {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(isRuntimeActivityMetricLine);
+}
+
 function parseRuntimeMetrics(line: string): Record<string, string> {
   return Object.fromEntries(
     Array.from(line.matchAll(/([A-Za-z][A-Za-z0-9]*)=([^\s]+)/g), (match) => [match[1], match[2]]),
   );
+}
+
+function resolveRuntimeTextActivitySemantics(line: string): RuntimeActivitySemanticsResolution {
+  const markers = Array.from(
+    line.matchAll(/\bActivitySemantics=([^\s]+)/gi),
+    (match) => match[1]?.trim() ?? "",
+  ).filter((value) => value.length > 0);
+  const uniqueMarkers = Array.from(new Set(markers));
+  if (uniqueMarkers.length > 1) {
+    return {
+      kind: "unknown",
+      marker: CONFLICTING_ACTIVITY_SEMANTICS,
+      detail: `conflicting runtime activity semantics: ${uniqueMarkers.join(" vs ")}`,
+    };
+  }
+
+  const metrics = parseRuntimeMetrics(line);
+  const marker = uniqueMarkers[0] ?? "";
+  const hasCurrentLeaseShape = runtimeMetricAlias(metrics, "CurrentSessions", "CurrentClaims", "CurrentLeases") !== "n/a";
+  if (!marker) {
+    return hasCurrentLeaseShape
+      ? {kind: "current", marker: RUNTIME_ACTIVITY_SEMANTICS, detail: ""}
+      : {kind: "legacy", marker: "", detail: ""};
+  }
+  if (marker === RUNTIME_ACTIVITY_SEMANTICS) {
+    return {kind: "current", marker, detail: ""};
+  }
+  if (marker === LEGACY_ACTIVITY_SEMANTICS && !hasCurrentLeaseShape) {
+    return {kind: "legacy", marker, detail: ""};
+  }
+  if (marker === LEGACY_ACTIVITY_SEMANTICS) {
+    return {
+      kind: "unknown",
+      marker: CONFLICTING_ACTIVITY_SEMANTICS,
+      detail: "conflicting runtime activity semantics: legacy marker with current-lease fields",
+    };
+  }
+  return {
+    kind: "unknown",
+    marker,
+    detail: `unrecognized runtime activity semantics: ${marker}`,
+  };
+}
+
+function runtimeMetricAssignment(metrics: Record<string, string>, key: string, ...aliases: string[]): string {
+  const value = runtimeMetricAlias(metrics, key, ...aliases);
+  return value === "n/a" ? "" : `${key}=${value}`;
+}
+
+function canonicalRuntimeTextActivity(
+  rawActivity: string,
+  semantics: RuntimeActivitySemanticsResolution,
+): string {
+  const metrics = parseRuntimeMetrics(rawActivity);
+  if (semantics.kind === "legacy") {
+    return rawActivity;
+  }
+  if (semantics.kind === "unknown") {
+    return [
+      `ActivitySemantics=${semantics.marker}`,
+      runtimeMetricAssignment(metrics, "Sessions"),
+      runtimeMetricAssignment(metrics, "Claims"),
+      runtimeMetricAssignment(metrics, "Runs"),
+      "ExecutorLiveness=unproven",
+    ]
+      .filter((value) => value.length > 0)
+      .join("  ");
+  }
+  return [
+    `ActivitySemantics=${RUNTIME_ACTIVITY_SEMANTICS}`,
+    runtimeMetricAssignment(metrics, "Sessions"),
+    runtimeMetricAssignment(metrics, "CurrentSessions"),
+    runtimeMetricAssignment(metrics, "Claims"),
+    runtimeMetricAssignment(metrics, "CurrentClaims"),
+    runtimeMetricAssignment(metrics, "ObservedNonterminalClaims"),
+    runtimeMetricAssignment(metrics, "AckedClaims"),
+    runtimeMetricAssignment(metrics, "Runs"),
+    runtimeMetricAssignment(metrics, "CurrentLeases"),
+    runtimeMetricAssignment(metrics, "ObservedNonterminalRuns", "ObservedNonterminal"),
+    runtimeMetricAssignment(metrics, "ExpiredOrUnproven", "ExpiredOrUnprovenRuns"),
+    "ExecutorLiveness=unproven",
+  ]
+    .filter((value) => value.length > 0)
+    .join("  ");
+}
+
+function runtimePreviewActivityInput(preview: TabPreview): string {
+  const explicitSemantics = (preview["Activity semantics"] ?? "").trim();
+  const runtimeActivity = preview["Runtime activity"] ?? "";
+  return [
+    explicitSemantics ? `ActivitySemantics=${explicitSemantics}` : "",
+    runtimeActivity,
+  ]
+    .filter((value) => value.length > 0)
+    .join("  ");
+}
+
+function hasUnsafeRuntimeActivityClaim(value: string): boolean {
+  return (
+    /\bactive\s+(?:claims?|runs?|sessions?|agents?)\b/i.test(value) ||
+    hasUnsafeRuntimeLivenessDeclaration(value)
+  );
+}
+
+export function canonicalRuntimePreviewForRendering(preview: TabPreview): TabPreview {
+  const activityInput = runtimePreviewActivityInput(preview);
+  const semantics = resolveRuntimeTextActivitySemantics(activityInput);
+  if (semantics.kind === "legacy") {
+    return {...preview};
+  }
+
+  const runtimeActivity = canonicalRuntimeTextActivity(activityInput, semantics);
+  const canonical: TabPreview = {
+    ...preview,
+    "Activity semantics": semantics.marker,
+    "Runtime activity": runtimeActivity,
+    "Session state": summarizeSessionState(runtimeActivity),
+    "Run state": summarizeRunState(runtimeActivity),
+    "Executor liveness": "unproven",
+  };
+  delete canonical["Active runs detail"];
+  if (
+    semantics.kind === "unknown" ||
+    hasUnsafeRuntimeActivityClaim(canonical["Current lease runs detail"] ?? "")
+  ) {
+    delete canonical["Current lease runs detail"];
+  }
+  canonical["Runtime summary"] = summarizeRuntimeSummary(
+    canonical["Runtime DB"] ?? "runtime db not reported",
+    canonical["Session state"] ?? "none",
+    canonical["Run state"] ?? "none",
+    canonical["Context state"] ?? "none",
+  );
+  if (semantics.detail) {
+    canonical.Alerts = [canonical.Alerts, semantics.detail]
+      .filter((value) => value && value !== "none")
+      .join("; ") || "none";
+  }
+  return canonical;
 }
 
 function runtimeMetricValue(metrics: Record<string, string>, key: string): string {
@@ -1276,6 +1474,21 @@ function runtimeMetricValue(metrics: Record<string, string>, key: string): strin
 
 function runtimeMetricFragment(metrics: Record<string, string>, key: string, label: string): string {
   const value = runtimeMetricValue(metrics, key);
+  return value === "n/a" ? "" : `${value} ${label}`;
+}
+
+function runtimeMetricAlias(metrics: Record<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = metrics[key];
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return "n/a";
+}
+
+function runtimeMetricAliasFragment(metrics: Record<string, string>, keys: string[], label: string): string {
+  const value = runtimeMetricAlias(metrics, ...keys);
   return value === "n/a" ? "" : `${value} ${label}`;
 }
 
@@ -1292,6 +1505,28 @@ function summarizeSessionState(line: string): string {
   if (Object.keys(metrics).length === 0) {
     return "none";
   }
+  const semantics = runtimeMetricValue(metrics, "ActivitySemantics");
+  if (semantics === RUNTIME_ACTIVITY_SEMANTICS) {
+    const hasCurrentClaimEvidence = runtimeMetricAlias(metrics, "CurrentSessions", "CurrentClaims") !== "n/a";
+    return joinRuntimeMetricFragments([
+      runtimeMetricFragment(metrics, "Sessions", "sessions"),
+      runtimeMetricFragment(metrics, "CurrentSessions", "current lease sessions"),
+      runtimeMetricFragment(metrics, "Claims", "claims"),
+      runtimeMetricFragment(metrics, "CurrentClaims", "current lease claims"),
+      runtimeMetricFragment(metrics, "ObservedNonterminalClaims", "observed nonterminal claims"),
+      runtimeMetricFragment(metrics, "AckedClaims", "acked claims"),
+      hasCurrentClaimEvidence ? "" : "current lease claim count unavailable",
+    ]);
+  }
+  if (semantics !== "n/a" && semantics !== LEGACY_ACTIVITY_SEMANTICS) {
+    return joinRuntimeMetricFragments([
+      runtimeMetricFragment(metrics, "Sessions", "sessions"),
+      runtimeMetricFragment(metrics, "Claims", "claims"),
+      semantics === CONFLICTING_ACTIVITY_SEMANTICS
+        ? "activity semantics conflict"
+        : `activity semantics ${semantics} unrecognized`,
+    ]);
+  }
   return joinRuntimeMetricFragments([
     runtimeMetricFragment(metrics, "Sessions", "sessions"),
     runtimeMetricFragment(metrics, "Claims", "claims"),
@@ -1307,6 +1542,33 @@ function summarizeRunState(line: string): string {
   const metrics = parseRuntimeMetrics(line);
   if (Object.keys(metrics).length === 0) {
     return "none";
+  }
+  const semantics = runtimeMetricValue(metrics, "ActivitySemantics");
+  if (semantics === RUNTIME_ACTIVITY_SEMANTICS) {
+    const executorLiveness = runtimeMetricAlias(metrics, "ExecutorLiveness");
+    return joinRuntimeMetricFragments([
+      runtimeMetricFragment(metrics, "Runs", "runs"),
+      runtimeMetricFragment(metrics, "CurrentLeases", "current leases"),
+      runtimeMetricValue(metrics, "CurrentLeases") === "n/a" ? "current lease count unavailable" : "",
+      runtimeMetricAliasFragment(
+        metrics,
+        ["ObservedNonterminalRuns", "ObservedNonterminal"],
+        "observed nonterminal runs",
+      ),
+      runtimeMetricAliasFragment(
+        metrics,
+        ["ExpiredOrUnprovenRuns", "ExpiredOrUnproven"],
+        "expired/unproven runs",
+      ),
+      executorLiveness === "n/a" ? "" : `executor liveness ${executorLiveness}`,
+    ]);
+  }
+  if (semantics !== "n/a" && semantics !== LEGACY_ACTIVITY_SEMANTICS) {
+    return joinRuntimeMetricFragments([
+      runtimeMetricFragment(metrics, "Runs", "runs"),
+      "lease classification unavailable",
+      "executor liveness unproven",
+    ]);
   }
   return joinRuntimeMetricFragments([
     runtimeMetricFragment(metrics, "Runs", "runs"),
@@ -1490,22 +1752,82 @@ function runtimeSnapshotStateFromPayload(payload: RuntimeSnapshotPayload): {
   runtimeActivity: string;
   artifactState: string;
   alerts: string;
+  activitySemantics: string;
+  executorLiveness: string;
 } {
   const metrics = payload.snapshot.metrics ?? {};
-  const claims = String(metrics.claims ?? "0");
-  const activeClaims = String(metrics.active_claims ?? "0");
+  const metadata = asRecord(payload.snapshot.metadata);
+  const overview = asRecord(metadata.overview);
+  const semantics = resolveRuntimeActivitySemantics(metadata, overview);
+  const declaredSemantics = semantics.marker;
+  const leaseSemantics = semantics.kind === "current";
+  const claims = String(overview.claims ?? metrics.claims ?? "0");
   const acknowledgedClaims = String(metrics.acknowledged_claims ?? "0");
   const promotedFacts = String(metrics.promoted_facts ?? "0");
   const operatorActions = String(metrics.operator_actions ?? "0");
+  const totalSessions = String(overview.sessions ?? payload.snapshot.active_session_count);
+  const totalRuns = String(overview.runs ?? payload.snapshot.active_run_count);
+  if (leaseSemantics) {
+    const currentSessions = String(overview.active_sessions ?? payload.snapshot.active_session_count);
+    const currentClaims = String(overview.current_lease_claims ?? metrics.active_claims ?? "0");
+    const currentLeases = String(payload.snapshot.active_run_count);
+    const observedNonterminalClaims = String(
+      overview.observed_nonterminal_claims ?? metrics.observed_nonterminal_claims ?? "0",
+    );
+    const observedNonterminalRuns = String(
+      overview.observed_nonterminal_runs ?? metrics.observed_nonterminal_runs ?? "0",
+    );
+    const expiredOrUnprovenRuns = String(
+      overview.expired_or_unproven_runs ?? metrics.expired_or_unproven_runs ?? "0",
+    );
+    return {
+      runtimeDb: payload.snapshot.runtime_db ?? "unknown",
+      sessionState: `${totalSessions} sessions | ${currentSessions} current lease sessions | ${claims} claims | ${currentClaims} current lease claims | ${observedNonterminalClaims} observed nonterminal claims | ${acknowledgedClaims} acked claims`,
+      runState: `${totalRuns} runs | ${currentLeases} current leases | ${observedNonterminalRuns} observed nonterminal runs | ${expiredOrUnprovenRuns} expired/unproven runs | executor liveness unproven`,
+      contextState: `${payload.snapshot.artifact_count} artifacts | ${promotedFacts} promoted facts | ${payload.snapshot.context_bundle_count} context bundles | ${operatorActions} operator actions`,
+      runtimeActivity:
+        `ActivitySemantics=${RUNTIME_ACTIVITY_SEMANTICS} Sessions=${totalSessions} CurrentSessions=${currentSessions} Claims=${claims} CurrentClaims=${currentClaims} ObservedNonterminalClaims=${observedNonterminalClaims} AckedClaims=${acknowledgedClaims} Runs=${totalRuns} CurrentLeases=${currentLeases} ObservedNonterminalRuns=${observedNonterminalRuns} ExpiredOrUnproven=${expiredOrUnprovenRuns} ExecutorLiveness=unproven`,
+      artifactState: `Artifacts=${payload.snapshot.artifact_count} PromotedFacts=${promotedFacts} ContextBundles=${payload.snapshot.context_bundle_count} OperatorActions=${operatorActions}`,
+      alerts: payload.snapshot.warnings.length > 0 ? payload.snapshot.warnings.join("; ") : "none",
+      activitySemantics: RUNTIME_ACTIVITY_SEMANTICS,
+      executorLiveness: "unproven",
+    };
+  }
+  if (semantics.kind === "unknown") {
+    return {
+      runtimeDb: payload.snapshot.runtime_db ?? "unknown",
+      sessionState: `${totalSessions} sessions | ${claims} claims | activity semantics ${declaredSemantics} unrecognized`,
+      runState: `${totalRuns} runs | lease classification unavailable | executor liveness unproven`,
+      contextState: `${payload.snapshot.artifact_count} artifacts | ${promotedFacts} promoted facts | ${payload.snapshot.context_bundle_count} context bundles | ${operatorActions} operator actions`,
+      runtimeActivity: `ActivitySemantics=${declaredSemantics} Sessions=${totalSessions} Claims=${claims} Runs=${totalRuns} ExecutorLiveness=unproven`,
+      artifactState: `Artifacts=${payload.snapshot.artifact_count} PromotedFacts=${promotedFacts} ContextBundles=${payload.snapshot.context_bundle_count} OperatorActions=${operatorActions}`,
+      alerts: [
+        ...payload.snapshot.warnings,
+        semantics.detail,
+      ].join("; "),
+      activitySemantics: declaredSemantics,
+      executorLiveness: "unproven",
+    };
+  }
+  const activeClaims = String(metrics.active_claims ?? "0");
+  const explicitLegacySemantics = declaredSemantics === LEGACY_ACTIVITY_SEMANTICS;
   return {
     runtimeDb: payload.snapshot.runtime_db ?? "unknown",
     sessionState: `${payload.snapshot.active_session_count} sessions | ${claims} claims | ${activeClaims} active claims | ${acknowledgedClaims} acked claims`,
     runState: `${payload.snapshot.active_run_count === 1 ? "1 active run" : `${payload.snapshot.active_run_count} active runs`} | ${String((asRecord(payload.snapshot.metadata.overview).runs ?? payload.snapshot.active_run_count))} runs total`,
     contextState: `${payload.snapshot.artifact_count} artifacts | ${promotedFacts} promoted facts | ${payload.snapshot.context_bundle_count} context bundles | ${operatorActions} operator actions`,
-    runtimeActivity:
-      `Sessions=${payload.snapshot.active_session_count} Runs=${payload.snapshot.active_run_count} Claims=${claims} ActiveClaims=${activeClaims} AckedClaims=${acknowledgedClaims}`,
+    runtimeActivity: [
+      ...(explicitLegacySemantics ? [`ActivitySemantics=${LEGACY_ACTIVITY_SEMANTICS}`] : []),
+      `Sessions=${payload.snapshot.active_session_count}`,
+      `Runs=${payload.snapshot.active_run_count}`,
+      `Claims=${claims}`,
+      `ActiveClaims=${activeClaims}`,
+      `AckedClaims=${acknowledgedClaims}`,
+    ].join(" "),
     artifactState: `Artifacts=${payload.snapshot.artifact_count} PromotedFacts=${promotedFacts} ContextBundles=${payload.snapshot.context_bundle_count} OperatorActions=${operatorActions}`,
     alerts: payload.snapshot.warnings.length > 0 ? payload.snapshot.warnings.join("; ") : "none",
+    activitySemantics: explicitLegacySemantics ? LEGACY_ACTIVITY_SEMANTICS : "",
+    executorLiveness: "",
   };
 }
 
@@ -1559,12 +1881,15 @@ function runtimeSupervisorPreviewFromPayload(payload: RuntimeSnapshotPayload): T
 
 export function runtimePayloadToPreview(payload: RuntimeSnapshotPayload, summary: SupervisorControlState | null = null, now: Date = new Date()): TabPreview {
   const state = runtimeSnapshotStateFromPayload(payload);
+  const semanticActivity = state.activitySemantics.length > 0;
   const supervisorPreview = runtimeSupervisorPreviewFromPayload(payload);
   const compactPreview = compactSupervisorPreview(supervisorPreview);
-  const authoritativeRuntimeSummary =
+  const authoritativeRuntimeSummary = !semanticActivity
+    ?
     (hasPreviewSignal(supervisorPreview["Runtime summary"]) && supervisorPreview["Runtime summary"]) ||
     (hasPreviewSignal(payload.snapshot.runtime_summary ?? undefined) && payload.snapshot.runtime_summary) ||
-    "";
+    ""
+    : "";
   const snapshotAuthoritativeFields: TabPreview = {
     ...(hasPreviewSignal(payload.snapshot.loop_state ?? undefined) ? {"Loop state": payload.snapshot.loop_state ?? ""} : {}),
     ...(hasPreviewSignal(payload.snapshot.loop_decision ?? undefined)
@@ -1608,7 +1933,7 @@ export function runtimePayloadToPreview(payload: RuntimeSnapshotPayload, summary
     ...(hasPreviewSignal(payload.snapshot.durable_state ?? undefined)
       ? {"Durable state": payload.snapshot.durable_state ?? ""}
       : {}),
-    ...(hasPreviewSignal(payload.snapshot.runtime_summary ?? undefined)
+    ...(!semanticActivity && hasPreviewSignal(payload.snapshot.runtime_summary ?? undefined)
       ? {"Runtime summary": payload.snapshot.runtime_summary ?? ""}
       : {}),
     ...(hasPreviewSignal(payload.snapshot.runtime_freshness ?? undefined)
@@ -1625,11 +1950,13 @@ export function runtimePayloadToPreview(payload: RuntimeSnapshotPayload, summary
     "Context state": state.contextState,
     "Runtime activity": state.runtimeActivity,
     "Artifact state": state.artifactState,
+    ...(state.activitySemantics ? {"Activity semantics": state.activitySemantics} : {}),
+    ...(state.executorLiveness ? {"Executor liveness": state.executorLiveness} : {}),
     Toolchain: "none",
     Alerts: state.alerts,
   };
   preview["Runtime summary"] =
-    payload.snapshot.runtime_summary ??
+    (!semanticActivity ? payload.snapshot.runtime_summary : undefined) ??
     summarizeRuntimeSummary(preview["Runtime DB"], preview["Session state"], preview["Run state"], preview["Context state"]);
 
   const mergedPreview = summary
@@ -1647,6 +1974,9 @@ export function runtimePayloadToPreview(payload: RuntimeSnapshotPayload, summary
     : preview;
 
   Object.entries(snapshotAuthoritativeFields).forEach(([key, value]) => {
+    if (semanticActivity && key === "Runtime summary") {
+      return;
+    }
     if (RUNTIME_SUPERVISOR_AUTHORITATIVE_FIELDS.has(key) && hasPreviewSignal(value)) {
       if (hasPreviewSignal(supervisorPreview[key])) {
         return;
@@ -1660,6 +1990,9 @@ export function runtimePayloadToPreview(payload: RuntimeSnapshotPayload, summary
   });
 
   Object.entries(supervisorPreview).forEach(([key, value]) => {
+    if (semanticActivity && key === "Runtime summary") {
+      return;
+    }
     if (RUNTIME_SUPERVISOR_AUTHORITATIVE_FIELDS.has(key) && hasPreviewSignal(value)) {
       mergedPreview[key] = value;
       return;
@@ -1676,7 +2009,7 @@ export function runtimePayloadToPreview(payload: RuntimeSnapshotPayload, summary
   });
 
   mergedPreview["Runtime summary"] =
-    authoritativeRuntimeSummary ||
+    (!semanticActivity ? authoritativeRuntimeSummary : "") ||
     summarizeRuntimeSummary(
       mergedPreview["Runtime DB"] ?? "runtime db not reported",
       mergedPreview["Session state"] ?? "none",
@@ -1733,21 +2066,34 @@ function extractRuntimeAlerts(content: string): string[] {
     .slice(0, 2);
 }
 
-function buildRuntimeSnapshotPrelude(content: string, summary: SupervisorControlState | null = null, now: Date = new Date()): string[] {
-  const preview = runtimeSnapshotToPreview(content, summary, now);
-  return buildRuntimeSnapshotPreludeFromPreview(preview, now);
-}
-
 function buildRuntimeSnapshotPreludeFromPreview(preview: TabPreview, now: Date = new Date()): string[] {
   const runtimeActivity = preview["Runtime activity"] ?? "none";
   const artifactState = preview["Artifact state"] ?? "none";
   const controlPulse = previewControlPulse(preview, now);
+  const activitySemantics = preview["Activity semantics"] ?? "";
+  const declaredActivitySemantics = Boolean(activitySemantics && activitySemantics !== "n/a" && activitySemantics !== "none");
+  const semanticActivity = declaredActivitySemantics && activitySemantics !== LEGACY_ACTIVITY_SEMANTICS;
+  const leaseSemantics = activitySemantics === RUNTIME_ACTIVITY_SEMANTICS;
+  const runDetailLabel = leaseSemantics
+    ? "Current lease runs detail"
+    : semanticActivity
+      ? "Unclassified runs detail"
+      : "Active runs detail";
+  const runDetail = leaseSemantics
+    ? preview["Current lease runs detail"] ?? "none"
+    : semanticActivity
+      ? "none"
+      : preview["Active runs detail"] ?? "none";
   return [
     "# Control Preview",
     `Runtime DB: ${preview["Runtime DB"] ?? "unknown"}`,
     `Session state: ${preview["Session state"] ?? summarizeSessionState(runtimeActivity)}`,
     `Run state: ${preview["Run state"] ?? summarizeRunState(runtimeActivity)}`,
-    `Active runs detail: ${preview["Active runs detail"] ?? "none"}`,
+    `${runDetailLabel}: ${runDetail}`,
+    ...(declaredActivitySemantics ? [`Activity semantics: ${preview["Activity semantics"]}`] : []),
+    ...(hasPreviewSignal(preview["Executor liveness"])
+      ? [`Executor liveness: ${preview["Executor liveness"]}`]
+      : []),
     `Context state: ${preview["Context state"] ?? summarizeContextState(artifactState)}`,
     `Recent operator actions: ${preview["Recent operator actions"] ?? "none"}`,
     `Runtime activity: ${runtimeActivity}`,
@@ -1765,17 +2111,24 @@ export function runtimeSnapshotToPreview(content: string, summary: SupervisorCon
   const runtimeDb = extractRuntimeDb(content);
   const toolchain = extractToolchain(content);
   const alerts = extractRuntimeAlerts(content);
-  const sessions = extractRuntimeMetricLine(content, "Sessions=");
+  const rawRuntimeActivity = extractRuntimeActivityMetricLines(content).join("  ");
+  const semantics = resolveRuntimeTextActivitySemantics(rawRuntimeActivity);
+  const runtimeActivity = canonicalRuntimeTextActivity(rawRuntimeActivity, semantics);
+  const activityMetrics = parseRuntimeMetrics(runtimeActivity);
   const artifacts = extractRuntimeMetricLine(content, "Artifacts=");
   const preview: TabPreview = {
     "Runtime DB": runtimeDb,
-    "Session state": summarizeSessionState(sessions),
-    "Run state": summarizeRunState(sessions),
+    "Session state": summarizeSessionState(runtimeActivity),
+    "Run state": summarizeRunState(runtimeActivity),
     "Context state": summarizeContextState(artifacts),
-    "Runtime activity": sessions || "none",
+    "Runtime activity": runtimeActivity || "none",
     "Artifact state": artifacts || "none",
+    ...(semantics.marker ? {"Activity semantics": semantics.marker} : {}),
+    ...(semantics.kind !== "legacy"
+      ? {"Executor liveness": runtimeMetricAlias(activityMetrics, "ExecutorLiveness")}
+      : {}),
     Toolchain: toolchain.length > 0 ? toolchain.join(", ") : "none",
-    Alerts: alerts.length > 0 ? alerts.join("; ") : "none",
+    Alerts: [...alerts, ...(semantics.detail ? [semantics.detail] : [])].join("; ") || "none",
   };
   preview["Runtime summary"] = summarizeRuntimeSummary(
     preview["Runtime DB"],
@@ -3426,14 +3779,35 @@ export function operatorSnapshotToLines(payload: Record<string, unknown>): Trans
     lines.push(`Error: ${error}`);
     return toLines("error", lines.join("\n"));
   }
+  const declaredSemantics = runtimeActivitySemantics(overview);
+  const leaseSemantics = usesRuntimeActivitySemantics(overview);
+  const unknownSemantics = Boolean(
+    declaredSemantics && declaredSemantics !== LEGACY_ACTIVITY_SEMANTICS && !leaseSemantics,
+  );
+  const currentClaims = String(overview.current_lease_claims ?? overview.active_claims ?? 0);
+  const currentLeases = String(overview.active_runs ?? 0);
+  const observedNonterminalClaims = String(overview.observed_nonterminal_claims ?? 0);
+  const observedNonterminalRuns = String(overview.observed_nonterminal_runs ?? 0);
+  const expiredOrUnprovenRuns = String(overview.expired_or_unproven_runs ?? 0);
   lines.push(
     `Sessions: ${String(overview.sessions ?? 0)}`,
-    `Claims: ${String(overview.claims ?? 0)} | active ${String(overview.active_claims ?? 0)} | acked ${String(overview.acknowledged_claims ?? 0)}`,
-    `Runs: ${String(overview.runs ?? 0)} | active ${String(overview.active_runs ?? 0)}`,
+    leaseSemantics
+      ? `Claims: ${String(overview.claims ?? 0)} | current lease ${currentClaims} | observed nonterminal ${observedNonterminalClaims} | acked ${String(overview.acknowledged_claims ?? 0)}`
+      : unknownSemantics
+        ? `Claims: ${String(overview.claims ?? 0)} | lease classification unavailable (${declaredSemantics})`
+        : `Claims: ${String(overview.claims ?? 0)} | active ${String(overview.active_claims ?? 0)} | acked ${String(overview.acknowledged_claims ?? 0)}`,
+    leaseSemantics
+      ? `Runs: ${String(overview.runs ?? 0)} | current leases ${currentLeases} | observed nonterminal ${observedNonterminalRuns} | expired/unproven ${expiredOrUnprovenRuns}`
+      : unknownSemantics
+        ? `Runs: ${String(overview.runs ?? 0)} | lease classification unavailable | executor liveness unproven`
+        : `Runs: ${String(overview.runs ?? 0)} | active ${String(overview.active_runs ?? 0)}`,
+    ...(leaseSemantics || unknownSemantics
+      ? [`Activity semantics: ${declaredSemantics}`, "Executor liveness: unproven"]
+      : []),
     `Artifacts: ${String(overview.artifacts ?? 0)} | promoted facts ${String(overview.promoted_facts ?? 0)}`,
     `Context bundles: ${String(overview.context_bundles ?? 0)} | operator actions ${String(overview.operator_actions ?? 0)}`,
     "",
-    "## Active runs",
+    leaseSemantics ? "## Current lease runs" : unknownSemantics ? "## Unclassified runs" : "## Active runs",
   );
   if (runs.length === 0) {
     lines.push("none");
@@ -3441,7 +3815,9 @@ export function operatorSnapshotToLines(payload: Record<string, unknown>): Trans
     for (const run of runs.slice(0, 8)) {
       const record = typeof run === "object" && run !== null ? (run as Record<string, unknown>) : {};
       lines.push(
-        `- ${String(record.assigned_to ?? "?")} | ${String(record.status ?? "?")} | task ${String(record.task_id ?? "").slice(0, 18)} | run ${String(record.run_id ?? "").slice(0, 12)}`,
+        leaseSemantics
+          ? `- ${String(record.assigned_to ?? "?")} | current lease | stored status ${String(record.status ?? "?")} | task ${String(record.task_id ?? "").slice(0, 18)} | run ${String(record.run_id ?? "").slice(0, 12)} | executor liveness unproven`
+          : `- ${String(record.assigned_to ?? "?")} | ${String(record.status ?? "?")} | task ${String(record.task_id ?? "").slice(0, 18)} | run ${String(record.run_id ?? "").slice(0, 12)}`,
       );
     }
   }
@@ -3468,21 +3844,55 @@ export function operatorSnapshotToPreview(payload: Record<string, unknown>): Tab
       : {};
   const runs = Array.isArray(snapshot.runs) ? snapshot.runs : [];
   const actions = Array.isArray(snapshot.actions) ? snapshot.actions : [];
-  const runtimeActivity = [
-    `Sessions=${String(overview.sessions ?? 0)}`,
-    `Claims=${String(overview.claims ?? 0)}`,
-    `ActiveClaims=${String(overview.active_claims ?? 0)}`,
-    `AckedClaims=${String(overview.acknowledged_claims ?? 0)}`,
-    `Runs=${String(overview.runs ?? 0)}`,
-    `ActiveRuns=${String(overview.active_runs ?? 0)}`,
-  ].join("  ");
+  const declaredSemantics = runtimeActivitySemantics(overview);
+  const leaseSemantics = usesRuntimeActivitySemantics(overview);
+  const unknownSemantics = Boolean(
+    declaredSemantics && declaredSemantics !== LEGACY_ACTIVITY_SEMANTICS && !leaseSemantics,
+  );
+  const currentSessions = String(overview.active_sessions ?? 0);
+  const currentClaims = String(overview.current_lease_claims ?? overview.active_claims ?? 0);
+  const currentLeases = String(overview.active_runs ?? 0);
+  const observedNonterminalClaims = String(overview.observed_nonterminal_claims ?? 0);
+  const observedNonterminalRuns = String(overview.observed_nonterminal_runs ?? 0);
+  const expiredOrUnprovenRuns = String(overview.expired_or_unproven_runs ?? 0);
+  const runtimeActivity = leaseSemantics
+    ? [
+        `ActivitySemantics=${RUNTIME_ACTIVITY_SEMANTICS}`,
+        `Sessions=${String(overview.sessions ?? 0)}`,
+        `CurrentSessions=${currentSessions}`,
+        `Claims=${String(overview.claims ?? 0)}`,
+        `CurrentClaims=${currentClaims}`,
+        `ObservedNonterminalClaims=${observedNonterminalClaims}`,
+        `AckedClaims=${String(overview.acknowledged_claims ?? 0)}`,
+        `Runs=${String(overview.runs ?? 0)}`,
+        `CurrentLeases=${currentLeases}`,
+        `ObservedNonterminalRuns=${observedNonterminalRuns}`,
+        `ExpiredOrUnproven=${expiredOrUnprovenRuns}`,
+        "ExecutorLiveness=unproven",
+      ].join("  ")
+    : unknownSemantics
+      ? [
+          `ActivitySemantics=${declaredSemantics}`,
+          `Sessions=${String(overview.sessions ?? 0)}`,
+          `Claims=${String(overview.claims ?? 0)}`,
+          `Runs=${String(overview.runs ?? 0)}`,
+          "ExecutorLiveness=unproven",
+        ].join("  ")
+      : [
+          `Sessions=${String(overview.sessions ?? 0)}`,
+          `Claims=${String(overview.claims ?? 0)}`,
+          `ActiveClaims=${String(overview.active_claims ?? 0)}`,
+          `AckedClaims=${String(overview.acknowledged_claims ?? 0)}`,
+          `Runs=${String(overview.runs ?? 0)}`,
+          `ActiveRuns=${String(overview.active_runs ?? 0)}`,
+        ].join("  ");
   const artifactState = [
     `Artifacts=${String(overview.artifacts ?? 0)}`,
     `PromotedFacts=${String(overview.promoted_facts ?? 0)}`,
     `ContextBundles=${String(overview.context_bundles ?? 0)}`,
     `OperatorActions=${String(overview.operator_actions ?? 0)}`,
   ].join("  ");
-  const activeRunsDetail =
+  const runDetail =
     runs
       .slice(0, 3)
       .map((run) => {
@@ -3500,14 +3910,30 @@ export function operatorSnapshotToPreview(payload: Record<string, unknown>): Tab
       .join("; ") || "none";
   return {
     "Runtime DB": String(snapshot.runtime_db ?? "unavailable"),
-    "Session state": [
-      `${String(overview.sessions ?? 0)} sessions`,
-      `${String(overview.claims ?? 0)} claims`,
-      `${String(overview.active_claims ?? 0)} active claims`,
-      `${String(overview.acknowledged_claims ?? 0)} acked claims`,
-    ].join(" | "),
-    "Run state": [`${String(overview.runs ?? 0)} runs`, `${String(overview.active_runs ?? 0)} active runs`].join(" | "),
-    "Active runs detail": activeRunsDetail,
+    "Session state": leaseSemantics
+      ? [
+          `${String(overview.sessions ?? 0)} sessions`,
+          `${currentSessions} current lease sessions`,
+          `${String(overview.claims ?? 0)} claims`,
+          `${currentClaims} current lease claims`,
+          `${observedNonterminalClaims} observed nonterminal claims`,
+          `${String(overview.acknowledged_claims ?? 0)} acked claims`,
+        ].join(" | ")
+      : unknownSemantics
+        ? `${String(overview.sessions ?? 0)} sessions | ${String(overview.claims ?? 0)} claims | activity semantics ${declaredSemantics} unrecognized`
+        : [
+            `${String(overview.sessions ?? 0)} sessions`,
+            `${String(overview.claims ?? 0)} claims`,
+            `${String(overview.active_claims ?? 0)} active claims`,
+            `${String(overview.acknowledged_claims ?? 0)} acked claims`,
+          ].join(" | "),
+    "Run state": leaseSemantics
+      ? `${String(overview.runs ?? 0)} runs | ${currentLeases} current leases | ${observedNonterminalRuns} observed nonterminal runs | ${expiredOrUnprovenRuns} expired/unproven runs | executor liveness unproven`
+      : unknownSemantics
+        ? `${String(overview.runs ?? 0)} runs | lease classification unavailable | executor liveness unproven`
+        : [`${String(overview.runs ?? 0)} runs`, `${String(overview.active_runs ?? 0)} active runs`].join(" | "),
+    ...(leaseSemantics ? {"Current lease runs detail": runDetail} : {}),
+    ...(!leaseSemantics && !unknownSemantics ? {"Active runs detail": runDetail} : {}),
     "Context state": [
       `${String(overview.artifacts ?? 0)} artifacts`,
       `${String(overview.promoted_facts ?? 0)} promoted facts`,
@@ -3517,27 +3943,48 @@ export function operatorSnapshotToPreview(payload: Record<string, unknown>): Tab
     "Recent operator actions": recentOperatorActions,
     "Runtime activity": runtimeActivity,
     "Artifact state": artifactState,
+    ...(leaseSemantics || unknownSemantics ? {"Activity semantics": declaredSemantics} : {}),
+    ...(leaseSemantics || unknownSemantics ? {"Executor liveness": "unproven"} : {}),
     Sessions: String(overview.sessions ?? 0),
-    "Active claims": String(overview.active_claims ?? 0),
-    "Active runs": String(overview.active_runs ?? 0),
+    ...(leaseSemantics ? {"Current lease claims": currentClaims} : {}),
+    ...(leaseSemantics ? {"Current leases": currentLeases} : {}),
+    ...(!leaseSemantics && !unknownSemantics ? {"Active claims": String(overview.active_claims ?? 0)} : {}),
+    ...(!leaseSemantics && !unknownSemantics ? {"Active runs": String(overview.active_runs ?? 0)} : {}),
+    ...(leaseSemantics ? {"Observed nonterminal runs": observedNonterminalRuns} : {}),
+    ...(leaseSemantics ? {"Expired or unproven runs": expiredOrUnprovenRuns} : {}),
     Artifacts: String(overview.artifacts ?? 0),
     "Recent actions": String(actions.length),
-    Agents: runs
+    ...(leaseSemantics ? {"Lease assignees": runs
       .slice(0, 3)
       .map((run) => {
         const record = typeof run === "object" && run !== null ? (run as Record<string, unknown>) : {};
         return `${String(record.assigned_to ?? "?")} (${String(record.status ?? "?")})`;
       })
-      .join("; ") || "none",
+      .join("; ") || "none"} : {}),
+    ...(!leaseSemantics && !unknownSemantics ? {Agents: runs
+      .slice(0, 3)
+      .map((run) => {
+        const record = typeof run === "object" && run !== null ? (run as Record<string, unknown>) : {};
+        return `${String(record.assigned_to ?? "?")} (${String(record.status ?? "?")})`;
+      })
+      .join("; ") || "none"} : {}),
     "Runtime summary": summarizeRuntimeSummary(
       String(snapshot.runtime_db ?? "unavailable"),
-      [
-        `${String(overview.sessions ?? 0)} sessions`,
-        `${String(overview.claims ?? 0)} claims`,
-        `${String(overview.active_claims ?? 0)} active claims`,
-        `${String(overview.acknowledged_claims ?? 0)} acked claims`,
-      ].join(" | "),
-      [`${String(overview.runs ?? 0)} runs`, `${String(overview.active_runs ?? 0)} active runs`].join(" | "),
+      leaseSemantics
+        ? `${String(overview.sessions ?? 0)} sessions | ${currentSessions} current lease sessions | ${String(overview.claims ?? 0)} claims | ${currentClaims} current lease claims | ${observedNonterminalClaims} observed nonterminal claims`
+        : unknownSemantics
+          ? `${String(overview.sessions ?? 0)} sessions | ${String(overview.claims ?? 0)} claims | activity semantics ${declaredSemantics} unrecognized`
+          : [
+              `${String(overview.sessions ?? 0)} sessions`,
+              `${String(overview.claims ?? 0)} claims`,
+              `${String(overview.active_claims ?? 0)} active claims`,
+              `${String(overview.acknowledged_claims ?? 0)} acked claims`,
+            ].join(" | "),
+      leaseSemantics
+        ? `${String(overview.runs ?? 0)} runs | ${currentLeases} current leases | ${observedNonterminalRuns} observed nonterminal runs | ${expiredOrUnprovenRuns} expired/unproven runs | executor liveness unproven`
+        : unknownSemantics
+          ? `${String(overview.runs ?? 0)} runs | lease classification unavailable | executor liveness unproven`
+          : [`${String(overview.runs ?? 0)} runs`, `${String(overview.active_runs ?? 0)} active runs`].join(" | "),
       [
         `${String(overview.artifacts ?? 0)} artifacts`,
         `${String(overview.promoted_facts ?? 0)} promoted facts`,
@@ -3808,9 +4255,13 @@ export function runtimeSnapshotToLines(
   summary: SupervisorControlState | null = null,
   now: Date = new Date(),
 ): TranscriptLine[] {
+  const preview = runtimeSnapshotToPreview(content, summary, now);
+  const activitySemantics = preview["Activity semantics"] ?? "";
+  const preserveLegacyBody = !activitySemantics || activitySemantics === LEGACY_ACTIVITY_SEMANTICS;
+  const body = preserveLegacyBody ? content.split("\n") : [];
   return toLines(
     "system",
-    [...buildRuntimeSnapshotPrelude(content, summary, now), ...buildSupervisorPrelude(summary), ...content.split("\n")].join("\n"),
+    [...buildRuntimeSnapshotPreludeFromPreview(preview, now), ...buildSupervisorPrelude(summary), ...body].join("\n"),
   );
 }
 
@@ -3819,8 +4270,14 @@ export function runtimePreviewToLines(
   summary: SupervisorControlState | null = null,
   now: Date = new Date(),
 ): TranscriptLine[] {
-  const supervisorPrelude = summary ? buildSupervisorPrelude(summary) : buildSupervisorPreludeFromPreview(preview);
-  return toLines("system", [...buildRuntimeSnapshotPreludeFromPreview(preview, now), ...supervisorPrelude].join("\n"));
+  const canonicalPreview = canonicalRuntimePreviewForRendering(preview);
+  const supervisorPrelude = summary
+    ? buildSupervisorPrelude(summary)
+    : buildSupervisorPreludeFromPreview(canonicalPreview);
+  return toLines(
+    "system",
+    [...buildRuntimeSnapshotPreludeFromPreview(canonicalPreview, now), ...supervisorPrelude].join("\n"),
+  );
 }
 
 export function buildBridgeTabs(): TabSpec[] {

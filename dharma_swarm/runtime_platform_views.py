@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_activity import load_runtime_activity
 from dharma_swarm.runtime_control_actions import RuntimeControlActions
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -113,7 +114,18 @@ class RuntimePlatformViews:
             status=status,
             limit=max_items,
         )
-        session_views = [self._session_to_dict(session) for session in sessions]
+        activity = load_runtime_activity(self.runtime_state.db_path)
+        current_session_ids = activity.current_session_ids
+        session_views = []
+        for session in sessions:
+            session_view = self._session_to_dict(session)
+            session_view["activity"] = {
+                "semantics": activity.semantics,
+                "current_lease": session.session_id in current_session_ids,
+                "stored_status": session.status,
+                "proves_executor_liveness": False,
+            }
+            session_views.append(session_view)
         return {
             "schema_version": "runtime_sessions_snapshot.v1",
             "generated_at": _utc_now().isoformat(),
@@ -122,8 +134,15 @@ class RuntimePlatformViews:
             "summary": {
                 "session_count": len(session_views),
                 "active_session_count": sum(
+                    1
+                    for session in session_views
+                    if session["activity"]["current_lease"]
+                ),
+                "stored_active_session_count": sum(
                     1 for session in session_views if session["status"] == "active"
                 ),
+                "activity_semantics": activity.semantics,
+                "proves_executor_liveness": False,
             },
             "sessions": session_views,
         }
@@ -143,7 +162,17 @@ class RuntimePlatformViews:
             status=status,
             limit=max_items,
         )
-        run_views = [await self._run_summary(run) for run in runs]
+        activity = load_runtime_activity(
+            self.runtime_state.db_path,
+            run_ids=tuple(run.run_id for run in runs),
+        )
+        activity_by_run = activity.by_run_id
+        activity_summary = activity.summary()
+        run_views = []
+        for run in runs:
+            observation = activity_by_run.get(run.run_id)
+            observed_run = observation.run_record if observation is not None else run
+            run_views.append(await self._run_summary(observed_run, observation))
         return {
             "schema_version": "runtime_runs_snapshot.v1",
             "generated_at": _utc_now().isoformat(),
@@ -156,11 +185,21 @@ class RuntimePlatformViews:
             },
             "summary": {
                 "run_count": len(run_views),
-                "active_run_count": sum(
-                    1
-                    for run in run_views
-                    if run["status"] not in {"completed", "failed", "stale_recovered"}
-                ),
+                "active_run_count": activity_summary["current_lease_run_count"],
+                "current_lease_run_count": activity_summary[
+                    "current_lease_run_count"
+                ],
+                "observed_nonterminal_run_count": activity_summary[
+                    "observed_nonterminal_run_count"
+                ],
+                "expired_or_unproven_run_count": activity_summary[
+                    "expired_or_unproven_run_count"
+                ],
+                "terminal_evidence_conflict_count": activity_summary[
+                    "terminal_evidence_conflict_count"
+                ],
+                "activity_semantics": activity.semantics,
+                "proves_executor_liveness": False,
             },
             "runs": run_views,
         }
@@ -169,6 +208,13 @@ class RuntimePlatformViews:
         detail = await self.runtime_state.describe_run(run_id)
         found = detail.get("run") is not None
         serialized = _serialize_value(detail)
+        activity = load_runtime_activity(
+            self.runtime_state.db_path,
+            run_ids=(run_id,),
+        )
+        observation = activity.by_run_id.get(run_id)
+        if observation is not None:
+            serialized["activity"] = observation.to_dict()
         return {
             "schema_version": "runtime_run_detail.v1",
             "generated_at": _utc_now().isoformat(),
@@ -185,6 +231,10 @@ class RuntimePlatformViews:
                 ),
                 "has_topology_state": serialized.get("topology_state") is not None,
                 "has_identity": serialized.get("identity") is not None,
+                "activity_state": (
+                    observation.state.value if observation is not None else "not_found"
+                ),
+                "proves_executor_liveness": False,
             },
             "detail": serialized,
         }
@@ -326,8 +376,22 @@ class RuntimePlatformViews:
             payload=payload,
         )
 
-    async def _run_summary(self, run: DelegationRun) -> dict[str, Any]:
+    async def _run_summary(
+        self,
+        run: DelegationRun,
+        activity: Any | None = None,
+    ) -> dict[str, Any]:
         run_view = _serialize_value(run)
+        run_view["activity"] = (
+            activity.to_dict()
+            if activity is not None
+            else {
+                "semantics": "runtime_activity.v1",
+                "state": "expired_or_unproven",
+                "reason_codes": ["activity_observation_missing"],
+                "proves_executor_liveness": False,
+            }
+        )
         topology_state = await self.runtime_state.get_topology_state(run.run_id)
         if topology_state is not None:
             run_view["topology"] = topology_state.topology

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm import cron_scheduler
+from dharma_swarm.runtime_activity import RuntimeActivityState, load_runtime_activity
 from dharma_swarm.runtime_platform_views import _serialize_value
 from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore, SessionEventRecord
 
@@ -97,6 +98,11 @@ class RuntimeAgentServerViews:
             limit=max_items * 2,
         )
         runs = await self.runtime_state.list_delegation_runs(limit=max_items * 5)
+        activity = load_runtime_activity(
+            self.runtime_state.db_path,
+            run_ids=tuple(run.run_id for run in runs),
+        )
+        activity_by_run = activity.by_run_id
         assistants: dict[str, dict[str, Any]] = {}
         configurations: dict[str, dict[str, Any]] = {}
 
@@ -120,7 +126,9 @@ class RuntimeAgentServerViews:
                 status=session.status,
             )
 
-        for run in runs:
+        for listed_run in runs:
+            observation = activity_by_run.get(listed_run.run_id)
+            run = observation.run_record if observation is not None else listed_run
             metadata = _metadata(run)
             assistant_id = _profile_field(
                 metadata,
@@ -139,6 +147,15 @@ class RuntimeAgentServerViews:
                 session_id=run.session_id,
                 run_id=run.run_id,
                 status=run.status,
+                current_lease=bool(observation and observation.current_lease),
+                observed_nonterminal=bool(
+                    observation and observation.observed_nonterminal
+                ),
+                expired_or_unproven=bool(
+                    observation
+                    and observation.state
+                    is RuntimeActivityState.EXPIRED_OR_UNPROVEN
+                ),
             )
 
         assistant_views = sorted(
@@ -162,6 +179,16 @@ class RuntimeAgentServerViews:
                 "active_assistant_count": sum(
                     1 for assistant in assistant_views if assistant["active_run_count"] > 0
                 ),
+                "observed_nonterminal_run_count": sum(
+                    assistant["observed_nonterminal_run_count"]
+                    for assistant in assistant_views
+                ),
+                "expired_or_unproven_run_count": sum(
+                    assistant["expired_or_unproven_run_count"]
+                    for assistant in assistant_views
+                ),
+                "activity_semantics": activity.semantics,
+                "proves_executor_liveness": False,
             },
             "assistants": assistant_views,
             "configurations": configuration_views,
@@ -171,8 +198,24 @@ class RuntimeAgentServerViews:
         max_items = max(1, limit)
         cron_jobs = await asyncio.to_thread(cron_scheduler.list_jobs, True)
         runs = await self.runtime_state.list_delegation_runs(limit=max_items * 5)
+        activity = load_runtime_activity(
+            self.runtime_state.db_path,
+            run_ids=tuple(run.run_id for run in runs),
+        )
+        activity_by_run = activity.by_run_id
         events = await self.runtime_state.list_session_events(limit=max_items * 5)
-        background_runs = [self._run_to_dict(run) for run in runs if _is_background_run(run)]
+        background_runs = [
+            self._run_to_dict(
+                (
+                    activity_by_run[run.run_id].run_record
+                    if run.run_id in activity_by_run
+                    else run
+                ),
+                activity_by_run.get(run.run_id),
+            )
+            for run in runs
+            if _is_background_run(run)
+        ]
         background_events = [
             _serialize_value(event) for event in events if _is_background_event(event)
         ]
@@ -190,8 +233,20 @@ class RuntimeAgentServerViews:
                 "active_background_run_count": sum(
                     1
                     for run in background_runs
-                    if run["status"] not in {"completed", "failed", "stale_recovered"}
+                    if run["activity"]["current_lease"]
                 ),
+                "observed_nonterminal_run_count": sum(
+                    1
+                    for run in background_runs
+                    if run["activity"]["observed_nonterminal"]
+                ),
+                "expired_or_unproven_run_count": sum(
+                    1
+                    for run in background_runs
+                    if run["activity"]["state"] == "expired_or_unproven"
+                ),
+                "activity_semantics": activity.semantics,
+                "proves_executor_liveness": False,
                 "background_event_count": len(background_events),
             },
             "cron_jobs": cron_views[:max_items],
@@ -212,6 +267,9 @@ class RuntimeAgentServerViews:
         session_id: str = "",
         run_id: str = "",
         status: str = "",
+        current_lease: bool = False,
+        observed_nonterminal: bool = False,
+        expired_or_unproven: bool = False,
     ) -> None:
         configuration_id = _configuration_id(
             metadata,
@@ -230,6 +288,9 @@ class RuntimeAgentServerViews:
                 "latest_session_id": "",
                 "run_count": 0,
                 "active_run_count": 0,
+                "observed_nonterminal_run_count": 0,
+                "expired_or_unproven_run_count": 0,
+                "proves_executor_liveness": False,
                 "status": status or "unknown",
                 "metadata": {},
             },
@@ -242,8 +303,12 @@ class RuntimeAgentServerViews:
         if run_id:
             assistant["latest_run_id"] = run_id
             assistant["run_count"] += 1
-            if status not in {"completed", "failed", "stale_recovered"}:
+            if current_lease:
                 assistant["active_run_count"] += 1
+            if observed_nonterminal:
+                assistant["observed_nonterminal_run_count"] += 1
+            if expired_or_unproven:
+                assistant["expired_or_unproven_run_count"] += 1
         assistant["status"] = status or assistant["status"]
         assistant["metadata"].update(_serialize_value(metadata))
 
@@ -270,7 +335,7 @@ class RuntimeAgentServerViews:
         configuration["metadata"].update(_serialize_value(metadata))
 
     @staticmethod
-    def _run_to_dict(run: DelegationRun) -> dict[str, Any]:
+    def _run_to_dict(run: DelegationRun, activity: Any | None = None) -> dict[str, Any]:
         run_view = _serialize_value(run)
         metadata = _metadata(run)
         run_view["cron_job_id"] = _profile_field(
@@ -285,6 +350,18 @@ class RuntimeAgentServerViews:
             "execution_kind",
             "surface",
             default="background",
+        )
+        run_view["activity"] = (
+            activity.to_dict()
+            if activity is not None
+            else {
+                "semantics": "runtime_activity.v1",
+                "state": "expired_or_unproven",
+                "observed_nonterminal": True,
+                "current_lease": False,
+                "reason_codes": ["activity_observation_missing"],
+                "proves_executor_liveness": False,
+            }
         )
         return run_view
 

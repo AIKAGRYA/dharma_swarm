@@ -4,7 +4,12 @@ import {Box, Text} from "ink";
 
 import type {TabPreview, TranscriptLine} from "../types";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "../freshness";
-import {parseRepoControlPreview} from "../repoControlPreview";
+import {
+  LEGACY_RUNTIME_ACTIVITY_SEMANTICS,
+  RUNTIME_ACTIVITY_SEMANTICS,
+  parseRepoControlPreview,
+  runtimeActivitySemanticsFromPreview,
+} from "../repoControlPreview";
 import {buildVerificationSummaryRows, isGenericVerificationLabel, resolveVerificationEntries} from "../verification";
 import {THEME} from "../theme";
 
@@ -45,6 +50,9 @@ const STRUCTURED_CONTROL_LABELS = [
   "Session state",
   "Run state",
   "Active runs detail",
+  "Current lease runs detail",
+  "Activity semantics",
+  "Executor liveness",
   "Context state",
   "Recent operator actions",
   "Runtime activity",
@@ -277,7 +285,7 @@ function authorityOverviewRows(preview: TabPreview | undefined, lines: Transcrip
 const SECTION_PREVIEW_PREFERENCES: SectionPreviewPreference[] = [
   {title: "Overview", prefixes: ["Loop ", "Verification ", "Freshness ", "Outcome ", "Pulse ", "Runtime ", "Context ", "Decision ", "State "]},
   {title: "Loop", prefixes: ["State ", "Task ", "Outcome ", "Freshness ", "Decision ", "Updated "]},
-  {title: "Runtime", prefixes: ["DB ", "Sessions ", "Runs ", "Active ", "Context ", "Actions ", "Activity ", "Artifacts ", "Summary "]},
+  {title: "Runtime", prefixes: ["DB ", "Sessions ", "Runs ", "Lease ", "Active ", "Evidence ", "Context ", "Actions ", "Activity ", "Artifacts ", "Summary "]},
   {title: "Verification", prefixes: ["Verification ", "Receipt ", "Updated ", "Freshness ", "Status ", "Failing ", "Passing ", "Summary ", "Bundle ", "Last "]},
   {title: "Durability", prefixes: ["State ", "Receipt ", "Truth ", "Pulse "]},
   {title: "Tools", prefixes: ["Toolchain ", "Alerts "]},
@@ -325,6 +333,12 @@ export function sectionCardPreviewRows(section: ControlSection, maxRows = 2): st
 
 function runtimeSummaryRow(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
   const explicit = previewValue(preview, lines, "Runtime summary");
+  const semantics = runtimeSemanticsForPreview(preview, lines);
+  if (!isLegacyRuntimeSemantics(semantics) && /\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i.test(explicit)) {
+    return semantics === RUNTIME_ACTIVITY_SEMANTICS
+      ? "Runtime current lease evidence unavailable"
+      : `Runtime activity semantics ${semantics} unrecognized`;
+  }
   return hasSignal(explicit) ? `Runtime ${explicit}` : "Runtime unknown";
 }
 
@@ -339,13 +353,13 @@ function primaryRuntimeSignalFragment(value: string): string {
 }
 
 function runtimeOverviewRow(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
-  const runtimeActivity = parseRuntimeMetrics(previewValue(preview, lines, "Runtime activity"));
+  const runtimeActivity = runtimeMetricsForPreview(preview, lines);
   if (Object.keys(runtimeActivity).length > 0) {
     return `Runtime ${[
       metricFragment(runtimeActivity, "Sessions", "sessions"),
       metricFragment(runtimeActivity, "Runs", "runs"),
-      nonZeroMetricFragment(runtimeActivity, "ActiveRuns", "active runs"),
-      nonZeroMetricFragment(runtimeActivity, "ActiveClaims", "active claims"),
+      leaseOrLegacyMetricFragment(runtimeActivity, "CurrentLeases", "ActiveRuns", "current leases", "active runs", true),
+      leaseOrLegacyMetricFragment(runtimeActivity, "CurrentClaims", "ActiveClaims", "current lease claims", "active claims", true),
     ]
       .filter((value) => value.length > 0)
       .join(" | ")}`;
@@ -410,6 +424,46 @@ function parseRuntimeMetrics(value: string): Record<string, string> {
   );
 }
 
+function runtimeSemanticsForPreview(preview: TabPreview | undefined, lines: TranscriptLine[]): string {
+  const explicit = previewValue(preview, lines, "Activity semantics");
+  const runtimeActivity = previewValue(preview, lines, "Runtime activity");
+  return runtimeActivitySemanticsFromPreview({
+    ...(explicit !== "n/a" && explicit !== "none" ? {"Activity semantics": explicit} : {}),
+    ...(hasSignal(runtimeActivity) ? {"Runtime activity": runtimeActivity} : {}),
+  });
+}
+
+function runtimeMetricsForPreview(preview: TabPreview | undefined, lines: TranscriptLine[]): Record<string, string> {
+  const metrics = parseRuntimeMetrics(previewValue(preview, lines, "Runtime activity"));
+  const semantics = runtimeSemanticsForPreview(preview, lines);
+  if (semantics) {
+    metrics.ActivitySemantics = semantics;
+  }
+  if (!isLegacyRuntimeSemantics(semantics)) {
+    metrics.ExecutorLiveness = "unproven";
+  }
+  return metrics;
+}
+
+function isLegacyRuntimeSemantics(semantics: string): boolean {
+  return !semantics || semantics === "n/a" || semantics === LEGACY_RUNTIME_ACTIVITY_SEMANTICS;
+}
+
+function qualifiedRuntimeValue(value: string, semantics: string): string {
+  if (isLegacyRuntimeSemantics(semantics)) {
+    return value;
+  }
+  const livenessQualified = value
+    .replace(/\bExecutorLiveness=[^\s|]+/gi, "ExecutorLiveness=unproven")
+    .replace(/\bexecutor liveness (?!unproven\b)[^|]+/gi, "executor liveness unproven");
+  if (!/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b|\bActive(?:Claims|Runs|Sessions)=/i.test(livenessQualified)) {
+    return livenessQualified;
+  }
+  return semantics === RUNTIME_ACTIVITY_SEMANTICS
+    ? `ActivitySemantics=${semantics} lease-qualified evidence unavailable`
+    : `ActivitySemantics=${semantics} lease classification unavailable`;
+}
+
 function runtimeMetricValue(metrics: Record<string, string>, key: string): string {
   return metrics[key] ?? "n/a";
 }
@@ -424,9 +478,82 @@ function nonZeroMetricFragment(metrics: Record<string, string>, key: string, lab
   return value === "n/a" || value === "0" ? "" : `${value} ${label}`;
 }
 
+function activitySemantics(metrics: Record<string, string>): string {
+  return runtimeMetricValue(metrics, "ActivitySemantics");
+}
+
+function leaseOrLegacyMetricFragment(
+  metrics: Record<string, string>,
+  leaseKey: string,
+  legacyKey: string,
+  leaseLabel: string,
+  legacyLabel: string,
+  nonZero = false,
+): string {
+  const semantics = activitySemantics(metrics);
+  if (semantics === "runtime_activity.v1") {
+    return nonZero
+      ? nonZeroMetricFragment(metrics, leaseKey, leaseLabel)
+      : metricFragment(metrics, leaseKey, leaseLabel);
+  }
+  if (semantics !== "n/a" && semantics !== "legacy_status_counts") {
+    return "";
+  }
+  return nonZero
+    ? nonZeroMetricFragment(metrics, legacyKey, legacyLabel)
+    : metricFragment(metrics, legacyKey, legacyLabel);
+}
+
 function joinMetricFragments(fragments: string[]): string {
   const filtered = fragments.filter((fragment) => fragment.length > 0);
   return filtered.length > 0 ? filtered.join(" | ") : "n/a";
+}
+
+function sessionActivityFragments(metrics: Record<string, string>): string[] {
+  const common = [
+    metricFragment(metrics, "Sessions", "sessions"),
+    metricFragment(metrics, "Claims", "claims"),
+  ];
+  const semantics = activitySemantics(metrics);
+  if (semantics === "runtime_activity.v1") {
+    return [
+      metricFragment(metrics, "Sessions", "sessions"),
+      metricFragment(metrics, "CurrentSessions", "current lease sessions"),
+      metricFragment(metrics, "Claims", "claims"),
+      metricFragment(metrics, "CurrentClaims", "current lease claims"),
+      metricFragment(metrics, "ObservedNonterminalClaims", "observed nonterminal claims"),
+      metricFragment(metrics, "AckedClaims", "acked claims"),
+    ];
+  }
+  if (semantics !== "n/a" && semantics !== "legacy_status_counts") {
+    return [...common, `activity semantics ${semantics} unrecognized`];
+  }
+  return [
+    ...common,
+    metricFragment(metrics, "ActiveClaims", "active claims"),
+    metricFragment(metrics, "AckedClaims", "acked claims"),
+  ];
+}
+
+function runActivityFragments(metrics: Record<string, string>): string[] {
+  const semantics = activitySemantics(metrics);
+  if (semantics === "runtime_activity.v1") {
+    const liveness = runtimeMetricValue(metrics, "ExecutorLiveness");
+    return [
+      metricFragment(metrics, "Runs", "runs"),
+      metricFragment(metrics, "CurrentLeases", "current leases"),
+      metricFragment(metrics, "ObservedNonterminalRuns", "observed nonterminal runs"),
+      metricFragment(metrics, "ExpiredOrUnproven", "expired/unproven runs"),
+      liveness === "n/a" ? "" : `executor liveness ${liveness}`,
+    ];
+  }
+  if (semantics !== "n/a" && semantics !== "legacy_status_counts") {
+    return [metricFragment(metrics, "Runs", "runs"), "lease classification unavailable"];
+  }
+  return [
+    metricFragment(metrics, "Runs", "runs"),
+    metricFragment(metrics, "ActiveRuns", "active runs"),
+  ];
 }
 
 function runtimeRow(
@@ -437,10 +564,14 @@ function runtimeRow(
   formatter: (metrics: Record<string, string>) => string,
 ): string {
   const explicit = previewValue(preview, lines, label);
-  if (!isPlaceholderValue(explicit)) {
+  const semantics = runtimeSemanticsForPreview(preview, lines);
+  const legacyActivityLanguage = /\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i.test(explicit);
+  if (!isPlaceholderValue(explicit) && (isLegacyRuntimeSemantics(semantics) || !legacyActivityLanguage)) {
     return `${fallbackLabel} ${explicit}`;
   }
-  const metrics = parseRuntimeMetrics(previewValue(preview, lines, label === "Context state" ? "Artifact state" : "Runtime activity"));
+  const metrics = label === "Context state"
+    ? parseRuntimeMetrics(previewValue(preview, lines, "Artifact state"))
+    : runtimeMetricsForPreview(preview, lines);
   return `${fallbackLabel} ${Object.keys(metrics).length > 0 ? formatter(metrics) : "n/a"}`;
 }
 
@@ -711,7 +842,7 @@ function overviewSectionRows(preview: TabPreview | undefined, lines: TranscriptL
   const resultStatus = derivedResultStatus(preview, lines);
   const acceptance = derivedAcceptance(preview, lines);
   const freshness = derivedFreshness(preview, lines);
-  const runtimeActivity = parseRuntimeMetrics(previewValue(preview, lines, "Runtime activity"));
+  const runtimeActivity = runtimeMetricsForPreview(preview, lines);
   const artifactState = parseRuntimeMetrics(previewValue(preview, lines, "Artifact state"));
   const contextState = previewValue(preview, lines, "Context state");
   const verification = verificationOverviewRow(preview, lines);
@@ -738,8 +869,8 @@ function overviewSectionRows(preview: TabPreview | undefined, lines: TranscriptL
       `Runtime ${[
         metricFragment(runtimeActivity, "Sessions", "sessions"),
         metricFragment(runtimeActivity, "Runs", "runs"),
-        nonZeroMetricFragment(runtimeActivity, "ActiveRuns", "active runs"),
-        nonZeroMetricFragment(runtimeActivity, "ActiveClaims", "active claims"),
+        leaseOrLegacyMetricFragment(runtimeActivity, "CurrentLeases", "ActiveRuns", "current leases", "active runs", true),
+        leaseOrLegacyMetricFragment(runtimeActivity, "CurrentClaims", "ActiveClaims", "current lease claims", "active claims", true),
       ]
         .filter((value) => value.length > 0)
         .join(" | ")}`,
@@ -779,11 +910,14 @@ function runtimeSectionRows(preview: TabPreview | undefined, lines: TranscriptLi
   const runtimeDb = previewValue(preview, lines, "Runtime DB");
   const sessionState = previewValue(preview, lines, "Session state");
   const runState = previewValue(preview, lines, "Run state");
+  const currentLeaseRunsDetail = previewValue(preview, lines, "Current lease runs detail");
   const activeRunsDetail = previewValue(preview, lines, "Active runs detail");
   const contextState = previewValue(preview, lines, "Context state");
   const recentActions = previewValue(preview, lines, "Recent operator actions");
   const runtimeActivity = previewValue(preview, lines, "Runtime activity");
   const artifactState = previewValue(preview, lines, "Artifact state");
+  const activityMetrics = runtimeMetricsForPreview(preview, lines);
+  const semantics = activitySemantics(activityMetrics);
 
   if (hasSignal(runtimeDb)) {
     rows.push(`DB ${runtimeDb}`);
@@ -795,13 +929,7 @@ function runtimeSectionRows(preview: TabPreview | undefined, lines: TranscriptLi
         lines,
         "Session state",
         "Sessions",
-        (metrics) =>
-          joinMetricFragments([
-            metricFragment(metrics, "Sessions", "sessions"),
-            metricFragment(metrics, "Claims", "claims"),
-            metricFragment(metrics, "ActiveClaims", "active claims"),
-            metricFragment(metrics, "AckedClaims", "acked claims"),
-          ]),
+        (metrics) => joinMetricFragments(sessionActivityFragments(metrics)),
       ),
     );
   }
@@ -812,16 +940,20 @@ function runtimeSectionRows(preview: TabPreview | undefined, lines: TranscriptLi
         lines,
         "Run state",
         "Runs",
-        (metrics) =>
-          joinMetricFragments([
-            metricFragment(metrics, "Runs", "runs"),
-            metricFragment(metrics, "ActiveRuns", "active runs"),
-          ]),
+        (metrics) => joinMetricFragments(runActivityFragments(metrics)),
       ),
     );
   }
-  if (hasSignal(activeRunsDetail)) {
+  if (semantics === "runtime_activity.v1" && hasSignal(currentLeaseRunsDetail)) {
+    rows.push(`Lease ${currentLeaseRunsDetail}`);
+  } else if ((semantics === "n/a" || semantics === "legacy_status_counts") && hasSignal(activeRunsDetail)) {
     rows.push(`Active ${activeRunsDetail}`);
+  }
+  const executorLiveness = isLegacyRuntimeSemantics(semantics)
+    ? previewValue(preview, lines, "Executor liveness")
+    : "unproven";
+  if (semantics !== "n/a" && semantics !== "legacy_status_counts" && hasSignal(executorLiveness)) {
+    rows.push(`Evidence executor liveness ${executorLiveness}`);
   }
   if (hasSignal(contextState) || Object.keys(parseRuntimeMetrics(artifactState)).length > 0) {
     rows.push(
@@ -844,7 +976,7 @@ function runtimeSectionRows(preview: TabPreview | undefined, lines: TranscriptLi
     rows.push(`Actions ${recentActions}`);
   }
   if (hasSignal(runtimeActivity)) {
-    rows.push(`Activity ${runtimeActivity}`);
+    rows.push(`Activity ${qualifiedRuntimeValue(runtimeActivity, semantics)}`);
   }
   if (hasSignal(artifactState)) {
     rows.push(`Artifacts ${artifactState}`);

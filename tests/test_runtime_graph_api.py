@@ -16,12 +16,15 @@ from dharma_swarm.runtime_state import (
     RuntimeStateStore,
     SessionEventRecord,
     SessionState,
+    TaskClaim,
     TopologyStateRecord,
 )
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 
 async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
     base_time = datetime(2026, 6, 30, 21, 0, tzinfo=timezone.utc)
+    lease_now = datetime.now(timezone.utc)
     await store.upsert_session(
         SessionState(
             session_id="sess-graph",
@@ -32,11 +35,36 @@ async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
             metadata={"surface": "phase7-runtime-platform"},
         )
     )
+    identity = ExecutionIdentity.new(
+        trace_id="trace-parent",
+        correlation_id="corr-parent",
+        task_id="task-graph",
+        run_id="run-parent",
+        claim_id="claim-parent",
+        idempotency_key="idem-parent",
+        agent_id="supervisor",
+        session_id="sess-graph",
+    )
+    await store.record_execution_identity(identity, source="test")
+    await store.record_task_claim(
+        TaskClaim(
+            claim_id=identity.claim_id,
+            task_id=identity.task_id,
+            session_id=identity.session_id,
+            agent_id=identity.agent_id,
+            status="active",
+            claimed_at=lease_now - timedelta(minutes=3),
+            acked_at=lease_now - timedelta(minutes=2),
+            heartbeat_at=lease_now - timedelta(minutes=1),
+            stale_after=lease_now + timedelta(minutes=5),
+        )
+    )
     await store.record_delegation_run(
         DelegationRun(
             run_id="run-parent",
             session_id="sess-graph",
             task_id="task-graph",
+            claim_id=identity.claim_id,
             assigned_to="supervisor",
             assigned_by="operator",
             status="in_progress",
@@ -156,6 +184,7 @@ def _redirect_cron_storage(tmp_path, monkeypatch) -> None:
 
 async def _seed_agent_server_platform(store: RuntimeStateStore) -> None:
     base_time = datetime(2026, 6, 30, 22, 0, tzinfo=timezone.utc)
+    lease_now = datetime.now(timezone.utc)
     await store.upsert_session(
         SessionState(
             session_id="sess-agent-server",
@@ -172,11 +201,36 @@ async def _seed_agent_server_platform(store: RuntimeStateStore) -> None:
             },
         )
     )
+    identity = ExecutionIdentity.new(
+        trace_id="trace-background",
+        correlation_id="corr-background",
+        task_id="task-background",
+        run_id="run-background",
+        claim_id="claim-background",
+        idempotency_key="idem-background",
+        agent_id="ops-assistant",
+        session_id="sess-agent-server",
+    )
+    await store.record_execution_identity(identity, source="test")
+    await store.record_task_claim(
+        TaskClaim(
+            claim_id=identity.claim_id,
+            task_id=identity.task_id,
+            session_id=identity.session_id,
+            agent_id=identity.agent_id,
+            status="active",
+            claimed_at=lease_now - timedelta(minutes=3),
+            acked_at=lease_now - timedelta(minutes=2),
+            heartbeat_at=lease_now - timedelta(minutes=1),
+            stale_after=lease_now + timedelta(minutes=5),
+        )
+    )
     await store.record_delegation_run(
         DelegationRun(
             run_id="run-background",
             session_id="sess-agent-server",
             task_id="task-background",
+            claim_id=identity.claim_id,
             assigned_to="ops-assistant",
             assigned_by="cron_scheduler",
             status="in_progress",
@@ -249,7 +303,14 @@ async def test_operator_views_runtime_graph_surfaces_live_topology_state(tmp_pat
     assert snapshot["summary"]["topology_state_count"] == 1
     assert snapshot["summary"]["run_count"] == 2
     assert snapshot["summary"]["active_run_count"] == 1
-    assert snapshot["active_agents"] == ["worker-a"]
+    assert snapshot["summary"]["observed_nonterminal_run_count"] == 1
+    assert snapshot["summary"]["expired_or_unproven_run_count"] == 0
+    assert snapshot["summary"]["proves_executor_liveness"] is False
+    assert snapshot["active_agents"] == ["supervisor"]
+    assert snapshot["topology_active_agents"] == ["worker-a"]
+    parent_run = next(run for run in snapshot["runs"] if run["run_id"] == "run-parent")
+    assert parent_run["activity"]["state"] == "current_lease"
+    assert parent_run["activity"]["proves_executor_liveness"] is False
     assert snapshot["checkpoints"][0]["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
     assert snapshot["topology_states"][0]["handoff_receipts"][0]["status"] == "accepted"
     assert snapshot["receipts"][0]["receipt_id"] == "receipt-topology"
@@ -275,14 +336,21 @@ async def test_operator_views_runtime_platform_surfaces_use_runtime_state(tmp_pa
 
     assert sessions["schema_version"] == "runtime_sessions_snapshot.v1"
     assert sessions["summary"]["session_count"] == 1
+    assert sessions["summary"]["active_session_count"] == 1
+    assert sessions["summary"]["stored_active_session_count"] == 1
+    assert sessions["summary"]["proves_executor_liveness"] is False
     assert sessions["sessions"][0]["current_task_id"] == "task-graph"
+    assert sessions["sessions"][0]["activity"]["current_lease"] is True
     assert sessions["sessions"][0]["metadata"]["surface"] == "phase7-runtime-platform"
 
     assert runs["schema_version"] == "runtime_runs_snapshot.v1"
     assert runs["summary"]["run_count"] == 2
+    assert runs["summary"]["current_lease_run_count"] == 1
+    assert runs["summary"]["proves_executor_liveness"] is False
     parent = next(run for run in runs["runs"] if run["run_id"] == "run-parent")
     assert parent["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
     assert parent["active_agent"] == "worker-a"
+    assert parent["activity"]["state"] == "current_lease"
 
     assert detail["schema_version"] == "runtime_run_detail.v1"
     assert detail["found"] is True
@@ -332,6 +400,8 @@ async def test_operator_views_runtime_agent_server_surfaces(tmp_path, monkeypatc
     assert assistants["summary"]["assistant_count"] == 1
     assert assistants["summary"]["configuration_count"] == 1
     assert assistants["summary"]["active_assistant_count"] == 1
+    assert assistants["summary"]["observed_nonterminal_run_count"] == 1
+    assert assistants["summary"]["proves_executor_liveness"] is False
     assert assistants["assistants"][0]["assistant_id"] == "ops-assistant"
     assert assistants["assistants"][0]["active_run_count"] == 1
     assert assistants["configurations"][0]["configuration_id"] == "ops-assistant-config"
@@ -342,10 +412,13 @@ async def test_operator_views_runtime_agent_server_surfaces(tmp_path, monkeypatc
     assert background["summary"]["enabled_cron_job_count"] == 1
     assert background["summary"]["background_run_count"] == 1
     assert background["summary"]["active_background_run_count"] == 1
+    assert background["summary"]["observed_nonterminal_run_count"] == 1
+    assert background["summary"]["proves_executor_liveness"] is False
     assert background["summary"]["background_event_count"] == 1
     assert background["cron_jobs"][0]["job_id"] == "cron-nightly"
     assert background["cron_jobs"][0]["output_count"] == 1
     assert background["background_runs"][0]["cron_job_id"] == "cron-nightly"
+    assert background["background_runs"][0]["activity"]["state"] == "current_lease"
     assert background["background_events"][0]["event_id"] == "event-cron-fired"
 
 

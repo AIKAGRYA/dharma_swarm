@@ -780,6 +780,74 @@ describe("buildControlPaneSections", () => {
     ]);
   });
 
+  test("keeps runtime_activity.v1 lease evidence qualified throughout the runtime pane", () => {
+    const preview: TabPreview = {
+      "Runtime DB": "/tmp/runtime.db",
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "unproven",
+      "Session state":
+        "4169 sessions | 1 current lease sessions | 3 claims | 1 current lease claims | 3 observed nonterminal claims | 2 acked claims",
+      "Run state":
+        "3 runs | 1 current leases | 3 observed nonterminal runs | 2 expired/unproven runs | executor liveness unproven",
+      "Current lease runs detail": "agent-alpha (running) task task-123",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=4169 CurrentSessions=1 Claims=3 CurrentClaims=1 ObservedNonterminalClaims=3 AckedClaims=2 Runs=3 CurrentLeases=1 ObservedNonterminalRuns=3 ExpiredOrUnproven=2 ExecutorLiveness=unproven",
+      "Context state": "0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
+      "Artifact state": "Artifacts=0 PromotedFacts=0 ContextBundles=0 OperatorActions=0",
+      "Runtime summary":
+        "/tmp/runtime.db | 4169 sessions | 1 current lease sessions | 3 claims | 1 current lease claims | 3 runs | 1 current leases | executor liveness unproven",
+      Alerts: "none",
+    };
+
+    const rows = buildRuntimePaneSections(preview).flatMap((section) => section.rows);
+
+    expect(rows).toContain(
+      "Runs 3 runs | 1 current leases | 3 observed nonterminal runs | 2 expired/unproven runs | executor liveness unproven",
+    );
+    expect(rows).toContain("Lease agent-alpha (running) task task-123");
+    expect(rows).toContain("Evidence executor liveness unproven");
+    expect(rows.some((row) => /\bactive (?:claims|runs|agents?)\b/i.test(row))).toBe(false);
+  });
+
+  test("fails closed when explicit unknown semantics accompany stale legacy activity rows", () => {
+    const preview: TabPreview = {
+      "Activity semantics": "runtime_activity.v2",
+      "Runtime activity": "Sessions=8 Claims=3 ActiveClaims=2 Runs=4 ActiveRuns=2",
+      "Session state": "8 sessions | 3 claims | 2 active claims",
+      "Run state": "4 runs | 2 active runs",
+      "Active runs detail": "agent-alpha (running)",
+      "Runtime summary": "/tmp/runtime.db | 2 active claims | 2 active runs",
+      "Executor liveness": "unproven",
+    };
+    const rendered = JSON.stringify([
+      ...buildControlPaneSections(preview),
+      ...buildRuntimePaneSections(preview),
+    ]);
+
+    expect(rendered).toContain("runtime_activity.v2");
+    expect(rendered).toContain("lease classification unavailable");
+    expect(rendered).not.toMatch(/\bactive (?:claim|claims|run|runs|session|sessions|agent|agents)\b/i);
+    expect(rendered).not.toMatch(/Active(?:Claims|Runs|Sessions)=/);
+  });
+
+  test("rejects executor-liveness promotion inside runtime_activity.v1", () => {
+    const preview: TabPreview = {
+      "Activity semantics": "runtime_activity.v1",
+      "Executor liveness": "proven",
+      "Runtime activity":
+        "ActivitySemantics=runtime_activity.v1 Sessions=8 CurrentSessions=1 Claims=3 CurrentClaims=1 Runs=4 CurrentLeases=1 ExecutorLiveness=proven",
+    };
+    const rendered = JSON.stringify([
+      ...buildControlPaneSections(preview),
+      ...buildRuntimePaneSections(preview),
+    ]);
+
+    expect(rendered).toContain("executor liveness unproven");
+    expect(rendered).toContain("ExecutorLiveness=unproven");
+    expect(rendered).not.toMatch(/executor liveness proven/i);
+    expect(rendered).not.toContain("ExecutorLiveness=proven");
+  });
+
   test("does not let authority-only placeholder previews suppress raw runtime transcript fallback", () => {
     const lines: TranscriptLine[] = [
       {id: "1", kind: "system", text: "Runtime snapshot loading..."},

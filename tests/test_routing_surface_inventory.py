@@ -1,7 +1,13 @@
-"""Guard: every ``create_runtime_provider(...)`` site under dharma_swarm/api is inventoried.
+"""Guards for the repository's known direct runtime-routing surfaces.
 
 Adds are intentional: extend ``KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES`` and note the
 tier in comments. Scope excludes ``scripts/`` (operator utilities).
+
+``KNOWN_NATIVE_PROCESS_REPLACEMENT_SINKS`` is a separate, deliberately narrow
+inventory of all Python ``os.exec*`` process-replacement calls under ``dharma_swarm``
+and ``api``.  It classifies shell handoffs as well as the native interactive
+provider handoff, but does not claim to cover subprocess calls, SDK calls, shell
+scripts, or every possible inference sink.
 
 Routing truth (2026 maintenance):
 - ``api/routers/chat.py`` remains the in-repo **dashboard** bypass (per-request provider).
@@ -20,6 +26,7 @@ Also asserts shared ``create_default_router()`` is invoked once per long-running
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import inspect
@@ -51,6 +58,42 @@ KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES: frozenset[str] = frozenset(
 
 DASHBOARD_CHAT_ROUTER_BYPASS = "api/routers/chat.py"
 
+# Tuple: (path, enclosing function, os.exec* method, executable expression,
+# occurrence within that function/expression).  The occurrence makes duplicate
+# additions visible without pinning the inventory to fragile source line numbers.
+KNOWN_NATIVE_PROCESS_REPLACEMENT_SINKS: dict[
+    tuple[str, str, str, str, int], str
+] = {
+    (
+        "dharma_swarm/terminal_commands/lifecycle.py",
+        "cmd_up",
+        "execvpe",
+        "'bash'",
+        1,
+    ): "shell_handoff",
+    (
+        "dharma_swarm/terminal_commands/lifecycle.py",
+        "cmd_swarm",
+        "execvp",
+        "'bash'",
+        1,
+    ): "shell_handoff",
+    (
+        "dharma_swarm/terminal_commands/lifecycle.py",
+        "cmd_setup",
+        "execvp",
+        "'bash'",
+        1,
+    ): "shell_handoff",
+    (
+        "dharma_swarm/terminal_commands/surfaces.py",
+        "cmd_chat",
+        "execve",
+        "executable",
+        1,
+    ): "provider_interactive:claude_code:provider_resolved:absolute_execve:model_native_deferred",
+}
+
 
 def _py_files_under(rel: str) -> list[Path]:
     root = REPO_ROOT / rel
@@ -69,12 +112,124 @@ def _call_sites() -> set[str]:
     return found
 
 
+class _NativeExecVisitor(ast.NodeVisitor):
+    def __init__(self, relative_path: str) -> None:
+        self.relative_path = relative_path
+        self.function_stack: list[str] = []
+        self.counts: dict[tuple[str, str, str], int] = {}
+        self.sites: set[tuple[str, str, str, str, int]] = set()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.function_stack.append(node.name)
+        self.generic_visit(node)
+        self.function_stack.pop()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.function_stack.append(node.name)
+        self.generic_visit(node)
+        self.function_stack.pop()
+
+    def visit_Call(self, node: ast.Call) -> None:
+        func = node.func
+        if (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "os"
+            and func.attr
+            in {
+                "execl",
+                "execle",
+                "execlp",
+                "execlpe",
+                "execv",
+                "execve",
+                "execvp",
+                "execvpe",
+            }
+            and node.args
+        ):
+            enclosing_function = (
+                self.function_stack[-1] if self.function_stack else "<module>"
+            )
+            executable = ast.unparse(node.args[0])
+            count_key = (enclosing_function, func.attr, executable)
+            occurrence = self.counts.get(count_key, 0) + 1
+            self.counts[count_key] = occurrence
+            self.sites.add(
+                (
+                    self.relative_path,
+                    enclosing_function,
+                    func.attr,
+                    executable,
+                    occurrence,
+                )
+            )
+        self.generic_visit(node)
+
+
+def _native_process_replacement_sites() -> set[tuple[str, str, str, str, int]]:
+    found: set[tuple[str, str, str, str, int]] = set()
+    for base in ("dharma_swarm", "api"):
+        for path in _py_files_under(base):
+            relative_path = str(path.relative_to(REPO_ROOT))
+            visitor = _NativeExecVisitor(relative_path)
+            visitor.visit(ast.parse(path.read_text(encoding="utf-8")))
+            found.update(visitor.sites)
+    return found
+
+
 def test_create_runtime_provider_inventory_matches_disk() -> None:
     found = _call_sites()
     assert found == KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES, (
         "Update KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES to match create_runtime_provider"
         f" call sites. Found={sorted(found)} expected={sorted(KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES)}"
     )
+
+
+def test_native_process_replacement_inventory_matches_disk() -> None:
+    found = _native_process_replacement_sites()
+    expected = set(KNOWN_NATIVE_PROCESS_REPLACEMENT_SINKS)
+    assert found == expected, (
+        "Classify each Python os.exec* process-replacement call. This inventory "
+        "does not cover subprocess, SDK, or shell-script sinks. "
+        f"Found={sorted(found)} expected={sorted(expected)}"
+    )
+
+
+def test_dgc_chat_native_provider_exec_is_runtime_and_policy_resolved() -> None:
+    provider_sinks = {
+        site: classification
+        for site, classification in KNOWN_NATIVE_PROCESS_REPLACEMENT_SINKS.items()
+        if classification.startswith("provider_interactive:")
+    }
+    assert provider_sinks == {
+        (
+            "dharma_swarm/terminal_commands/surfaces.py",
+            "cmd_chat",
+            "execve",
+            "executable",
+            1,
+        ): "provider_interactive:claude_code:provider_resolved:absolute_execve:model_native_deferred"
+    }
+
+    source = (REPO_ROOT / "dharma_swarm/terminal_commands/surfaces.py").read_text(
+        encoding="utf-8"
+    )
+    assert "resolve_runtime_provider_config(" in source
+    assert "ProviderPolicyRouter(" in source
+    assert "ProviderRoutingConfig(default_model_hints={})" in source
+    assert ").route(" in source
+    assert "available_providers=[ProviderType.CLAUDE_CODE]" in source
+    assert '"ANTHROPIC_API_KEY"' in source
+    assert '"ANTHROPIC_AUTH_TOKEN"' in source
+    assert "def _normalize_chat_executable(" in source
+    exec_line = next(
+        line
+        for line in source.splitlines()
+        if "os.execve(executable, command, env)" in line
+    )
+    assert "nosemgrep: python.lang.security.audit.dangerous-os-exec" in exec_line
+    assert "os.execvpe(" not in source
 
 
 def test_dashboard_chat_bypass_remains_inventoried() -> None:

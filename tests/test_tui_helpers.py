@@ -1,12 +1,10 @@
 """Tests for dharma_swarm.tui_helpers -- status text builders."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import tempfile
 from pathlib import Path
-
-import pytest
 
 from dharma_swarm.runtime_state import (
     ArtifactRecord,
@@ -18,6 +16,7 @@ from dharma_swarm.runtime_state import (
     SessionState,
     TaskClaim,
 )
+from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.tui_helpers import (
     _read_json,
     build_darwin_status_text,
@@ -447,7 +446,7 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
     async def seed_runtime() -> None:
         store = RuntimeStateStore(runtime_db)
         await store.init_db()
-        now = datetime(2026, 3, 11, 1, 2, 3, tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
         await store.upsert_session(
             SessionState(
                 session_id="sess-runtime-view",
@@ -457,6 +456,17 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
                 updated_at=now,
             )
         )
+        identity = ExecutionIdentity.new(
+            trace_id="trace-runtime-view",
+            correlation_id="corr-runtime-view",
+            task_id="task-runtime-view",
+            run_id="run-runtime-view",
+            claim_id="claim-runtime-view",
+            idempotency_key="idem-runtime-view",
+            agent_id="codex",
+            session_id="sess-runtime-view",
+        )
+        await store.record_execution_identity(identity, source="test")
         await store.record_task_claim(
             TaskClaim(
                 claim_id="claim-runtime-view",
@@ -464,8 +474,10 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
                 task_id="task-runtime-view",
                 agent_id="codex",
                 status="acknowledged",
-                claimed_at=now,
-                acked_at=now,
+                claimed_at=now - timedelta(minutes=3),
+                acked_at=now - timedelta(minutes=2),
+                heartbeat_at=now - timedelta(minutes=1),
+                stale_after=now + timedelta(minutes=5),
             )
         )
         await store.record_delegation_run(
@@ -549,7 +561,9 @@ def test_build_runtime_status_text_reports_runtime_db_state(tmp_path, monkeypatc
     assert "PromotedFacts=1" in result
     assert "ContextBundles=1" in result
     assert "OperatorActions=1" in result
-    assert "Active runs" in result
+    assert "CurrentLeases=1" in result
+    assert "Current lease runs" in result
+    assert "ExecutorLiveness=unproven" in result
     assert "Recent artifacts" in result
     assert "Recent operator actions" in result
     assert "python3: /mock/bin/python3" in result
@@ -618,6 +632,9 @@ def test_build_runtime_status_data_returns_structured_dict(tmp_path, monkeypatch
     assert data["counts"]["sessions"] == 1
     assert data["counts"]["claims"] == 1
     assert data["counts"]["acknowledged_claims"] == 1
+    assert data["counts"]["active_runs"] == 0
+    assert data["activity_semantics"] == "runtime_activity.v1"
+    assert data["proves_executor_liveness"] is False
     assert data["toolchain"]["python3"] == "/mock/bin/python3"
     assert data["toolchain"]["claude"] is None
     serialized = json.dumps(data)

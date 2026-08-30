@@ -20,6 +20,8 @@ import {
   parseTrackedUpstream,
   parseRepoControlPreview,
   parseRepoTruthPreview,
+  qualifyRuntimeActivityValue,
+  runtimeActivitySemanticsFromPreview,
   splitWarningMembers,
   splitPreviewPipes,
 } from "../repoControlPreview";
@@ -406,22 +408,48 @@ function firstRuntimeMetricValue(candidates: string[], patterns: RegExp[]): stri
   return "";
 }
 
+function resolvedControlRuntimeSemantics(tabs: TabSpec[], controlPreview?: TabPreview): string {
+  const explicit = rawLineValueFor(tabs, "control", "Activity semantics", controlPreview);
+  return runtimeActivitySemanticsFromPreview({
+    ...(explicit !== "n/a" && explicit !== "none" ? {"Activity semantics": explicit} : {}),
+    "Runtime activity": rawLineValueFor(tabs, "control", "Runtime activity", controlPreview),
+  });
+}
+
+function qualifiedRuntimeValue(value: string, semantics: string): string {
+  return qualifyRuntimeActivityValue(value, semantics);
+}
+
 function runtimeInventoryValue(
   runtimeActivity: string,
   artifactState: string,
   sessionState: string,
   contextState: string,
   runtimeSummary: string,
+  explicitActivitySemantics = "",
 ): string {
   const candidates = [runtimeActivity, artifactState, sessionState, contextState, runtimeSummary];
   const claims = firstRuntimeMetricValue(candidates, [/\bClaims=(\d+)\b/i, /\b(\d+)\s+claims\b/i]);
+  const activitySemantics = runtimeActivitySemanticsFromPreview({
+    ...(explicitActivitySemantics !== "n/a" && explicitActivitySemantics !== "none"
+      ? {"Activity semantics": explicitActivitySemantics}
+      : {}),
+    "Runtime activity": candidates.join(" "),
+  });
+  const currentClaims = firstRuntimeMetricValue(candidates, [
+    /\bCurrentClaims=(\d+)\b/i,
+    /\b(\d+)\s+current lease claims\b/i,
+  ]);
   const activeClaims = firstRuntimeMetricValue(candidates, [/\bActiveClaims=(\d+)\b/i, /\b(\d+)\s+active claims\b/i]);
   const ackedClaims = firstRuntimeMetricValue(candidates, [/\bAckedClaims=(\d+)\b/i, /\b(\d+)\s+acked claims\b/i]);
   const promotedFacts = firstRuntimeMetricValue(candidates, [/\bPromotedFacts=(\d+)\b/i, /\b(\d+)\s+promoted facts\b/i]);
   const operatorActions = firstRuntimeMetricValue(candidates, [/\bOperatorActions=(\d+)\b/i, /\b(\d+)\s+operator actions\b/i]);
   const parts = [
     claims ? `${claims} claims` : "",
-    activeClaims ? `${activeClaims} active claims` : "",
+    activitySemantics === "runtime_activity.v1" && currentClaims ? `${currentClaims} current lease claims` : "",
+    (!activitySemantics || activitySemantics === "legacy_status_counts") && activeClaims
+      ? `${activeClaims} active claims`
+      : "",
     ackedClaims ? `${ackedClaims} acked claims` : "",
     promotedFacts ? `${promotedFacts} promoted facts` : "",
     operatorActions ? `${operatorActions} operator actions` : "",
@@ -436,6 +464,7 @@ function controlRuntimeInventory(tabs: TabSpec[], controlPreview?: TabPreview): 
     rawLineValueFor(tabs, "control", "Session state", controlPreview),
     rawLineValueFor(tabs, "control", "Context state", controlPreview),
     rawLineValueFor(tabs, "control", "Runtime summary", controlPreview),
+    rawLineValueFor(tabs, "control", "Activity semantics", controlPreview),
   );
 }
 
@@ -446,6 +475,9 @@ function fallbackRuntimeInventoryValue(tabs: TabSpec[], repoPreview?: TabPreview
     "n/a",
     "n/a",
     buildFallbackRuntimeStateValue(tabs, repoPreview, controlPreview),
+    !["n/a", "none"].includes(rawLineValueFor(tabs, "control", "Activity semantics", controlPreview))
+      ? rawLineValueFor(tabs, "control", "Activity semantics", controlPreview)
+      : parseRepoControlPreview(repoPreview)?.activitySemantics ?? "",
   );
 }
 
@@ -1012,7 +1044,17 @@ function lineValueFor(tabs: TabSpec[], tabId: string, label: string, preview?: T
       case "Verification bundle":
         return controlVerificationBundle(tabs, preview);
       case "Runtime activity":
-        return controlRuntimeActivity(tabs, preview);
+        return qualifiedRuntimeValue(
+          controlRuntimeActivity(tabs, preview),
+          resolvedControlRuntimeSemantics(tabs, preview),
+        );
+      case "Session state":
+      case "Run state":
+      case "Runtime summary":
+        return qualifiedRuntimeValue(
+          rawLineValueFor(tabs, tabId, label, preview),
+          resolvedControlRuntimeSemantics(tabs, preview),
+        );
       case "Artifact state":
         return controlArtifactState(tabs, preview);
       default:
@@ -1843,7 +1885,8 @@ function buildRepoControlCorrelationValue(
 ): string {
   const explicit = repoControlPreviewValue(tabs, repoPreview);
   if (!hasControlSnapshotSignal(tabs, controlPreview) && explicit.length > 0) {
-    return explicit;
+    const parsed = parseRepoControlPreview(explicit);
+    return qualifiedRuntimeValue(explicit, parsed?.activitySemantics ?? "n/a");
   }
   const updated = lineValueFor(tabs, "control", "Updated", controlPreview);
   const runtimeFreshness =
@@ -2094,9 +2137,10 @@ function buildControlFreshnessDetails(
 
 function buildControlSnapshotLines(tabs: TabSpec[], controlPreview?: TabPreview, now: Date = new Date()): string[] {
   const explicitTruth = rawLineValueFor(tabs, "control", "Control truth preview", controlPreview);
+  const activitySemantics = resolvedControlRuntimeSemantics(tabs, controlPreview);
   return [
     `Snapshot task ${compact(lineValueFor(tabs, "control", "Active task", controlPreview), 18)} | ${controlResultStatus(tabs, controlPreview)}/${controlAcceptance(tabs, controlPreview)}`,
-    `Snapshot runtime ${compact(lineValueFor(tabs, "control", "Runtime DB", controlPreview), 24)} | ${compact(controlRuntimeActivity(tabs, controlPreview), 24)} | ${compact(controlArtifactState(tabs, controlPreview), 24)}`,
+    `Snapshot runtime ${compact(lineValueFor(tabs, "control", "Runtime DB", controlPreview), 24)} | ${compact(qualifiedRuntimeValue(controlRuntimeActivity(tabs, controlPreview), activitySemantics), 24)} | ${compact(controlArtifactState(tabs, controlPreview), 24)}`,
     `Snapshot loop ${freshnessToken(controlUpdated(tabs, controlPreview), now)} | ${compact(controlLoopState(tabs, controlPreview), 22)} | ${compact(lineValueFor(tabs, "control", "Loop decision", controlPreview), 18)}`,
     `Snapshot verify ${compact(controlVerificationBundle(tabs, controlPreview), 42)}`,
     explicitTruth !== "n/a"
@@ -2111,17 +2155,20 @@ function buildControlFreshnessLine(tabs: TabSpec[], controlPreview?: TabPreview,
 
 function buildControlRuntimeSummaryLine(tabs: TabSpec[], controlPreview?: TabPreview): string {
   const explicit = rawLineValueFor(tabs, "control", "Runtime summary", controlPreview);
+  const activitySemantics = resolvedControlRuntimeSemantics(tabs, controlPreview);
   if (explicit !== "n/a") {
-    return `Runtime summary ${compact(explicit, 88)}`;
+    return `Runtime summary ${compact(qualifiedRuntimeValue(explicit, activitySemantics), 88)}`;
   }
-  return `Runtime summary ${compact(lineValueFor(tabs, "control", "Runtime DB", controlPreview), 24)} | ${compact(lineValueFor(tabs, "control", "Session state", controlPreview), 24)} | ${compact(lineValueFor(tabs, "control", "Run state", controlPreview), 22)} | ${compact(lineValueFor(tabs, "control", "Context state", controlPreview), 24)}`;
+  const derived = `${compact(lineValueFor(tabs, "control", "Runtime DB", controlPreview), 24)} | ${compact(lineValueFor(tabs, "control", "Session state", controlPreview), 24)} | ${compact(lineValueFor(tabs, "control", "Run state", controlPreview), 22)} | ${compact(lineValueFor(tabs, "control", "Context state", controlPreview), 24)}`;
+  return `Runtime summary ${qualifiedRuntimeValue(derived, activitySemantics)}`;
 }
 
 function buildFallbackRuntimeStateValue(tabs: TabSpec[], repoPreview?: TabPreview, controlPreview?: TabPreview): string {
   if (hasControlRuntimeStateSignal(tabs, controlPreview)) {
+    const activitySemantics = resolvedControlRuntimeSemantics(tabs, controlPreview);
     const liveRuntimeState = [
       rawLineValueFor(tabs, "control", "Runtime DB", controlPreview),
-      lineValueFor(tabs, "control", "Runtime activity", controlPreview),
+      qualifiedRuntimeValue(lineValueFor(tabs, "control", "Runtime activity", controlPreview), activitySemantics),
       lineValueFor(tabs, "control", "Artifact state", controlPreview),
     ]
       .filter((value) => value !== "n/a" && value !== "none")
@@ -2134,7 +2181,9 @@ function buildFallbackRuntimeStateValue(tabs: TabSpec[], repoPreview?: TabPrevie
   if (!parsed) {
     return "";
   }
-  return parsed.runtimeSummary !== "n/a" ? parsed.runtimeSummary : "";
+  return parsed.runtimeSummary !== "n/a"
+    ? qualifiedRuntimeValue(parsed.runtimeSummary, parsed.activitySemantics)
+    : "";
 }
 
 function buildControlPreviewFallbackLines(tabs: TabSpec[], repoPreview?: TabPreview, controlPreview?: TabPreview): string[] {
@@ -2152,7 +2201,7 @@ function buildControlPreviewFallbackLines(tabs: TabSpec[], repoPreview?: TabPrev
       ? `Snapshot task ${parsed.task} | ${parsed.resultStatus}/${parsed.acceptance} | ${parsed.loopState} | ${parsed.loopDecision}`
       : null;
   return [
-    labeledValue("Repo/control", compact(parsed.raw, 88)),
+    labeledValue("Repo/control", compact(qualifiedRuntimeValue(parsed.raw, parsed.activitySemantics), 88)),
     labeledValue(
       "Control pulse",
       compact([parsed.freshness, parsed.loopState, `updated ${parsed.updated}`, `verify ${parsed.verificationBundle}`].join(" | "), 88),
@@ -2242,7 +2291,7 @@ function buildControlPreviewLines(
     lines.splice(
       11,
       0,
-      `${labeledValue("Activity", compact(controlRuntimeActivity(tabs, controlPreview), 24))} | ${compact(controlArtifactState(tabs, controlPreview), 24)}`,
+      `${labeledValue("Activity", compact(lineValueFor(tabs, "control", "Runtime activity", controlPreview), 24))} | ${compact(controlArtifactState(tabs, controlPreview), 24)}`,
     );
   }
 
@@ -2474,6 +2523,22 @@ export function buildContextSidebarLines(
   const providerLabel = normalizedContextValue(provider);
   const modelLabel = normalizedContextValue(model);
   const effectiveRepoPreview = withRepoControlPreviewFallback(tabs, repoPreview, controlPreview);
+  const currentLeases = lineValueFor(tabs, "agents", "Current leases");
+  const liveControlActivitySemantics = resolvedControlRuntimeSemantics(tabs, controlPreview);
+  const fallbackActivitySemantics = parseRepoControlPreview(
+    repoControlPreviewValue(tabs, effectiveRepoPreview),
+  )?.activitySemantics;
+  const controlActivitySemantics =
+    liveControlActivitySemantics || (fallbackActivitySemantics === "n/a" ? "" : fallbackActivitySemantics ?? "");
+  const allowLegacyAgentRunFallback =
+    !controlActivitySemantics || controlActivitySemantics === "legacy_status_counts";
+  const agentRunEvidence = hasPreviewSignal(currentLeases)
+    ? labeledValue("Leases", currentLeases)
+    : allowLegacyAgentRunFallback
+      ? labeledValue("Runs", lineValueFor(tabs, "agents", "Active runs"))
+      : controlActivitySemantics === "runtime_activity.v1"
+        ? "Leases n/a"
+        : "Runs unclassified";
   return [
     "Active",
     `${activeLabel} | bridge ${bridgeLabel}`,
@@ -2488,7 +2553,7 @@ export function buildContextSidebarLines(
     `${labeledValue("Active", lineValueFor(tabs, "models", "Active"))} | ${lineValueFor(tabs, "models", "Strategy")}`,
     `${labeledValue("Route", lineValueFor(tabs, "models", "Route"))} | fallback ${lineValueFor(tabs, "models", "Fallbacks")}`,
     "Agents",
-    `${labeledValue("Runs", lineValueFor(tabs, "agents", "Active runs"))} | ${lineValueFor(tabs, "agents", "Recent actions")}`,
+    `${agentRunEvidence} | ${lineValueFor(tabs, "agents", "Recent actions")}`,
     `${labeledValue("Routes", lineValueFor(tabs, "agents", "Routes"))} | ${lineValueFor(tabs, "agents", "Primary route")}`,
     "Evolution",
     `${labeledValue("Domains", lineValueFor(tabs, "evolution", "Domains"))} | ${lineValueFor(tabs, "evolution", "Primary domain")}`,
