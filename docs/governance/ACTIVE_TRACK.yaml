@@ -269,7 +269,7 @@ active_tracks:
     name: RSI Lab — exact-code Mac and Meghadharma campaign lane
     status: ACTIVE
     opened_at: "2026-08-27"
-    verified_at: "2026-08-27"
+    verified_at: "2026-08-30"
     ttl_days: 14
     owner: "@dhyana"
     serves: research-depth
@@ -291,7 +291,7 @@ active_tracks:
       - cost_efficiency
       - security_guardrails
     target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "The rsi sync owner proves exact code identity only. Commit b148f55e is active and ready on Mac and Meghadharma under plan digest sha256:38410a2e9b3caaae29f37b9492d01261560865f452210c7c3ef582b6e6da3db7; state, secrets, provider credentials, and research quality remain separate claims."
+    claim_boundary: "The rsi sync owner proves exact code identity only. Commit d221961c is active and ready on Mac and Meghadharma under plan digest sha256:211faf2c0881a8e44cd98f3d76ec2925cdd55d8342800fa3fb8e85a8793ef9d6; state, secrets, provider credentials, and research quality remain separate claims."
     description: |
       Keep the RSI Lab exact-code release synchronized between the Mac and
       Meghadharma, then run bounded research campaigns through the governed
@@ -317,8 +317,8 @@ active_tracks:
         key_field: node
         value_field: commit
         expected:
-          mac: b148f55e00f668fa84774f299610eaae4d8283e4
-          meghadharma: b148f55e00f668fa84774f299610eaae4d8283e4
+          mac: d221961c24232d7d05dbff1d971e223da3967f9c
+          meghadharma: d221961c24232d7d05dbff1d971e223da3967f9c
       - id: exact_sync_host_trees_match
         kind: json_collection_values_match
         file: reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json
@@ -326,8 +326,8 @@ active_tracks:
         key_field: node
         value_field: tree
         expected:
-          mac: 9d24a2a2b32e7a16e070d4126d2dde1938728475
-          meghadharma: 9d24a2a2b32e7a16e070d4126d2dde1938728475
+          mac: 8625c4c4d270cc89fb14a12a24dd83fe46972ad8
+          meghadharma: 8625c4c4d270cc89fb14a12a24dd83fe46972ad8
     non_goals:
       - Do not synchronize mutable state, secrets, OAuth material, or provider credentials as code.
       - Do not equate exact code identity with research validity or production readiness.
