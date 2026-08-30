@@ -55,5 +55,7 @@ is exercised.
 
 ## Status
 
-Alpha — extracted from [DHARMA SWARM](https://github.com/AmitabhainArunachala/dharma_swarm).
-Production use in the swarm since April 2026.
+Alpha — extracted from [DHARMA SWARM](https://github.com/AIKAGRYA/dharma_swarm).
+This package is a thin re-export shim over `dharma_swarm/telos_gates.py`
+(which runs inside the swarm); the shim itself is not separately deployed
+and requires `dharma_swarm` to be importable.

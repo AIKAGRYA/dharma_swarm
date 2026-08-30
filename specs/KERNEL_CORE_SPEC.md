@@ -63,6 +63,11 @@ agent_protocol:
 
 ## The Transmissive Nucleus of the Dharmic Gödel Claw Ecosystem
 
+> **2026-08-13:** transmissive-nucleus role proposed to transfer to
+> `docs/vision_maps/VISION_TRANSMISSION.md` (see `make vision`). THE CRYSTAL
+> below is preserved as the historical seed. **PENDING OPERATOR RATIFICATION**
+> (immutability_class TRANSMISSIVE_NUCLEUS — only the operator may amend).
+
 ---
 
 ## THE CRYSTAL

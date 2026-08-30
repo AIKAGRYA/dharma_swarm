@@ -7,7 +7,6 @@ from typing import Any
 
 REQUIRED_GATES: tuple[str, ...] = (
     "CONSENT",
-    "BHED_GNAN",
     "STEELMAN",
     "DOGMA_DRIFT",
 )

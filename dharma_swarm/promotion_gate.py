@@ -27,7 +27,6 @@ SEALED_PACKET_BLOCKED_PATHS: tuple[str, ...] = (
     "dharma_swarm/evolution.py",
     "dharma_swarm/evolution_safety.py",
     "dharma_swarm/evolution_safety_runtime.py",
-    "dharma_swarm/frontier_council.py",
     "dharma_swarm/guardian_crew.py",
     "dharma_swarm/insight_brief.py",
     "dharma_swarm/models.py",

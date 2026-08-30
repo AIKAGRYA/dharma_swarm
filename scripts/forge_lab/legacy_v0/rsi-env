@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# RSI lab environment — sourced by all rsi-* commands.
+export RSI_BASE=${RSI_BASE:-/root/rsi-lab/current-main}
+export RSI_REPO=${RSI_REPO:-$RSI_BASE/repo}
+export RSI_STATE=${RSI_STATE:-$RSI_BASE/state}
+export RSI_PY=${RSI_PY:-$RSI_BASE/.venv/bin/python3}
+export HOME="$RSI_STATE"
+export PYTHONPATH="$RSI_REPO:$RSI_BASE/pydeps"
+export DHARMA_MODEL_BUDGET_USD=${DHARMA_MODEL_BUDGET_USD:-5}
+export FORGE_MODEL_CALL_TIMEOUT_S=${FORGE_MODEL_CALL_TIMEOUT_S:-180}
+
+# Load the one live provider key (Moonshot/Kimi) staged by rsi-fix-substrate.
+if [ -f "$RSI_BASE/secrets/keys.env" ]; then
+  set -a; . "$RSI_BASE/secrets/keys.env"; set +a
+fi
+
+# Verified-live model on this VPS is Kimi K2.7 Code via the api.moonshot.ai lane.
+# The "moonshot:" prefix forces the reachable route (see rsi-fix-substrate patches).
+export RSI_DEFAULT_SOLVER=${RSI_DEFAULT_SOLVER:-moonshot:kimi-k2.7-code}
+export RSI_DEFAULT_VERIFIER=${RSI_DEFAULT_VERIFIER:-moonshot:kimi-k2.7-code}
+export RSI_DEFAULT_MUTATOR=${RSI_DEFAULT_MUTATOR:-moonshot:kimi-k2.7-code}

@@ -81,7 +81,7 @@ Command boundaries: `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
   - owns: dharma_swarm/forge_lab/**, scripts/forge_lab/**, tests/forge_lab_v1/**, docs/ops/RSI_LAB_SYNC.md
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`sublimation-forge-2026-08`** — Sublimation Forge — offline-first governed foundry (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 2)
-  - owns: dharma_swarm/foundry/**, scripts/foundry/**, tests/test_foundry_*.py, docs/foundry/**, dharma_swarm/rudra/**, dharma_swarm/terminal_commands/rudra.py, tests/test_rudra_*.py, tests/fixtures/rudra/**, reports/rudra/**, docs/plans/rudra_v0/**
+  - owns: dharma_swarm/foundry/__init__.py, dharma_swarm/foundry/army.py, dharma_swarm/foundry/artifacts.py, dharma_swarm/foundry/campaign.py, dharma_swarm/foundry/daemon.py, dharma_swarm/foundry/elite_grid.py, dharma_swarm/foundry/evaluator.py, dharma_swarm/foundry/heldout.py, dharma_swarm/foundry/kill_metrics.py, dharma_swarm/foundry/killswitch.py, dharma_swarm/foundry/loop.py, dharma_swarm/foundry/patches.py, dharma_swarm/foundry/receipts.py, dharma_swarm/foundry/report_card.py, dharma_swarm/foundry/runner_isolation.py, dharma_swarm/foundry/shakti_local_world.py, dharma_swarm/foundry/shakti_system.py, dharma_swarm/foundry/target_ingest.py, dharma_swarm/foundry/targets.py, dharma_swarm/foundry/tripwires.py, scripts/foundry/**, tests/test_foundry_army.py, tests/test_foundry_artifacts.py, tests/test_foundry_campaign.py, tests/test_foundry_daemon.py, tests/test_foundry_evaluator.py, tests/test_foundry_heldout.py, tests/test_foundry_kill_metrics.py, tests/test_foundry_killswitch.py, tests/test_foundry_loop.py, tests/test_foundry_patches.py, tests/test_foundry_receipts.py, tests/test_foundry_report_card.py, tests/test_foundry_runner_isolation.py, tests/test_foundry_shakti_system.py, tests/test_foundry_target_ingest.py, tests/test_foundry_tripwires.py, docs/foundry/**, dharma_swarm/rudra/**, dharma_swarm/terminal_commands/rudra.py, tests/test_rudra_*.py, tests/fixtures/rudra/**, reports/rudra/**, docs/plans/rudra_v0/**
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
@@ -101,6 +101,13 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
   Uncited claims carry zero weight regardless of fluency. Prefer uncharmable
   mechanical checks (ratcheted baselines, import provenance, DocOps counts)
   over reviewer vigilance.
+- **Claim locus:** receipts, reviews, audits, and measured claims carry
+  commit + host + branch (`docs/governance/CLAIM_LOCUS_CONVENTION.md`); a
+  claim without locus is a rumor.
+- **One trunk.** `origin/main` on `AIKAGRYA/dharma_swarm` is the sole trunk.
+  Work lands via PR (never direct push), branches are tributaries with a
+  deadline, and long-lived divergence is a defect — see
+  `docs/plans/ONE_WORLD_2026-08-30.md` and `docs/state/BRANCH_TTL_REGISTER.md`.
 - **Runtime receipts never enter git.** `reports/a2a/*_receipts/`,
   `reports/model_*/e2e/`, and `reports/model_pool/` are loop-generated and
   gitignored; write runtime receipts under `~/.dharma/`.
@@ -116,6 +123,23 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 - **Worktree budget** is enforced by
   `scripts/governance/check_worktree_budget.py` — run it rather than counting
   from prose.
+- **Worktree lifecycle** — the flow that keeps the budget true between
+  cleanups:
+  - Create only against an active track in `docs/governance/ACTIVE_TRACK.yaml`;
+    name the dir `<stem>_YYYYMMDD` and the branch `<author>/<stem>-<YYYYMMDD>`
+    so the budget script can map it. Scratch trees (≤2) live under `/tmp`.
+  - Dispose in the same session the PR merges or the track closes:
+    `git worktree remove <path>`. Removal never deletes branch refs —
+    committed work survives in the canonical object store; cleanup never
+    deletes refs.
+  - Dirty trees: capture `git diff`, staged diff, and untracked files into a
+    custody directory outside the repo *before* any `--force` removal.
+    Detached-HEAD trees get a `custody/<name>-YYYYMMDD` branch pin first —
+    after removal nothing else keeps the commit reachable.
+  - Cadence: `git worktree prune` plus
+    `python3 scripts/governance/check_worktree_budget.py` at session start.
+    Over-budget or unmapped trees are disposed before new work begins, not
+    saved up for a periodic cleanup project.
 
 ## Build & test
 

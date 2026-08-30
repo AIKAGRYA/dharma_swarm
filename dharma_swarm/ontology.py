@@ -1864,7 +1864,7 @@ _VENTURE_CELL = ObjectType(
         ActionDef(name="Advance", object_type="VentureCell",
                   description="Advance autonomy stage",
                   modifies=["autonomy_stage"],
-                  telos_gates=["SVABHAAVA"]),
+                  telos_gates=["ANEKANTA"]),
     ],
     security=SecurityPolicy(
         create_roles=["orchestrator", "system"],

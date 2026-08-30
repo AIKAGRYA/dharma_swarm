@@ -30,6 +30,7 @@ It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard,
 make help              # full curated target list
 make onboard           # read-only session status; mandatory first command
 make organism-status   # deeper read-only whole-organism orientation
+make vision            # the vision: what this is FOR and which laws bend your work (read-only projection)
 make agent-build-preflight PACKET=<path>  # exact edit admission
 make install           # pip install -e .[dev]
 make test-fast         # fast subset of pytest

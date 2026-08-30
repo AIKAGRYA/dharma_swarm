@@ -41,7 +41,8 @@ class TestStopVerify:
         result = stop_verify()
         # With a benign action string, most gates should pass
         assert result["gates_passed"] >= 8
-        assert result["gates_total"] >= 11
+        # 11 -> 9 after the Tier-C theater-gate silvering (f2ab77a31).
+        assert result["gates_total"] >= 9
 
 
 class TestSessionContext:

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 
 from dharma_swarm.forge_v1.canonical import KIMI_TEMP1, _call, _provider_for_slot, pool_slots
+from dharma_swarm.forge_v1.providers import _complete_and_close
 from dharma_swarm.model_pool import (
     default_for_provider,
     forge_default_high_slot_verifier_id,
@@ -47,7 +49,9 @@ def _prefix_provider(model_id: str):
         return ProviderType.ANTHROPIC
     if mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
         return ProviderType.ZHIPU
-    if mid in {"k3", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
+    if mid.startswith("moonshot:"):
+        return ProviderType.MOONSHOT  # RSI-LAB travel route: api.moonshot.ai lane
+    if mid in {"k3", "kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         return ProviderType.KIMI_CODE
     if mid.startswith("nvidia/") or mid.startswith("meta/") or "llama" in mid:
         return ProviderType.NVIDIA_NIM
@@ -68,7 +72,8 @@ def _slot_for_id(model_id: str):
         return _SimpleSlot(route.model_id, route.provider, getattr(entry, "tier", "strong"))
     prov = _prefix_provider(model_id)
     if prov is not None:
-        return _SimpleSlot(model_id, prov, "frontier")
+        wire = model_id.split(":", 1)[1] if model_id.startswith("moonshot:") else model_id
+        return _SimpleSlot(wire, prov, "frontier")
     return None
 
 
@@ -116,28 +121,97 @@ def _high_slot_probe_timeout_s(timeout_s: int) -> int:
     return max(1, min(int(timeout_s), configured))
 
 
-def _probe(slot, timeout_s=40) -> bool:
+def _probe_model_identity(model_id: str) -> str:
+    """Normalize only serving suffixes; never collapse different model families."""
+    normalized = (model_id or "").strip().casefold()
+    if normalized.endswith(":cloud"):
+        normalized = normalized[:-6]
+    elif normalized.endswith("-cloud"):
+        normalized = normalized[:-6]
+    return normalized
+
+
+def _probe_with_receipt(slot, timeout_s=40) -> dict:
+    """Return a typed, redacted reachability receipt for one exact model route.
+
+    A non-empty response is insufficient: some providers transparently fall
+    back across model families.  Forge high-slot authority requires the served
+    model identity to match the requested route before it can contribute to a
+    cross-family pair.
+    """
+    started = time.monotonic()
+    requested_model = str(slot.model_id)
+    receipt = {
+        "outcome": "unavailable",
+        "callable": False,
+        "requested_model": requested_model,
+        "requested_family": _family(requested_model),
+    }
+
+    def finish(**fields) -> dict:
+        receipt.update(fields)
+        receipt["latency_ms"] = round((time.monotonic() - started) * 1000)
+        return receipt
+
     try:
         prov, wire = _provider_for_slot(slot, timeout_s=timeout_s)
-        temp = 1.0 if slot.model_id in KIMI_TEMP1 else 0.2
-        # 256 (not 16): reasoning models (gemini-2.5-*) spend tokens on internal
-        # thinking before visible output; 16 truncates to empty -> false-negative.
-        from dharma_swarm.models import LLMRequest
+    except Exception as exc:
+        return finish(stage="config", error_type=type(exc).__name__)
 
-        req = LLMRequest(
-            model=wire,
-            messages=[{"role": "user", "content": "Reply with the single word OK."}],
-            max_tokens=256,
-            temperature=temp,
+    temp = 1.0 if slot.model_id in KIMI_TEMP1 else 0.2
+    # 256 (not 16): reasoning models can spend tokens on internal thinking
+    # before visible output; 16 creates false empty-response negatives.
+    from dharma_swarm.models import LLMRequest
+
+    req = LLMRequest(
+        model=wire,
+        messages=[{"role": "user", "content": "Reply with the single word OK."}],
+        max_tokens=256,
+        temperature=temp,
+    )
+    receipt["wire_model"] = wire
+    try:
+        response = asyncio.run(_complete_and_close(prov, req, timeout_s=timeout_s))
+    except TimeoutError as exc:
+        return finish(stage="timeout", error_type=type(exc).__name__)
+    except Exception as exc:
+        return finish(stage="call", error_type=type(exc).__name__)
+
+    served_model = str(getattr(response, "model", "") or "").strip()
+    content = str(getattr(response, "content", "") or "").strip()
+    if not served_model:
+        return finish(stage="response", error_type="missing_served_model")
+
+    served_family = _family(served_model)
+    identity_matches = (
+        _probe_model_identity(requested_model) == _probe_model_identity(served_model)
+    )
+    if not identity_matches:
+        return finish(
+            stage="response",
+            error_type="served_model_mismatch",
+            served_model=served_model,
+            served_family=served_family,
         )
+    if not content:
+        return finish(
+            stage="response",
+            error_type="empty_content",
+            served_model=served_model,
+            served_family=served_family,
+        )
+    return finish(
+        outcome="callable",
+        callable=True,
+        stage="complete",
+        served_model=served_model,
+        served_family=served_family,
+    )
 
-        async def _once():
-            return await asyncio.wait_for(prov.complete(req), timeout=timeout_s)
 
-        response = asyncio.run(_once())
-        return bool((getattr(response, "content", "") or "").strip())
-    except Exception:
-        return False
+def _probe(slot, timeout_s=40) -> bool:
+    """Compatibility boolean over the typed probe receipt."""
+    return bool(_probe_with_receipt(slot, timeout_s=timeout_s)["callable"])
 
 
 def _resolve_high_slot_pair(gen_id: str | None, ver_id: str | None, *, timeout_s: int):
@@ -150,6 +224,7 @@ def _resolve_high_slot_pair(gen_id: str | None, ver_id: str | None, *, timeout_s
     becomes verifier.
     """
     callable_slots: list = []
+    callable_rows: list[dict] = []
     rows: list[dict] = []
     probe_timeout_s = _high_slot_probe_timeout_s(timeout_s)
     for model_id in _high_slot_candidate_ids(gen_id, ver_id):
@@ -161,27 +236,49 @@ def _resolve_high_slot_pair(gen_id: str | None, ver_id: str | None, *, timeout_s
             "probe_timeout_s": probe_timeout_s,
         }
         if slot is None:
-            row.update({"callable": False, "error": "unresolved_model_id"})
+            row.update(
+                {
+                    "outcome": "unavailable",
+                    "callable": False,
+                    "stage": "config",
+                    "error_type": "unresolved_model_id",
+                }
+            )
             rows.append(row)
             continue
         row["provider"] = getattr(slot.provider, "value", str(slot.provider))
         if not _is_high_slot_model_id(slot.model_id):
-            row.update({"callable": False, "error": "below_recent_high_slot_floor"})
+            row.update(
+                {
+                    "outcome": "unavailable",
+                    "callable": False,
+                    "stage": "policy",
+                    "error_type": "below_recent_high_slot_floor",
+                }
+            )
             rows.append(row)
             continue
-        ok = _probe(slot, timeout_s=probe_timeout_s)
-        row["callable"] = ok
+        probe_receipt = _probe_with_receipt(slot, timeout_s=probe_timeout_s)
+        row.update(probe_receipt)
         rows.append(row)
-        if ok:
+        if row["callable"]:
             callable_slots.append(slot)
-            if len({_family(candidate.model_id) for candidate in callable_slots}) >= 2:
+            callable_rows.append(row)
+            if len({candidate["served_family"] for candidate in callable_rows}) >= 2:
                 break
 
     gen = callable_slots[0] if callable_slots else None
     ver = None
     if gen is not None:
-        gfam = _family(gen.model_id)
-        ver = next((slot for slot in callable_slots[1:] if _family(slot.model_id) != gfam), None)
+        gfam = callable_rows[0]["served_family"]
+        ver = next(
+            (
+                slot
+                for slot, row in zip(callable_slots[1:], callable_rows[1:])
+                if row["served_family"] != gfam
+            ),
+            None,
+        )
     return gen, ver, callable_slots, rows
 
 
@@ -231,8 +328,20 @@ def _resolve_pinned_slots(model_ids: list[str], *, timeout_s: int) -> tuple[list
     slots, probe_rows = [], []
     for model_id in model_ids:
         slot = _slot_for_id(model_id)
-        ok = slot is not None and _probe(slot, timeout_s=timeout_s)
-        probe_rows.append({"role": "mixed_moa", "model_id": model_id, "callable": ok})
+        receipt = (
+            _probe_with_receipt(slot, timeout_s=timeout_s)
+            if slot is not None
+            else {
+                "outcome": "unavailable",
+                "callable": False,
+                "requested_model": model_id,
+                "requested_family": _family(model_id),
+                "stage": "config",
+                "error_type": "unresolved_model_id",
+            }
+        )
+        ok = bool(receipt["callable"])
+        probe_rows.append({"role": "mixed_moa", "model_id": model_id, **receipt})
         if ok:
             slots.append(slot)
     return slots, probe_rows

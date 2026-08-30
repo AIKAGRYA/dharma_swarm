@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep every launcher pinned to the host's immutable current release. The Mac
+# and Meghadharma intentionally use different runtime roots but identical code.
+if [[ -n "${RSI_LAB_BASE:-}" ]]; then
+    logical_base="${RSI_LAB_BASE}"
+elif [[ -d /root/rsi-lab/current ]]; then
+    logical_base="/root/rsi-lab/current"
+else
+    logical_base="${HOME}/.dharma/rsi-lab/current"
+fi
+
+# Production always imports from the physical immutable release target.  The
+# explicit dev switch exists only for repository tests and cannot be inherited
+# accidentally from RSI_LAB_REPO/PYTHONPATH alone.
+if [[ "${RSI_LAB_DEV_SOURCE:-0}" == "1" ]]; then
+    base="${logical_base}"
+    repo="${RSI_LAB_REPO:-${base}/repo}"
+    python="${RSI_LAB_PYTHON:-${base}/.venv/bin/python}"
+    pydeps="${RSI_LAB_PYDEPS:-${base}/pydeps}"
+    state="${RSI_LAB_STATE:-${base}/state}"
+    grader_mode="${RSI_LAB_GRADER_MODE:-official-swebench-docker}"
+else
+    if [[ ! -d "${logical_base}" ]]; then
+        printf 'rsi: immutable current release is missing: %s\n' "${logical_base}" >&2
+        exit 2
+    fi
+    base="$(cd -- "${logical_base}" && pwd -P)"
+    repo="${base}/repo"
+    python="${base}/.venv/bin/python"
+    pydeps="${base}/pydeps"
+    state="${base}/state"
+    grader_mode="official-swebench-docker"
+fi
+
+if [[ ! -x "${python}" ]]; then
+    printf 'rsi: canonical Python is not executable: %s\n' "${python}" >&2
+    exit 2
+fi
+if [[ ! -d "${repo}/dharma_swarm/forge_lab" ]]; then
+    printf 'rsi: canonical checkout is not readable: %s\n' "${repo}" >&2
+    exit 2
+fi
+
+swebench_pydeps=""
+swebench_required="0"
+if [[ "${base}" == /root/rsi-lab/* ]]; then
+    swebench_required="1"
+fi
+if [[ -x /root/rsi-lab/runtime/swebench-venv/bin/python ]]; then
+    python_abi="$("${python}" -I -c 'import sys; print(f"python{sys.version_info.major}.{sys.version_info.minor}")')"
+    candidate="/root/rsi-lab/runtime/swebench-venv/lib/${python_abi}/site-packages"
+    if [[ -d "${candidate}/swebench" && -d "${candidate}/docker" ]]; then
+        swebench_pydeps="${candidate}"
+    fi
+fi
+if [[ "$(uname -s)" == "Linux" ]]; then
+    docker_context="default"
+    docker_host="unix:///var/run/docker.sock"
+else
+    docker_context="colima-forge-swebench"
+    docker_host=""
+fi
+
+export PYTHONDONTWRITEBYTECODE=1
+export RSI_LAB_BASE="${base}"
+export RSI_LAB_REPO="${repo}"
+export RSI_LAB_PYDEPS="${pydeps}"
+export RSI_LAB_SWEBENCH_PYDEPS="${swebench_pydeps}"
+export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="${swebench_required}"
+export RSI_LAB_STATE="${state}"
+export DHARMA_HOME="${state}/.dharma"
+export RSI_LAB_PROVIDER_SELFTEST_ROOT="${state}/.dharma/forge_lab/provider_selftests"
+export RSI_LAB_GRADER_MODE="${grader_mode}"
+export DOCKER_CONTEXT="${docker_context}"
+export FORGE_DOCKER_CONTEXT="${docker_context}"
+if [[ -n "${docker_host}" ]]; then
+    export DOCKER_HOST="${docker_host}"
+else
+    unset DOCKER_HOST
+fi
+export PYTHONPATH="${repo}:${pydeps}${swebench_pydeps:+:${swebench_pydeps}}"
+cd "${repo}"
+exec "${python}" -m dharma_swarm.forge_lab "$@"

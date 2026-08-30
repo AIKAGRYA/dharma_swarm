@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# Production-only launcher.  Unlike the interactive `rsi` wrapper there is no
+# development-source escape hatch: a timer must execute the immutable current
+# release and the stable host-owned state root or fail closed.
+if [[ "${RSI_LAB_DEV_SOURCE:-0}" == "1" ]]; then
+    printf 'rsi-unattended-explore: RSI_LAB_DEV_SOURCE is forbidden\n' >&2
+    exit 9
+fi
+
+if [[ -d /root/rsi-lab/current ]]; then
+    logical_base="/root/rsi-lab/current"
+    state="/root/rsi-lab/state"
+    hf_home="/root/.cache/huggingface"
+else
+    logical_base="${HOME}/.dharma/rsi-lab/current"
+    state="${HOME}/.dharma/rsi-lab/state"
+    hf_home="${HOME}/.cache/huggingface"
+fi
+if [[ "$(uname -s)" == "Linux" ]]; then
+    docker_context="default"
+    docker_host="unix:///var/run/docker.sock"
+else
+    docker_context="colima-forge-swebench"
+    docker_host=""
+fi
+if [[ ! -d "${logical_base}" ]]; then
+    printf 'rsi-unattended-explore: immutable current release is missing\n' >&2
+    exit 9
+fi
+base="$(cd -- "${logical_base}" && pwd -P)"
+if [[ ! -d "${state}" ]]; then
+    printf 'rsi-unattended-explore: stable state root is missing\n' >&2
+    exit 9
+fi
+state="$(cd -- "${state}" && pwd -P)"
+repo="${base}/repo"
+python="${base}/.venv/bin/python"
+pydeps="${base}/pydeps"
+if [[ ! -x "${python}" || ! -d "${repo}/dharma_swarm/forge_lab" ]]; then
+    printf 'rsi-unattended-explore: immutable release runtime is incomplete\n' >&2
+    exit 9
+fi
+
+swebench_pydeps=""
+if [[ -x /root/rsi-lab/runtime/swebench-venv/bin/python ]]; then
+    python_abi="$("${python}" -I -c 'import sys; print(f"python{sys.version_info.major}.{sys.version_info.minor}")')"
+    candidate="/root/rsi-lab/runtime/swebench-venv/lib/${python_abi}/site-packages"
+    if [[ -d "${candidate}/swebench" && -d "${candidate}/docker" ]]; then
+        swebench_pydeps="${candidate}"
+    fi
+fi
+if [[ "${logical_base}" == "/root/rsi-lab/current" && -z "${swebench_pydeps}" ]]; then
+    printf 'rsi-unattended-explore: compatible SWE-bench runtime is missing\n' >&2
+    exit 9
+fi
+
+export PYTHONDONTWRITEBYTECODE=1
+export HF_DATASETS_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export HF_HOME="${hf_home}"
+export HF_DATASETS_CACHE="${hf_home}/datasets"
+export HF_HUB_CACHE="${hf_home}/hub"
+export RSI_LAB_BASE="${base}"
+export RSI_LAB_REPO="${repo}"
+export RSI_LAB_PYDEPS="${pydeps}"
+export RSI_LAB_SWEBENCH_PYDEPS="${swebench_pydeps}"
+if [[ "${logical_base}" == "/root/rsi-lab/current" ]]; then
+    export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="1"
+else
+    export RSI_LAB_REQUIRE_SWEBENCH_PYDEPS="0"
+fi
+export RSI_LAB_STATE="${state}"
+export DHARMA_HOME="${state}/.dharma"
+export RSI_LAB_GRADER_MODE="official-swebench-docker"
+export DOCKER_CONTEXT="${docker_context}"
+export FORGE_DOCKER_CONTEXT="${docker_context}"
+if [[ -n "${docker_host}" ]]; then
+    export DOCKER_HOST="${docker_host}"
+else
+    unset DOCKER_HOST
+fi
+export PYTHONPATH="${repo}:${pydeps}${swebench_pydeps:+:${swebench_pydeps}}"
+cd "${repo}"
+exec "${python}" -m dharma_swarm.forge_lab.unattended_explore \
+    --state-root "${state}" "$@"

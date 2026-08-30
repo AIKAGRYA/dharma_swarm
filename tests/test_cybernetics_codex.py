@@ -363,10 +363,10 @@ def test_one_wire_blocks_self_improvement_when_guardian_quorum_missing(tmp_path)
 
     assert by_id["self_improvement"]["verdict"] == "BLOCKED"
     assert by_id["free_evolution_grind"]["verdict"] == "BLOCKED"
-    assert "quorum" in by_id["self_improvement"]["blocker"]
+    assert "receipt missing" in by_id["self_improvement"]["blocker"]
 
 
-def test_one_wire_reads_nested_guardian_threshold(tmp_path):
+def test_one_wire_reads_guardian_operator_flag(tmp_path):
     state = tmp_path / ".dharma"
     db = state / "state" / "runtime.db"
     db.parent.mkdir(parents=True)
@@ -374,34 +374,18 @@ def test_one_wire_reads_nested_guardian_threshold(tmp_path):
     guard = state / "forge_measurement_guardian" / "cycle-003-fitness-quorum-guard.json"
     guard.parent.mkdir(parents=True)
     guard.write_text(
-        json.dumps(
-            {
-                "authority_result": {
-                    "confirmed_receipt_count": 3,
-                    "domain_count": 1,
-                    "eligible_to_set_archive_fitness": False,
-                    "archive_fitness_changed": False,
-                    "fitness_authority_granted": False,
-                },
-                "threshold_guard": {
-                    "required_confirmed_receipts": 5,
-                    "observed_confirmed_receipts": 3,
-                    "required_distinct_domains": 3,
-                    "observed_distinct_domains": 1,
-                },
-            }
-        ),
+        json.dumps({"operator_approved": False, "archive_fitness_changed": False}),
         encoding="utf-8",
     )
 
     report = build_audit(repo_root=tmp_path, state_dir=state)
 
-    assert report["one_wire"]["confirmed"] == 3
-    assert report["one_wire"]["domains"] == 1
-    assert report["one_wire"]["blocker"] == "guardian quorum below threshold: N=3/5, M=1/3"
+    assert report["one_wire"]["operator_approved"] is False
+    assert report["one_wire"]["blocker"] == "operator_approved flag missing or not true"
 
 
-def test_one_wire_audit_uses_archive_quorum_floors(tmp_path):
+def test_one_wire_audit_ignores_legacy_quorum_fields(tmp_path):
+    """Legacy self-attested quorum/authority fields no longer grant authority."""
     state = tmp_path / ".dharma"
     guard = state / "forge_measurement_guardian" / "cycle-003-fitness-quorum-guard.json"
     guard.parent.mkdir(parents=True)
@@ -409,16 +393,16 @@ def test_one_wire_audit_uses_archive_quorum_floors(tmp_path):
         json.dumps(
             {
                 "authority_result": {
-                    "confirmed_receipt_count": 4,
-                    "domain_count": 2,
+                    "confirmed_receipt_count": 99,
+                    "domain_count": 99,
                     "eligible_to_set_archive_fitness": True,
                     "fitness_authority_granted": True,
                 },
                 "threshold_guard": {
                     "required_confirmed_receipts": 0,
-                    "observed_confirmed_receipts": 4,
+                    "observed_confirmed_receipts": 99,
                     "required_distinct_domains": 0,
-                    "observed_distinct_domains": 2,
+                    "observed_distinct_domains": 99,
                 },
             }
         ),
@@ -427,10 +411,13 @@ def test_one_wire_audit_uses_archive_quorum_floors(tmp_path):
 
     one_wire = read_one_wire_summary(state)
 
-    assert one_wire["required_confirmed"] == 5
-    assert one_wire["required_domains"] == 3
     assert one_wire["eligible"] is False
-    assert one_wire["blocker"] == "guardian quorum below threshold: N=4/5, M=2/3"
+    assert one_wire["blocker"] == "operator_approved flag missing or not true"
+
+    guard.write_text(
+        json.dumps({"operator_approved": True}), encoding="utf-8"
+    )
+    assert read_one_wire_summary(state)["eligible"] is True
 
 
 def test_routing_adaptation_chunks_large_truth_run_sets():

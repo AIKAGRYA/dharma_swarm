@@ -10,6 +10,7 @@ from dharma_swarm.forge_v1.forge_v2.budget import Budget
 from dharma_swarm.forge_v1.forge_v2.provenance import contamination_state, split_explore_confirm
 from dharma_swarm.forge_v1.forge_v2.receipts import AttemptReceipt, Ledger, scaffold_parity_hash
 from dharma_swarm.forge_v1.forge_v2.runner import _pick_generator_verifier
+from dharma_swarm.forge_v1.canonical import KIMI_TEMP1, WINDOW_MODELS
 from dharma_swarm.forge_v1.forge_v2.stats import (
     benjamini_hochberg,
     paired_bootstrap_ci,
@@ -46,6 +47,13 @@ def test_budget_invalidates_token_overrun() -> None:
 def test_first_slice_windows_all_models_to_fit_budget_before_big_context_calls() -> None:
     assert _win(Slot("glm-5.2")) == 11000
     assert _win(Slot("moonshotai/kimi-k2.6")) == 11000
+
+
+def test_kimi_k3_alias_uses_temperature_wall_but_no_window() -> None:
+    # Post-K3 (#1008): the Kimi Code alias is "k3" with a 1M-token context, so
+    # the K2.7-era windowing set is empty; the temperature=1 wall still applies.
+    assert WINDOW_MODELS == frozenset()
+    assert "k3" in KIMI_TEMP1
 
 
 def test_provenance_split_and_contamination_are_explicit() -> None:

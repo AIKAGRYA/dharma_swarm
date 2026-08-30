@@ -57,11 +57,12 @@ def test_fourfold_warrant_allows_well_evidenced_governance_action():
 
     warrant = evaluate_fourfold_warrant(request)
 
-    assert warrant.verdict == WarrantVerdict.ALLOW
-    assert warrant.pass_count == 4
+    # Keyword-bag self-passing was removed: dimensions pass only on declared
+    # evidence. Here mahalakshmi (no_new_substrate + reduces_fragmentation)
+    # and mahasaraswati (tests + paths + allowlisted pytest) pass.
+    assert warrant.verdict == WarrantVerdict.WARN
+    assert warrant.pass_count == 2
     assert {dimension.energy.value for dimension in warrant.dimensions if dimension.passed} == {
-        "maheshwari",
-        "mahakali",
         "mahalakshmi",
         "mahasaraswati",
     }
@@ -163,6 +164,8 @@ def test_check_shakti_warrant_cli_json_output():
             "--metadata",
             "tests_planned=true",
             "--metadata",
+            "reduces_fragmentation=true",
+            "--metadata",
             "allowed_tools=pytest",
             "--json",
         ],
@@ -188,6 +191,7 @@ def test_requested_tool_without_allowlist_warns():
             "telos_aligned": True,
             "fixes_blocker": True,
             "no_new_substrate": True,
+            "reduces_fragmentation": True,
             "tests_planned": True,
         },
     )
@@ -458,8 +462,6 @@ def test_check_shakti_warrant_cli_honors_env_impact_ack_for_hot_paths(tmp_path):
         "enforce_hotpath_ack=true",
         "--fail-on",
         "block",
-        "--fail-on",
-        "hold",
         "--json",
     ]
     blocked = subprocess.run(
@@ -485,7 +487,9 @@ def test_check_shakti_warrant_cli_honors_env_impact_ack_for_hot_paths(tmp_path):
     )
     payload = json.loads(allowed.stdout)
 
-    assert payload["verdict"] in {"allow", "warn"}
+    # With keyword scoring removed, low declared evidence yields HOLD, which
+    # no longer fails the guard; the ack must clear the hot-path block/warning.
+    assert payload["verdict"] != "block"
     assert not any("hot-path changes lack impact_checked" in item for item in payload["warnings"])
 
 
@@ -529,3 +533,34 @@ def test_check_shakti_warrant_cli_writes_report_and_json_outputs(tmp_path):
     assert "Fourfold Shakti Warrant" in report_path.read_text(encoding="utf-8")
     assert payload["action_type"] == "proposed_action"
     assert payload["target_paths"] == ["tests/test_shakti_warrant.py"]
+
+
+def test_diff_deleting_dangerous_line_does_not_block():
+    """A diff REMOVING an unsafe line must not trip the block-pattern scan."""
+    request = FourfoldActionWarrantRequest(
+        actor_id="codex",
+        action_type="governance_patch",
+        intent="remove unsafe cleanup command from script",
+        content='-rm -rf ~/.dharma\n+shutil.rmtree(state_dir, ignore_errors=True)',
+        metadata={"diff_bound": True},
+    )
+
+    warrant = evaluate_fourfold_warrant(request)
+
+    assert warrant.verdict != WarrantVerdict.BLOCK
+
+
+def test_diff_adding_dangerous_line_blocks():
+    """A diff ADDING an unsafe line still trips the block-pattern scan."""
+    request = FourfoldActionWarrantRequest(
+        actor_id="codex",
+        action_type="governance_patch",
+        intent="add cleanup command",
+        content="+rm -rf ~/.dharma",
+        metadata={"diff_bound": True},
+    )
+
+    warrant = evaluate_fourfold_warrant(request)
+
+    assert warrant.verdict == WarrantVerdict.BLOCK
+    assert "matched unsafe pattern" in warrant.rationale

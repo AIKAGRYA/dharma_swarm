@@ -50,6 +50,11 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 `SOVEREIGN_MANIFEST.md` remains the deeper architecture/doctrine authority; it
 is no longer a forced first-read surface.
 
+`docs/vision_maps/VISION_TRANSMISSION.md` (rendered by `make vision`) is a
+TRANSMISSION projection of the vision corpus: its registry entries retain
+their own authority, and it is NOT a sixth first-read surface — depth-on-demand
+only.
+
 ---
 
 ## Ownership Map (what owns what)
@@ -72,6 +77,7 @@ is no longer a forced first-read surface.
 | Memory first-token ordering (build spec) | `docs/architecture/MEMORY_FIRST_TOKEN_SPEC.md` | Defers to `context_compiler.py`/MemoryKernel code and trust-gate C5 for live state |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
+| Claim locus (commit + host + branch on receipts, reviews, audits, measured claims) | `docs/governance/CLAIM_LOCUS_CONVENTION.md` | Generated artifacts record their generator's locus; `make onboard` prints the session's |
 | Forge / Pudgala naming rule | `docs/governance/SOVEREIGN_MANIFEST.md` | `docs/governance/FORGE_NAMING_BOUNDARY.md` is reference-only and defers to the manifest |
 | Vibe-code and AI-agent hygiene lifecycle | `docs/governance/hygiene/README.md` + `docs/governance/hygiene/AI_AGENT_GOVERNANCE.md` + `docs/governance/hygiene/patterns/*.yaml` | `ANTI_SLOP_RULES.md` and `docs/ops/PR_REVIEW_CONTROL.md` when a pattern is promoted to a hard gate |
 | Vibe-code antipattern catalogue (54 patterns × 12 clusters, scan-backed) | `docs/governance/VIBE_CODE_HYGIENE.md` + `scripts/governance/vibe_code_scan.sh` + `reports/governance/vibe_code_baseline_2026-06-07.txt` | `ANTI_SLOP_RULES.md` (companion); signals promote into enforced rules via PR |
@@ -116,6 +122,11 @@ is no longer a forced first-read surface.
 | Perplexity Computer autonomous loop mode | `docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md` | Perplexity Computer agent card loop-mode metadata and deployment notes |
 | BoardStore facade / agent participation | `docs/architecture/SWARM_BOARDSTORE_SPEC.md` | — |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
+| Forge Lab v0.1 target protocol | `specs/FORGE_LAB_V0_1_0_SPEC.md` | Bounded active spec; defers repo-wide behavior and governance to their owners, and live/capability claims to executable gates and receipts |
+| Specs directory classification and precedence | `specs/README.md` | Index authority only; individual specs own their bounded contracts and code/tests own executable truth |
+| Prompt directory classification | `docs/prompts/README.md` | Reference index only; prompt artifacts do not own product, architecture, runtime, or repository truth |
+| Forge Lab continuation handoff | `docs/prompts/FORGE_LAB_V0_1_0_CONTINUATION_PROMPT_2026-07-10.md` | Working-plan handoff; defers to the Forge Lab spec, active-track owner, current source, tests, and receipts |
+| Forge Lab legacy v0 script custody | `scripts/forge_lab/legacy_v0/README.md` | Archive/custody witness only; grants no execution or current-control authority |
 | Constitutional rules | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel immutability | `specs/KERNEL_CORE_SPEC.md` | — |
 | Foundations index | `foundations/INDEX.md` | Empirical-claims research and lodestone references |

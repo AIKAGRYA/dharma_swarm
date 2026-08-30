@@ -8,6 +8,8 @@ anthropic
 arch
 croniter
 cryptography
+defusedxml
+docker
 fastapi
 fasttext
 gemma_scope_feature_install
@@ -24,9 +26,9 @@ langgraph
 mcp
 nats
 numpy
-ollama
 openai
 playwright
+pyarrow
 pydantic
 pytest
 pytest_asyncio

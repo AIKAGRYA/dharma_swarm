@@ -59,14 +59,27 @@ BASELINE_DB_NAMES = 39
 # 2026-08-18 row 1). One runtime-state file per month under
 # ~/.dharma/forge_v1/spend/ (e.g. 2026-08.jsonl), never in git; it aggregates
 # per-run Budget spend against the $200/month benchmark compute cap.
-BASELINE_JSONL_NAMES = 223
+# 223 -> 225 (2026-08-30, PR #1493): +events.jsonl (forge_lab campaign event
+# chain — the hermetic five-run pilot's lifecycle ledger), +history.v1.jsonl
+# (forge_lab operator-history projection rows), +assurance_guard_unavailable.jsonl
+# (the assurance-diff fail-open witness flag; reviewed write-baseline entry in
+# memory_kernel/write_policy.py), -flickers.jsonl (retired by the 11->9 gate
+# silvering). Three merge-introduced stores, one consolidation removal.
+# 225 -> 226 (2026-08-30, PR #1498): run.jsonl — the RUDRA v0 per-attempt
+# journal (Journal in rudra/workcell.py; written by runner.py and
+# goal_gate_admission.py under the attempt dir). One append-only witness
+# ledger per attempt, not a second content store.
+BASELINE_JSONL_NAMES = 226
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 # 12 -> 13 (2026-08-19): monthly_ledger.py — the Forge monthly spend meter
 # (forge_v2; yes-sheet 2026-08-18 row 1). It aggregates per-run Budget spend
 # across runs against the $200/month benchmark compute cap; a genuine new
 # ledger, deliberately named as one rather than dodging this ratchet.
-BASELINE_LEDGER_MODULES = 13
+# 13 -> 14 (2026-08-30, PR #1493): forge_lab/unattended_ledger.py — the UTC
+# day/month budget-reservation ledger for the bounded unattended EXPLORE
+# runner; reserves spend before any provider call and fails closed.
+BASELINE_LEDGER_MODULES = 14
 BASELINE_LEDGER_CLASSES = 11
 
 

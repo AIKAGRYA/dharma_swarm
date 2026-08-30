@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' \
+    'rsi-update-main is retired: it edited a live checkout and could mask fetch failures.' \
+    'Use `rsi sync status`, then `rsi sync plan` + `rsi sync apply` (or explicit `rsi sync converge`).' >&2
+exit 2

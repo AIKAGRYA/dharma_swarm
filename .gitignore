@@ -122,6 +122,15 @@ reports/model_routing/e2e/
 reports/a2a/*_receipts/
 reports/model_*/e2e/
 reports/model_pool/
+reports/a2a/launchd_plans/
+reports/a2a/nats_live_production_matrix/
+reports/a2a/phase_a/
+reports/sab_first_six_agent_flywheel/
+reports/sovereign_holons/verify_holon_harness_prod_*
+
+# Agent-tool local state — per-machine, not source.
+.grok/
+.serena/
 
 # Personal obey-plugin rule state belongs outside the repo.
 .claude/obey.rules.local.json

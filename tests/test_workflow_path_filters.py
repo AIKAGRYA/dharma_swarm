@@ -168,15 +168,9 @@ GATE_INPUTS: dict[str, tuple[tuple[str, str], ...]] = {
 # with the reason it cannot be scoped, because "add the missing patterns" is
 # the wrong fix here: any enumeration is a list nobody can prove complete, and
 # a filter that is silently short is worse than no filter at all.
-WHOLE_DIFF_GATES: dict[str, str] = {
-    "fourfold-warrant.yml": (
-        "check_shakti_warrant.py runs with --diff-scope base; _path_stats "
-        "(shakti_warrant.py:243-273) scores docs, config and governance paths "
-        "as first-class inputs and _explicit_block_reasons (:379-399) matches "
-        "against the request text, so a docs-only or Go-only PR earns a real "
-        "graded verdict that a language filter would delete"
-    ),
-}
+# NOTE: fourfold-warrant.yml was retired in fdcca8fe3 (advisory, self-passing,
+# duplicated the pre-commit guard), so its WHOLE_DIFF_GATES entry went with it.
+WHOLE_DIFF_GATES: dict[str, str] = {}
 
 
 def test_a_filtered_workflow_still_runs_when_its_gate_inputs_change() -> None:
@@ -219,41 +213,10 @@ def test_the_terminal_lane_runs_when_the_python_bridge_it_boots_changes() -> Non
     )
 
 
-def test_the_hot_path_set_has_no_input_the_warrant_filter_cannot_see() -> None:
-    """Defence in depth behind WHOLE_DIFF_GATES.
-
-    fourfold-warrant is unfiltered today, so the hot-path set is trivially
-    covered and this passes on the first branch. It stays live because if
-    anyone ever re-adds a filter there, `.pre-commit-config.yaml` — the only
-    non-.py member of _HOT_PATHS — is the input a `**/*.py` filter silently
-    drops, and this names it explicitly. Re-parsed from the source so the
-    hand-written table cannot go stale (AI-N4)."""
-    import re
-
-    doc = yaml.safe_load(
-        (WORKFLOWS / "fourfold-warrant.yml").read_text(encoding="utf-8")
-    )
-    stanza = _pull_request_stanza(doc)
-    paths = list((stanza or {}).get("paths") or [])
-    if not paths:
-        return
-
-    source = (REPO_ROOT / "dharma_swarm" / "shakti_warrant.py").read_text(
-        encoding="utf-8"
-    )
-    block = re.search(r"_HOT_PATHS = frozenset\(\s*\{(.*?)\}", source, re.DOTALL)
-    assert block, "_HOT_PATHS literal not found in shakti_warrant.py"
-    entries = re.findall(r'"([^"]+)"', block.group(1))
-    assert entries, "no _HOT_PATHS entries parsed"
-
-    uncovered = [
-        entry for entry in entries
-        if not entry.endswith(".py") and entry not in paths
-    ]
-    assert not uncovered, (
-        "hot paths the fourfold-warrant filter cannot see, so a PR touching "
-        f"only them would skip the attestation gate: {uncovered}"
-    )
+# test_the_hot_path_set_has_no_input_the_warrant_filter_cannot_see was retired
+# with .github/workflows/fourfold-warrant.yml in fdcca8fe3 (the workflow was
+# advisory, self-passing, and duplicated the pre-commit guard); its subject no
+# longer exists.
 
 
 def test_a_whole_diff_gate_never_carries_a_paths_filter() -> None:

@@ -16,6 +16,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+import inspect
 from typing import Any
 
 from dharma_swarm.models import LLMRequest, LLMResponse
@@ -202,4 +203,13 @@ class BaseProvider(ABC):
     # -- Closeable protocol -------------------------------------------------
 
     async def close(self) -> None:
-        """Close any persistent connections.  Override if needed."""
+        """Close and forget a conventional cached async client, if present."""
+        client = getattr(self, "_client", None)
+        if client is None:
+            return
+        self._client = None
+        close = getattr(client, "close", None) or getattr(client, "aclose", None)
+        if callable(close):
+            result = close()
+            if inspect.isawaitable(result):
+                await result

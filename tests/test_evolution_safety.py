@@ -69,7 +69,7 @@ async def test_diffapplier_refuses_protected_roots(tmp_path):
         Path.home() / "dharma_swarm",
         Path("/root/dharma_swarm"),
         Path("/home/openclaw/dharma_swarm"),
-        Path("/Users/dhyana/dharma_swarm"),
+        Path("/app/dharma_swarm"),
     ):
         applier = DiffApplier(workspace=root)
         res = await applier.apply(_HELLO_DIFF)
