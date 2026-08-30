@@ -154,7 +154,7 @@ git clone https://github.com/yourusername/dharma_swarm.git
 cd dharma_swarm
 
 # 2. Create virtual environment
-python3.11 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 
 # 3. Install dependencies

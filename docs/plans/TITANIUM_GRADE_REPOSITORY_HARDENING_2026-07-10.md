@@ -427,8 +427,8 @@ The repository must be:
 
 WP-00B records current host/tool observations and WP-0A validates the following proposed clean-room versions:
 
-- Python 3.12.13 primary;
-- Python 3.11.15 compatibility;
+- Python 3.13.12 primary;
+- Python 3.12.13 / 3.11.15 compatibility (required pytest names until GitHub branch protection drops them);
 - uv 0.11.2;
 - Go 1.26.3;
 - Node 22.23.1;

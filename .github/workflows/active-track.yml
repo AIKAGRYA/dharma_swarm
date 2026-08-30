@@ -68,7 +68,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install package + test deps
         run: |
@@ -149,7 +149,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12.13"
+          python-version: "3.13.12"
 
       - name: Install package + test deps
         run: |
@@ -332,7 +332,7 @@ jobs:
         if: steps.packet-scope-boundary.outputs.enforce == 'true'
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       # The enforcement code (checker script, its first-party imports, and the
       # installed package) comes from the trusted event base, never the
@@ -427,7 +427,7 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           # macos-14 is arm64 and does not publish every CPython patch.
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install repository-declared proof dependencies
         run: |
@@ -472,7 +472,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       # Install the same dev environment as tests.yml so pytest-backed track
       # criteria can execute instead of rendering as unverified. Fail-safe: a

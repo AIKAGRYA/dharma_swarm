@@ -1,6 +1,6 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 7,
+  "version": 8,
   "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow. Completeness is enforced: every PR-visible check name must carry a row here or an explicit exclusion, pinned by tests/test_ci_truth_contract_completeness.py.",
   "required_contexts_manifest": "scripts/governance/ci_parity_manifest.json",
   "required": [
@@ -54,6 +54,14 @@
     }
   ],
   "advisory": [
+    {
+      "id": "tests_py313",
+      "names": ["pytest (3.13)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    },
     {
       "id": "quality_ratchet",
       "names": [

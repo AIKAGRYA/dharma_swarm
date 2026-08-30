@@ -7,7 +7,7 @@ name = "dharma-swarm"
 version = "0.1.0"
 description = "Darwin-Heuristic Autonomous Recursive Meta-Agent Swarm"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11"  # floor until required pytest (3.11)/(3.12) retire; primary runtime/CI is 3.13
 license = "MIT"
 authors = [{ name = "John Shrader", email = "dhyana@example.com" }]
 dependencies = [

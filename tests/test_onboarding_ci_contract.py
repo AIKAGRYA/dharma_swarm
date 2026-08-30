@@ -190,7 +190,7 @@ def test_ci_status_has_no_weakening_flags() -> None:
     assert "DHARMA_ONBOARD_STRICT" not in job
     assert not re.search(r"\bmake onboard\s+--strict\b", job)
     assert "timeout-minutes: 30" in job
-    assert 'python-version: "3.12.13"' in job
+    assert 'python-version: "3.13.12"' in job
     assert (
         'install_source="${RUNNER_TEMP}/dharma-agentops-bootstrap/package-source"'
         in job
@@ -261,8 +261,8 @@ def test_active_track_gate_installs_full_dev_environment_before_evaluation() -> 
 def test_macos_compatibility_job_is_advisory_and_executable() -> None:
     job = _job_block("onboarding-macos-compatibility")
     assert "runs-on: macos-14" in job
-    assert "python-version: \"3.12\"" in job
-    assert "python-version: \"3.12.13\"" not in job
+    assert "python-version: \"3.13\"" in job
+    assert "python-version: \"3.13.12\"" not in job
     assert 'git archive --format=tar HEAD | tar -xf - -C "${install_source}"' in job
     assert 'python3 -m pip install "${install_source}[dev]"' in job
     assert "pip install 'pytest>=7.0'" not in job
