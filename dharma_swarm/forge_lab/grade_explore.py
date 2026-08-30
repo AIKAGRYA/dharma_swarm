@@ -272,8 +272,12 @@ def grade_genome_explore(
     soft_token_cap: bool = True,
     tier: str = TIER_EXPLORE_FAST,
 ) -> GradeOutcome:
-    """Grade one genome on the generation's task slice. Never raises for
-    per-task trouble — a failed observation is a row, not an exception."""
+    """Grade one genome on the generation's task slice.
+
+    Per-task trouble is a row, not an exception. Grade-level custody faults
+    are fail-closed via ``GradeOutcome.error``: an over-cap budget is INVALID,
+    never a lower score, and a zero-attempt sweep is never graded.
+    """
     raw_budget = seams.budget_factory(cap_tokens=budget_cap_tokens, cap_usd=budget_cap_usd)
     budget = (
         _ExploreOpenBudget(raw_budget, soft_cap_tokens=budget_cap_tokens)
@@ -353,6 +357,11 @@ def grade_genome_explore(
         per_task.append(row)
         if not row.get("resolved"):
             failures.append(row)
+    # Custody truth: a task counts as attempted only if the generation seam
+    # actually ran for it (tokens_spent) or it reached grading (grade_seconds /
+    # clean row). Pre-generation infra skips are NOT attempts — a zero-attempt
+    # sweep is a laundered infra zero (L009), never a score.
+    attempted = [r for r in per_task if "tokens_spent" in r or "grade_seconds" in r or "error" not in r]
     graded = [
         row
         for row in per_task
@@ -391,12 +400,18 @@ def grade_genome_explore(
         evidence_class = MEASURED_TASK_OUTCOME
     else:
         evidence_class = MEASURED_NEGATIVE
+    error: str | None = None
+    if getattr(budget, "invalid", False):
+        error = f"budget_invalid:{getattr(budget, 'invalid_reason', None) or 'over_cap'}"
+    elif not attempted:
+        error = "no_tasks_attempted"
     return GradeOutcome(
         pass_rate=pass_rate,
         per_task=per_task,
         budget=budget_dict,
         tokens_used=spent_tokens,
         tier=tier,
+        error=error,
         failures=failures,
         evidence_class=evidence_class,
         comparable_observations=denominator,

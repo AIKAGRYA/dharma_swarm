@@ -1,22 +1,12 @@
 """The generational EXPLORE loop — the Forge v3 chassis, wild-first.
 
-Doctrine (freeform_explore, on main): EXPLORE freely, CONFIRM honestly,
-PROMOTE rarely. This module is EXPLORE only: it can never emit a positive-lift
-claim, never touches promotion, never requests live mutation. The membrane is
-enforced at preflight; inside it, mutation is free.
+EXPLORE freely, CONFIRM honestly, PROMOTE rarely. This module cannot emit a
+positive-lift claim, touch promotion, or request live mutation. The membrane
+is enforced at preflight; inside it, mutation is free.
 
-Loop shape (packet §7): seed baseline (generation 0) → per generation:
-fresh task slice from the taskbed → one parent sampled PER CHILD SLOT from the
-full graded archive (novelty-pressure weighted) → mutate (LLM-proposed by
-default) → dedup by content-addressed id → grade on the explore-fast tier →
-append (immediately durable) → generation receipt → honest closeout.
-
-Decomposition (leaf modules, one-directional):
-  experiment_config    — ExperimentConfig, Seams, cost estimate
-  experiment_git       — source-git identity probes for receipts
-  experiment_preflight — membrane facts, scratch admission, run manifest
-  experiment_closeout  — terminal state decision and closeout receipt
-This module keeps the public API stable by re-exporting those leaves.
+Each generation samples fresh tasks, grades a content-addressed mutation from
+the novelty-weighted archive, persists its result, and emits an honest
+closeout. Leaf modules hold configuration, git identity, preflight, and closeout concerns.
 """
 
 from __future__ import annotations
@@ -213,6 +203,19 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             counters["inconclusive_generation"] += 1
         if budget_count:
             counters["inconclusive_budget"] += 1
+        if outcome.error:
+            await store.append_errored(
+                candidate_id=cid, genome=genome, parent_id=parent_id, generation=generation,
+                loop_iteration=loop_iteration, reasons=[outcome.error], raw_output=raw,
+            )
+            counters["errored"] += 1
+            return _append_result_row(
+                results_path, _result_row(
+                    exp_id=exp_id, candidate_id=cid, parent_id=parent_id, state="errored",
+                    role=role, op=op, generation=generation, pass_rate=outcome.pass_rate,
+                    per_task=outcome.per_task, budget=outcome.budget, reasons=[outcome.error],
+                )
+            )
         envelope = FreeformExploreEnvelope(
             candidate_id=cid, parent_id=parent_id, experiment_id=exp_id,
             category=cfg.category, raw_output=raw, notes=notes,
