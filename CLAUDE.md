@@ -104,6 +104,10 @@ For machine-readable status, run `python3 scripts/governance/check_track_status.
 - **Claim locus:** receipts, reviews, audits, and measured claims carry
   commit + host + branch (`docs/governance/CLAIM_LOCUS_CONVENTION.md`); a
   claim without locus is a rumor.
+- **One trunk.** `origin/main` on `AIKAGRYA/dharma_swarm` is the sole trunk.
+  Work lands via PR (never direct push), branches are tributaries with a
+  deadline, and long-lived divergence is a defect — see
+  `docs/plans/ONE_WORLD_2026-08-30.md` and `docs/state/BRANCH_TTL_REGISTER.md`.
 - **Runtime receipts never enter git.** `reports/a2a/*_receipts/`,
   `reports/model_*/e2e/`, and `reports/model_pool/` are loop-generated and
   gitignored; write runtime receipts under `~/.dharma/`.

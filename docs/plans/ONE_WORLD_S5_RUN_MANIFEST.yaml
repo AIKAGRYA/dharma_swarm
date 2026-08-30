@@ -1,4 +1,6 @@
 # ONE_WORLD S5 campaign run manifest — RUDRA v0 real-task A/B
+# Role: working_plan (per docs/AGENTS.md prose-layer roles; subordinate to
+# docs/plans/ONE_WORLD_S5_CAMPAIGN_PREREG.md, whose frozen sections govern).
 # Status: DRAFT — frozen at launch once the live-driver digest lands.
 # Preregistration: docs/plans/ONE_WORLD_S5_CAMPAIGN_PREREG.md (frozen sections govern;
 # this manifest may not contradict them). Protocol: docs/plans/rudra_v0/TEST_AND_BURNIN_PLAN.md §5.
