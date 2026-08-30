@@ -241,7 +241,7 @@ jobs:
           # Exact Node pin (WP-0H): the dashboard manifest declares no engines
           # range, so the workflow is the version authority. Bump deliberately;
           # tests/test_polyglot_ci_contract.py rejects a floating major.
-          node-version: "20.20.2"
+          node-version: "22.14.0"
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
@@ -314,7 +314,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20.20.2"
+          node-version: "22.14.0"
 
       # Pinned installer, no unpinned curl|bash. The exact bun version must
       # match the packageManager pin in terminal/package.json;
