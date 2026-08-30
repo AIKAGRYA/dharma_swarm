@@ -280,6 +280,7 @@
     "tests/test_operator_brief_insight_brief.py",
     "tests/test_pr_merge_control.py",
     "tests/test_providers.py",
+    "tests/test_routing_surface_inventory.py",
     "tests/test_shakti_warrant.py",
     "tests/test_store_inventory_census.py",
     "tests/test_strange_loop.py",
@@ -356,7 +357,7 @@
       "Differential-oracle reseal (operator-directed unification program, 2026-08-30): the one-world merge touched pyproject.toml/uv.lock, which are inside the parity gauntlet's RELEVANT_SOURCE_ROOTS, so the sealed parity evidence on main (58.00/100, stable_digest 5c799bb0... stored) no longer replays \u2014 identical failure at a0a88841 and on nightly main run 33229410291. This head replays 60.00/100 with zero capability/gap deltas vs base replay (oracle-neutral; stable_digest b8602c39... matches the CI replay at this head). The foundry-branch corrective reseal a4cd15dbe (digest d902c4b1) binds its own tree's source digest and cannot transfer; the seal is therefore regenerated at this head with the repo's own tooling (dharmagraph_parity_gauntlet.py --emit builder+judge, reconciliation MATCH). The judge ratification is minted from that real replay evidence and annotated in its judge id as minted by the ONE_WORLD unification program under operator directive, pending operator countersign. Custody of reports/governance/dharmagraph_parity/{builder_receipt.json,judge_receipt.json,PARITY_MATRIX.md} and docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json is admitted to this packet for this reseal."
     ],
     "owner": "@dhyana",
-    "packet_digest": "bf2ee6cbdd19033da569ed51cd9f4b3702c0bcfe6d34c8d6a6e3a6e4427d0bc9",
+    "packet_digest": "3267cc2f7c43c15677bfc9d00af99895b05555d062dea6971747cb0a33a1d1ab",
     "rollback": "git revert the integration merge commit and the repair commits on integrate/one-world-2026-08-30; satellites remain intact on their own branches.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
