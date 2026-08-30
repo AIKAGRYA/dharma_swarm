@@ -109,6 +109,7 @@ async def test_budget_invalid_grade_lands_errored_never_fitness_bearing(tmp_path
     outcome = grade_explore.grade_genome_explore(
         genome, {"t1": ({}, {})},
         seams=_fake_seams(), budget_cap_tokens=5, budget_cap_usd=1.0,
+        soft_token_cap=False,
     )
     assert outcome.budget["invalid"] is True
     assert outcome.error is not None and outcome.error.startswith("budget_invalid")
