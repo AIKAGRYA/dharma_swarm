@@ -118,6 +118,11 @@ from dharma_swarm.terminal_commands.ouroboros import (
     cmd_ouroboros_record,
     cmd_ledger,
 )
+from dharma_swarm.terminal_commands.rudra import (
+    cmd_rudra_run,
+    cmd_rudra_status,
+    cmd_rudra_stop,
+)
 from dharma_swarm.terminal_commands.semantic import (
     cmd_semantic_digest,
     cmd_semantic_research,
@@ -1332,6 +1337,19 @@ def _build_parser() -> argparse.ArgumentParser:
     cross_sub.add_parser("status", help="Catalytic graph health + last run")
     cross_sub.add_parser("fly", help="Full murder flight — YATAGARASU + 5 KARASU + TOMBI")
 
+    # -- rudra (supervised mission executor) --
+    p_rudra = sub.add_parser("rudra", help="RUDRA supervised mission execution (reproduced completion only)")
+    rudra_sub = p_rudra.add_subparsers(dest="rudra_cmd")
+    p_rudra_run = rudra_sub.add_parser("run", help="Run one admitted mission (foreground)")
+    p_rudra_run.add_argument("mission_yaml", help="Path to the mission contract YAML")
+    p_rudra_run.add_argument("--repo-path", default=".", help="Base checkout path (default: cwd)")
+    p_rudra_status = rudra_sub.add_parser("status", help="Read-only mission status (no stale-file liveness)")
+    p_rudra_status.add_argument("mission_id")
+    p_rudra_status.add_argument("--json", action="store_true", help="Emit JSON output")
+    p_rudra_stop = rudra_sub.add_parser("stop", help="Write a durable stop request")
+    p_rudra_stop.add_argument("mission_id")
+    p_rudra_stop.add_argument("--reason", required=True, help="Operator stop reason")
+
     return parser
 
 
@@ -2172,6 +2190,25 @@ def main() -> None:
                 raise SystemExit(2)
         case "foundations":
             cmd_foundations(args.pillar)
+        case "rudra":
+            match getattr(args, "rudra_cmd", None):
+                case "run":
+                    raise SystemExit(
+                        cmd_rudra_run(args.mission_yaml, repo_path=args.repo_path)
+                    )
+                case "status":
+                    raise SystemExit(
+                        cmd_rudra_status(
+                            args.mission_id, as_json=getattr(args, "json", False)
+                        )
+                    )
+                case "stop":
+                    raise SystemExit(
+                        cmd_rudra_stop(args.mission_id, reason=args.reason)
+                    )
+                case _:
+                    print("Usage: dgc rudra {run|status|stop}")
+                    raise SystemExit(2)
         case "telos":
             cmd_telos(args.doc)
         case "meta":
