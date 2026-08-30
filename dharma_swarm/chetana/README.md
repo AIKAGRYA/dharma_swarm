@@ -23,6 +23,22 @@ voice memos            │                  │      │
                     query  ──►   unified hits across memory + gitnexus + contextplus + catalytic
 ```
 
+Capture and compilation are deliberately separate. `ingest` creates a staged
+derivative atom; immutable raw-source custody is not implemented yet. `compile`
+consumes a reviewed `chetana.integration.v2` plan and revises only the canonical
+pages explicitly named by that plan when all source hashes, target hashes,
+per-operation evidence bindings, claim IDs, and exact replacement counts still
+match. It is dry-run-only unless `--apply` is given.
+Plan sources declared as agent inference, runtime observation, operator input,
+or primary source cannot directly rewrite canonical pages. A write must bind to
+an audited source or canonical ledger below an operator-configured authority
+root. Every claim ID must occur as an exact token in a unique locator inside the
+hashed evidence; ledgers/registers and audited-source sections have additional
+structural checks. These are bounded filesystem capabilities and syntactic proof
+obligations, not semantic entailment or cryptographic attestations. Apply
+requires and records a reviewer name; authenticating that reviewer remains
+outside this prototype.
+
 Every promote pass runs through `dharma_swarm.telos_gates.TelosGatekeeper`
 (11 gates) and is signed against `dharma_swarm.dharma_kernel.KernelGuard`'s
 SHA-256. Atom provenance is structurally enforced: source, processing chain,
@@ -78,6 +94,17 @@ python -m dharma_swarm.chetana.cli gap-scan --queue ~/.dharma/campaign_chetana/g
 python -m dharma_swarm.chetana.cli palace
 python -m dharma_swarm.chetana.cli query "strange loop"
 python -m dharma_swarm.chetana.cli status
+
+# Integrative ingest: inspect a multi-page patch, then apply the same plan
+python -m dharma_swarm.chetana.cli compile plan.json --show-diff
+python -m dharma_swarm.chetana.cli compile plan.json \
+  --canonical-ledger-root /trusted/ledgers --apply --reviewer NAME
+
+# Backlinks are a computed projection, not authored semantic evidence
+python -m dharma_swarm.chetana.cli backlinks
+python -m dharma_swarm.chetana.cli backlinks --apply
+# Reconcile a reviewed batch while retaining a full-corpus hash guard
+python -m dharma_swarm.chetana.cli backlinks --page concepts/example.md --apply
 ```
 
 ## MCP server
