@@ -327,15 +327,21 @@ def _identity_from_registered_holon(
         or holon.identity.get("working_directory")
         or Path.home()
     )
-    return AgentIdentity(
+    identity_kwargs: dict[str, Any] = dict(
         name=holon.name,
         role=role,
         system_prompt=holon.system_prompt,
         model=holon.model,
         provider=provider,
-        allowed_tools=[],
         working_directory=working_directory,
     )
+    # Honor a tool contract declared in the holon's identity.json; otherwise
+    # fall back to the AgentIdentity default toolset. The previous hardcoded
+    # allowed_tools=[] woke every registered holon permanently toolless.
+    declared_tools = holon.identity.get("allowed_tools")
+    if declared_tools:
+        identity_kwargs["allowed_tools"] = [str(t) for t in declared_tools]
+    return AgentIdentity(**identity_kwargs)
 
 
 def _providers_registered_on_router(
@@ -737,6 +743,13 @@ class AutonomousAgent:
     ) -> dict[str, Any]:
         from dharma_swarm.models import LLMRequest
 
+        # The ReAct loop stores history in Anthropic content-block dialect
+        # (assistant {type: tool_use} blocks, user {type: tool_result} lists).
+        # Every lane behind this method speaks the OpenAI chat schema, which
+        # rejects that shape outright — the historic "turn-1 works, turn-2
+        # 400s" fleet-lane failure. Convert once here, at the dialect seam.
+        openai_messages = self._history_to_openai(messages)
+
         configs = preferred_runtime_provider_configs(
             model_overrides={
                 ProviderType.OPENROUTER_FREE: self.identity.model,
@@ -760,7 +773,7 @@ class AutonomousAgent:
             lm_args: dict[str, Any] = {
                 "model": self.identity.model,
                 "system": system,
-                "messages": messages,
+                "messages": openai_messages,
                 "max_tokens": 4096,
                 "temperature": 0.0,
             }
@@ -786,7 +799,7 @@ class AutonomousAgent:
                 request_kwargs = {
                     "model": config.default_model or self.identity.model,
                     "system": system,
-                    "messages": messages,
+                    "messages": openai_messages,
                     "max_tokens": 4096,
                     "temperature": 0.0,
                 }
@@ -902,6 +915,31 @@ class AutonomousAgent:
         if last_exc is not None:
             raise last_exc
         raise RuntimeError("Claude Code provider chain exhausted without an explicit error")
+
+    @classmethod
+    def _history_to_openai(cls, messages: list[dict]) -> list[dict]:
+        """Convert an Anthropic-block conversation history to OpenAI format.
+
+        ``_to_openai_message`` converts one message but returns only the FIRST
+        tool_result of a multi-result user message; OpenAI wants one ``tool``
+        message per result, so this walker expands them.
+        """
+        out: list[dict] = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list) and content and all(
+                isinstance(b, dict) and b.get("type") == "tool_result"
+                for b in content
+            ):
+                for block in content:
+                    out.append(
+                        cls._to_openai_message(
+                            {"role": msg.get("role", "user"), "content": [block]}
+                        )
+                    )
+                continue
+            out.append(cls._to_openai_message(msg))
+        return out
 
     @staticmethod
     def _to_openai_message(msg: dict) -> dict:

@@ -60,7 +60,9 @@ export DHARMA_FAST_BOOT="${DHARMA_FAST_BOOT:-1}"
 # Enable verbose logging
 export DHARMA_LOG_LEVEL="${DHARMA_LOG_LEVEL:-INFO}"
 
-exec python3 -u -c "
+# Bare `python3` resolved to the Homebrew interpreter (no dharma deps →
+# ModuleNotFoundError: icontract on boot); pin the repo venv, overridable.
+exec "${DHARMA_PYTHON:-${SCRIPT_DIR}/.venv/bin/python}" -u -c "
 import asyncio, logging, sys
 logging.basicConfig(
     level=getattr(logging, '$DHARMA_LOG_LEVEL'),

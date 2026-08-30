@@ -40,8 +40,13 @@ def cmd_up(background: bool = False) -> None:
         print(f"Daemon already running (PID {pid})")
         return
 
-    repo_root = Path(__file__).resolve().parent.parent
+    # parents[2] = the repo root; parent.parent is the *package* dir
+    # (dharma_swarm/), which made daemon_script a nonexistent path and
+    # `dgc up --background` print success while launching nothing.
+    repo_root = Path(__file__).resolve().parents[2]
     daemon_script = repo_root / "run_daemon.sh"
+    if not daemon_script.exists():
+        raise SystemExit(f"run_daemon.sh not found at {daemon_script}")
     env = os.environ.copy()
     env["MISSION_PREFLIGHT"] = "0"  # Skip preflight for direct launch
 

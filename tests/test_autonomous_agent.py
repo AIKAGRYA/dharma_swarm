@@ -111,8 +111,35 @@ class TestAgentIdentity:
         assert ident.model == "gpt-5.5"
         assert ident.provider == "codex"
         assert ident.system_prompt == "REAL REGISTERED SOUL"
-        assert ident.allowed_tools == []
+        # No declared tool contract -> the AgentIdentity default toolset.
+        # (A hardcoded allowed_tools=[] used to wake every registered holon
+        # permanently toolless.)
+        default_tools = AgentIdentity(name="d", role="r", system_prompt="s").allowed_tools
+        assert ident.allowed_tools == default_tools
         assert ident.working_directory == str(agent_dir)
+
+    def test_registered_holon_identity_honors_declared_tools(self, tmp_path):
+        agent_dir = tmp_path / "tooled_agent"
+        (agent_dir / "prompt_variants").mkdir(parents=True)
+        (agent_dir / "identity.json").write_text(
+            json.dumps(
+                {
+                    "model": "gpt-5.5",
+                    "provider": "codex",
+                    "role": "lead_orchestrator",
+                    "storage_root": str(agent_dir),
+                    "system_prompt": "soul",
+                    "allowed_tools": ["read_file", "bash"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (agent_dir / "prompt_variants" / "active.txt").write_text(
+            "soul", encoding="utf-8"
+        )
+        ident = _identity_from_registered_holon("tooled_agent", agents_root=tmp_path)
+        assert ident is not None
+        assert ident.allowed_tools == ["read_file", "bash"]
 
     def test_unregistered_holon_identity_returns_none(self, tmp_path):
         assert _identity_from_registered_holon("missing", agents_root=tmp_path) is None
