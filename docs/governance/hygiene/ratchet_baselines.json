@@ -8,7 +8,7 @@
     "boundary_unwitnessed_swallows": 10,
     "hygiene_patterns_enforced_or_resolved": 2,
     "largest_module_lines": 5255,
-    "modules_over_500_lines": 207,
+    "modules_over_500_lines": 205,
     "property_test_files": 6,
     "ruff_undefined_or_redefined": 0,
     "silent_exception_swallows": 239,
