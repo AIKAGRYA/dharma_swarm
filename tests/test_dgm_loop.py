@@ -9,6 +9,7 @@ from dharma_swarm.dgm_loop import (
     DGM_PROTECTED_FILES,
     DGM_TARGET_FILES,
     DGMLoop,
+    DGMResult,
     _is_protected_dgm_target,
     run_dgm_evolution_task,
 )
@@ -45,6 +46,69 @@ async def test_agent_callable_dgm_task_refuses_legacy_local_fitness_by_default(t
     assert result["forge_required"] is True
     assert "run_dgm_forge_genome_task" in result["error"]
     assert "grade_genome" in result["error"]
+
+
+class _FakeContinuousLoop:
+    """Stand-in DGMLoop returning pre-cooked per-generation results."""
+
+    def __init__(self, results, **kwargs):
+        self._results = results
+        self._shadow_mode = True
+
+    async def run_continuous(self, **kwargs):
+        return self._results
+
+
+@pytest.mark.asyncio
+async def test_dgm_multi_generation_reports_failure_when_every_generation_errors(
+    monkeypatch, tmp_path,
+) -> None:
+    results = [DGMResult(error=f"generation {i} failed") for i in range(3)]
+    monkeypatch.setattr(
+        dgm_loop_mod, "DGMLoop", lambda **kw: _FakeContinuousLoop(results, **kw),
+    )
+
+    result = await run_dgm_evolution_task(
+        source_file="agent_runner.py",
+        n_generations=3,
+        state_dir=tmp_path,
+        allow_legacy_local_fitness=True,
+    )
+
+    assert result["success"] is False
+    assert result["generations_run"] == 3
+    assert result["generations_applied"] == 0
+
+
+@pytest.mark.asyncio
+async def test_dgm_multi_generation_reports_success_when_a_generation_grades_clean(
+    monkeypatch, tmp_path,
+) -> None:
+    results = [
+        DGMResult(error="generation 1 failed"),
+        DGMResult(
+            error=None,
+            fitness_after=0.5,
+            fitness_delta=0.5,
+            applied=True,
+            archive_size_before=0,
+            archive_size_after=1,
+        ),
+    ]
+    monkeypatch.setattr(
+        dgm_loop_mod, "DGMLoop", lambda **kw: _FakeContinuousLoop(results, **kw),
+    )
+
+    result = await run_dgm_evolution_task(
+        source_file="agent_runner.py",
+        n_generations=2,
+        state_dir=tmp_path,
+        allow_legacy_local_fitness=True,
+    )
+
+    assert result["success"] is True
+    assert result["generations_run"] == 2
+    assert result["generations_applied"] == 1
 
 
 @pytest.mark.asyncio
