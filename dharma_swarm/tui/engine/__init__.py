@@ -1,5 +1,7 @@
 """DGC TUI Engine — pure Python stream parsing, no Textual dependency."""
 
+from typing import Any
+
 from .events import (
     EVENT_TYPES,
     CanonicalEvent,
@@ -22,8 +24,6 @@ from .events import (
     UsageReport,
 )
 from .governance import GovernanceFilter, GovernancePolicy
-from .provider_runner import ProviderRunner
-from .session_store import SessionStore
 from .event_types import (
     AssistantMessage,
     RateLimitEvent,
@@ -37,6 +37,21 @@ from .event_types import (
 )
 from .session_state import SessionState
 from .stream_parser import parse_ndjson_line
+
+
+def __getattr__(name: str) -> Any:
+    """Load cycle-forming compatibility exports only when requested."""
+
+    if name == "ProviderRunner":
+        from .provider_runner import ProviderRunner
+
+        return ProviderRunner
+    if name == "SessionStore":
+        from .session_store import SessionStore
+
+        return SessionStore
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "AssistantMessage",
