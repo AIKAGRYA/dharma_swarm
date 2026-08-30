@@ -1,0 +1,84 @@
+# ONE_WORLD S5 campaign run manifest — RUDRA v0 real-task A/B
+# Status: DRAFT — frozen at launch once the live-driver digest lands.
+# Preregistration: docs/plans/ONE_WORLD_S5_CAMPAIGN_PREREG.md (frozen sections govern;
+# this manifest may not contradict them). Protocol: docs/plans/rudra_v0/TEST_AND_BURNIN_PLAN.md §5.
+# World-locus: drafted 2026-08-30 · host Mac · branch chore/silvering-cleanup-2026-08-28 ·
+# against pinned release one-world/2026-08-30 = a9282490dc6c57442807ac567461eb99457d2dde.
+
+schema_version: rudra.runmanifest.v0
+campaign_id: one-world-s5-rudra-ab-2026-08-30
+pinned_release:
+  tag: one-world/2026-08-30
+  commit: a9282490dc6c57442807ac567461eb99457d2dde
+  toolchain: /Users/dhyana/dharma_swarm/.venv/bin/python (CPython 3.13.12)  # interpreter-pinned: fixture redness depends on it
+  repository: https://github.com/AIKAGRYA/dharma_swarm.git
+
+fixture:
+  mission_id: lane-deliver-rollback-atomic-lease
+  objective: >-
+    Make the existing failing assertion in
+    tests/test_lane_deliver.py::test_orphan_rollback_deletes_under_an_atomic_lease
+    execute and pass by editing only scripts/runtime/lane_deliver.py — purge the
+    non-atomic ls-remote shape from rollback_branch's unstripped source regions
+    while keeping the atomic force-with-lease delete and stale-info handling
+    intact. Do not edit tests.
+  admitted_gate:
+    - tests/test_lane_deliver.py::test_orphan_rollback_deletes_under_an_atomic_lease
+  baseline_red_evidence: >-
+    reproduced at a9282490d under the pinned 3.13.12 venv: FAILED,
+    assert 'ls-remote' not in code_only (tests/test_lane_deliver.py:461);
+    full-file gate 1 failed / 70 passed
+  required_changed_paths: [scripts/runtime/lane_deliver.py]
+  allowed_changed_paths: [scripts/runtime/lane_deliver.py]
+  forbidden_changed_paths: [tests/**, .github/**, docs/governance/**, pyproject.toml, uv.lock]
+  titanium_scope_admission: OWED  # external track-owner act; arms do not launch without it
+
+arms:
+  count_per_side: 3
+  rudra_arm:
+    runner: dgc rudra run (MissionRunner + GoalGate)
+    driver: LIVE_CODEX_APP_SERVER  # digest pinned at freeze — see driver_digest below
+  control_arm:
+    definition: >-
+      exactly one bare app-server trajectory with the same frozen objective and
+      final GoalGate; no RUDRA journal/recovery loop; no iterative GoalGate
+      feedback
+  shared_conditions:  # identical across arms, per frozen §5
+    base: a9282490dc6c57442807ac567461eb99457d2dde
+    workcell: fresh private Git workcell per arm
+    model: PINNED_AT_FREEZE
+    reasoning_effort: PINNED_AT_FREEZE
+    service_tier: PINNED_AT_FREEZE
+    sandbox: spec §11 sandboxPolicy (as bound in the live driver)
+    network: PINNED_AT_FREEZE
+    objective: fixture.objective (verbatim, both arms)
+    final_gate: GoalGate (same admitted verifiers, same digests)
+    order: randomized; seed 0x5EED20260830  # arms interleaved A/B/B/A/A/B from this seed
+    human_steering_after_launch: none
+    forced_fault: one matched SIGKILL after a real tool mutation in each arm
+    provider_path: no fake, mock, monkeypatch, or cached provider path — live only
+  caps:  # total per arm, enforced outside the model
+    wall_seconds: 3600
+    tokens_total: 400000
+    output_tokens: 64000
+    turns: 40
+    disk_mb: 2048
+    cpu_seconds: 2700
+    memory_mb: 4096
+    processes: 64
+  driver_digest: PINNED_AT_FREEZE  # live app-server binary + contract/workspace/gate digests
+
+verification:
+  final_gate_invocation: fresh detached verification workcell, independent, per arm
+  acceptance: see prereg "v0 acceptance" (frozen; quoted verbatim there)
+  retirement: see prereg "Immediate retirement conditions" (frozen)
+  receipt_fields: see prereg "Pairing (frozen)" receipt list (verbatim)
+  receipt_path: ~/.dharma/rudra/campaigns/one-world-s5-rudra-ab-2026-08-30/receipts/
+  witness_publication: outcomes (win or miss) externally timestamped into the
+    ONE_WORLD scoreboard verification log with world-locus
+
+gates_before_launch:
+  - live_driver_binding_merged  # feat/rudra-live-driver → main
+  - operator_§18_ceiling_ruling  # DELETION_REVIEW_2026-08-30.md options
+  - titanium_scope_admission  # fixture.titanium_scope_admission
+  - this_manifest_frozen  # all PINNED_AT_FREEZE fields resolved
