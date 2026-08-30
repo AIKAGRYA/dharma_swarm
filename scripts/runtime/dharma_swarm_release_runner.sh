@@ -49,6 +49,11 @@ case "${1-}" in
         shift
         runtime_args=("$@")
         ;;
+    codex-composer-semantic-responder)
+        runtime_command="codex-composer-semantic-responder"
+        shift
+        runtime_args=("$@")
+        ;;
     *)
         fail "unsupported command"
         ;;
@@ -184,6 +189,22 @@ case "${runtime_command}" in
             "${runtime_python}" -B -I -m \
             dharma_swarm.runtime_release_entrypoint \
             a2a-inbox-bridge "${runtime_args[@]}"
+        ;;
+    codex-composer-semantic-responder)
+        # The semantic responder needs provider credentials. Load them only
+        # after the immutable release has passed provenance admission, then
+        # dispatch the one admitted responder through the release entrypoint.
+        # shellcheck disable=SC1090
+        source "${runtime_env_helper}"
+        exec env \
+            DHARMA_RELEASE_ROOT="${release_root}" \
+            DHARMA_RUNTIME_EXPECTED_COMMIT="${expected_commit}" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            PYTHONNOUSERSITE=1 \
+            PYTHONUNBUFFERED=1 \
+            "${runtime_python}" -B -I -m \
+            dharma_swarm.runtime_release_entrypoint \
+            codex-composer-semantic-responder "${runtime_args[@]}"
         ;;
     *)
         fail "unsupported command"

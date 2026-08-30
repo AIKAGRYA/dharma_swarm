@@ -17,8 +17,13 @@ from pathlib import Path
 _RELEASE_ROOT_ENV = "DHARMA_RELEASE_ROOT"
 _ORCHESTRATE_COMMAND = "orchestrate-live"
 _A2A_INBOX_BRIDGE_COMMAND = "a2a-inbox-bridge"
+_CODEX_COMPOSER_SEMANTIC_RESPONDER_COMMAND = "codex-composer-semantic-responder"
 _SUPPORTED_COMMANDS = frozenset(
-    {_ORCHESTRATE_COMMAND, _A2A_INBOX_BRIDGE_COMMAND}
+    {
+        _ORCHESTRATE_COMMAND,
+        _A2A_INBOX_BRIDGE_COMMAND,
+        _CODEX_COMPOSER_SEMANTIC_RESPONDER_COMMAND,
+    }
 )
 
 
@@ -47,8 +52,8 @@ def main() -> int:
     args = sys.argv[1:]
     if not args or args[0] not in _SUPPORTED_COMMANDS:
         raise SystemExit(
-            "release entrypoint denied: supported commands are orchestrate-live "
-            "and a2a-inbox-bridge"
+            "release entrypoint denied: supported commands are orchestrate-live, "
+            "a2a-inbox-bridge, and codex-composer-semantic-responder"
         )
     command, command_args = args[0], args[1:]
     if command == _ORCHESTRATE_COMMAND and command_args:
@@ -63,9 +68,19 @@ def main() -> int:
         dgc_main()
         return 0
 
-    from scripts.runtime.a2a_inbox_bridge import main as bridge_main
+    if command == _A2A_INBOX_BRIDGE_COMMAND:
+        from scripts.runtime.a2a_inbox_bridge import main as bridge_main
 
-    return bridge_main(command_args)
+        return bridge_main(command_args)
+
+    if command == _CODEX_COMPOSER_SEMANTIC_RESPONDER_COMMAND:
+        from scripts.runtime.codex_composer_semantic_responder import (
+            main as semantic_responder_main,
+        )
+
+        return semantic_responder_main(command_args)
+
+    raise AssertionError("supported release command was not dispatched")
 
 
 if __name__ == "__main__":
