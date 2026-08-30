@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+RUN=${1:-}
+if [ -z "$RUN" ]; then
+  RUN=$(ls -1dt "$RSI_STATE"/.dharma/evolution_archive/agent_evolution/*/ 2>/dev/null | head -1 || true)
+fi
+[ -z "${RUN:-}" ] && { echo "no runs yet"; exit 0; }
+RUN=${RUN%/}
+echo "run: $RUN/"
+if [ -f "$RUN/results.jsonl" ]; then
+  "$RSI_PY" - "$RUN" <<'PY'
+import json, pathlib, collections, sys
+run=pathlib.Path(sys.argv[1])
+rows=[]
+for line in (run/"results.jsonl").read_text().splitlines():
+    if line.strip(): rows.append(json.loads(line))
+print(f"rows={len(rows)} receipts={len(list((run/'receipts').glob('generation_*.json'))) if (run/'receipts').exists() else 0}")
+print("states=" + str(dict(collections.Counter(r.get('state') for r in rows))))
+print("ops=" + str(dict(collections.Counter(r.get('op') for r in rows))))
+if rows:
+    print(f"last_generation={rows[-1].get('generation')} last_at={rows[-1].get('at')}")
+seed = next((r.get('pass_rate') for r in rows if r.get('role') == 'seed_baseline'), None)
+passes = [r.get('pass_rate') for r in rows if r.get('state') == 'graded' and r.get('pass_rate') is not None]
+print(f"seed_pass_rate={seed} best_pass_rate={max(passes) if passes else None}")
+invalid=collections.Counter()
+errors=collections.Counter()
+for r in rows:
+    inv=(r.get('budget') or {}).get('invalid_reason')
+    if inv: invalid[inv]+=1
+    for t in r.get('per_task') or []:
+        if not t.get('resolved'):
+            errors[t.get('error') or 'unresolved'] += 1
+print("invalid_budget=" + str(dict(invalid)))
+print("task_errors_top=" + str(dict(errors.most_common(6))))
+print("--- recent rows ---")
+for r in rows[-10:]:
+    print(f"gen={r.get('generation'):>2} {r.get('role'):<13} {r.get('op'):<12} {r.get('state'):<9} pass={r.get('pass_rate')} spent={(r.get('budget') or {}).get('spent_tokens')} invalid={(r.get('budget') or {}).get('invalid_reason')} reasons={r.get('reasons')}")
+PY
+else
+  echo "seed still grading (no results row yet); recent grade receipts:"
+  ls -1t "$RSI_STATE"/.dharma/forge_v1/task_harvests/pr_suite_grade_receipts/*.json 2>/dev/null | head -3 | while read -r f; do
+    echo "  $(basename "$f"): $(grep -oE '"resolved": (true|false)|"grade_error": [^,]*' "$f" | tr '\n' ' ')"
+  done
+fi
+if [ -f "$RUN/closeout.json" ]; then
+  echo "--- closeout ---"
+  "$RSI_PY" - "$RUN/closeout.json" <<'PY'
+import json,sys
+p=json.load(open(sys.argv[1]))
+for k in ('closeout_state','tokens_spent_total','seed_pass_rate','best_pass_rate','graded','blocked','duplicate','errored'):
+    if k in p: print(f"{k}={p[k]}")
+PY
+fi

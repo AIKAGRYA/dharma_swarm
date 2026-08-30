@@ -61,6 +61,7 @@
     "apoptosis.jsonl",
     "archive.jsonl",
     "artifacts.jsonl",
+    "assurance_guard_unavailable.jsonl",
     "audit.jsonl",
     "baseline.jsonl",
     "bridge_data.jsonl",
@@ -114,12 +115,12 @@
     "episode_ledger.jsonl",
     "equity_curve.jsonl",
     "evaluations.jsonl",
+    "events.jsonl",
     "evolution_log.jsonl",
     "evolution_rv.jsonl",
     "experiments.jsonl",
     "fitness_history.jsonl",
     "fitness_signals.jsonl",
-    "flickers.jsonl",
     "forge_scores.jsonl",
     "frontier_tasks.jsonl",
     "frontier_tasks_pending.jsonl",
@@ -131,6 +132,7 @@
     "handoffs.jsonl",
     "harvests.jsonl",
     "history.jsonl",
+    "history.v1.jsonl",
     "holon_events.jsonl",
     "hum.jsonl",
     "human_yds_ratings.jsonl",
@@ -215,6 +217,7 @@
     "route_retrospectives.jsonl",
     "routing_audit.jsonl",
     "routing_decisions.jsonl",
+    "run.jsonl",
     "runs.jsonl",
     "runtime.jsonl",
     "rv_optimization.jsonl",
@@ -282,6 +285,7 @@
   "ledger_modules": [
     "dharma_swarm/ai_reciprocity_ledger.py",
     "dharma_swarm/episode_ledger.py",
+    "dharma_swarm/forge_lab/unattended_ledger.py",
     "dharma_swarm/forge_v1/forge_v2/monthly_ledger.py",
     "dharma_swarm/forge_v1/forge_v2/taskbed_ledger.py",
     "dharma_swarm/gaia_ledger.py",
@@ -304,8 +308,8 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 223,
+    "distinct_jsonl_names": 226,
     "ledger_classes": 11,
-    "ledger_modules": 13
+    "ledger_modules": 14
   }
 }

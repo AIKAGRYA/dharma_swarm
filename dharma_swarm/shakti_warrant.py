@@ -99,79 +99,10 @@ _QUESTIONS: dict[ShaktiEnergy, str] = {
     ShaktiEnergy.MAHASARASWATI: "Is every detail precise, evidenced, and verified?",
 }
 
-_KEYWORDS: dict[ShaktiEnergy, frozenset[str]] = {
-    ShaktiEnergy.MAHESHWARI: frozenset(
-        {
-            "architecture",
-            "canonical",
-            "doctrine",
-            "emergence",
-            "governance",
-            "jagat",
-            "kalyan",
-            "larger",
-            "manifest",
-            "mission",
-            "pattern",
-            "purpose",
-            "semantic",
-            "system",
-            "telos",
-            "vision",
-            "warrant",
-        }
-    ),
-    ShaktiEnergy.MAHAKALI: frozenset(
-        {
-            "block",
-            "crash",
-            "decisive",
-            "enforce",
-            "execute",
-            "fail",
-            "fix",
-            "force",
-            "guard",
-            "hold",
-            "restore",
-            "urgent",
-            "unblock",
-        }
-    ),
-    ShaktiEnergy.MAHALAKSHMI: frozenset(
-        {
-            "align",
-            "bridge",
-            "cohere",
-            "coherence",
-            "consolidate",
-            "harmonize",
-            "integrate",
-            "reduce",
-            "reuse",
-            "single",
-            "source",
-            "truth",
-            "unify",
-        }
-    ),
-    ShaktiEnergy.MAHASARASWATI: frozenset(
-        {
-            "deterministic",
-            "evidence",
-            "exact",
-            "idempotent",
-            "line",
-            "path",
-            "pre-commit",
-            "pytest",
-            "reference",
-            "test",
-            "typed",
-            "verify",
-        }
-    ),
-}
+# NOTE: the per-energy keyword bags were removed. Matching words in the
+# author's own intent text let a request self-pass its own warrant, so
+# dimensions are scored from declared evidence only (metadata flags, diff
+# binding, allowlisted tools, touched paths) via `_boosts_for_energy`.
 
 _BLOCK_PATTERNS = (
     re.compile(r"\brm\s+-rf\b", re.IGNORECASE),
@@ -205,10 +136,6 @@ def _normalize_path(path: str) -> str:
     while normalized.startswith("./"):
         normalized = normalized[2:]
     return normalized
-
-
-def _tokenize(text: str) -> set[str]:
-    return set(re.findall(r"[a-zA-Z0-9_.-]+", text.lower()))
 
 
 def _request_text(request: FourfoldActionWarrantRequest) -> str:
@@ -345,40 +272,51 @@ def _boosts_for_energy(
     return score, boosts
 
 
+def _added_lines_only(text: str) -> str:
+    """Drop diff-removed lines so deleting a dangerous line does not block.
+
+    Diff content embedded in a request keeps unified-diff line markers; a
+    ``-rm -rf ...`` line is a removal, not a proposed action, and must not
+    trip the unsafe-pattern scan.
+    """
+    kept = [
+        line
+        for line in text.splitlines()
+        if not (line.startswith("-") and not line.startswith("---"))
+    ]
+    return "\n".join(kept)
+
+
 def _score_dimension(
     energy: ShaktiEnergy,
     request: FourfoldActionWarrantRequest,
     *,
     pass_threshold: float,
 ) -> ShaktiDimensionScore:
-    text = _request_text(request)
-    tokens = _tokenize(text)
-    keywords = _KEYWORDS[energy]
-    matched = sorted(token for token in tokens if token in keywords)
-    keyword_score = min(len(matched) / 4.0, 0.70)
-    boost, boosts = _boosts_for_energy(energy, request)
-    score = min(keyword_score + boost, 1.0)
+    score, boosts = _boosts_for_energy(energy, request)
+    score = min(score, 1.0)
     passed = score >= pass_threshold
-    rationale_parts = []
-    if matched:
-        rationale_parts.append("matched " + ", ".join(matched[:6]))
-    if boosts:
-        rationale_parts.append("boosted by " + ", ".join(boosts))
-    if not rationale_parts:
-        rationale_parts.append("no strong evidence for this Shakti question")
+    rationale = (
+        "declared evidence: " + ", ".join(boosts)
+        if boosts
+        else "no declared evidence for this Shakti question"
+    )
     return ShaktiDimensionScore(
         energy=energy,
         question=_QUESTIONS[energy],
         score=round(score, 3),
         passed=passed,
-        matched_terms=matched + boosts,
-        rationale="; ".join(rationale_parts),
+        matched_terms=boosts,
+        rationale=rationale,
     )
 
 
 def _explicit_block_reasons(request: FourfoldActionWarrantRequest) -> list[str]:
     reasons: list[str] = []
-    text = _request_text(request)
+    scan_request = request.model_copy(
+        update={"content": _added_lines_only(request.content)}
+    )
+    text = _request_text(scan_request)
     if request.metadata.get("destructive_without_consent") is True:
         reasons.append("destructive action without consent")
     if request.metadata.get("oversight_active") is False:

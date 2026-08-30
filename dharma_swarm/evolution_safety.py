@@ -48,7 +48,6 @@ _PROTECTED_LITERAL_ROOTS = (
     Path.home() / "dharma_swarm",
     Path("/root/dharma_swarm"),
     Path("/home/openclaw/dharma_swarm"),
-    Path("/Users/dhyana/dharma_swarm"),
     Path("/app/dharma_swarm"),  # container source mount
 )
 

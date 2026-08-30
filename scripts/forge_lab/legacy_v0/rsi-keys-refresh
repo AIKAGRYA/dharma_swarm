@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Refresh the Moonshot/Kimi liveness receipt (keys_status.json has a 900s TTL).
+# Safe, cheap (one 4-token probe). Run by rsi-run/rsi-loop and by cron.
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+MK="${MOONSHOT_API_KEY:-}"; BUR="${MOONSHOT_BASE_URL:-https://api.moonshot.ai/v1}"
+[ -z "$MK" ] && { echo "no MOONSHOT_API_KEY in env" >&2; exit 1; }
+code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$BUR/chat/completions" \
+  -H "Authorization: Bearer $MK" -H 'Content-Type: application/json' \
+  -d '{"model":"kimi-k2.7-code","messages":[{"role":"user","content":"OK"}],"max_tokens":4}' || echo 000)
+glyph='✗'; [ "$code" = "200" ] && glyph='✓'
+ts=$(date +%s)
+mkdir -p "$RSI_STATE/.dharma"
+cat > "$RSI_STATE/.dharma/keys_status.json" <<JEOF
+{"last_test_ts": $ts, "generated_at": $ts, "rows": [{"name": "kimi", "glyph": "$glyph", "status": "probe_http_$code"}, {"name": "moonshot", "glyph": "$glyph", "status": "probe_http_$code"}]}
+JEOF
+echo "$(date -u +%H:%M:%SZ) kimi probe http=$code glyph=$glyph"

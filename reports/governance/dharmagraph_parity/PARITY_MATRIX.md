@@ -1,15 +1,14 @@
-# DharmaGraph x LangGraph parity: 58.00/100
+# DharmaGraph x LangGraph parity: 60.00/100
 
 **Verdict: NOT_FINISHED. Closeout blocked: true.**
 
-Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`. Rubric commit: `9fe56ce57deba94c2f0bdee03028145a2ae7b2cc`. Dharma SHA: `4c83660632e88802c5e3c6536c71c0dc4b64e6ea`.
+Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`. Rubric commit: `9fe56ce57deba94c2f0bdee03028145a2ae7b2cc`. Dharma SHA: `13ea099256c0c30a7b5b43b64038ad738dcd1915`.
 
 ## Gaps
 
 - `LG02` — Node registration metadata, schemas, destinations, and default policies (0/2, weight 2); card `parity-gap-lg02-node-policies`.
 - `LG03` — Deferred and finalization nodes (0/2, weight 1); card `parity-gap-lg03-defer`.
 - `LG10` — Reducer and channel semantics with concurrent-write conflicts (1/2, weight 4); card `parity-gap-lg10-reducers`.
-- `LG11` — Message accumulation, replacement, removal, and formatting (0/2, weight 2); card `parity-gap-lg11-messages`.
 - `LG12` — Compilation and sync/async single-run interfaces (1/2, weight 4); card `parity-gap-lg12-invocation`.
 - `LG13` — Batch, as-completed, and max-concurrency interfaces (0/2, weight 1); card `parity-gap-lg13-batch`.
 - `LG19` — Static interrupt-before and interrupt-after (0/2, weight 1); card `parity-gap-lg19-static-interrupts`.
@@ -49,7 +48,7 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
 | `LG08` | Command update, multi-target goto, parent routing, and resume | 2 | 2 | 2.00 | command_goto:surface-lg08-command_goto, command_multi_target:surface-lg08-command_multi_target, command_parent:surface-lg08-command_parent | — |
 | `LG09` | Cycles, recursion caps, and managed remaining-step state | 1 | 2 | 1.00 | cycles:surface-lg09-cycles, limit_error:surface-lg09-limit_error, recursion_limit:surface-lg09-recursion_limit | — |
 | `LG10` | Reducer and channel semantics with concurrent-write conflicts | 4 | 1 | 2.00 | any_value:surface-lg10-any_value, barrier:surface-lg10-barrier, binary_reducer:surface-lg10-binary_reducer | unproven facets: topic, barrier, ephemeral, any_value, untracked_value, delta_channel, last_value_after_finish, named_barrier_after_finish |
-| `LG11` | Message accumulation, replacement, removal, and formatting | 2 | 0 | 0.00 | append_message:surface-lg11-append_message, invalid_remove:surface-lg11-invalid_remove, openai_format:surface-lg11-openai_format | unproven facets: append_message, replace_by_id, remove_message, remove_all, invalid_remove, openai_format, ui_message_helpers |
+| `LG11` | Message accumulation, replacement, removal, and formatting | 2 | 2 | 2.00 | append_message:surface-lg11-append_message, invalid_remove:surface-lg11-invalid_remove, openai_format:surface-lg11-openai_format | — |
 | `LG12` | Compilation and sync/async single-run interfaces | 4 | 1 | 2.00 | async_invoke:surface-lg12-async_invoke, async_stream:surface-lg12-async_stream, compile:surface-lg12-compile | unproven facets: sync_invoke, sync_stream, async_stream, typed_v2_invoke, typed_v2_ainvoke |
 | `LG13` | Batch, as-completed, and max-concurrency interfaces | 1 | 0 | 0.00 | abatch:surface-lg13-abatch, abatch_as_completed:surface-lg13-abatch_as_completed, batch:surface-lg13-batch | unproven facets: batch, abatch, batch_as_completed, abatch_as_completed, max_concurrency |
 | `LG14` | Checkpoint schema, saver protocol, pending writes, lineage, and serializer | 4 | 2 | 4.00 | async_checkpoint_lifecycle:surface-lg14-async_checkpoint_lifecycle, async_saver:surface-lg14-async_saver, checkpoint_schema:surface-lg14-checkpoint_schema | — |
@@ -89,8 +88,8 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
 
 ## Latest-stable drift (reported, non-gating)
 
-- Status: `DRIFT_OBSERVED`.
-- Behavioral execution: `true`.
+- Status: `NOT_REPLAYED_NON_GATING`.
+- Behavioral execution: `false`.
 - Target: `1.2.8`; frozen grade remains `1.2.4`.
 
 ## Performance (reported, not a win requirement)
@@ -100,9 +99,9 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
   "clock": "time.perf_counter",
   "environment_metadata": {
     "langgraph_version": "1.2.4",
-    "platform": "macOS-26.5.1-arm64-arm-64bit",
-    "python_executable": "/private/tmp/ds-merge-train-20260808.1WJosD/pr1284-oracle-venv311/bin/python",
-    "python_version": "3.11.15"
+    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "python_executable": "/Users/dhyana/dharma_swarm/.venv/bin/python3",
+    "python_version": "3.13.12"
   },
   "iterations": 5,
   "timing_decides_semantic_parity": false,
@@ -110,87 +109,87 @@ Target: LangGraph `1.2.4` at tag SHA `054a6f3d8b48d022a4881af3ba3dc0ddc3ac0690`.
   "workloads": {
     "seeded_checkpoint_resume_fork": {
       "dharma": {
-        "median_seconds": 0.009317000000010012,
+        "median_seconds": 0.00992712494917214,
         "samples_seconds": [
-          0.009625041999242967,
-          0.009317000000010012,
-          0.008506958001817111,
-          0.01156891700156848,
-          0.008807582998997532
+          0.00992712494917214,
+          0.009674041997641325,
+          0.010078874882310629,
+          0.010601083049550653,
+          0.009615791961550713
         ]
       },
-      "dharma_median_seconds": 0.009317000000010012,
+      "dharma_median_seconds": 0.00992712494917214,
       "iterations": 5,
       "langgraph": {
-        "median_seconds": 0.0023702920007053763,
+        "median_seconds": 0.002976665971800685,
         "samples_seconds": [
-          0.0023702920007053763,
-          0.0022825420019216835,
-          0.0026633750021574087,
-          0.0023696669995842967,
-          0.002648124998813728
+          0.002976665971800685,
+          0.0025746249593794346,
+          0.003058208152651787,
+          0.0029354169964790344,
+          0.0032777502201497555
         ]
       },
-      "langgraph_median_seconds": 0.0023702920007053763,
-      "overhead_ratio_dharma_to_langgraph": 3.930739333903739,
+      "langgraph_median_seconds": 0.002976665971800685,
+      "overhead_ratio_dharma_to_langgraph": 3.3349811645701344,
       "semantic_parity_all_iterations": true
     },
     "seeded_linear_reducer_chain": {
       "dharma": {
-        "median_seconds": 0.0006334169993351679,
+        "median_seconds": 0.000779417110607028,
         "samples_seconds": [
-          0.0009317920012108516,
-          0.0006042920031177346,
-          0.0005582910016528331,
-          0.0006334169993351679,
-          0.0006782909986213781
+          0.0009712090250104666,
+          0.0008484171703457832,
+          0.0006961668841540813,
+          0.0007092081941664219,
+          0.000779417110607028
         ]
       },
-      "dharma_median_seconds": 0.0006334169993351679,
+      "dharma_median_seconds": 0.000779417110607028,
       "iterations": 5,
       "langgraph": {
-        "median_seconds": 0.0014633329992648214,
+        "median_seconds": 0.0017565828748047352,
         "samples_seconds": [
-          0.0016744999993534293,
-          0.001334542001131922,
-          0.0013180000023567118,
-          0.0015030829999886919,
-          0.0014633329992648214
+          0.0020770409610122442,
+          0.0017565828748047352,
+          0.0016835827846080065,
+          0.0016300829593092203,
+          0.0020432081073522568
         ]
       },
-      "langgraph_median_seconds": 0.0014633329992648214,
-      "overhead_ratio_dharma_to_langgraph": 0.4328590960863977,
+      "langgraph_median_seconds": 0.0017565828748047352,
+      "overhead_ratio_dharma_to_langgraph": 0.4437121195854021,
       "semantic_parity_all_iterations": true
     },
     "seeded_send_map_reduce": {
       "dharma": {
-        "median_seconds": 0.00036337500205263495,
+        "median_seconds": 0.0004261659923940897,
         "samples_seconds": [
-          0.00040283400085172616,
-          0.0003965840005548671,
-          0.0003545420004229527,
-          0.00036337500205263495,
-          0.0003178330007358454
+          0.0004793750122189522,
+          0.0004261659923940897,
+          0.0003671669401228428,
+          0.00045570801012218,
+          0.00036629196256399155
         ]
       },
-      "dharma_median_seconds": 0.00036337500205263495,
+      "dharma_median_seconds": 0.0004261659923940897,
       "iterations": 5,
       "langgraph": {
-        "median_seconds": 0.0009996249973482918,
+        "median_seconds": 0.0012946249917149544,
         "samples_seconds": [
-          0.001100582998333266,
-          0.0009996249973482918,
-          0.0009623750011087395,
-          0.0009364580000692513,
-          0.0010917499967035837
+          0.0012946249917149544,
+          0.0013039999175816774,
+          0.002420915989205241,
+          0.0011920419055968523,
+          0.0011864998377859592
         ]
       },
-      "langgraph_median_seconds": 0.0009996249973482918,
-      "overhead_ratio_dharma_to_langgraph": 0.36351131976147144,
+      "langgraph_median_seconds": 0.0012946249917149544,
+      "overhead_ratio_dharma_to_langgraph": 0.329181033211447,
       "semantic_parity_all_iterations": true
     }
   }
 }
 ```
 
-Receipt stable digest: `ffc91d098bf2047ecf56b443cb5404194bfe4116f2fc87a88d71154b4709effd`.
+Receipt stable digest: `e9a98702c9828fd3bec7a5b10f853b45cb1b33158538c89eb3f761de86d2ab12`.

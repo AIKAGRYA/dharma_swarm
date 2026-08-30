@@ -12,7 +12,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-EXPLORE_CLOSEOUTS = ("measured_negative", "inconclusive_low_power", "blocked_with_evidence")
+EXPLORE_CLOSEOUTS = (
+    "measured_negative",
+    "inconclusive_low_power",
+    "inconclusive_infrastructure",
+    "inconclusive_generation",
+    "inconclusive_budget",
+    "blocked_with_evidence",
+)
 CLOSEOUT_SCHEMA = "forge_lab.closeout.v0"
 RESULT_ROW_SCHEMA = "forge_lab.result_observation.v0"
 GENERATION_RECEIPT_SCHEMA = "forge_lab.generation_receipt.v0"
@@ -48,6 +55,11 @@ def _result_row(
     budget: dict[str, Any] | None = None,
     reasons: list[str] | tuple[str, ...] | None = None,
     duplicate_of: str | None = None,
+    evidence_class: str | None = None,
+    comparable_observations: int | None = None,
+    comparison_block_id: str | None = None,
+    control_candidate_id: str | None = None,
+    control_pass_rate: float | None = None,
 ) -> dict[str, Any]:
     """Canonical row for ``results.jsonl``.
 
@@ -68,6 +80,11 @@ def _result_row(
         "budget": dict(budget or {}),
         "reasons": list(reasons or []),
         "duplicate_of": duplicate_of,
+        "evidence_class": evidence_class,
+        "comparable_observations": comparable_observations,
+        "comparison_block_id": comparison_block_id,
+        "control_candidate_id": control_candidate_id,
+        "control_pass_rate": control_pass_rate,
         "at": _now(),
     }
 
@@ -90,6 +107,11 @@ def _result_summary(row: dict[str, Any]) -> dict[str, Any]:
         "pass_rate": row["pass_rate"],
         "reasons": list(row.get("reasons") or []),
         "duplicate_of": row.get("duplicate_of"),
+        "evidence_class": row.get("evidence_class"),
+        "comparable_observations": row.get("comparable_observations"),
+        "comparison_block_id": row.get("comparison_block_id"),
+        "control_candidate_id": row.get("control_candidate_id"),
+        "control_pass_rate": row.get("control_pass_rate"),
     }
 
 

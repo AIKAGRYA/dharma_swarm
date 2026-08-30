@@ -267,26 +267,25 @@ async def test_canary_promote_and_rollback(tmp_dharma):
     assert rolled.rollback_reason == "Canary failed"
 
 
-# === Scenario 7: All 11 gates fire ===
+# === Scenario 7: All 9 gates fire ===
 
 
-def test_all_eleven_gates_fire(tmp_path):
-    """All 11 gates should be present and evaluated."""
+def test_all_nine_gates_fire(tmp_path):
+    """All 9 gates should be present and evaluated."""
     from dharma_swarm.telos_gates import GateRegistry, TelosGatekeeper
 
     # The operator's home may contain approved custom gates.  This assertion is
-    # specifically about the immutable core eleven, so give it an empty,
+    # specifically about the immutable core nine, so give it an empty,
     # test-owned registry instead of inheriting ambient authority state.
     gk = TelosGatekeeper(registry=GateRegistry(tmp_path / "gate_proposals.json"))
-    assert len(gk.GATES) == 11
+    assert len(gk.GATES) == 9
 
     result = gk.check(action="echo test")
-    assert len(result.gate_results) == 11
+    assert len(result.gate_results) == 9
 
     expected = {
         "AHIMSA", "SATYA", "CONSENT", "VYAVASTHIT", "REVERSIBILITY",
-        "SVABHAAVA", "BHED_GNAN", "WITNESS",
-        "ANEKANTA", "DOGMA_DRIFT", "STEELMAN",
+        "WITNESS", "ANEKANTA", "DOGMA_DRIFT", "STEELMAN",
     }
     assert set(result.gate_results.keys()) == expected
 

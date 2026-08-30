@@ -36,7 +36,7 @@
   - owns: dharma_swarm/forge_lab/**, scripts/forge_lab/**, tests/forge_lab_v1/**, docs/ops/RSI_LAB_SYNC.md
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`sublimation-forge-2026-08`** — Sublimation Forge — offline-first governed foundry (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 2)
-  - owns: dharma_swarm/foundry/**, scripts/foundry/**, tests/test_foundry_*.py, docs/foundry/**, dharma_swarm/rudra/**, dharma_swarm/terminal_commands/rudra.py, tests/test_rudra_*.py, tests/fixtures/rudra/**, reports/rudra/**, docs/plans/rudra_v0/**
+  - owns: dharma_swarm/foundry/__init__.py, dharma_swarm/foundry/army.py, dharma_swarm/foundry/artifacts.py, dharma_swarm/foundry/campaign.py, dharma_swarm/foundry/daemon.py, dharma_swarm/foundry/elite_grid.py, dharma_swarm/foundry/evaluator.py, dharma_swarm/foundry/heldout.py, dharma_swarm/foundry/kill_metrics.py, dharma_swarm/foundry/killswitch.py, dharma_swarm/foundry/loop.py, dharma_swarm/foundry/patches.py, dharma_swarm/foundry/receipts.py, dharma_swarm/foundry/report_card.py, dharma_swarm/foundry/runner_isolation.py, dharma_swarm/foundry/shakti_local_world.py, dharma_swarm/foundry/shakti_system.py, dharma_swarm/foundry/target_ingest.py, dharma_swarm/foundry/targets.py, dharma_swarm/foundry/tripwires.py, scripts/foundry/**, tests/test_foundry_army.py, tests/test_foundry_artifacts.py, tests/test_foundry_campaign.py, tests/test_foundry_daemon.py, tests/test_foundry_evaluator.py, tests/test_foundry_heldout.py, tests/test_foundry_kill_metrics.py, tests/test_foundry_killswitch.py, tests/test_foundry_loop.py, tests/test_foundry_patches.py, tests/test_foundry_receipts.py, tests/test_foundry_report_card.py, tests/test_foundry_runner_isolation.py, tests/test_foundry_shakti_system.py, tests/test_foundry_target_ingest.py, tests/test_foundry_tripwires.py, docs/foundry/**, dharma_swarm/rudra/**, dharma_swarm/terminal_commands/rudra.py, tests/test_rudra_*.py, tests/fixtures/rudra/**, reports/rudra/**, docs/plans/rudra_v0/**
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 
 Before editing any file, check it against the `owns:` globs above — a surface owned by a track you are not serving is off-limits except through that track's own next-items. Full track detail: `docs/governance/ACTIVE_TRACK.yaml`.
@@ -150,7 +150,7 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-08-01 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-08-30 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 One row per metric — refreshes REPLACE this table (never append; the 2026-06/07
@@ -158,18 +158,18 @@ append-style refreshes quadruplicated rows and broke `make docops-integrity`).
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **1,132** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **492 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **399,997** | wc -l across dharma_swarm Python modules |
-| Test files | **1025** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **15,673 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **1,194** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Top-level (flat) modules | **488 (44.4%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Total Python LOC | **417,522** | wc -l across dharma_swarm Python modules |
+| Test files | **1044** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **15,913 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **12,885 (measured 2026-07-10, cloud checkout)** | python3 -m pytest tests/ --collect-only -q |
 | Collection errors | **35 (measured 2026-07-10, cloud checkout — env-dependent optional extras; 0 on the operator host 2026-07-03)** | python3 -m pytest tests/ --collect-only -q |
-| Markdown files | **1,539** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
-| Markdown total lines | **322,476** | wc -l across all tracked .md |
+| Markdown files | **1,537** | git ls-files \| rg '\.md$' \| wc -l (excl. AGENTS.md, reports/docops) |
+| Markdown total lines | **327,549** | wc -l across all tracked .md |
 | Bridge files | **37** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **50** | find dharma_swarm -type f \| rg -i "adapter" |
-| Router files | **23** | find dharma_swarm -type f \| rg -i "rout" |
+| Router files | **22** | find dharma_swarm -type f \| rg -i "rout" |
 
 ## SYSTEM TOPOGRAPHY
 

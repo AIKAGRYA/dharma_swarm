@@ -105,7 +105,7 @@ class AgentSpec:
     default_provider: ProviderType
     default_model: str
     backup_models: list[str]    # Fallback chain
-    constitutional_gates: list[str]  # Subset of 11 gates this agent is bound by
+    constitutional_gates: list[str]  # Subset of core gates this agent is bound by
     max_concurrent_workers: int  # Worker spawn ceiling
     memory_namespace: str       # Path component under ~/.dharma/agent_memory/
     spawn_authority: list[str]  # Worker types this agent may spawn
@@ -270,7 +270,7 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
         default_model=_pool_model_id("claude-sonnet-4"),
         # qwen3.5-397b-a17b is sub-floor (BANISHED); ride the qwen3-coder floor entry.
         backup_models=[_pool_model_id("deepseek-r1"), _pool_model_id("qwen3-coder:480b-cloud")],
-        constitutional_gates=["SATYA", "WITNESS", "BHED_GNAN", "DOGMA_DRIFT"],
+        constitutional_gates=["SATYA", "WITNESS", "DOGMA_DRIFT"],
         max_concurrent_workers=0,  # Witness never spawns workers
         memory_namespace="witness",
         spawn_authority=[],

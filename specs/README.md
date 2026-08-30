@@ -84,6 +84,7 @@ Current high-signal specs in this directory:
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md): active ontology runtime spec
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md): execution companion checklist for that ontology pass
 - [STIGMERGY_11_LAYER_SPEC_2026-03-23.md](/Users/dhyana/dharma_swarm/specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md): structured subsystem spec
+- [FORGE_LAB_V0_1_0_SPEC.md](FORGE_LAB_V0_1_0_SPEC.md): operator-ratified target protocol for dedicated Meghadharma open-compute agent evolution; DGM implementation and evidence remain gated
 
 ## Version And Companion Precedence
 
@@ -93,6 +94,7 @@ Use these rules when multiple spec-shaped files exist for one surface:
 - [DGC_TERMINAL_ARCHITECTURE.md](/Users/dhyana/dharma_swarm/specs/DGC_TERMINAL_ARCHITECTURE.md) is retained as the v1.0 baseline, not the current precedence file.
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md) is the canonical ontology Phase 2 spec.
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md) is a companion execution checklist, not an independent canonical spec.
+- [FORGE_LAB_V0_1_0_SPEC.md](FORGE_LAB_V0_1_0_SPEC.md) is the current Forge Lab target contract. Its runtime authority remains gated by its build packets and acceptance criteria.
 
 ## Classification Rules
 

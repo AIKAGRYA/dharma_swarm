@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+# Keep the liveness receipt fresh (900s TTL) before every launch.
+/root/rsi-lab/bin/rsi-keys-refresh >/dev/null 2>&1 || true
+preset=${1:-calibration}
+shift || true
+# Per-candidate budgets are sized for Kimi K2.7 (verbose): ~8-30k tokens/grade.
+case "$preset" in
+  smoke)       generations=2;  children=1; tasks=3;  max_tokens=800000;  budget_tokens=90000;  budget_usd=1.00 ;;
+  calibration|n10) generations=10; children=1; tasks=5; max_tokens=4000000; budget_tokens=90000; budget_usd=3.00 ;;
+  n20)         generations=20; children=1; tasks=5;  max_tokens=8000000;  budget_tokens=90000;  budget_usd=6.00 ;;
+  power20)     generations=20; children=1; tasks=5;  max_tokens=14000000; budget_tokens=180000; budget_usd=10.00 ;;
+  deep20)      generations=20; children=2; tasks=5;  max_tokens=24000000; budget_tokens=220000; budget_usd=18.00 ;;
+  *) echo "usage: rsi-run {smoke|calibration|n10|n20|power20|deep20} [extra forge_lab args...]" >&2; exit 2 ;;
+esac
+session="rsi-${preset}-$(date -u +%Y%m%dT%H%M%SZ)"
+run_dir="$RSI_STATE/rsi_runs/$session"; mkdir -p "$run_dir"
+log="$RSI_STATE/rsi_runs/$session.log"
+cat > "$run_dir/run.sh" <<RUNEOF
+#!/usr/bin/env bash
+set -euo pipefail
+source /root/rsi-lab/bin/rsi-env
+cd "\$RSI_REPO"
+echo "RUN_SESSION=$session START=\$(date -u +%Y-%m-%dT%H:%M:%SZ) HEAD=\$(git rev-parse --short HEAD)"
+echo "PRESET=$preset generations=$generations children=$children tasks=$tasks budget_tokens=$budget_tokens"
+echo "MODELS solver=\$RSI_DEFAULT_SOLVER verifier=\$RSI_DEFAULT_VERIFIER mutator=\$RSI_DEFAULT_MUTATOR MODE=shadow"
+PYTHONUNBUFFERED=1 "\$RSI_PY" -u -m dharma_swarm.forge_lab.cli run \\
+  --generations $generations --children $children --tasks $tasks \\
+  --solver-model "\$RSI_DEFAULT_SOLVER" --verifier-model "\$RSI_DEFAULT_VERIFIER" --mutator-model "\$RSI_DEFAULT_MUTATOR" \\
+  --budget-tokens $budget_tokens --budget-usd $budget_usd --max-experiment-tokens $max_tokens \\
+  --propose-timeout 180 --grade-timeout 300 --source-repo "\$RSI_REPO" --mode shadow $*
+echo "END=\$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+RUNEOF
+chmod +x "$run_dir/run.sh"
+cmd="bash $(printf '%q' "$run_dir/run.sh") 2>&1 | tee -a $(printf '%q' "$log")"
+echo "Launching tmux session: $session"; echo "Log: $log"
+tmux new-session -d -s "$session" "$cmd"
+echo "Tail:   ssh meghadharma 'rsi-tail $session'"
+echo "Stop:   ssh meghadharma 'rsi-stop $session'"
