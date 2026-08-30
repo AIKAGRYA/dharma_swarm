@@ -77,6 +77,8 @@ from dharma_swarm.terminal_commands.agents import (
     _cmd_agent_runs,
     _cmd_agent_talk,
     _cmd_agent_run,
+    _cmd_agent_bootstrap,
+    _cmd_agent_remote_preflight,
     _cmd_agent_status,
     _cmd_agent_kill,
     cmd_task_create,
@@ -661,6 +663,37 @@ def _build_parser() -> argparse.ArgumentParser:
         default="declared-first",
         help="Routing mode: identity-declared model first, or explicit free-first chain",
     )
+
+    p_agent_bootstrap = agent_sub.add_parser(
+        "bootstrap",
+        help="Plan or materialize a complete canonical sovereign holon",
+    )
+    p_agent_bootstrap.add_argument("name", help="Target holon name")
+    p_agent_bootstrap.add_argument(
+        "--from-agent",
+        default="",
+        help="Copy the prompt/model/provider claims of an existing local holon",
+    )
+    p_agent_bootstrap.add_argument("--role", default="")
+    p_agent_bootstrap.add_argument("--provider", default="")
+    p_agent_bootstrap.add_argument("--model", default="")
+    p_agent_bootstrap.add_argument("--prompt-file", default="")
+    p_agent_bootstrap.add_argument("--harness", default="codex")
+    p_agent_bootstrap.add_argument("--endpoint", default="local://dgc-agent")
+    p_agent_bootstrap.add_argument("--dharma-home", default="")
+    p_agent_bootstrap.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write the reviewed plan; without this flag the command is read-only",
+    )
+
+    p_agent_remote_preflight = agent_sub.add_parser(
+        "remote-preflight",
+        help="Run a fixed read-only holon inventory through a configured SSH alias",
+    )
+    p_agent_remote_preflight.add_argument("ssh_alias")
+    p_agent_remote_preflight.add_argument("--name", default="codex_composer")
+    p_agent_remote_preflight.add_argument("--timeout", type=int, default=5)
 
     p_agent_status = agent_sub.add_parser(
         "status",
@@ -1634,7 +1667,7 @@ def main() -> None:
                     _cmd_agent_list()
                 case "runs":
                     _cmd_agent_runs()
-                case "talk" | "run" | "status" | "kill":
+                case "talk" | "run" | "bootstrap" | "remote-preflight" | "status" | "kill":
                     # Holon subcommands fail closed with a concise error, never a traceback.
                     try:
                         match args.agent_cmd:
@@ -1650,6 +1683,25 @@ def main() -> None:
                                     args.name,
                                     cycles=args.cycles,
                                     routing_mode=args.mode,
+                                )
+                            case "bootstrap":
+                                _cmd_agent_bootstrap(
+                                    args.name,
+                                    from_agent=args.from_agent,
+                                    role=args.role,
+                                    provider=args.provider,
+                                    model=args.model,
+                                    prompt_file=args.prompt_file,
+                                    harness=args.harness,
+                                    endpoint=args.endpoint,
+                                    dharma_home=args.dharma_home,
+                                    apply=args.apply,
+                                )
+                            case "remote-preflight":
+                                _cmd_agent_remote_preflight(
+                                    args.ssh_alias,
+                                    name=args.name,
+                                    timeout=args.timeout,
                                 )
                             case "status":
                                 _cmd_agent_status(args.name, as_json=args.json)

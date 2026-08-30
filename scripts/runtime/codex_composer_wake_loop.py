@@ -48,6 +48,7 @@ DEFAULT_AGENT_UID = "codex_composer"
 AUTHORITY_MODE = "read_only_until_execution_lease"
 DEFAULT_DHARMA_HOME = Path("~/.dharma")
 DEFAULT_INTERVAL_S = 900.0
+WAKE_LOOP_START_ACTION = "wake_loop_start"
 
 
 @dataclass(frozen=True)
@@ -711,15 +712,98 @@ def payload_correlation_id(payload: Mapping[str, Any]) -> str:
     return payload_field(payload, "correlation_id", "packet_id")
 
 
+def payload_request_text(payload: Mapping[str, Any], summary: str = "") -> str:
+    """Extract requested work text without letting lease fields describe scope."""
+    parts = [summary]
+    request_keys = (
+        "title",
+        "body",
+        "task",
+        "message",
+        "description",
+        "instruction",
+        "content",
+        "summary",
+    )
+    for container in (payload, payload.get("envelope")):
+        if not isinstance(container, Mapping):
+            continue
+        for key in request_keys:
+            value = container.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(value.strip())
+    return " ".join(dict.fromkeys(part for part in parts if part)).strip()
+
+
+def payload_declared_actions(payload: Mapping[str, Any]) -> list[str]:
+    """Return the action scope explicitly declared by the task producer."""
+    actions: list[str] = []
+    for container in (payload, payload.get("envelope")):
+        if not isinstance(container, Mapping):
+            continue
+        explicit = container.get("requested_actions")
+        if isinstance(explicit, str) and explicit.strip():
+            actions.append(explicit.strip())
+        elif isinstance(explicit, list):
+            actions.extend(str(item).strip() for item in explicit if str(item).strip())
+    return list(dict.fromkeys(actions))
+
+
+def payload_requested_actions(payload: Mapping[str, Any], request_text: str) -> list[str]:
+    """Union declared scope with conservative prose projections.
+
+    The projection can only narrow a declaration; it cannot replace the typed
+    ``requested_actions`` field for lease-required work.
+    """
+    actions = payload_declared_actions(payload)
+
+    lowered = request_text.lower()
+    projections = (
+        (r"\b(write|edit|modify|patch|apply|create|update)\b", "write_artifact"),
+        (r"\b(commit|push|merge)\b", "git_push"),
+        (r"\b(start|restart|tmux|daemon|service|launchd)\b", WAKE_LOOP_START_ACTION),
+        (r"\b(close|complete)\b", "close_task"),
+        (r"\b(publish|reply)\b", "publish_domain_reply"),
+        (r"\b(delete|remove)\b", "delete_artifact"),
+        (r"\b(spend|purchase|pay)\b", "spend"),
+        (r"\b(email|external contact|contact externally)\b", "external_contact"),
+    )
+    for pattern, action in projections:
+        if re.search(pattern, lowered):
+            actions.append(action)
+    return list(dict.fromkeys(actions))
+
+
+def payload_requested_paths(payload: Mapping[str, Any]) -> list[str]:
+    """Extract only explicit target paths; never infer a path from prose."""
+    paths: list[str] = []
+    for container in (payload, payload.get("envelope")):
+        if not isinstance(container, Mapping):
+            continue
+        for key in ("path", "target_path", "output_path", "workspace_path"):
+            value = container.get(key)
+            if isinstance(value, str) and value.strip():
+                paths.append(value.strip())
+        explicit = container.get("requested_paths")
+        if isinstance(explicit, str) and explicit.strip():
+            paths.append(explicit.strip())
+        elif isinstance(explicit, list):
+            paths.extend(str(item).strip() for item in explicit if str(item).strip())
+    return list(dict.fromkeys(paths))
+
+
 def payload_execution_lease_status(
     payload: Mapping[str, Any],
     *,
     agent_uid: str = "",
     task_id: str = "",
     lease_root: Path | None = None,
+    requested_actions: Sequence[str] = (),
+    requested_paths: Sequence[str | Path] = (),
 ) -> dict[str, Any]:
     lease = payload.get("execution_lease") or payload.get("lease")
     loaded_from = "embedded"
+    matched_by = ""
     if not isinstance(lease, dict):
         lease_id = str(
             payload_field(payload, "execution_lease_id", "lease_id")
@@ -736,49 +820,48 @@ def payload_execution_lease_status(
                     correlation_id=correlation_id,
                 )
                 if match is not None:
-                    path, lease, validation = match
-                    return {
-                        "present": True,
-                        "valid": True,
-                        "lease_id": validation.lease_id,
-                        "errors": [],
-                        "warnings": list(validation.warnings),
-                        "loaded_from": str(path),
-                        "matched_by": "task_or_correlation_id",
-                    }
-            return {
-                "present": False,
-                "valid": False,
-                "errors": ["missing execution lease"],
-                "warnings": [],
-                "task_id": task_id,
-                "correlation_id": correlation_id,
-            }
-        if lease_root is None:
-            return {
-                "present": True,
-                "valid": False,
-                "lease_id": lease_id,
-                "errors": ["lease_id present but no lease_root was available"],
-                "warnings": [],
-            }
-        try:
-            lease = load_execution_lease(lease_root, lease_id)
-            loaded_from = str(lease_root)
-        except (ExecutionLeaseError, OSError, json.JSONDecodeError) as exc:
-            return {
-                "present": True,
-                "valid": False,
-                "lease_id": lease_id,
-                "errors": [f"lease load failed: {type(exc).__name__}: {exc}"],
-                "warnings": [],
-            }
+                    path, lease, _ = match
+                    loaded_from = str(path)
+                    matched_by = "task_or_correlation_id"
+            if not isinstance(lease, dict):
+                return {
+                    "present": False,
+                    "valid": False,
+                    "errors": ["missing execution lease"],
+                    "warnings": [],
+                    "task_id": task_id,
+                    "correlation_id": correlation_id,
+                    "requested_actions": list(requested_actions),
+                    "requested_paths": [str(path) for path in requested_paths],
+                }
+        else:
+            if lease_root is None:
+                return {
+                    "present": True,
+                    "valid": False,
+                    "lease_id": lease_id,
+                    "errors": ["lease_id present but no lease_root was available"],
+                    "warnings": [],
+                }
+            try:
+                lease = load_execution_lease(lease_root, lease_id)
+                loaded_from = str(lease_root)
+            except (ExecutionLeaseError, OSError, json.JSONDecodeError) as exc:
+                return {
+                    "present": True,
+                    "valid": False,
+                    "lease_id": lease_id,
+                    "errors": [f"lease load failed: {type(exc).__name__}: {exc}"],
+                    "warnings": [],
+                }
 
     revoked = load_revoked_lease_ids(lease_root) if lease_root is not None else set()
     validation = validate_execution_lease(
         lease,
         agent_uid=agent_uid,
         task_id=task_id,
+        requested_actions=requested_actions,
+        requested_paths=requested_paths,
         revoked_lease_ids=revoked,
     )
     return {
@@ -788,6 +871,9 @@ def payload_execution_lease_status(
         "errors": list(validation.errors),
         "warnings": list(validation.warnings),
         "loaded_from": loaded_from,
+        "matched_by": matched_by,
+        "requested_actions": list(requested_actions),
+        "requested_paths": [str(path) for path in requested_paths],
     }
 
 
@@ -817,14 +903,35 @@ def classify_record(
 ) -> dict[str, Any]:
     payload = original_payload if isinstance(original_payload, dict) else {}
     summary = str(record.get("summary") or "")
-    text = summary
-    if payload:
-        text += " " + json.dumps(payload, sort_keys=True, default=_json_default)
-    explicit_requires = bool(payload.get("requires_execution_lease") or payload.get("requires_approval"))
+    text = payload_request_text(payload, summary)
+    envelope = payload.get("envelope") if isinstance(payload.get("envelope"), Mapping) else {}
+    explicit_requires = bool(
+        payload.get("requires_execution_lease")
+        or payload.get("requires_approval")
+        or envelope.get("requires_execution_lease")
+        or envelope.get("requires_approval")
+    )
     task_id = payload_task_id(payload, record)
-    lease_status = payload_execution_lease_status(payload, agent_uid=agent_uid, task_id=task_id, lease_root=lease_root)
+    declared_actions = payload_declared_actions(payload)
+    requested_actions = payload_requested_actions(payload, text)
+    requested_paths = payload_requested_paths(payload)
+    lease_status = payload_execution_lease_status(
+        payload,
+        agent_uid=agent_uid,
+        task_id=task_id,
+        lease_root=lease_root,
+        requested_actions=requested_actions,
+        requested_paths=requested_paths,
+    )
+    scope_declaration_required = explicit_requires or text_requires_execution_lease(text)
+    if scope_declaration_required and not declared_actions:
+        lease_status = dict(lease_status)
+        lease_status["valid"] = False
+        lease_status["errors"] = list(lease_status.get("errors") or []) + [
+            "lease-required payload must declare non-empty requested_actions"
+        ]
     has_lease = bool(lease_status["valid"])
-    requires_lease = (explicit_requires or text_requires_execution_lease(text)) and not has_lease
+    requires_lease = scope_declaration_required and not has_lease
     contact_evidence = str(payload.get("contact_evidence") or payload.get("ack_tier") or payload.get("evidence_tier") or "")
     publish_only = contact_evidence.upper() in {"PUBLISH_ACCEPTED", "NATS_CLI_JETSTREAM_PUB_ACK", "CORE_FLUSH_ONLY"}
     blocked = requires_lease or str(record.get("status") or "").lower() == "blocked"
@@ -836,6 +943,9 @@ def classify_record(
         "requires_execution_lease": requires_lease,
         "has_execution_lease": has_lease,
         "execution_lease": lease_status,
+        "declared_actions": declared_actions,
+        "requested_actions": requested_actions,
+        "requested_paths": requested_paths,
         "blocked": blocked,
         "block_reason": "execution_lease_required" if requires_lease else ("status_blocked" if blocked else ""),
         "publish_acceptance_only": publish_only,
@@ -915,7 +1025,6 @@ def classify_work(
 def nest_readme(profile: WakeProfile | None = None) -> str:
     profile = profile or WAKE_PROFILES[DEFAULT_AGENT_UID]
     uid = profile.agent_uid
-    slug = _slug(uid)
     return f"""# {uid} Wake Nest
 
 This is the durable local nest for the governed {uid} wake loop.
@@ -1177,9 +1286,30 @@ def render_status_markdown(status: Mapping[str, Any]) -> str:
 
 def loop_cycles(args: argparse.Namespace, paths: ComposerPaths) -> int:
     cycles = 0
-    latest: dict[str, Any] = {}
     while True:
-        latest = run_once(
+        lease_status = activation_lease_status(args.activation_lease, paths)
+        if not lease_status["valid"]:
+            result = {
+                "ok": False,
+                "status": "blocked_activation_lease_invalid",
+                "agent_uid": paths.agent_uid,
+                "activation_lease_validation": lease_status,
+                "wake_loop_active": False,
+                "cycles_completed": cycles,
+            }
+            record_action(
+                paths,
+                "loop_blocked",
+                "Repeated wake loop halted because its activation lease is no longer valid.",
+                outputs=result,
+                status="blocked",
+            )
+            write_json(
+                paths.status,
+                {**build_status(paths), "last_loop_block": result, "wake_loop_active": False},
+            )
+            return 2
+        run_once(
             paths,
             orientation_timeout_s=args.orientation_timeout_s,
             skip_orientation_command=args.skip_orientation_command,
@@ -1202,6 +1332,8 @@ def build_loop_command(args: argparse.Namespace, paths: ComposerPaths) -> list[s
         "--agent-uid",
         paths.agent_uid,
         "loop",
+        "--activation-lease",
+        str(args.activation_lease),
         "--interval-s",
         str(args.interval_s),
         "--orientation-timeout-s",
@@ -1214,14 +1346,77 @@ def build_loop_command(args: argparse.Namespace, paths: ComposerPaths) -> list[s
     return command
 
 
+def activation_lease_status(lease_id: str, paths: ComposerPaths) -> dict[str, Any]:
+    """Load and strictly scope the local v1 lease used to start a wake loop.
+
+    This closes the previous ``non-empty string == authority`` gap.  The v1
+    checksum is still only local integrity evidence, not an operator signature;
+    that assurance limit is explicit in every result.
+    """
+    requested_task = f"wake-loop-start:{paths.agent_uid}"
+    assurance = "local_scoped_checksum_not_operator_signature"
+    if not str(lease_id or "").strip():
+        return {
+            "valid": False,
+            "lease_id": "",
+            "errors": ["missing activation lease id"],
+            "warnings": ["execution lease v1 is not cryptographically signed"],
+            "requested_action": WAKE_LOOP_START_ACTION,
+            "requested_task": requested_task,
+            "authority_assurance": assurance,
+        }
+    try:
+        lease = load_execution_lease(paths.leases, str(lease_id).strip())
+    except (ExecutionLeaseError, OSError, json.JSONDecodeError) as exc:
+        return {
+            "valid": False,
+            "lease_id": str(lease_id).strip(),
+            "errors": [f"lease load failed: {type(exc).__name__}: {exc}"],
+            "warnings": ["execution lease v1 is not cryptographically signed"],
+            "requested_action": WAKE_LOOP_START_ACTION,
+            "requested_task": requested_task,
+            "authority_assurance": assurance,
+        }
+
+    validation = validate_execution_lease(
+        lease,
+        agent_uid=paths.agent_uid,
+        task_id=requested_task,
+        requested_actions=[WAKE_LOOP_START_ACTION],
+        revoked_lease_ids=load_revoked_lease_ids(paths.leases),
+    )
+    errors = list(validation.errors)
+    if str(lease.get("task_id") or "") != requested_task:
+        errors.append(f"lease task_id must be exactly {requested_task!r}")
+    if str(lease.get("issuer") or "") != "operator":
+        errors.append("activation lease issuer must be 'operator'")
+    return {
+        "valid": not errors,
+        "lease_id": validation.lease_id or str(lease_id).strip(),
+        "errors": errors,
+        "warnings": list(validation.warnings)
+        + ["execution lease v1 is not cryptographically signed"],
+        "requested_action": WAKE_LOOP_START_ACTION,
+        "requested_task": requested_task,
+        "authority_assurance": assurance,
+    }
+
+
 def start_loop(args: argparse.Namespace, paths: ComposerPaths) -> dict[str, Any]:
     bootstrap_nest(paths)
-    if not args.activation_lease:
+    lease_status = activation_lease_status(args.activation_lease, paths)
+    if not lease_status["valid"]:
+        missing = not str(args.activation_lease or "").strip()
         result = {
             "ok": False,
-            "status": "blocked_activation_lease_required",
+            "status": (
+                "blocked_activation_lease_required"
+                if missing
+                else "blocked_activation_lease_invalid"
+            ),
             "agent_uid": paths.agent_uid,
-            "message": "start refused without --activation-lease",
+            "message": "start refused: a valid, scoped activation lease is required",
+            "activation_lease_validation": lease_status,
             "wake_loop_active": False,
         }
         record_action(paths, "start_blocked", result["message"], outputs=result, status="blocked")
@@ -1253,6 +1448,7 @@ def start_loop(args: argparse.Namespace, paths: ComposerPaths) -> dict[str, Any]
         "session": session,
         "command": command_text,
         "activation_lease": args.activation_lease,
+        "activation_lease_validation": lease_status,
         "wake_loop_active": sent.returncode == 0,
         "stdout": sent.stdout,
         "stderr": sent.stderr,
@@ -1318,7 +1514,8 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--json", action="store_true")
     status.set_defaults(func=cmd_status)
 
-    loop = sub.add_parser("loop", help="Run repeated wake cycles. Use through start unless testing.")
+    loop = sub.add_parser("loop", help="Run repeated wake cycles with a scoped activation lease")
+    loop.add_argument("--activation-lease", required=True)
     loop.add_argument("--interval-s", type=float, default=DEFAULT_INTERVAL_S)
     loop.add_argument("--max-cycles", type=int, default=0)
     loop.add_argument("--orientation-timeout-s", type=float, default=30.0)
@@ -1347,7 +1544,10 @@ def _paths_from_args(args: argparse.Namespace) -> ComposerPaths:
 
 
 def _session_for(args: argparse.Namespace, paths: ComposerPaths) -> str:
-    return (getattr(args, "session", "") or "").strip() or paths.profile.session
+    session = (getattr(args, "session", "") or "").strip() or paths.profile.session
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", session):
+        raise ValueError("tmux session must be a single safe token")
+    return session
 
 
 def cmd_bootstrap(args: argparse.Namespace) -> int:
@@ -1379,7 +1579,26 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_loop(args: argparse.Namespace) -> int:
-    return loop_cycles(args, _paths_from_args(args))
+    paths = _paths_from_args(args)
+    lease_status = activation_lease_status(args.activation_lease, paths)
+    if not lease_status["valid"]:
+        result = {
+            "ok": False,
+            "status": "blocked_activation_lease_invalid",
+            "agent_uid": paths.agent_uid,
+            "activation_lease_validation": lease_status,
+            "wake_loop_active": False,
+        }
+        record_action(
+            paths,
+            "loop_blocked",
+            "Repeated wake loop refused an invalid activation lease.",
+            outputs=result,
+            status="blocked",
+        )
+        print(json.dumps(result, indent=2, sort_keys=True, default=_json_default))
+        return 2
+    return loop_cycles(args, paths)
 
 
 def cmd_start(args: argparse.Namespace) -> int:

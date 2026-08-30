@@ -8,8 +8,10 @@ are background only.
 
 ## The Contract
 
-- Keys live in one place: `~/.dharma/agent_keys.env`.
+- New key writes have one canonical destination: `~/.dharma/agent_keys.env`.
 - Keys are managed by one tool: `dkeys`.
+- The versioned tool source is `scripts/dkeys.py`; install it with
+  `install -m 700 scripts/dkeys.py ~/.dharma/bin/dkeys`.
 - Code reads keys through one module: `dharma_swarm/api_keys.py`.
 - Shell and launchd entrypoints source one loader:
   `scripts/load_runtime_env.sh`.
@@ -30,9 +32,23 @@ Use:
 ```bash
 dkeys
 dkeys test
-dkeys add VAR=value
-dkeys find kimi
+dkeys add VAR              # hidden prompt; value never enters argv/history
+printf '%s' "$VALUE" | dkeys add VAR --stdin
+dkeys find KIMI_API_KEY    # variable-name fragments only; values stay redacted
+dkeys safe-json            # automation-safe status; no values, masks, or lengths
+dkeys exec XAI_API_KEY -- your-command --flag
 ```
+
+`dkeys env` is deliberately disabled. Never print, copy, or synchronize the
+whole key store. A remote holon gets a named/scoped secret grant for its child
+process; SSH reachability is not authorization to replicate credentials.
+`dkeys exec` strips every other stored provider variable from the child
+environment and injects only the named references; it invokes the command
+directly, without a shell.
+
+Legacy stores may still be read by the transitional runtime loader. That is a
+migration fact, not permission to add another store. New writes go only to the
+canonical destination above.
 
 For the scheduled/operator refresh path, use:
 
@@ -57,7 +73,8 @@ config = resolve_runtime_provider_config(ProviderType.KIMI_CODE)
 provider = create_runtime_provider(config)
 ```
 
-Never read `os.environ["..._API_KEY"]` outside `api_keys.py`.
+Never read `os.environ["..._API_KEY"]` outside `api_keys.py`, and never pass a
+secret value in a command-line argument.
 
 ## Current First-Party Lanes
 

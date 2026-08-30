@@ -1,0 +1,63 @@
+{
+  "blockers": [],
+  "conviction_gate": "pass_fullness",
+  "critic_count": 1,
+  "critics": [
+    {
+      "actual_model": "kimi-k2.5",
+      "lane_id": "kimi27code",
+      "latency_ms": 147357,
+      "ok": true,
+      "parsed": {
+        "blockers": [],
+        "evidence_checked": [
+          "bootstrap.py: plan is read-only, prompt not embedded in plan dict, conflicts fail closed, symlink rejection, atomic writes, load_holon round-trip, secret_material_required=False",
+          "ssh_preflight.py: _validate_ssh_alias rejects user@host/IP/metacharacters, _validate_holon_name rejects traversal, _FIXED_SSH_OPTIONS pins ControlMaster/ControlPath/ProxyCommand/ProxyJump, REMOTE_PROBE is POSIX-sh allowlisted output only, _parse_probe rejects unknown/oversized fields, _authority always returns authorization_granted=False",
+          "execution_lease.py: DEFAULT_FORBIDDEN_ACTIONS unioned immutably, validate_execution_lease errors on requested_actions with empty allowed_actions, requested_paths with empty allowed_paths, revoked lease ids checked",
+          "codex_composer_wake_loop.py: loop_cycles calls activation_lease_status before every cycle and halts on invalid, activation_lease_status requires exact task_id 'wake-loop-start:<uid>', issuer='operator', WAKE_LOOP_START_ACTION in allowed_actions, authority_assurance='local_scoped_checksum_not_operator_signature', _session_for rejects option/colon/space/traversal tmux targets",
+          "scripts/dkeys.py: cmd_add refuses inline VAR=value, cmd_env refuses raw export, _atomic_upsert_key_file uses flock+O_EXCL+rename+chmod 0600, cmd_safe_json omits masked/key_present/len fields, cmd_exec strips all stored variable names then injects only requested, os.execvpe direct child without shell",
+          "_holons.py: imports only dharma_swarm.* no scripts.*",
+          "tests/test_dgc_cli.py::test_agent_talk_and_run_work_without_scripts_package: meta_path blocks scripts.* and verifies dispatch succeeds",
+          "tests/test_holon_bootstrap.py: plan read-only, idempotent apply, conflict rejection, unsupported provider rejection, evolved prompt canonical, symlink rejection",
+          "tests/test_remote_holon_ssh_preflight.py: fixed argv assertions, injection destination rejection, stderr not reflected, default-only hostname rejected, auth failure not promoted, arbitrary output rejected, key-store mode is metadata only",
+          "tests/test_execution_lease.py: empty scope fail-closed, baseline denial immutability, explicit scope validation",
+          "tests/test_codex_composer_wake_loop.py: per-cycle revalidation fixture, activation lease must bind agent/task/action, non-empty-but-unloadable rejected, tmux session injection rejection, lease-required payload without declared actions stays blocked",
+          "tests/test_dkeys.py: inline/raw refused, safe-json no metadata, exec injects only named ref, atomic private cache, qwen probe requires credential file",
+          "docs/ops/REMOTE_HOLON_FASTPATH.md: names all 8 activation gates, states all hosts report materialization_ready=false and activation_ready=false, root login called out as blocker, signed authority v2 named as missing",
+          "evidence report: sha256 match for repository vs installed dkeys, 267 passed, make agent-build-preflight exit 0"
+        ],
+        "explicit_disagreement": "",
+        "required_changes": [],
+        "score": 95,
+        "summary": "The narrow foundation claim is truthfully and safely established. All seven claim items are backed by concrete implementation and adversarial tests that exercise boundaries rather than assert prose. SSH preflight uses fixed hardened argv with validated alias/name inputs, allowlisted output parsing, and never promotes authentication to authorization. Bootstrap is read-only by default, idempotent on apply, refuses conflicting identity claims, rejects unknown providers, round-trips load_holon, and reads no secret. Execution-lease v1 fails closed for empty/unscoped action/path scopes, baseline denials are immutable, and the repeated wake loop re-validates the exact agent/task/action lease before every cycle with expiry/revocation halting mid-loop. The code explicitly admits lease v1 is a local checksum receipt, not a cryptographic signature. dkeys refuses inline/raw export, writes atomically under flock, safe-json omits all key metadata, and exec injects only named stored variables into a direct child process. The installed-package talk/run path is proven to work without scripts.* imports. Documentation truthfully names all remaining blockers and does not claim remote deployment is ready.",
+        "verdict": "pass"
+      },
+      "provider": "ollama",
+      "raw_response": "{\n  \"verdict\": \"pass\",\n  \"score\": 95,\n  \"summary\": \"The narrow foundation claim is truthfully and safely established. All seven claim items are backed by concrete implementation and adversarial tests that exercise boundaries rather than assert prose. SSH preflight uses fixed hardened argv with validated alias/name inputs, allowlisted output parsing, and never promotes authentication to authorization. Bootstrap is read-only by default, idempotent on apply, refuses conflicting identity claims, rejects unknown providers, round-trips load_holon, and reads no secret. Execution-lease v1 fails closed for empty/unscoped action/path scopes, baseline denials are immutable, and the repeated wake loop re-validates the exact agent/task/action lease before every cycle with expiry/revocation halting mid-loop. The code explicitly admits lease v1 is a local checksum receipt, not a cryptographic signature. dkeys refuses inline/raw export, writes atomically under flock, safe-json omits all key metadata, and exec injects only named stored variables into a direct child process. The installed-package talk/run path is proven to work without scripts.* imports. Documentation truthfully names all remaining blockers and does not claim remote deployment is ready.\",\n  \"blockers\": [],\n  \"required_changes\": [],\n  \"evidence_checked\": [\n    \"bootstrap.py: plan is read-only, prompt not embedded in plan dict, conflicts fail closed, symlink rejection, atomic writes, load_holon round-trip, secret_material_required=False\",\n    \"ssh_preflight.py: _validate_ssh_alias rejects user@host/IP/metacharacters, _validate_holon_name rejects traversal, _FIXED_SSH_OPTIONS pins ControlMaster/ControlPath/ProxyCommand/ProxyJump, REMOTE_PROBE is POSIX-sh allowlisted output only, _parse_probe rejects unknown/oversized fields, _authority always returns authorization_granted=False\",\n    \"execution_lease.py: DEFAULT_FORBIDDEN_ACTIONS unioned immutably, validate_execution_lease errors on requested_actions with empty allowed_actions, requested_paths with empty allowed_paths, revoked lease ids checked\",\n    \"codex_composer_wake_loop.py: loop_cycles calls activation_lease_status before every cycle and halts on invalid, activation_lease_status requires exact task_id 'wake-loop-start:<uid>', issuer='operator', WAKE_LOOP_START_ACTION in allowed_actions, authority_assurance='local_scoped_checksum_not_operator_signature', _session_for rejects option/colon/space/traversal tmux targets\",\n    \"scripts/dkeys.py: cmd_add refuses inline VAR=value, cmd_env refuses raw export, _atomic_upsert_key_file uses flock+O_EXCL+rename+chmod 0600, cmd_safe_json omits masked/key_present/len fields, cmd_exec strips all stored variable names then injects only requested, os.execvpe direct child without shell\",\n    \"_holons.py: imports only dharma_swarm.* no scripts.*\",\n    \"tests/test_dgc_cli.py::test_agent_talk_and_run_work_without_scripts_package: meta_path blocks scripts.* and verifies dispatch succeeds\",\n    \"tests/test_holon_bootstrap.py: plan read-only, idempotent apply, conflict rejection, unsupported provider rejection, evolved prompt canonical, symlink rejection\",\n    \"tests/test_remote_holon_ssh_preflight.py: fixed argv assertions, injection destination rejection, stderr not reflected, default-only hostname rejected, auth failure not promoted, arbitrary output rejected, key-store mode is metadata only\",\n    \"tests/test_execution_lease.py: empty scope fail-closed, baseline denial immutability, explicit scope validation\",\n    \"tests/test_codex_composer_wake_loop.py: per-cycle revalidation fixture, activation lease must bind agent/task/action, non-empty-but-unloadable rejected, tmux session injection rejection, lease-required payload without declared actions stays blocked\",\n    \"tests/test_dkeys.py: inline/raw refused, safe-json no metadata, exec injects only named ref, atomic private cache, qwen probe requires credential file\",\n    \"docs/ops/REMOTE_HOLON_FASTPATH.md: names all 8 activation gates, states all hosts report materialization_ready=false and activation_ready=false, root login called out as blocker, signed authority v2 named as missing\",\n    \"evidence report: sha256 match for repository vs installed dkeys, 267 passed, make agent-build-preflight exit 0\"\n  ],\n  \"explicit_disagreement\": \"\"\n}",
+      "requested_model": "kimi-k2.7-code:cloud",
+      "required": true
+    }
+  ],
+  "generated_at": "20260712T153148Z",
+  "max_evidence_chars": 0,
+  "max_output_tokens": 24000,
+  "persistent_agent_witness": {
+    "agent": "palantir-pilot",
+    "blocker": "",
+    "fresh": true,
+    "heartbeat_age_seconds": 2,
+    "heartbeat_timestamp": "2026-07-12T15:31:46Z",
+    "max_heartbeat_age_seconds": 300,
+    "raw_status": "status=running session=dharma_palantir_pilot_a2a_worker\nsubject=dharma.a2a.palantir-pilot\nconsumer=palantir_pilot_a2a\nstream=DHARMA_FLEET\nheartbeat=/Users/dhyana/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json\nlog=/Users/dhyana/.dharma/logs/palantir_pilot_a2a_worker/dharma_palantir_pilot_a2a_worker.log\n--- heartbeat ---\n{\n    \"agent_id\": \"palantir_pilot\",\n    \"callsign\": \"palantir-pilot\",\n    \"consumer\": \"palantir_pilot_a2a\",\n    \"cycle\": 3684,\n    \"last_receipt_path\": \"\",\n    \"receipt_count\": 0,\n    \"schema_version\": \"dharma.a2a.palantir_pilot.worker_heartbeat.v1\",\n    \"status\": \"IDLE\",\n    \"stream\": \"DHARMA_FLEET\",\n    \"subject\": \"dharma.a2a.palantir-pilot\",\n    \"suppress_no_messages\": true,\n    \"timestamp\": \"2026-07-12T15:31:46Z\"\n}\n--- consumer ---\n{\n  \"stream_name\": \"DHARMA_FLEET\",\n  \"name\": \"palantir_pilot_a2a\",\n  \"config\": {\n    \"ack_policy\": \"explicit\",\n    \"ack_wait\": 30000000000,\n    \"deliver_policy\": \"all\",\n    \"durable_name\": \"palantir_pilot_a2a\",\n    \"name\": \"palantir_pilot_a2a\",\n    \"filter_subject\": \"dharma.a2a.palantir-pilot\",\n    \"max_ack_pending\": 1000,\n    \"max_deliver\": -1,\n    \"max_waiting\": 512,\n    \"replay_policy\": \"instant\",\n    \"num_replicas\": 0,\n    \"metadata\": {\n      \"_nats.level\": \"3\",\n      \"_nats.req.level\": \"0\",\n      \"_nats.ver\": \"2.12.6\"\n    },\n    \"pause_until\": \"0001-01-01T00:00:00Z\"\n  },\n  \"created\": \"2026-07-10T15:21:55.497881Z\",\n  \"delivered\": {\n    \"consumer_seq\": 0,\n    \"stream_seq\": 0\n  },\n  \"ack_floor\": {\n    \"consumer_seq\": 0,\n    \"stream_seq\": 0\n  },\n  \"num_ack_pending\": 0,\n  \"num_redelivered\": 0,\n  \"num_waiting\": 1,\n  \"num_pending\": 0,\n  \"ts\": \"2026-07-12T15:31:48.728027Z\"\n}\n--- pane tail ---\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "status": "running"
+  },
+  "prompt_chars": 258315,
+  "prompt_file": "/Users/dhyana/ds_remote_holon_fastpath_20260712/reports/agentops/decorrelated_review_council/prompts/remote_holon_fastpath_20260712.md",
+  "prompt_words_estimate": 24805,
+  "required_critic_count": 1,
+  "schema_version": "codex.decorrelated_review_council.v1",
+  "score_avg": 95.0,
+  "score_min": 95,
+  "target_score": 95,
+  "timeout_seconds": 900
+}
