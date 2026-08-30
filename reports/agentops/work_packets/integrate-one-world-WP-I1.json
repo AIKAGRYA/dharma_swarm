@@ -114,6 +114,7 @@
     "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
     "docs/governance/CANONICAL_DOC_STACK.md",
     "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/hygiene/ratchet_baselines.json",
     "docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json",
     "docs/ops/FORGE_LAB_V0_1_RUNBOOK.md",
     "docs/ops/OZ_INTEGRATION.md",
