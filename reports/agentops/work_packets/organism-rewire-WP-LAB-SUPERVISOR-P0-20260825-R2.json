@@ -1,0 +1,100 @@
+{
+  "id": "organism-rewire-WP-LAB-SUPERVISOR-P0-20260825-R2",
+  "base_ref": "abc8bd35c34c729ed421f9615df504f5615868bd",
+  "branch": "codex/lab-supervisor-20260825",
+  "worktree": ".",
+  "intent": "Add a deterministic, fail-closed supervisor for the Sublimation Foundry and RSI Lab that continuously inspects typed health evidence and may perform only explicitly configured bounded recovery actions. Preserve durable KILL/Halt evidence, enforce locks, resource and call budgets, circuit breakers, cleanup allowlists, hash-chained receipts, dry-run defaults, and LLM-independent operation. Provide feature-detected adapters, five-tick simulations per lab, operator docs, and inert systemd templates without deploying or calling models.",
+  "allowed_files": [
+    "dharma_swarm/lab_supervisor/**",
+    "scripts/runtime/lab_supervisor.py",
+    "scripts/runtime/install_lab_supervisor.sh",
+    "scripts/runtime/status_lab_supervisor.sh",
+    "tests/test_lab_supervisor*.py",
+    "docs/ops/LAB_SUPERVISOR*.md",
+    "docs/ops/LAB_SUPERVISOR*.service",
+    "docs/ops/LAB_SUPERVISOR*.timer",
+    "reports/agentops/work_packets/organism-rewire-WP-LAB-SUPERVISOR-P0-20260825-R2.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/foundry/**",
+    "tests/test_foundry_*.py",
+    "tests/test_forge_lab*.py",
+    "docs/foundry/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "scripts/runtime/pr_merge_control.py",
+    ".github/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "name": "lab-supervisor-contract",
+      "command": "python3 -m pytest -q tests/test_lab_supervisor.py tests/test_lab_supervisor_cli.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "lab-supervisor-ruff",
+      "command": "python3 -m ruff check dharma_swarm/lab_supervisor scripts/runtime/lab_supervisor.py tests/test_lab_supervisor.py tests/test_lab_supervisor_cli.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "kill-evidence-cannot-auto-clear",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('dharma_swarm/lab_supervisor/engine.py'); original=p.read_text(); marker='if snapshot.halt_evidence:'; marker in original or sys.exit(3); p.write_text(original.replace(marker, 'if False and snapshot.halt_evidence:', 1)); result=subprocess.run([sys.executable,'-m','pytest','-q','tests/test_lab_supervisor.py','-k','kill_evidence']); p.write_text(original); sys.exit(result.returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(ops): add bounded cross-lab supervisor"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+      "work_packet": "WP-LAB-SUPERVISOR-P0-20260825-R2",
+    "active_track": "organism-rewire-2026-07",
+      "owner": "@AmitabhainArunachala",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "abc8bd35c34c729ed421f9615df504f5615868bd",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The Foundry and RSI installations expose different and version-dependent operator commands; the supervisor therefore detects declared argv features and records unsupported actions instead of guessing command names.",
+      "A scheduler can prove cadence and receipts but cannot prove model reasoning or research quality; optional anomaly analysis is a separate read-only adapter and is never required for supervision."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/foundry/daemon.py",
+      "dharma_swarm/forge_lab/cli.py",
+      "scripts/runtime/sarathi_wake_daemon.py",
+      "dharma_swarm/loop_supervisor.py"
+    ],
+    "honest_blockers": [
+      "This packet produces installable artifacts but does not deploy them to the VPS or Mac, mutate either lab, or call any external model.",
+      "Provider rotation and bounded trial launch remain unavailable unless an operator supplies exact pre-approved argv adapters in runtime configuration.",
+      "The supervisor classifies fresh evidence and operational safety; it cannot manufacture scientific insight or certify external validity."
+    ],
+    "rollback": "Revert the scoped commit to remove the supervisor package, operator entrypoints, tests, documentation, and inert service templates. Runtime receipts under the configured external state root remain as historical evidence and must not be automatically deleted.",
+      "packet_digest": "17573835fedc30c8a536fba1a6a77fc8fd54819d87e8a36d2addb5fea32a6d8c"
+  }
+}

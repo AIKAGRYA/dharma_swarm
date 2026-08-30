@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the Dharma cross-lab supervisor every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=20s
+AccuracySec=10s
+Persistent=true
+Unit=dharma-lab-supervisor.service
+
+[Install]
+WantedBy=timers.target

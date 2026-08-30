@@ -1,0 +1,34 @@
+[Unit]
+Description=Dharma bounded cross-lab supervisor tick
+Documentation=file:@@REPO@@/docs/ops/LAB_SUPERVISOR_RUNBOOK.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@@USER@@
+Group=@@GROUP@@
+WorkingDirectory=@@REPO@@
+UMask=0077
+ExecStart=@@PYTHON@@ @@REPO@@/scripts/runtime/lab_supervisor.py tick --config @@CONFIG@@ --state-root @@STATE_ROOT@@
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ReadWritePaths=@@STATE_ROOT@@
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+TimeoutStartSec=15min
+
+# Safe template: no --allow-actions. A reviewed override may add the flag only
+# after config dry_run=false, five bounded trials per lab, and operator approval.
