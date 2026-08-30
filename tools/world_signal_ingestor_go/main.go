@@ -285,7 +285,7 @@ func scoreFor(text, itemURL, source, sourceType string) float64 {
 	if strings.Contains(source, "operator") {
 		score += 0.12
 	}
-	if sourceType == "github_repos" || sourceType == "arxiv" {
+	if sourceType == "github_repos" || sourceType == "arxiv" || sourceType == "youtube_atom" || sourceType == "rss" {
 		score += 0.04
 	}
 	if score > 1.0 {

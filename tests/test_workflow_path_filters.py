@@ -52,6 +52,16 @@ def test_no_required_workflow_carries_a_paths_filter() -> None:
     )
 
 
+def test_agent_fast_job_always_reports() -> None:
+    """Background-agent compiler. A missing check name cannot be promoted
+    later; skip/needs would recreate the ci-lean trap."""
+    doc = yaml.safe_load((WORKFLOWS / "tests.yml").read_text())
+    job = doc["jobs"]["agent-fast"]
+    assert job.get("name") == "agent-fast"
+    assert "if" not in job
+    assert "needs" not in job
+
+
 def test_the_required_pytest_job_is_never_conditional() -> None:
     """tests.yml mixes the two required pytest contexts with advisory jobs, so
     the filtering there is per-job. `pytest` must stay outside it: neither an

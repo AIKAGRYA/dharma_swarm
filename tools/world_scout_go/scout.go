@@ -191,6 +191,10 @@ func observationsFromBytes(source Source, body []byte) []Observation {
 		return parseArxiv(source, body)
 	case "reddit":
 		return parseReddit(source, body)
+	case "youtube_atom":
+		return parseYouTubeAtom(source, body)
+	case "rss":
+		return parseRSS(source, body)
 	default:
 		if obs, ok := observationFromText(source, string(body)); ok {
 			return []Observation{obs}
@@ -311,6 +315,63 @@ func parseReddit(source Source, body []byte) []Observation {
 		}
 		description := strings.TrimSpace(data.Selftext + " subreddit=" + data.Subreddit)
 		observations = append(observations, makeObservation(source, data.ID, data.Title, description, url))
+	}
+	return observations
+}
+
+func parseYouTubeAtom(source Source, body []byte) []Observation {
+	var feed struct {
+		Entries []struct {
+			ID      string `xml:"id"`
+			VideoID string `xml:"videoId"`
+			Title   string `xml:"title"`
+			Link    struct {
+				Href string `xml:"href,attr"`
+			} `xml:"link"`
+			Published string `xml:"published"`
+			Group     struct {
+				Description string `xml:"description"`
+			} `xml:"group"`
+		} `xml:"entry"`
+	}
+	if xml.Unmarshal(body, &feed) != nil {
+		return fallbackObservation(source, body)
+	}
+	observations := []Observation{}
+	for _, entry := range feed.Entries {
+		itemURL := strings.TrimSpace(entry.Link.Href)
+		if itemURL == "" && entry.VideoID != "" {
+			itemURL = "https://www.youtube.com/watch?v=" + entry.VideoID
+		}
+		itemID := firstNonEmpty(entry.VideoID, entry.ID)
+		observations = append(observations, makeObservation(source, itemID, entry.Title, entry.Group.Description, itemURL))
+	}
+	if len(observations) == 0 {
+		return fallbackObservation(source, body)
+	}
+	return observations
+}
+
+func parseRSS(source Source, body []byte) []Observation {
+	var feed struct {
+		Channel struct {
+			Items []struct {
+				Title       string `xml:"title"`
+				Link        string `xml:"link"`
+				Description string `xml:"description"`
+				GUID        string `xml:"guid"`
+			} `xml:"item"`
+		} `xml:"channel"`
+	}
+	if xml.Unmarshal(body, &feed) != nil {
+		return fallbackObservation(source, body)
+	}
+	observations := []Observation{}
+	for _, item := range feed.Channel.Items {
+		observations = append(observations, makeObservation(source, firstNonEmpty(item.GUID, item.Link, item.Title), item.Title, item.Description, item.Link))
+	}
+	if len(observations) == 0 {
+		return fallbackObservation(source, body)
 	}
 	return observations
 }

@@ -190,6 +190,14 @@ def test_editing_the_workflow_that_defines_the_jobs_runs_every_job() -> None:
     )
 
 
+def test_editing_agent_fast_compiler_runs_python_jobs() -> None:
+    classes = ccp.classify(["scripts/ci/agent_fast.py"])
+    assert all(classes.values()), (
+        "editing the agent-fast compiler must exercise every tests.yml class: "
+        + repr(classes)
+    )
+
+
 def test_editing_the_classifier_itself_runs_every_job() -> None:
     classes = ccp.classify(["scripts/ci/classify_changed_paths.py"])
     assert all(classes.values()), (

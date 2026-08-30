@@ -34,6 +34,7 @@ SUPPORTED_SOURCE_TYPES = {
     "arxiv",
     "hacker_news",
     "operator_drop",
+    "youtube",
 }
 
 DEFAULT_CORROBORATION_K = 2
@@ -302,6 +303,8 @@ def _canonical_source_type(row: dict[str, Any]) -> str:
         return "hacker_news"
     if "arxiv" in raw or _is_arxiv_url(url):
         return "arxiv"
+    if "youtube" in raw or "youtube_atom" in raw or _is_youtube_url(url):
+        return "youtube"
     return raw.split()[0] if raw.split() else ""
 
 
@@ -318,6 +321,8 @@ def _fetch_method(row: dict[str, Any], source_type: str) -> str:
         return "operator_drop_attested_url"
     if source_type == "hacker_news":
         return "hn_algolia_api"
+    if source_type == "youtube":
+        return "youtube_atom_feed"
     return "arxiv_public_api"
 
 
@@ -329,6 +334,8 @@ def _license(row: dict[str, Any], source_type: str) -> str:
         return "operator_attested_public_source"
     if source_type == "hacker_news":
         return "hn_algolia_public_api_terms"
+    if source_type == "youtube":
+        return "youtube_standard_feeds_terms"
     return "arxiv_metadata_public_terms"
 
 
@@ -649,6 +656,11 @@ def _is_hacker_news_url(value: str) -> bool:
 def _is_arxiv_url(value: str) -> bool:
     host = _url_hostname(value)
     return host == "arxiv.org" or host.endswith(".arxiv.org")
+
+
+def _is_youtube_url(value: str) -> bool:
+    host = _url_hostname(value)
+    return host in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
 
 
 def _short_hash(value: str, *, length: int = 16) -> str:

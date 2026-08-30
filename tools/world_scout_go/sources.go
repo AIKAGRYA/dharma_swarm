@@ -34,6 +34,10 @@ func DefaultSources() []Source {
 		{Name: "arxiv_llm_agent_architecture", URL: "https://export.arxiv.org/api/query?search_query=all:LLM%20agent%20architecture&sortBy=submittedDate&sortOrder=descending&max_results=10", Kind: "arxiv"},
 		{Name: "hacker_news_agentic_engineering", URL: "https://hn.algolia.com/api/v1/search_by_date?query=agentic%20engineering", Kind: "hn_algolia"},
 		{Name: "github_agentic_design_patterns", URL: "https://api.github.com/search/repositories?q=agentic+design+patterns&sort=updated&order=desc", Kind: "github_repos"},
+		// Allowlisted YouTube / RSS — not a scrape farm. Channel RSS is the
+		// public Atom feed; skill releases are Matt's own RSS (2026-08-25).
+		{Name: "youtube_matt_pocock", URL: "https://www.youtube.com/feeds/videos.xml?channel_id=UCswG6FSbgZjbWtdf_hMLaow", Kind: "youtube_atom"},
+		{Name: "aihero_skills_rss", URL: "https://www.aihero.dev/skills/rss.xml", Kind: "rss"},
 	}
 }
 
@@ -94,6 +98,10 @@ func inferKind(rawURL string) string {
 		return "arxiv"
 	case strings.Contains(rawURL, "reddit.com"):
 		return "reddit"
+	case strings.Contains(rawURL, "youtube.com/feeds/videos.xml"):
+		return "youtube_atom"
+	case strings.HasSuffix(rawURL, "/rss.xml") || strings.HasSuffix(rawURL, ".rss") || strings.Contains(rawURL, "/rss"):
+		return "rss"
 	default:
 		return "html"
 	}
