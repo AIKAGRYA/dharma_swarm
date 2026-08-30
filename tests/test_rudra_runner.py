@@ -259,6 +259,43 @@ def test_blocked_environment_without_driver(mission) -> None:
     assert result["terminal"] == "BLOCKED_ENVIRONMENT"
 
 
+def test_bind_failure_proves_spawned_tree_dead_before_seal(mission) -> None:
+    """A bind failure after a successful spawn must not leave a live
+    unowned model process: the BLOCKED_ENVIRONMENT seal is withheld until
+    the ProcessOwner census proves zero descendants of the spawned tree."""
+    from dharma_swarm.rudra.live_driver import DriverBindError
+    from dharma_swarm.rudra.process_owner import descendants_of
+
+    repo, _base, path, state = mission
+    runner = MissionRunner(repo, state_dir=state)
+    spawned: dict = {}
+
+    def factory(admitted, workcell_root):
+        _proc, handle = runner.owner.spawn(
+            [__import__("sys").executable, "-c", "import time; time.sleep(300)"],
+            env={"PATH": "/usr/bin:/bin"},
+            cwd=workcell_root,
+        )
+        spawned["handle"] = handle
+        stub = StubCodexDriver(workcell_root, [], attempt_key=admitted.attempt_key)
+        stub.process_handles = [handle]
+
+        def bind_fails(**_kw):
+            raise DriverBindError("containment echo rejected")
+
+        stub.start_or_resume = bind_fails
+        return stub
+
+    runner.driver_factory = factory
+    result = runner.run(path)
+    assert result["terminal"] == "BLOCKED_ENVIRONMENT"
+    assert "executor bind failed" in result["reason"]
+    handle = spawned["handle"]
+    # Census semantics: zero group members, zero descendants, dead identity.
+    assert runner.owner.prove_dead(handle)
+    assert descendants_of(handle.pid) == set()
+
+
 def test_restore_budgets_from_journal(tmp_path: Path) -> None:
     """Spec 12: token, wall, and no-delta state is rebuilt from the journal,
     never optimistically zeroed after a supervisor restart."""

@@ -217,6 +217,95 @@ def test_containment_echo_mismatch_is_bind_error(tmp_path: Path) -> None:
     driver.close()
 
 
+@pytest.mark.parametrize(
+    "omitted", ["approvalPolicy", "sandbox", "model", "modelProvider"]
+)
+def test_absent_policy_echo_is_bind_error(tmp_path: Path, omitted: str) -> None:
+    """A schema-drifted server that OMITS a containment/model echo field
+    fails closed: an absent echo is a DriverBindError, never a vacuous
+    pass — and the spawned tree is still proven dead on close."""
+    owner = ProcessOwner()
+    echo = {key: value for key, value in THREAD_ECHO.items() if key != omitted}
+    driver = make_driver(
+        tmp_path, owner,
+        [
+            {"expect_method": "initialize", "result": {"userAgent": "fake/1.0"}},
+            {"read_request": True},
+            {"expect_method": "thread/start", "result": echo},
+        ],
+    )
+    with pytest.raises(DriverBindError):
+        driver.start_or_resume()
+    driver.close()
+    assert owner.prove_dead(driver.process_handles[0])
+
+
+def test_stderr_drained_with_bounded_witness(tmp_path: Path) -> None:
+    """Spec section 11: stdout and stderr are drained concurrently with
+    size limits. A server emitting far more stderr than the OS pipe buffer
+    mid-turn deadlocks a piped-and-undrained pair (server blocks on write,
+    driver blocks on read); the bounded witness keeps the turn flowing and
+    retains a forensic tail with the overflow counted, never buffered."""
+    owner = ProcessOwner()
+    steps = handshake_steps() + [
+        {"expect_method": "turn/start",
+         "result": {"turn": {"id": "t-0", "status": "inProgress", "items": []}}},
+        {"write_stderr": "x" * 4096, "repeat": 1024},  # 4 MiB >> pipe buffer
+        {"send": {
+            "jsonrpc": "2.0", "method": "turn/completed",
+            "params": {"threadId": "th-1",
+                       "turn": {"id": "t-0", "status": "completed", "items": []}},
+        }},
+    ]
+    driver = make_driver(tmp_path, owner, steps)
+    driver.start_or_resume()
+    observation = driver.start_turn(prompt="p", logical_seq=0, deadline_seconds=30)
+    assert observation.reported_complete
+    driver.close()  # kills the tree; the drainer joins at stderr EOF
+    tail = driver.stderr_witness_text()
+    assert tail, "server diagnostics were not retained as evidence"
+    assert len(tail.encode()) <= 1 << 16  # bounded capture, never unbounded
+    witness = driver._stderr_witness
+    assert witness is not None and witness.dropped_bytes > 0
+
+
+def test_foreign_turn_usage_event_not_counted(tmp_path: Path) -> None:
+    """Delayed or foreign tokenUsage telemetry is never attributed to the
+    active turn's budget: wrong thread, wrong turn, and missing
+    correlating ids are all dropped, leaving counts None so the runner
+    applies its conservative per-turn ceiling charge."""
+    owner = ProcessOwner()
+    foreign = {
+        "inputTokens": 999999, "outputTokens": 999999, "cachedInputTokens": 0,
+        "reasoningOutputTokens": 0, "totalTokens": 1999998,
+    }
+
+    def usage(params: dict) -> dict:
+        return {"send": {
+            "jsonrpc": "2.0", "method": "thread/tokenUsage/updated",
+            "params": {**params, "tokenUsage": {"last": foreign, "total": foreign}},
+        }}
+
+    steps = handshake_steps() + [
+        {"expect_method": "turn/start",
+         "result": {"turn": {"id": "t-0", "status": "inProgress", "items": []}}},
+        usage({"threadId": "th-FOREIGN", "turnId": "t-0"}),
+        usage({"threadId": "th-1", "turnId": "t-PRIOR"}),
+        usage({"threadId": "th-1"}),  # no turn id: unattributable
+        {"send": {
+            "jsonrpc": "2.0", "method": "turn/completed",
+            "params": {"threadId": "th-1",
+                       "turn": {"id": "t-0", "status": "completed", "items": []}},
+        }},
+    ]
+    driver = make_driver(tmp_path, owner, steps)
+    driver.start_or_resume()
+    observation = driver.start_turn(prompt="p", logical_seq=0, deadline_seconds=30)
+    assert observation.reported_complete
+    assert observation.input_tokens is None and observation.output_tokens is None
+    driver.close()
+
+
 def test_spawn_env_allowlist() -> None:
     env = build_spawn_env(
         {

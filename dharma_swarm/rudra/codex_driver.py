@@ -210,6 +210,33 @@ class JsonRpcPeer:
             return result, notifications
 
 
+class TurnState:
+    """Accumulates protocol observations for one in-flight turn.
+
+    Telemetry handlers accept only events correlated to the active
+    thread+turn; uncorrelated counts stay None so the supervisor charges
+    its conservative ceiling instead of a foreign measurement."""
+
+    def __init__(self) -> None:
+        self.input_tokens: int | None = None
+        self.output_tokens: int | None = None
+        self.diff_sha256: str | None = None
+        self.response_parts: list[str] = []
+        self.response_chars = 0
+        self.terminal_status: str | None = None
+
+    def response_sha256(self) -> str | None:
+        if not self.response_parts:
+            return None
+        digest = hashlib.sha256()
+        for part in self.response_parts:
+            digest.update(part.encode())
+        return digest.hexdigest()
+
+    def response_text(self) -> str | None:
+        return "".join(self.response_parts) or None
+
+
 # --- Driver interface (spec 7 frozen seam) ----------------------------------
 
 

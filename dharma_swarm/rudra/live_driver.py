@@ -36,10 +36,11 @@ from dharma_swarm.rudra.codex_driver import (
     JsonRpcPeer,
     ProtocolError,
     ServerRequestDenied,
+    TurnState,
     deterministic_message_id,
 )
 from dharma_swarm.rudra.contracts import ProcessHandle, TurnObservation
-from dharma_swarm.rudra.process_owner import ProcessOwner
+from dharma_swarm.rudra.process_owner import BoundedStreamWitness, ProcessOwner
 
 LIVE_DRIVER_NAME = "codex_app_server_stdio"
 LIVE_DRIVER_ENV = "DHARMA_RUDRA_LIVE_DRIVER"
@@ -72,29 +73,6 @@ def build_spawn_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
     env.setdefault("LANG", "C.UTF-8")
     env.setdefault("LC_ALL", "C.UTF-8")
     return env
-
-
-class _TurnState:
-    """Accumulates protocol observations for one in-flight turn."""
-
-    def __init__(self) -> None:
-        self.input_tokens: int | None = None
-        self.output_tokens: int | None = None
-        self.diff_sha256: str | None = None
-        self.response_parts: list[str] = []
-        self.response_chars = 0
-        self.terminal_status: str | None = None
-
-    def response_sha256(self) -> str | None:
-        if not self.response_parts:
-            return None
-        digest = hashlib.sha256()
-        for part in self.response_parts:
-            digest.update(part.encode())
-        return digest.hexdigest()
-
-    def response_text(self) -> str | None:
-        return "".join(self.response_parts) or None
 
 
 class LiveCodexDriver:
@@ -142,6 +120,7 @@ class LiveCodexDriver:
         self._peer: JsonRpcPeer | None = None
         self._peer_dead = False
         self._proc: subprocess.Popen[Any] | None = None
+        self._stderr_witness: BoundedStreamWitness | None = None
         self._rpc_seq = 0
 
     # --- Protocol parameter shapes (codex-cli 0.151.0 v2 schema) -----------
@@ -197,6 +176,11 @@ class LiveCodexDriver:
         self.process_handles.append(handle)
         self._peer = JsonRpcPeer(proc.stdout, proc.stdin)
         self._peer_dead = False
+        # Spec section 11: stdout and stderr are drained concurrently with
+        # size limits. An undrained stderr pipe deadlocks the pair once the
+        # server emits more than the OS pipe buffer.
+        if proc.stderr is not None:
+            self._stderr_witness = BoundedStreamWitness(proc.stderr)
         try:
             result, _ = self._peer.call(
                 "initialize",
@@ -209,6 +193,12 @@ class LiveCodexDriver:
             self._peer_dead = True
             raise DriverBindError(f"app-server handshake failed: {exc}") from exc
         self.server_agent = str(result.get("userAgent", "unknown"))
+
+    def stderr_witness_text(self) -> str:
+        """Bounded tail of server diagnostics retained for evidence rows."""
+        if self._stderr_witness is None:
+            return ""
+        return self._stderr_witness.text()
 
     def _prove_former_tree_dead(self) -> None:
         """Single mutation owner: no new session while the old one may live."""
@@ -223,26 +213,36 @@ class LiveCodexDriver:
 
     def _check_thread_echo(self, result: dict[str, Any]) -> str:
         """Containment/model echo must match the admitted fields (no silent
-        downgrade; a reroute is BLOCKED_ENVIRONMENT, never accepted)."""
+        downgrade; a reroute is BLOCKED_ENVIRONMENT, never accepted).
+
+        The comparison fails closed: a schema-drifted server that OMITS an
+        echo field can never pass vacuously — a missing or null containment
+        echo is a DriverBindError, exactly like a mismatching one."""
         thread = result.get("thread")
         if not isinstance(thread, dict) or not isinstance(thread.get("id"), str):
             raise DriverBindError("thread start/resume returned no thread id")
         approval = result.get("approvalPolicy")
-        if approval is not None and approval != "never":
+        if approval != "never":
             raise DriverBindError(f"server approvalPolicy echo {approval!r} != never")
         sandbox = result.get("sandbox")
-        if isinstance(sandbox, str) and sandbox != "workspace-write":
-            raise DriverBindError(f"server sandbox echo {sandbox!r} != workspace-write")
-        if isinstance(sandbox, dict) and sandbox.get("type") != "workspaceWrite":
-            raise DriverBindError(f"server sandboxPolicy echo {sandbox!r} rejected")
-        if self.model is not None and result.get("model") not in (None, self.model):
+        if isinstance(sandbox, str):
+            if sandbox != "workspace-write":
+                raise DriverBindError(
+                    f"server sandbox echo {sandbox!r} != workspace-write"
+                )
+        elif isinstance(sandbox, dict):
+            if sandbox.get("type") != "workspaceWrite":
+                raise DriverBindError(f"server sandboxPolicy echo {sandbox!r} rejected")
+        else:
+            raise DriverBindError(f"server sandbox echo absent: {sandbox!r}")
+        if self.model is not None and result.get("model") != self.model:
             raise DriverBindError(
-                f"model reroute: admitted {self.model!r}, server {result.get('model')!r}"
+                f"model reroute: admitted {self.model!r}, "
+                f"server {result.get('model')!r}"
             )
-        if self.model_provider is not None and result.get("modelProvider") not in (
-            None,
-            self.model_provider,
-        ):
+        if self.model_provider is not None and result.get(
+            "modelProvider"
+        ) != self.model_provider:
             raise DriverBindError(
                 f"provider reroute: admitted {self.model_provider!r}, "
                 f"server {result.get('modelProvider')!r}"
@@ -325,7 +325,7 @@ class LiveCodexDriver:
         if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
             raise ProtocolError("turn/start returned no turn id")
         self.active_turn_id = turn["id"]
-        state = _TurnState()
+        state = TurnState()
         try:
             for note in early:
                 self._handle_notification(note, self.active_turn_id, state)
@@ -352,13 +352,22 @@ class LiveCodexDriver:
         )
 
     def _handle_notification(
-        self, message: dict[str, Any], turn_id: str, state: _TurnState
+        self, message: dict[str, Any], turn_id: str, state: TurnState
     ) -> None:
         method = message.get("method", "")
         params = message.get("params")
         if not isinstance(params, dict):
             raise ProtocolError(f"notification without params object: {message!r}")
         if method == TOKEN_NOTIFICATION:
+            # Telemetry is attributed only to the active thread+turn. A
+            # delayed event from a former turn, a foreign thread, or an
+            # event without correlating ids is dropped: the turn's counts
+            # then stay None and the runner charges the conservative
+            # per-turn ceiling — never a foreign measurement.
+            if params.get("threadId") != self.thread_id:
+                return
+            if params.get("turnId") != turn_id:
+                return
             usage = params.get("tokenUsage")
             last = usage.get("last") if isinstance(usage, dict) else None
             if isinstance(last, dict):
@@ -394,7 +403,7 @@ class LiveCodexDriver:
         # require; it is ignored, never acted on.
 
     def _handle_in_turn_message(
-        self, message: dict[str, Any], turn_id: str, state: _TurnState
+        self, message: dict[str, Any], turn_id: str, state: TurnState
     ) -> None:
         is_response = "result" in message or "error" in message
         if "method" in message and not is_response:
@@ -447,6 +456,9 @@ class LiveCodexDriver:
         if self.handle is not None and not self.owner.prove_dead(self.handle):
             if not self.owner.terminate_tree(self.handle):
                 self.witness.append("app-server tree survived close teardown")
+        if self._stderr_witness is not None:
+            # Joins the drainer; the retained tail stays readable as evidence.
+            self._stderr_witness.close()
 
 
 def live_driver_factory(

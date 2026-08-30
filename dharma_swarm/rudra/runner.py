@@ -258,7 +258,19 @@ class MissionRunner:
             except DriverBindError as exc:
                 # Invariant 9: a bind-time capability failure (spawn,
                 # handshake, containment/model echo) is BLOCKED_ENVIRONMENT,
-                # never a host fallback.
+                # never a host fallback. A spawn may already have succeeded
+                # before the bind failed; the seal is withheld until every
+                # journaled handle is census-proven dead, so a live unowned
+                # model process can never outlive the terminal row.
+                driver.close()
+                for handle in getattr(driver, "process_handles", []):
+                    if not self.owner.prove_dead(handle):
+                        self.owner.terminate_tree(handle)
+                        if not self.owner.prove_dead(handle):
+                            return self._seal(
+                                journal, Terminal.FAILED_INVARIANT,
+                                {"reason": "model process tree alive at bind failure"},
+                            )
                 return self._seal(
                     journal, Terminal.BLOCKED_ENVIRONMENT,
                     {"reason": f"executor bind failed: {exc}"},

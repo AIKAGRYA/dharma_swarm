@@ -10,6 +10,7 @@ line per frame. Steps:
   {"read_error_response": true}                     read one line, must be error
   {"read_request": true}                            read one request, discard
   {"sleep": S}                                      stay silent for S seconds
+  {"write_stderr": "...", "repeat": N}              write N copies to stderr
   {"exit": true}                                    terminate immediately (EOF)
 """
 
@@ -26,6 +27,10 @@ def main() -> int:
     for step in steps:
         if "sleep" in step:
             time.sleep(float(step["sleep"]))
+        elif "write_stderr" in step:
+            data = step["write_stderr"].encode() * int(step.get("repeat", 1))
+            sys.stderr.buffer.write(data)
+            sys.stderr.buffer.flush()
         elif "send_raw" in step:
             data = step["send_raw"].encode()
             chunks = int(step.get("chunks", 1))
