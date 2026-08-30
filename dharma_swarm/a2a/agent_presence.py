@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 REGISTERED_AGENT_UIDS = [
     "codex_composer",
+    "codex_rsi_lab_manager",
     "fable_composer",
     "fable_claude_code",
     "hermes-m5",

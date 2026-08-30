@@ -54,6 +54,7 @@ This directory holds reusable prompt artifacts. These are not product truth, run
 
 ## Current Prompt Pack
 
+- [FORGE_LAB_V0_1_0_CONTINUATION_PROMPT_2026-07-10.md](FORGE_LAB_V0_1_0_CONTINUATION_PROMPT_2026-07-10.md)
 - [DEEP_REPO_CARTOGRAPHER_PROMPT_2026-03-31.md](/Users/dhyana/dharma_swarm/docs/prompts/DEEP_REPO_CARTOGRAPHER_PROMPT_2026-03-31.md)
 - [DGC_SUBAGENT_GAUNTLET_PROMPT.md](/Users/dhyana/dharma_swarm/docs/prompts/DGC_SUBAGENT_GAUNTLET_PROMPT.md)
 - [DHARMIC_SINGULARITY_PROMPT_v2.md](/Users/dhyana/dharma_swarm/docs/prompts/DHARMIC_SINGULARITY_PROMPT_v2.md)

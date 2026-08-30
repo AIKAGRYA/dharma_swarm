@@ -37,8 +37,6 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
 }
 
 FITNESS_DIMENSIONS: tuple[str, ...] = tuple(_DEFAULT_WEIGHTS)
-ONE_WIRE_REQUIRED_CONFIRMED = 5
-ONE_WIRE_REQUIRED_DOMAINS = 3
 ONE_WIRE_GUARDIAN_RECEIPT = (
     Path("forge_measurement_guardian")
     / "cycle-003-fitness-quorum-guard.json"
@@ -50,52 +48,37 @@ def _clamp01(value: float) -> float:
 
 
 class OneWireFitnessAuthorityError(PermissionError):
-    """Raised when archive fitness would move without One Wire authority."""
+    """Raised when archive fitness would move without operator approval."""
 
 
 @dataclass(frozen=True)
 class OneWireFitnessAuthority:
-    """Read-only projection of the guardian receipt that can authorize fitness."""
+    """Read-only projection of the guardian receipt that can authorize fitness.
+
+    The former N-confirmed/M-domain quorum counted fields of an unsigned,
+    self-authored JSON — arithmetic over self-attestation. Authority is now a
+    single explicit operator flag: ``"operator_approved": true`` in the
+    receipt JSON. The receipt itself is still required and parsed, so the
+    audit trail (who/what authorized) stays on disk.
+    """
 
     receipt_path: Path
     exists: bool
-    confirmed: int = 0
-    domains: int = 0
-    required_confirmed: int = ONE_WIRE_REQUIRED_CONFIRMED
-    required_domains: int = ONE_WIRE_REQUIRED_DOMAINS
-    eligible_to_set_archive_fitness: bool = False
-    fitness_authority_granted: bool = False
+    operator_approved: bool = False
     archive_fitness_changed: bool = False
     blocker: str = ""
 
     @property
     def allowed(self) -> bool:
-        return (
-            self.exists
-            and self.confirmed >= self.required_confirmed
-            and self.domains >= self.required_domains
-            and self.eligible_to_set_archive_fitness
-            and self.fitness_authority_granted
-        )
-
-
-def _int_field(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _bool_field(value: Any) -> bool:
-    return value is True
+        return self.exists and self.operator_approved
 
 
 def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuthority:
-    """Read the guardian quorum receipt that authorizes archive fitness writes.
+    """Read the guardian receipt that authorizes archive fitness writes.
 
     The archive treats internal metadata on an entry as non-authoritative. Only
-    this guardian receipt can grant fitness authority, and it must carry both
-    the quorum counts and explicit authority flag.
+    this receipt can grant fitness authority, and only via an explicit
+    ``"operator_approved": true`` (literal boolean) field.
     """
     state = Path(state_dir)
     receipt_path = state / ONE_WIRE_GUARDIAN_RECEIPT
@@ -103,7 +86,7 @@ def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuth
         return OneWireFitnessAuthority(
             receipt_path=receipt_path,
             exists=False,
-            blocker="guardian quorum receipt missing",
+            blocker="guardian receipt missing",
         )
 
     try:
@@ -122,78 +105,15 @@ def read_one_wire_fitness_authority(state_dir: Path | str) -> OneWireFitnessAuth
             blocker="guardian receipt payload is not an object",
         )
 
-    authority = payload.get("authority_result")
-    threshold = payload.get("threshold_guard")
-    authority = authority if isinstance(authority, dict) else {}
-    threshold = threshold if isinstance(threshold, dict) else {}
+    operator_approved = payload.get("operator_approved") is True
+    archive_fitness_changed = payload.get("archive_fitness_changed") is True
 
-    required_confirmed = max(
-        ONE_WIRE_REQUIRED_CONFIRMED,
-        _int_field(
-            threshold.get("required_confirmed_receipts"),
-            ONE_WIRE_REQUIRED_CONFIRMED,
-        ),
-    )
-    required_domains = max(
-        ONE_WIRE_REQUIRED_DOMAINS,
-        _int_field(
-            threshold.get("required_distinct_domains"),
-            ONE_WIRE_REQUIRED_DOMAINS,
-        ),
-    )
-    confirmed = _int_field(
-        threshold.get(
-            "observed_confirmed_receipts",
-            authority.get("confirmed_receipt_count", payload.get("confirmed")),
-        )
-    )
-    domains = _int_field(
-        threshold.get(
-            "observed_distinct_domains",
-            authority.get("domain_count", payload.get("domains")),
-        )
-    )
-    eligible = _bool_field(
-        payload.get(
-            "eligible",
-            authority.get("eligible_to_set_archive_fitness", False),
-        )
-    )
-    fitness_authority_granted = _bool_field(
-        payload.get(
-            "fitness_authority_granted",
-            authority.get("fitness_authority_granted", False),
-        )
-    )
-    archive_fitness_changed = _bool_field(
-        payload.get(
-            "archive_fitness_changed",
-            authority.get("archive_fitness_changed", False),
-        )
-    )
-
-    blocker = ""
-    if confirmed < required_confirmed or domains < required_domains:
-        blocker = (
-            "guardian quorum below threshold: "
-            f"N={confirmed}/{required_confirmed}, M={domains}/{required_domains}"
-        )
-    elif not eligible or not fitness_authority_granted:
-        blocker = (
-            "guardian authority flags missing: "
-            f"eligible_to_set_archive_fitness={eligible}, "
-            f"fitness_authority_granted={fitness_authority_granted}"
-        )
+    blocker = "" if operator_approved else "operator_approved flag missing or not true"
 
     return OneWireFitnessAuthority(
         receipt_path=receipt_path,
         exists=True,
-        confirmed=confirmed,
-        domains=domains,
-        required_confirmed=required_confirmed,
-        required_domains=required_domains,
-        eligible_to_set_archive_fitness=eligible,
-        fitness_authority_granted=fitness_authority_granted,
+        operator_approved=operator_approved,
         archive_fitness_changed=archive_fitness_changed,
         blocker=blocker,
     )

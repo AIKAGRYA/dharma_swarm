@@ -11,9 +11,6 @@ gate blocks.
 Gate mapping (master spec §6, applied in this order):
 
 * ``CONSENT``    — Tier B. Permission/exfiltration check.
-* ``BHED_GNAN``  — Tier C. Doer-witness distinction. Always passes
-  today; the witness row is still written so the seam picks up future
-  strengthening automatically.
 * ``STEELMAN``   — Tier C. Counterargument requirement. Enforced here:
   the drafted brief must contain at least one steelman marker or this
   seam treats the gate as BLOCK.
@@ -23,7 +20,7 @@ Gate mapping (master spec §6, applied in this order):
   the gate as BLOCK (fails as ``failed_input`` if no source available
   at all).
 
-A REVIEW from any of the four gates is treated as BLOCK for v0.
+A REVIEW from any of the three gates is treated as BLOCK for v0.
 """
 
 from __future__ import annotations
@@ -658,8 +655,8 @@ def _evaluate_gates(
     """Run the required gates against the drafted brief content.
 
     Strategy:
-    1. Call ``keeper.check`` once on the drafted body for CONSENT,
-       BHED_GNAN, and ambient gate behaviour.
+    1. Call ``keeper.check`` once on the drafted body for CONSENT
+       and ambient gate behaviour.
     2. Locally enforce STEELMAN (must contain a counter-argument
        marker — the gate's pattern check requires "mutate"/"propose"
        in the action string, which this seam does not use, so we
@@ -669,7 +666,7 @@ def _evaluate_gates(
        (for example AHIMSA or SATYA) so hard safety decisions cannot
        be silently discarded by the operator-brief-specific gate list.
 
-    The returned mapping always contains all four required gate names,
+    The returned mapping always contains all three required gate names,
     plus an extra blocking gate when the upstream keeper blocks outside
     that narrow set.
     """
@@ -685,12 +682,6 @@ def _evaluate_gates(
 
     consent = keeper_gates.get("CONSENT") or (GateResult.PASS, "")
     out["CONSENT"] = consent
-
-    bhed = keeper_gates.get("BHED_GNAN") or (
-        GateResult.PASS,
-        "Doer-witness distinction noted",
-    )
-    out["BHED_GNAN"] = bhed
 
     if drafted.has_steelman:
         out["STEELMAN"] = (GateResult.PASS, "Counterargument present")

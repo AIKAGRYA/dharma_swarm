@@ -134,8 +134,34 @@ jobs:
             done
           fi
 
-      - name: Validate Coherence Delta fields
+      - name: Detect PR author type
+        id: author
         if: ${{ github.event_name == 'pull_request' }}
+        env:
+          AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Automation = logins ending in "[bot]" plus Copilot (same
+          # convention as automerge.yml / pr-dedupe.yml).
+          case "${AUTHOR_LOGIN}" in
+            *"[bot]"|Copilot) echo "kind=automation" >> "$GITHUB_OUTPUT" ;;
+            *) echo "kind=human" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # Automation-authored PRs: hard fail (the required context keeps its
+      # teeth where the self-heal lane and bot accounts operate).
+      - name: Validate Coherence Delta fields (automation PR)
+        if: steps.author.outputs.kind == 'automation'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 scripts/governance/check_pr_coherence_delta.py \
+            --comments-file /tmp/pr_comments.json
+
+      # Human-authored PRs: warn-only. Humans answer in review; a red
+      # required check on prose compliance was drag, not signal.
+      - name: Validate Coherence Delta fields (human PR — warn only)
+        if: steps.author.outputs.kind == 'human'
+        continue-on-error: true
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+session=${1:-}
+if [ -z "$session" ]; then echo "usage: rsi-stop SESSION"; exit 2; fi
+echo "Sending Ctrl-C to tmux session $session (named session stop; no raw PID kill)."
+tmux send-keys -t "$session" C-c

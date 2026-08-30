@@ -50,6 +50,11 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 `SOVEREIGN_MANIFEST.md` remains the deeper architecture/doctrine authority; it
 is no longer a forced first-read surface.
 
+`docs/vision_maps/VISION_TRANSMISSION.md` (rendered by `make vision`) is a
+TRANSMISSION projection of the vision corpus: its registry entries retain
+their own authority, and it is NOT a sixth first-read surface — depth-on-demand
+only.
+
 ---
 
 ## Ownership Map (what owns what)
@@ -116,6 +121,11 @@ is no longer a forced first-read surface.
 | Perplexity Computer autonomous loop mode | `docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md` | Perplexity Computer agent card loop-mode metadata and deployment notes |
 | BoardStore facade / agent participation | `docs/architecture/SWARM_BOARDSTORE_SPEC.md` | — |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
+| Forge Lab v0.1 target protocol | `specs/FORGE_LAB_V0_1_0_SPEC.md` | Bounded active spec; defers repo-wide behavior and governance to their owners, and live/capability claims to executable gates and receipts |
+| Specs directory classification and precedence | `specs/README.md` | Index authority only; individual specs own their bounded contracts and code/tests own executable truth |
+| Prompt directory classification | `docs/prompts/README.md` | Reference index only; prompt artifacts do not own product, architecture, runtime, or repository truth |
+| Forge Lab continuation handoff | `docs/prompts/FORGE_LAB_V0_1_0_CONTINUATION_PROMPT_2026-07-10.md` | Working-plan handoff; defers to the Forge Lab spec, active-track owner, current source, tests, and receipts |
+| Forge Lab legacy v0 script custody | `scripts/forge_lab/legacy_v0/README.md` | Archive/custody witness only; grants no execution or current-control authority |
 | Constitutional rules | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel immutability | `specs/KERNEL_CORE_SPEC.md` | — |
 | Foundations index | `foundations/INDEX.md` | Empirical-claims research and lodestone references |

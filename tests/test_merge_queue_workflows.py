@@ -117,10 +117,20 @@ def test_coherence_pr_body_steps_are_pr_only() -> None:
     for name in (
         "Fetch PR comments (comment fallback)",
         "Self-heal — derive + post Coherence Delta if missing",
-        "Validate Coherence Delta fields",
     ):
         step = _step(workflow, "coherence-delta", name)
         assert "github.event_name == 'pull_request'" in step["if"]
+    # Since b94d56658 (warn-only for human-authored PRs) the validate step is
+    # split by author kind; both branches inherit the pull_request guard
+    # transitively from the author-detection step instead of restating it.
+    author_step = _step(workflow, "coherence-delta", "Detect PR author type")
+    assert "github.event_name == 'pull_request'" in author_step["if"]
+    for name in (
+        "Validate Coherence Delta fields (automation PR)",
+        "Validate Coherence Delta fields (human PR — warn only)",
+    ):
+        step = _step(workflow, "coherence-delta", name)
+        assert "steps.author.outputs.kind" in step["if"]
 
 
 def test_semgrep_uses_exact_merge_group_delta_fail_closed() -> None:

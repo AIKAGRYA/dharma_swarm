@@ -59,7 +59,15 @@ def _provider_for_model(model_id: str):
         provider_type = ProviderType.ANTHROPIC
     elif mid.startswith("gemini"):
         provider_type = ProviderType.GOOGLE_AI
-    elif mid in {"k3", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
+    elif mid.startswith("moonshot:"):
+        # RSI-LAB travel route: force the Moonshot OpenAI-compatible lane
+        # (api.moonshot.ai) with the accessible id after the prefix, e.g.
+        # "moonshot:kimi-k2.7-code". The default kimi-* ids route to Ollama
+        # Cloud / kimi-for-coding which are not reachable/entitled here.
+        provider_type = ProviderType.MOONSHOT
+        model_id = model_id.split(":", 1)[1]
+        mid = model_id.lower()
+    elif mid in {"k3", "kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         provider_type = ProviderType.KIMI_CODE
     elif mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
         provider_type = ProviderType.ZHIPU
@@ -108,6 +116,41 @@ def _usage_tokens(usage: dict) -> int:
     return int(total)
 
 
+async def _complete_and_close(
+    provider: object,
+    request: object,
+    *,
+    timeout_s: float | None = None,
+):
+    """Complete one Forge call and close the provider on the same event loop.
+
+    Forge exposes synchronous adapters over asynchronous providers.  Closing a
+    cached HTTP client after ``asyncio.run`` returns leaves its transport bound
+    to an already-closed loop; the SDK finalizer then emits ``Event loop is
+    closed`` during a later call.  Keep completion, timeout cancellation, and
+    cleanup inside one owned loop instead.
+    """
+    primary_error: BaseException | None = None
+    try:
+        completion = provider.complete(request)
+        if timeout_s is None:
+            return await completion
+        return await asyncio.wait_for(completion, timeout=timeout_s)
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        close = getattr(provider, "close", None)
+        if callable(close):
+            try:
+                await close()
+            except Exception:
+                # Preserve the provider/timeout failure when cleanup also fails.
+                # A cleanup failure after a successful call remains load-bearing.
+                if primary_error is None:
+                    raise
+
+
 class FakeCompletion:
     """Offline backend: cycles through canned responses. complete(prompt) ->
     (text, tokens). Used to validate the prompt-build / patch-parse plumbing
@@ -149,7 +192,7 @@ class PoolCompletion:
             max_tokens=2048,
             temperature=0.2,
         )
-        response = asyncio.run(self._provider.complete(request))
+        response = asyncio.run(_complete_and_close(self._provider, request))
         return response.content or "", _usage_tokens(response.usage)
 
 

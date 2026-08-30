@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Scheduled provider liveness: at most six tiny probes per hour. Credentials
+# are resolved inside the provider layer and never appear in argv or output.
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# These are model IDs only. They intentionally map to the VPS's distinct
+# Zhipu and Ollama Cloud entitlements.  Both exact routes passed the bounded
+# release-owned probe on 2026-08-27; the former Moonshot default is retained as
+# an operator-selectable route but is not scheduled while that account is
+# rate-limited.  An operator may override the names without changing this
+# versioned wrapper.
+# An explicit RSI_LAB_STAGED_MODELS remains a process-local probe override.
+# With no override, provider_selftest consumes the active model-role profile;
+# before first activation it uses the source-reviewed bootstrap pair.
+exec "${script_dir}/rsi" provider selftest \
+    --profile staged \
+    --live \
+    --require-independent-routes 2 \
+    --timeout-s 20 \
+    --max-probes 6 \
+    --min-refresh-interval-s 3000 \
+    --json

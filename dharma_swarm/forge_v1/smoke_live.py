@@ -7,7 +7,7 @@ the HIDDEN gold test in an isolated sandbox — never an agent self-report).
 
 This SPENDS real tokens. Run it deliberately, not in CI:
 
-    PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python \
+    PYTHONPATH=. .venv/bin/python \
         -m dharma_swarm.forge_v1.smoke_live
 
 A correct model fixes the bug -> verify True with tokens > 0.

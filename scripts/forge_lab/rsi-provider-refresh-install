@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# Converge the single provider-health cron entry. Planning is read-only;
+# applying requires an exact plan digest and a stable idempotency key.
+apply=0
+request_id=""
+claimed_plan_digest=""
+usage='usage: rsi-provider-refresh-install [--plan | --apply --plan-digest sha256:HEX --request-id ID]'
+while (($#)); do
+    case "$1" in
+        --plan) apply=0 ;;
+        --apply) apply=1 ;;
+        --request-id)
+            shift
+            request_id="${1:-}"
+            ;;
+        --plan-digest)
+            shift
+            claimed_plan_digest="${1:-}"
+            ;;
+        *)
+            printf '%s\n' "${usage}" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+if ((apply)); then
+    if [[ ! "${request_id}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$ ]]; then
+        printf 'rsi-provider-refresh-install: --apply requires a safe request ID\n' >&2
+        exit 2
+    fi
+    if [[ ! "${claimed_plan_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+        printf 'rsi-provider-refresh-install: --apply requires --plan-digest\n' >&2
+        exit 2
+    fi
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x /root/rsi-lab/bin/rsi-provider-refresh ]]; then
+    refresh="/root/rsi-lab/bin/rsi-provider-refresh"
+elif [[ -x "${HOME}/.dharma/bin/rsi-provider-refresh" ]]; then
+    refresh="${HOME}/.dharma/bin/rsi-provider-refresh"
+else
+    refresh="${script_dir}/rsi-provider-refresh"
+fi
+if [[ ! -x "${refresh}" ]]; then
+    printf 'rsi-provider-refresh-install: versioned refresh wrapper missing\n' >&2
+    exit 2
+fi
+
+if [[ -n "${RSI_LAB_STATE:-}" ]]; then
+    state="${RSI_LAB_STATE}"
+elif [[ -d /root/rsi-lab ]]; then
+    state="/root/rsi-lab/state"
+else
+    state="${HOME}/.dharma/rsi-lab/state"
+fi
+if [[ ! "${refresh}" =~ ^/[A-Za-z0-9_./:+-]+$ ]] ||
+   [[ ! "${state}" =~ ^/[A-Za-z0-9_./:+-]+$ ]] ||
+   [[ "${state}" == "/" ]]; then
+    printf 'rsi-provider-refresh-install: refresh/state path is not canonical shell-safe\n' >&2
+    exit 2
+fi
+log_path="${state}/provider_refresh.log"
+
+current="$(mktemp)"
+next="$(mktemp)"
+crontab_error="$(mktemp)"
+verify="$(mktemp)"
+verify_error="$(mktemp)"
+plan_material="$(mktemp)"
+lock_dir=""
+cleanup() {
+    rm -f -- "${current}" "${next}" "${crontab_error}" "${verify}" \
+        "${verify_error}" "${plan_material}"
+    if [[ -n "${lock_dir}" ]]; then
+        rmdir -- "${lock_dir}" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+read_crontab() {
+    local output="$1"
+    local error_output="$2"
+    local status
+    set +e
+    crontab -l >"${output}" 2>"${error_output}"
+    status=$?
+    set -e
+    if ((status == 0)); then
+        return 0
+    fi
+    if ((status == 1)) && grep -qi 'no crontab for' "${error_output}"; then
+        : >"${output}"
+        return 0
+    fi
+    printf 'rsi-provider-refresh-install: existing crontab is unreadable; refusing overwrite\n' >&2
+    return 2
+}
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf 'sha256:%s\n' "$(sha256sum "$1" | awk '{print $1}')"
+    else
+        printf 'sha256:%s\n' "$(shasum -a 256 "$1" | awk '{print $1}')"
+    fi
+}
+
+read_crontab "${current}" "${crontab_error}"
+legacy_count="$(awk '
+    /rsi-keys-refresh/ || /current-main\/state\/rsi_runs/ { count += 1 }
+    END { print count + 0 }
+' "${current}")"
+versioned_count="$(awk '/rsi-provider-refresh/ && !/rsi-provider-refresh-install/ { count += 1 } END { print count + 0 }' "${current}")"
+legacy_script="/root/rsi-lab/bin/rsi-keys-refresh"
+legacy_script_present=0
+if [[ -e "${legacy_script}" || -L "${legacy_script}" ]]; then
+    legacy_script_present=1
+fi
+legacy_state_paths=(
+    "/root/rsi-lab/current-main/state/rsi_runs"
+    "/root/rsi-lab/current-main/state/.dharma/keys_status.json"
+    "/root/rsi-lab/state/.dharma/keys_status.json"
+)
+legacy_state_present=0
+legacy_state_bitmap=""
+for legacy_path in "${legacy_state_paths[@]}"; do
+    present=0
+    if [[ -e "${legacy_path}" || -L "${legacy_path}" ]]; then
+        present=1
+        legacy_state_present=$((legacy_state_present + 1))
+    fi
+    legacy_state_bitmap="${legacy_state_bitmap}${present}"
+done
+
+awk '
+    /rsi-keys-refresh/ { next }
+    /current-main\/state\/rsi_runs/ { next }
+    /rsi-provider-refresh/ { next }
+    { print }
+' "${current}" >"${next}"
+printf '%s\n' '# RSI Lab versioned provider selftest (managed)' >>"${next}"
+printf "17 * * * * '%s' >> '%s' 2>&1\n" "${refresh}" "${log_path}" >>"${next}"
+
+before_digest="$(sha256_file "${current}")"
+after_digest="$(sha256_file "${next}")"
+printf '%s\n' \
+    'schema=rsi_lab.provider_refresh_install_plan.v1' \
+    "before_digest=${before_digest}" \
+    "after_digest=${after_digest}" \
+    "refresh=${refresh}" \
+    "log_path=${log_path}" \
+    "legacy_script_present=${legacy_script_present}" \
+    "legacy_state_bitmap=${legacy_state_bitmap}" >"${plan_material}"
+plan_digest="$(sha256_file "${plan_material}")"
+
+printf 'plan_digest: %s\n' "${plan_digest}"
+printf 'crontab_before_digest: %s\n' "${before_digest}"
+printf 'crontab_after_digest: %s\n' "${after_digest}"
+printf 'legacy_entries_to_retire: %s\n' "${legacy_count}"
+printf 'legacy_script_to_retire: %s\n' "${legacy_script_present}"
+printf 'legacy_state_artifacts_to_retire: %s\n' "${legacy_state_present}"
+printf 'versioned_entries_before: %s\n' "${versioned_count}"
+printf 'versioned_entries_after: 1\n'
+if ((!apply)); then
+    printf 'result: PLAN_ONLY\n'
+    exit 0
+fi
+
+receipt_dir="${state}/.dharma/forge_lab/maintenance"
+receipt="${receipt_dir}/${request_id}__provider_refresh_install.json"
+if [[ -e "${receipt}" || -L "${receipt}" ]]; then
+    if [[ -L "${receipt}" || ! -f "${receipt}" ]] ||
+       ! grep -Fq "\"request_id\":\"${request_id}\"" "${receipt}" ||
+       ! grep -Fq "\"plan_digest\":\"${claimed_plan_digest}\"" "${receipt}"; then
+        printf 'rsi-provider-refresh-install: request ID is bound to different evidence\n' >&2
+        exit 2
+    fi
+    printf 'result: ALREADY_APPLIED\nreceipt: %s\n' "${receipt}"
+    exit 0
+fi
+if [[ "${claimed_plan_digest}" != "${plan_digest}" ]]; then
+    printf 'rsi-provider-refresh-install: plan digest changed; inspect a fresh --plan\n' >&2
+    exit 2
+fi
+
+mkdir -p -- "${receipt_dir}"
+lock_dir="${receipt_dir}/provider_refresh_install.lock"
+if ! mkdir -- "${lock_dir}" 2>/dev/null; then
+    printf 'rsi-provider-refresh-install: another installer holds the mutation lock\n' >&2
+    exit 2
+fi
+read_crontab "${verify}" "${verify_error}"
+if [[ "$(sha256_file "${verify}")" != "${before_digest}" ]]; then
+    printf 'rsi-provider-refresh-install: crontab changed after planning; refusing overwrite\n' >&2
+    exit 2
+fi
+
+crontab "${next}"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+legacy_script_retired=0
+if ((legacy_script_present)); then
+    mv -- "${legacy_script}" "${legacy_script}.legacy-${stamp}-${request_id}"
+    legacy_script_retired=1
+fi
+legacy_state_retired=0
+for legacy_path in "${legacy_state_paths[@]}"; do
+    if [[ -e "${legacy_path}" || -L "${legacy_path}" ]]; then
+        mv -- "${legacy_path}" "${legacy_path}.legacy-${stamp}-${request_id}"
+        legacy_state_retired=$((legacy_state_retired + 1))
+    fi
+done
+if ! ( set -o noclobber; printf '{"schema":"rsi_lab.provider_refresh_install.v2","request_id":"%s","plan_digest":"%s","crontab_before_digest":"%s","crontab_after_digest":"%s","legacy_entries_retired":%s,"legacy_script_retired":%s,"legacy_state_artifacts_retired":%s,"versioned_entries_before":%s,"versioned_entries_after":1,"provider_calls":false,"secret_values_recorded":false}\n' \
+    "${request_id}" "${plan_digest}" "${before_digest}" "${after_digest}" \
+    "${legacy_count}" "${legacy_script_retired}" "${legacy_state_retired}" \
+    "${versioned_count}" >"${receipt}" ); then
+    printf 'rsi-provider-refresh-install: APPLIED_OUTCOME_UNKNOWN; terminal receipt write failed\n' >&2
+    exit 3
+fi
+printf 'result: APPLIED\nreceipt: %s\n' "${receipt}"

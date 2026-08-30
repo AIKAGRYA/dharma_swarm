@@ -133,9 +133,26 @@ curl -L https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.ja
 
 ---
 
-## Integration with CI/CD
+## Integration with CI/CD — NOT DONE
 
-Add to `.github/workflows/verify.yml`:
+The CI wiring sketched below was **never landed**: no
+`.github/workflows/verify.yml` exists, and the proof is not re-run on
+commits. What actually happened:
+
+- **2026-03-09** (commit `d31bf0bec`): a one-shot TLC model-check of
+  `specs/TaskBoardCoordination.tla` completed with no errors found.
+- The checked model is tiny: 2 agents (`{a1, a2}`) and 2 tasks
+  (`{t1, t2}`) — see `specs/TaskBoardCoordination.cfg`.
+- The spec has since drifted from the live task board
+  (`dharma_swarm/` implementation has evolved; the TLA+ model was not
+  updated to track it).
+
+So the honest statement is: **one bounded model of an early task-board
+design was proven safe once, offline.** No commit carries mathematical
+proof of anything today.
+
+The sketch below is retained as a starting point if CI verification is
+ever reinstated:
 
 ```yaml
 name: TLA+ Formal Verification
@@ -164,8 +181,6 @@ jobs:
             -config TaskBoardCoordination.cfg \
             TaskBoardCoordination.tla
 ```
-
-**Result**: Every commit now includes mathematical proof that the task coordination protocol is safe.
 
 ---
 

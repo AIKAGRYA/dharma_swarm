@@ -4,7 +4,7 @@
 
 ```bash
 # 1. Copy plugin into Claude Code's marketplaces directory
-cp -R /Users/dhyana/dharma_chetana/dharma_swarm/chetana/claude_code_plugin \
+cp -R ~/dharma_swarm/dharma_swarm/chetana/claude_code_plugin \
       ~/.claude/plugins/marketplaces/local-chetana
 
 # 2. Add to ~/.claude/settings.json:
@@ -17,7 +17,7 @@ cp -R /Users/dhyana/dharma_chetana/dharma_swarm/chetana/claude_code_plugin \
 Or, if you prefer a symlink so plugin updates flow with `git pull`:
 
 ```bash
-ln -s /Users/dhyana/dharma_chetana/dharma_swarm/chetana/claude_code_plugin \
+ln -s ~/dharma_swarm/dharma_swarm/chetana/claude_code_plugin \
       ~/.claude/plugins/marketplaces/local-chetana
 ```
 

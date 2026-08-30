@@ -1,8 +1,14 @@
-"""3-of-5 oracle verification for GAIA ecological claims.
+"""Oracle-verdict counting for GAIA ecological claims.
 
 Five oracle types: satellite imagery, IoT ground sensors, human auditor,
-community attestation, statistical model. Threshold signature scheme
-requires 3-of-5 to mark an offset as verified.
+community attestation, statistical model. A claim is marked verified when at
+least 3-of-5 verdicts agree.
+
+HONEST SCOPE: this module performs no signature or threshold-signature
+cryptography. It counts caller-supplied verdicts (`agrees_with_claim`) and
+averages their self-reported confidences; nothing here authenticates an
+oracle, checks provenance, or blocks synthetic/self-authored verdicts. The
+fail-closed evidence gate lives in `gaia_sis_mint_gate.evaluate`.
 
 Integrates with sheaf.py for multi-perspective coherence:
 - H0 = global truths all oracles agree on

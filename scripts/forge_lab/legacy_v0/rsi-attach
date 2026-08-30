@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+session=${1:-}
+if [ -z "$session" ]; then tmux ls | grep "^rsi-" || true; echo "usage: rsi-attach SESSION"; exit 2; fi
+exec tmux attach -t "$session"

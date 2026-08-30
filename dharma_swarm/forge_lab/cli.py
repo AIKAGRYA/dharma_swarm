@@ -24,6 +24,16 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--mutator-model", default="", help="the mutation operator's model")
     run.add_argument("--budget-tokens", type=int, default=120_000, help="per candidate-grade cap")
     run.add_argument("--budget-usd", type=float, default=2.0)
+    run.add_argument(
+        "--hard-token-cap",
+        action="store_true",
+        help="legacy behavior: token overage invalidates candidates instead of being measured as explore-open compute",
+    )
+    run.add_argument(
+        "--allow-hard-invalid-seed",
+        action="store_true",
+        help="continue even if the seed baseline hits a hard invalid budget condition",
+    )
     run.add_argument("--max-experiment-tokens", type=int, default=600_000)
     run.add_argument("--propose-timeout", type=int, default=240)
     run.add_argument("--grade-timeout", type=int, default=600)
@@ -60,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
         mutator_model=args.mutator_model,
         budget_cap_tokens=args.budget_tokens,
         budget_cap_usd=args.budget_usd,
+        soft_token_cap=not args.hard_token_cap,
+        require_valid_seed=not args.allow_hard_invalid_seed,
         max_experiment_tokens=args.max_experiment_tokens,
         propose_timeout_s=args.propose_timeout,
         grade_timeout_s=args.grade_timeout,

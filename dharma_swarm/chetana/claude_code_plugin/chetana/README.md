@@ -44,7 +44,7 @@ Plugin is at `~/.claude/plugins/marketplaces/local-chetana/chetana/`. Marketplac
 
 ## Code
 
-The Python package lives in `dharma_swarm/chetana/` on the `feat/chetana-grand-memory` branch at `/Users/dhyana/dharma_chetana/`. Once merged to main, `pip install -e .` from `~/dharma_swarm/` is enough; the hooks discover the venv automatically.
+The Python package lives in `dharma_swarm/chetana/` in this repo. `pip install -e .` from `~/dharma_swarm/` is enough; the hooks discover the venv automatically.
 
 ## Logs
 
