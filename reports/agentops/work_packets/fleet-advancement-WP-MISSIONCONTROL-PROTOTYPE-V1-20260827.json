@@ -1,0 +1,128 @@
+{
+  "id": "fleet-advancement-WP-MISSIONCONTROL-PROTOTYPE-V1-20260827",
+  "base_ref": "3498b3e0fb6f608ce55149143e10b076c148e94b",
+  "branch": "codex/mission-control-fleet-final-20260827",
+  "worktree": ".",
+  "intent": "Render one tactile Linear-v1 Mission Control cockpit at the existing dashboard/cockpit front door and add only a bounded explicit-mission GET projection through an injected read-only provider. Preserve TaskBoard plus RuntimeStateStore as authority, retain source uncertainty, admit only publicly witnessed reconciliation states over retained fields, and label simulated prototype data so no projection can be mistaken for executor liveness, runtime proof, or production command authority.",
+  "allowed_files": [
+    "api/routers/control_surface.py",
+    "api/routers/mission_control_reconciliation_validation.py",
+    "api/routers/mission_control_snapshot_validation.py",
+    "dashboard/next.config.ts",
+    "dashboard/src/app/dashboard/cockpit/page.tsx",
+    "dashboard/src/components/cockpit/MissionControlDeck.tsx",
+    "dashboard/src/hooks/useMissionControl.ts",
+    "dashboard/src/lib/types.ts",
+    "tests/test_control_surface_mission_control.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-MISSIONCONTROL-PROTOTYPE-V1-20260827.json"
+  ],
+  "forbidden_files": [
+    "deploy/sadhana/**",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "dashboard/src/app/dashboard/sadhana/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/forge_lab/**",
+    "tests/forge_lab_v1/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**",
+    "tests/test_foundry_*.py",
+    "docs/foundry/**"
+  ],
+  "gates": [
+    {
+      "name": "mission-control-read-projection-contracts",
+      "command": "python3 -m pytest -q tests/test_control_surface_mission_control.py tests/test_control_surface.py tests/test_control_surface_router_threadpool.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "mission-control-api-ruff",
+      "command": "python3 -m ruff check api/routers/control_surface.py api/routers/mission_control_reconciliation_validation.py api/routers/mission_control_snapshot_validation.py tests/test_control_surface_mission_control.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "mission-control-fail-closed-negative-controls",
+      "command": "python3 -m pytest -q tests/test_control_surface_mission_control.py -k 'uninitialized or rejects or mismatch or failure'",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(mission-control): land typed cockpit prototype"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-MISSIONCONTROL-PROTOTYPE-V1-20260827",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "3498b3e0fb6f608ce55149143e10b076c148e94b",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Canonical owner reads can initialize or migrate stores, so the HTTP projection accepts only a dependency-injected read-only provider and never constructs owner stores during a request.",
+      "There is no canonical unbounded mission-list API; the endpoint and cockpit require one explicit bounded mission identifier.",
+      "The existing cockpit report is a broad repository projection while MissionSnapshot is a typed mission projection; the UI must display their provenance separately.",
+      "The HTTP boundary proves only PubliclyWitnessed[State] over retained fields and trusts the injected canonical owner for hidden causal identity; it does not independently re-prove omitted evidence.",
+      "Every stale-recovery projection, coherent or noncoherent, requires the retained attempt failure_code to equal stale_lease_recovered; coherent recovery also requires the retained lease to prove expiry.",
+      "The complete provider transaction runs inside a bounded worker: get_snapshot descriptor discovery and invocation, native-coroutine completion in a worker-local asyncio.Runner, and runtime_projection_mode descriptor discovery and sanitization all remain inside one failure boundary.",
+      "The injected QuiescentRead provider contract permits a plain snapshot value or native coroutine and requires that result to own and await all work; generic custom awaitables and detached tasks, Futures, callbacks, executors, threads, or subprocesses violate that read-only dependency contract.",
+      "Provider reads share one fixed one-second outward deadline; a four-slot raw-Future guard retains ownership through provider-operation result publication, while a best-effort worker-loop guard rejects common detached-work violations without claiming an in-process sandbox.",
+      "A sanitized exception handler plus repeated cleanup of observed Tasks and retained async generators retrieves factory-mediated provider failures; factory-mediated task creation after cleanup begins is rejected with a canceled placeholder, including eager-start requests, without logging provider-controlled exception text.",
+      "One raw concurrent Future owns each read slot, including thread construction and start races, so cleanup is single-release and remains tied to whether the worker actually began.",
+      "Every retained metadata and receipt payload mapping is recursively checked for non-finite numbers before promotion so strict response serialization cannot escape the sanitized failure boundary.",
+      "A retained lease may project active true only when its canonical status belongs to ACTIVE_CLAIM_STATUSES; claimed and terminal statuses fail closed across all reconciliation labels.",
+      "The current visual shell predates the locked matte indigo-sumi canon, so this packet scopes the canonical treatment to Mission Control without changing unrelated dashboard routes."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_mcp.py",
+      "api/routers/control_surface.py",
+      "dashboard/src/app/dashboard/cockpit/page.tsx",
+      "dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx"
+    ],
+    "honest_blockers": [
+      "The API has no default Mission Control provider and therefore reports uninitialized until a trusted embedding injects a read-only provider.",
+      "The tactile fixture is explicitly SIMULATION and is excluded from live health, liveness, completion, and production-readiness claims.",
+      "Mission Control and TaskBoard remain separate databases without an atomic cross-store lifecycle transaction.",
+      "Recorded task, lease, run, heartbeat, acknowledgement, or receipt state never proves an executor process is alive.",
+      "Evidence-scan saturation and hidden-only noncoherent claims are unprovable from the schema-stable public v1 projection and fail closed to unknown.",
+      "In-process Python cannot forcibly terminate a wedged synchronous or native provider body, and native code that holds the GIL can delay the outward deadline itself; the fixed four-slot guard retains every started provider worker through result publication.",
+      "The worker-local asyncio.Runner owns the provider-returned awaitable; cancellation-resistant work awaited by that operation or its default executor retains the bounded worker slot until it exits.",
+      "The injected provider is a trusted QuiescentRead dependency: detached same-loop tasks, Futures, callbacks, or executors; replacing loop factories, handlers, or async-generator hooks; mutating private loop state; direct logging; and unmanaged threads or subprocesses are contract violations outside this in-process boundary, not containment claims.",
+      "This packet does not deploy, start or restart a daemon, initialize a state store, discover missions, mutate runtime state, use a live provider, or grant command authority."
+    ],
+    "rollback": "Revert the packet-scoped Mission Control API and cockpit commit. No canonical owner state, runtime database, transport, daemon, deployment, credential, ACL, or external system is changed.",
+    "packet_digest": "36f27429d44e090574043a880476c0c200f64fb7cf322f86af14dc12825d4946"
+  }
+}
