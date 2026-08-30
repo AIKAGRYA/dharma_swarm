@@ -204,6 +204,93 @@ async def test_mock_swarm_init_is_noop():
 
 
 # ---------------------------------------------------------------------------
+# Spine wiring: mutating tool calls carry identity + side-effect receipts
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mutating_tool_spine_records_side_effect_receipts(tmp_path):
+    """A consequential (mutating) MCP tool call must mint an ExecutionIdentity
+    and land side-effect intent + completion receipts in the runtime ledger —
+    the mcp_tool_access surface joining the spine."""
+    from dharma_swarm.mcp_server import McpToolSpine
+    from dharma_swarm.runtime_state import RuntimeStateStore
+
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    spine = McpToolSpine(store)
+    identity, effect_key = spine.begin("create_task", {"title": "Fix bug"})
+    assert identity is not None
+    assert effect_key.startswith("mcp:create_task:")
+    spine.complete(identity, effect_key)
+
+    ledger = await store.get_run_ledger(identity.run_id)
+    kinds = [(r.receipt_type, r.status) for r in ledger["receipts"]]
+    assert ("side_effect_intent", "started") in kinds
+    assert ("side_effect_complete", "completed") in kinds
+    assert spine.audit_failures == 0
+
+
+@pytest.mark.asyncio
+async def test_mutating_tool_failure_completes_receipt_as_failed(tmp_path):
+    from dharma_swarm.mcp_server import McpToolSpine
+    from dharma_swarm.runtime_state import RuntimeStateStore
+
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    spine = McpToolSpine(store)
+    identity, effect_key = spine.begin("store_memory", {"content": "x"})
+    spine.complete(identity, effect_key, status="failed")
+    ledger = await store.get_run_ledger(identity.run_id)
+    kinds = [(r.receipt_type, r.status) for r in ledger["receipts"]]
+    assert ("side_effect_complete", "failed") in kinds
+
+
+def test_read_only_tool_records_nothing(tmp_path):
+    """Read paths (list/status/recall/query) stay receipt-free."""
+    import sqlite3
+
+    from dharma_swarm.mcp_server import McpToolSpine
+    from dharma_swarm.runtime_state import RuntimeStateStore
+
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    spine = McpToolSpine(store)
+    for tool in ("swarm_status", "list_tasks", "recall_memory", "telos_status"):
+        identity, effect_key = spine.begin(tool, {})
+        assert (identity, effect_key) == (None, "")
+    store.init_db_sync()
+    with sqlite3.connect(store.db_path) as db:
+        count = db.execute("SELECT COUNT(*) FROM runtime_receipts").fetchone()[0]
+    assert count == 0
+
+
+def test_spine_fail_open_is_counted_not_silent():
+    """A broken store must not break the tool call — but the blind spot is
+    COUNTED (audit_failures), never silently swallowed."""
+    from dharma_swarm.mcp_server import McpToolSpine
+
+    class _BrokenStore:
+        def record_execution_identity_sync(self, *a, **k):
+            raise RuntimeError("store down")
+
+    spine = McpToolSpine(_BrokenStore())
+    identity, effect_key = spine.begin("create_task", {"title": "x"})
+    assert (identity, effect_key) == (None, "")
+    assert spine.audit_failures == 1
+
+
+def test_call_tool_dispatch_is_spine_wrapped():
+    """The MCP call_tool handler must route every dispatch through the spine
+    recorder (begin before, complete after — failed on exception)."""
+    import inspect
+
+    from dharma_swarm.mcp_server import MUTATING_MCP_TOOLS, create_mcp_server
+
+    assert set(MUTATING_MCP_TOOLS) == {"spawn_agent", "create_task", "store_memory"}
+    source = inspect.getsource(create_mcp_server)
+    assert "spine.begin(" in source
+    assert 'spine.complete(identity, effect_key, status="failed")' in source
+
+
+# ---------------------------------------------------------------------------
 # Tool name coverage
 # ---------------------------------------------------------------------------
 
