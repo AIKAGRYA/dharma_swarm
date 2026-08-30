@@ -1,0 +1,23 @@
+{
+  "edge_count": 5963,
+  "generated_by": "scripts/graph/repo_self_graph.py",
+  "grandfathered_modules": 16,
+  "largest_scc": 10,
+  "node_count": 2400,
+  "over_budget_modules": 33,
+  "scc_multi_count": 25,
+  "schema_version": 1,
+  "test_skip_markers": 62,
+  "top_refactor_targets": [
+    "dharma_swarm.providers",
+    "dharma_swarm.ontology",
+    "dharma_swarm.evolution",
+    "dharma_swarm.organism",
+    "dharma_swarm.thinkodynamic_director",
+    "dharma_swarm.context",
+    "dharma_swarm.telos_gates",
+    "dharma_swarm.ontology_runtime",
+    "dharma_swarm.ontology_hub",
+    "dharma_swarm.lineage"
+  ]
+}
