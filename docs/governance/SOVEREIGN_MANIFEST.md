@@ -20,7 +20,7 @@
      check:  python3 scripts/governance/render_active_track_includes.py --check
      checked by: .github/workflows/active-track.yml, make docops-integrity,
                  tests/test_active_track_governance.py
-     newest track verified_at in source: 2026-08-27 -->
+     newest track verified_at in source: 2026-08-30 -->
 
 **Active portfolio — declared intent only:** 4 co-equal track(s) (WIP warn 5, max 10; scoped WIP: `mac_build` 4 active / max 4; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy. Admission scopes constrain declared build authority; they do not prove where a process is running.
 
@@ -32,7 +32,7 @@
 - **`sadhana-10-day-program-2026-08`** — SADHANA — governed 10-day program (ACTIVE, serves `revenue-external-humans-served`, verified 2026-08-27, open blocker items: 2)
   - owns: deploy/sadhana/**, scripts/runtime/sadhana_release.py, tests/test_sadhana_release.py, dashboard/src/app/dashboard/sadhana/**
   - admission scopes: mac_build (declared build authority; not runtime evidence)
-- **`rsi-lab-meghadharma-2026-08`** — RSI Lab — exact-code Mac and Meghadharma campaign lane (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 1)
+- **`rsi-lab-meghadharma-2026-08`** — RSI Lab — exact-code Mac and Meghadharma campaign lane (ACTIVE, serves `research-depth`, verified 2026-08-30, open blocker items: 1)
   - owns: dharma_swarm/forge_lab/**, scripts/forge_lab/**, tests/forge_lab_v1/**, docs/ops/RSI_LAB_SYNC.md
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`sublimation-forge-2026-08`** — Sublimation Forge — offline-first governed foundry (ACTIVE, serves `research-depth`, verified 2026-08-27, open blocker items: 2)

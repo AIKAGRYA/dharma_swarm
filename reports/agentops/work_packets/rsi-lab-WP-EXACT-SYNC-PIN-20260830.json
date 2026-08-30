@@ -1,0 +1,86 @@
+{
+  "id": "rsi-lab-WP-EXACT-SYNC-PIN-20260830",
+  "base_ref": "35dbfbd38d5f329a7c2969813583a80c183f2a44",
+  "branch": "docs/rsi-lab-exact-sync-pin-20260830",
+  "worktree": ".",
+  "intent": "Repin rsi-lab-meghadharma-2026-08 completion criteria and claim_boundary from stale b148f55e to the live rsi-lab/canonical identity d221961c after operator-requested rsi sync plan/apply (request-id operator-20260830-daily-lane). Governance pin only; no forge_lab implementation change.",
+  "allowed_files": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json",
+    "reports/agentops/work_packets/rsi-lab-WP-EXACT-SYNC-PIN-20260830.json"
+  ],
+  "forbidden_files": [],
+  "gates": [
+    {
+      "name": "active-track-governance-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py tests/test_check_track_status_lifecycle.py tests/test_track_portfolio.py",
+      "expected_exit": 0,
+      "timeout_seconds": 900
+    },
+    {
+      "name": "rsi-sync-witness-digest",
+      "command": "python3 -c \"import json,hashlib,pathlib; p=pathlib.Path('reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json'); d=json.loads(p.read_text()); got=hashlib.sha256(json.dumps({k:v for k,v in d.items() if k!='digest'}, sort_keys=True, separators=(',', ':')).encode()).hexdigest(); assert d['digest']==got, (d['digest'], got); assert d['claim']['target_commit']=='d221961c24232d7d05dbff1d971e223da3967f9c'\"",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-whitespace-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "renderer-invalid-flag-rejected",
+      "command": "python3 scripts/governance/render_active_track_includes.py --invalid-flag",
+      "expected_exit": 2,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(governance): repin RSI lab exact-sync witness to d221961c"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-EXACT-SYNC-PIN-20260830",
+    "active_track": "rsi-lab-meghadharma-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "35dbfbd38d5f329a7c2969813583a80c183f2a44",
+      "details": []
+    },
+    "interface_mismatches": [],
+    "closest_existing_implementation": [
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "reports/governance/mac_active_programs/2026-08-27-rsi-exact-sync-witness.json",
+      "scripts/governance/check_track_status.py"
+    ],
+    "honest_blockers": [
+      "Human merge required; agents do not merge.",
+      "Witness proves exact code identity only, not campaign health or a positive RSI claim."
+    ],
+    "rollback": "Revert this commit. Restores the stale b148f55e pin. No runtime, remote-host, credential, or campaign mutation.",
+    "packet_digest": "e61c90d7875d1d7a3cb1accc271621fd4f2c203175a823a1996caf825d673175"
+  }
+}
