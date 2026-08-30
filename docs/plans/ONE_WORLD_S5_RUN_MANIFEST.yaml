@@ -22,6 +22,7 @@ pinned_release:
 
 fixture:
   mission_id: lane-deliver-rollback-atomic-lease
+  executable_contract: docs/plans/rudra_v0/MISSION_CONTRACT_LANE_DELIVER_V0.yaml  # what cmd_rudra_run consumes; digests recompute at launch
   objective: >-
     Make the existing failing assertion in
     tests/test_lane_deliver.py::test_orphan_rollback_deletes_under_an_atomic_lease
@@ -51,7 +52,7 @@ arms:
       final GoalGate; no RUDRA journal/recovery loop; no iterative GoalGate
       feedback
   shared_conditions:  # identical across arms, per frozen §5
-    base: a9282490dc6c57442807ac567461eb99457d2dde
+    base: 5301bdc57a07cc115296467285a910c92fd4536e  # == pin r1; fixture re-verified red here
     workcell: fresh private Git workcell per arm
     model: gpt-5.6-sol          # MISSION_CONTRACT_V0.yaml executor spec
     reasoning_effort: high      # MISSION_CONTRACT_V0.yaml
