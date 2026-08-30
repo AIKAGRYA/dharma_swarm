@@ -5,6 +5,10 @@ Command implementations live in dharma_swarm.terminal_commands.
 See docs/plans/OPERATOR_COMMAND_VISION.md for the architecture vision.
 """
 
+# This dispatcher deliberately re-exports compatibility names used by tests
+# and downstream operator scripts.
+# ruff: noqa: F401
+
 from __future__ import annotations
 
 import argparse
@@ -631,9 +635,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Override provider lane (e.g. openrouter, ollama, claude_code)",
     )
 
-    p_agent_list = agent_sub.add_parser("list", help="List available preset agents")
+    agent_sub.add_parser("list", help="List available preset agents")
 
-    p_agent_runs = agent_sub.add_parser("runs", help="Show recent agent run reports")
+    agent_sub.add_parser("runs", help="Show recent agent run reports")
 
     p_agent_talk = agent_sub.add_parser(
         "talk",
@@ -1591,7 +1595,9 @@ def main() -> None:
         case "loops":
             cmd_loops()
         case "health-check":
-            cmd_health_check()
+            rc = cmd_health_check()
+            if rc != 0:
+                raise SystemExit(rc)
         case "verify-baseline":
             from dharma_swarm.claude_hooks import verify_baseline
             import json as _json
@@ -2091,7 +2097,7 @@ def main() -> None:
                         import asyncio as _aio
                         from dharma_swarm.ginko_orchestrator import action_data_pull
                         result = _aio.run(action_data_pull())
-                        print(f"Data pull complete:")
+                        print("Data pull complete:")
                         print(f"  Macro: {'yes' if result.get('macro_available') else 'no'}")
                         print(f"  Stocks: {result.get('stocks_count', 0)}")
                         print(f"  Crypto: {result.get('crypto_count', 0)}")
@@ -2115,7 +2121,7 @@ def main() -> None:
                             resolve_by=resolve_by,
                             category=args.category,
                         )
-                        print(f"Prediction recorded:")
+                        print("Prediction recorded:")
                         print(f"  ID: {pred.id}")
                         print(f"  Question: {pred.question}")
                         print(f"  Probability: {pred.probability:.0%}")

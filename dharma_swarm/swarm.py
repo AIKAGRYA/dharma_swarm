@@ -76,6 +76,207 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
+_RUNTIME_AUTHORITY_RECONCILER_TYPE: type[Any] | None = None
+
+
+def get_runtime_authority_reconciler_type() -> type[Any]:
+    """Return the cached authority-first composition over frozen graph code."""
+    global _RUNTIME_AUTHORITY_RECONCILER_TYPE
+    if _RUNTIME_AUTHORITY_RECONCILER_TYPE is None:
+        from dharma_swarm.graph.reconciler import GraphReconciler
+        from dharma_swarm.runtime_state import RuntimeAuthorityReconcilerMixin
+
+        class RuntimeAuthorityReconciler(
+            RuntimeAuthorityReconcilerMixin, GraphReconciler
+        ):
+            _runtime_authority_reconcile_impl = staticmethod(
+                _reconcile_runtime_authority
+            )
+            _runtime_authority_row_impl = staticmethod(
+                _reconcile_runtime_authority_row
+            )
+
+        _RUNTIME_AUTHORITY_RECONCILER_TYPE = RuntimeAuthorityReconciler
+    return _RUNTIME_AUTHORITY_RECONCILER_TYPE
+
+
+def build_runtime_authority_reconciler(
+    runtime_state: Any, task_board: Any | None = None, **kwargs: Any
+) -> Any:
+    reconciler_type = get_runtime_authority_reconciler_type()
+    return reconciler_type(runtime_state, task_board=task_board, **kwargs)
+
+
+async def _reconcile_runtime_authority(
+    reconciler: Any, *, now: datetime | None, stale_only: bool
+) -> Any:
+    import aiosqlite
+
+    from dharma_swarm.graph.reconcile_board import settle_task_board
+    from dharma_swarm.graph.reconciler import (
+        IN_FLIGHT_STATUSES,
+        LIVE_ROW_PREDICATE,
+        ReconcileReport,
+        _ensure_quarantine_columns,
+    )
+    from dharma_swarm.runtime_state import (
+        TerminalIdentityAuthorityError,
+        TerminalReceiptPersistenceError,
+    )
+
+    now = now or datetime.now(timezone.utc)
+    report = ReconcileReport()
+    await reconciler._runtime_state.init_db()
+    async with aiosqlite.connect(reconciler._runtime_state.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await _ensure_quarantine_columns(db)
+        await db.execute("BEGIN IMMEDIATE")
+        placeholders = ",".join("?" for _ in IN_FLIGHT_STATUSES)
+        rows = await (
+            await db.execute(
+                "SELECT run_id, session_id, task_id, claim_id, status, failure_code,"
+                " assigned_to, metadata_json, receipt_json FROM delegation_runs"
+                f" WHERE status IN ({placeholders}) AND {LIVE_ROW_PREDICATE}",
+                IN_FLIGHT_STATUSES,
+            )
+        ).fetchall()
+        for index, row in enumerate(rows):
+            savepoint = f"reconcile_run_{index}"
+            await db.execute(f"SAVEPOINT {savepoint}")
+            try:
+                await reconciler._reconcile_run_row(
+                    db, row, now, report, stale_only=stale_only
+                )
+            except (
+                TerminalIdentityAuthorityError,
+                TerminalReceiptPersistenceError,
+                aiosqlite.Error,
+                ValueError,
+                KeyError,
+            ) as exc:
+                await db.execute(f"ROLLBACK TO {savepoint}")
+                await db.execute(f"RELEASE {savepoint}")
+                reconciler._record_reconcile_error(
+                    report, f"run:{row['run_id']}", exc
+                )
+            else:
+                await db.execute(f"RELEASE {savepoint}")
+        await reconciler._recover_stale_claims(db, now, report)
+        await db.commit()
+
+    await settle_task_board(
+        runtime_state=reconciler._runtime_state,
+        task_board=reconciler._task_board,
+        report=report,
+        now=now,
+        logger=logger,
+    )
+    if report.total_reconciled or report.recovered_claims or report.errors:
+        logger.info("reconciler: pass complete %s", report.summary())
+    if report.quarantined_runs:
+        logger.warning(
+            "reconciler: quarantined %d retry-exhausted run(s): %s",
+            len(report.quarantined_runs),
+            report.quarantined_runs,
+        )
+    if report.errors:
+        logger.warning(
+            "reconciler: %d fail-closed error(s), first 10: %s",
+            len(report.errors),
+            report.errors[:10],
+        )
+    return report
+
+
+async def _reconcile_runtime_authority_row(
+    reconciler: Any,
+    db: Any,
+    row: Any,
+    now: datetime,
+    report: Any,
+    *,
+    stale_only: bool,
+) -> None:
+    from dharma_swarm.graph.receipt_authority import (
+        claim_run_match,
+        has_runtime_completion,
+    )
+    from dharma_swarm.graph.reconciler import (
+        FAILURE_CODE_DIED_MID_DISPATCH,
+        FAILURE_CODE_NEVER_STARTED,
+    )
+    from dharma_swarm.runtime_state import _runtime_authority_json
+
+    run_id = str(row["run_id"])
+    claim_id = str(row["claim_id"] or "")
+    claim_row = await reconciler._fetch_claim(db, claim_id) if claim_id else None
+    if claim_row is not None and not claim_run_match(claim_row, row):
+        logger.warning(
+            "reconciler: claim %s authority does not match run %s; ignoring claim",
+            claim_id,
+            run_id,
+        )
+        claim_row = None
+    receipt = _runtime_authority_json(row["receipt_json"])
+    if receipt and await has_runtime_completion(
+        db, run_id=run_id, task_id=str(row["task_id"]),
+        claim_id=claim_id, receipt=receipt,
+    ):
+        run_status, claim_status, failure_code = await reconciler._complete_from_receipt(
+            db, row, claim_row, receipt, now
+        )
+        await reconciler._persist_terminal_receipts(
+            db, row=row, claim_row=claim_row, run_status=run_status,
+            claim_status=claim_status, reason="reconciled_from_receipt",
+            failure_code=failure_code, now=now,
+        )
+        logger.info(
+            "reconciler: completed run %s from receipt (status=%s)",
+            run_id,
+            run_status,
+        )
+        report.completed_from_receipt.append(run_id)
+        return
+    if receipt:
+        logger.warning("reconciler: ignoring unbound receipt for run %s", run_id)
+    if stale_only and not reconciler._claim_is_stale(claim_row, now):
+        return
+
+    started = claim_row is not None and bool(
+        claim_row["acked_at"] or claim_row["heartbeat_at"]
+    )
+    retry_count = int(claim_row["retry_count"]) if claim_row is not None else 0
+    failure_code = (
+        FAILURE_CODE_DIED_MID_DISPATCH if started else FAILURE_CODE_NEVER_STARTED
+    )
+    if started and retry_count >= reconciler._max_retries:
+        await reconciler._quarantine_run(db, row, now, failure_code)
+        run_tally = report.quarantined_runs
+        quarantined = True
+    else:
+        await reconciler._requeue_run(db, row, now, failure_code, retry_count + 1)
+        run_tally = report.requeued_runs
+        quarantined = False
+    if claim_row is not None:
+        await reconciler._stamp_claim_recovered(
+            db, claim_id, now, retry_count=retry_count + 1,
+            recovery_reason=failure_code,
+        )
+    await reconciler._persist_terminal_receipts(
+        db, row=row, claim_row=claim_row, run_status="failed",
+        claim_status="recovered" if claim_row is not None else None,
+        reason=failure_code, failure_code=failure_code, now=now,
+    )
+    run_tally.append(run_id)
+    if not quarantined:
+        logger.info(
+            "reconciler: requeued orphaned run %s (failure_code=%s retry=%d)",
+            run_id,
+            failure_code,
+            retry_count + 1,
+        )
+    if claim_row is not None:
+        report.recovered_claims.append(claim_id)
 
 
 class SubsystemNotReady(RuntimeError):
@@ -671,12 +872,37 @@ class SwarmManager:
 
         if self._read_only_boot:
             logger.info(
-                "Read-only boot enabled — skipping manifest refresh, stale task reaping, "
-                "startup crews, seed tasks, and optional subsystem init"
+                "Read-only boot enabled — skipping graph reconciliation, manifest "
+                "refresh, stale task reaping, startup crews, seed tasks, and "
+                "optional subsystem init"
             )
             self._telos_substrate_seeded = False
             self._refresh_initialized_registry()
             return
+
+        # Writable boots reconcile graph authority before the board-level
+        # stale-task reaper below.
+        boot_graph_reconcile_succeeded = False
+        try:
+            boot_report = await self.reconcile_graph_runs()
+            boot_graph_reconcile_succeeded = not boot_report.errors
+            if boot_report.total_reconciled or boot_report.recovered_claims:
+                logger.info(
+                    "Graph reconciler settled orphaned dispatch state at boot: %s",
+                    boot_report.summary(),
+                )
+            if boot_report.errors:
+                self._last_boot_reconcile_error = (
+                    f"GraphReconcileReportErrors: {boot_report.errors[:10]}"
+                )
+                logger.warning(
+                    "Graph boot reconcile had %d fail-closed error(s); "
+                    "board stale-task reaping will be skipped",
+                    len(boot_report.errors),
+                )
+        except Exception as exc:
+            logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
+            self._last_boot_reconcile_error = f"{type(exc).__name__}: {exc}"
 
         # Load ecosystem awareness on every init
         from dharma_swarm.ecosystem_bridge import MANIFEST_PATH, update_manifest
@@ -692,33 +918,23 @@ class SwarmManager:
             )
             self._manifest = update_manifest(manifest_path=fallback_manifest_path)
 
-        # Boot reconcile of orphaned delegation_runs/task_claims from prior
-        # daemon incarnations (single-writer: SwarmManager owns this pass).
-        # Must run BEFORE the stale-task reaper: a crashed run with a persisted
-        # success receipt settles its board task COMPLETED here; if the reaper
-        # ran first it would board-FAIL the task and the receipt completion
-        # could no longer apply (FAILED -> COMPLETED is not a legal transition).
-        try:
-            boot_report = await self.reconcile_graph_runs()
-            if boot_report.total_reconciled or boot_report.recovered_claims:
-                logger.info(
-                    "Graph reconciler settled orphaned dispatch state at boot: %s",
-                    boot_report.summary(),
-                )
-        except Exception as exc:
-            logger.warning("Graph boot reconcile failed (non-fatal): %s", exc)
-            self._last_boot_reconcile_error = f"{type(exc).__name__}: {exc}"
-
         # Reap stale running tasks from prior daemon incarnations.
         # When the daemon crashes, tasks it dispatched are left in RUNNING status
         # forever. No other daemon instance will ever settle them because
         # _collect_completed only tracks in-process asyncio tasks.
-        try:
-            reaped = await self._reap_stale_running_tasks()
-            if reaped:
-                logger.info("Reaped %d stale running tasks from prior daemon", reaped)
-        except Exception as exc:
-            logger.warning("Stale task reaper failed (non-fatal): %s", exc)
+        if boot_graph_reconcile_succeeded:
+            try:
+                reaped = await self._reap_stale_running_tasks()
+                if reaped:
+                    logger.info(
+                        "Reaped %d stale running tasks from prior daemon", reaped
+                    )
+            except Exception as exc:
+                logger.warning("Stale task reaper failed (non-fatal): %s", exc)
+        else:
+            logger.warning(
+                "Skipping stale task reaper: graph reconciliation not confirmed"
+            )
 
         # Spawn default crew and seed tasks if this is a fresh start
         from dharma_swarm.startup_crew import (
@@ -1797,17 +2013,62 @@ class SwarmManager:
         return False
 
     def _get_graph_reconciler(self) -> GraphReconciler:
-        from dharma_swarm.graph.reconciler import GraphReconciler
         from dharma_swarm.runtime_state import RuntimeStateStore
 
         if self._graph_reconciler is None:
             runtime_state = RuntimeStateStore(
                 self.state_dir / "state" / "runtime.db"
             )
-            self._graph_reconciler = GraphReconciler(
+            self._graph_reconciler = build_runtime_authority_reconciler(
                 runtime_state, task_board=self._task_board
             )
         return self._graph_reconciler
+
+    async def _current_process_live_claim_ids(self) -> set[str]:
+        """Return claims proven by this process's in-memory asyncio tasks.
+
+        Durable ``task_claims`` rows are intentionally not consulted: after a
+        restart they are orphan evidence, not heartbeat authority.  TaskBoard
+        claim metadata is only a stable identity join for a currently-running
+        in-memory task after Orchestrator has removed its active-dispatch row.
+        """
+        orchestrator = self._orchestrator
+        if orchestrator is None:
+            return set()
+        running_tasks = getattr(orchestrator, "_running_tasks", {})
+        active_dispatches = getattr(orchestrator, "_active_dispatches", {})
+        live_claim_ids: set[str] = set()
+        for task_id, background_task in running_tasks.items():
+            if background_task.done():
+                continue
+            dispatch = active_dispatches.get(task_id)
+            metadata = getattr(dispatch, "metadata", None)
+            claim_id = (
+                str(metadata.get("claim_id") or "").strip()
+                if isinstance(metadata, dict)
+                else ""
+            )
+            if not claim_id and self._task_board is not None:
+                try:
+                    board_task = await self._task_board.get(task_id)
+                except Exception:
+                    logger.debug(
+                        "Live claim identity lookup failed for task %s",
+                        task_id,
+                        exc_info=True,
+                    )
+                    board_task = None
+                board_metadata = getattr(board_task, "metadata", None)
+                if isinstance(board_metadata, dict):
+                    for key in ("active_claim", "last_claim"):
+                        candidate = board_metadata.get(key)
+                        if isinstance(candidate, dict):
+                            claim_id = str(candidate.get("claim_id") or "").strip()
+                            if claim_id:
+                                break
+            if claim_id:
+                live_claim_ids.add(claim_id)
+        return live_claim_ids
 
     async def reconcile_graph_runs(self, *, stale_only: bool = False) -> ReconcileReport:
         """Requeue-or-quarantine orphaned dispatch state (graph reconciler)."""
@@ -2310,10 +2571,12 @@ class SwarmManager:
             except Exception as me_exc:
                 logger.debug("Meta-evolution observation error: %s", me_exc)
 
-        # Heartbeat live claims every tick, before any staleness-gated
-        # reconcile: claim windows can be shorter than the rescue cadence.
+        # Heartbeat only claims with explicit in-memory execution authority.
+        # Persisted rows alone can never revive work from an earlier boot.
         try:
-            beaten = self._get_graph_reconciler().heartbeat_live_claims()
+            beaten = self._get_graph_reconciler().heartbeat_live_claims(
+                await self._current_process_live_claim_ids()
+            )
             result["claims_heartbeaten"] = beaten
         except Exception as exc:
             logger.warning("Claim heartbeat failed (non-fatal): %s", exc)
@@ -2333,33 +2596,44 @@ class SwarmManager:
             self._last_auto_rescue_scan = now
         result["rescued"] = len(rescued)
 
-        # Orphan reaper: recover tasks stuck on dead agents (runs with rescue scan)
+        # Runtime graph settlement owns ordering.  Only after it succeeds may
+        # the board-level orphan projection requeue tasks; otherwise the board
+        # could become PENDING while its durable run remains graph-active.
         if (self._last_auto_rescue_scan is not None
                 and self._last_auto_rescue_scan == now):
-            try:
-                orphans = await asyncio.wait_for(
-                    self.reap_orphaned_tasks(), timeout=10.0
-                )
-                result["orphans_reaped"] = len(orphans)
-                if orphans:
-                    logger.info("Orphan reaper recovered %d task(s)", len(orphans))
-            except asyncio.TimeoutError:
-                logger.warning("reap_orphaned_tasks timed out after 10s")
-            except Exception:
-                logger.debug("Orphan reaper error", exc_info=True)
-
-            # Graph reconciler: settle orphaned delegation_runs/task_claims
-            # (runs with rescue scan cadence; heartbeat already ran this tick).
+            graph_reconcile_succeeded = False
             try:
                 tick_report = await asyncio.wait_for(
                     self.reconcile_graph_runs(stale_only=True), timeout=10.0
                 )
                 result["graph_reconciled"] = tick_report.total_reconciled
+                graph_reconcile_succeeded = not tick_report.errors
+                if tick_report.errors:
+                    result["graph_reconcile_error"] = (
+                        f"{len(tick_report.errors)} fail-closed reconciliation error(s)"
+                    )
             except asyncio.TimeoutError:
                 logger.warning("reconcile_graph_runs timed out after 10s")
             except Exception as exc:
                 logger.warning("Graph tick reconcile failed (non-fatal): %s", exc)
                 result["graph_reconcile_error"] = f"{type(exc).__name__}: {exc}"
+
+            if graph_reconcile_succeeded:
+                try:
+                    orphans = await asyncio.wait_for(
+                        self.reap_orphaned_tasks(), timeout=10.0
+                    )
+                    result["orphans_reaped"] = len(orphans)
+                    if orphans:
+                        logger.info(
+                            "Orphan reaper recovered %d task(s)", len(orphans)
+                        )
+                except asyncio.TimeoutError:
+                    logger.warning("reap_orphaned_tasks timed out after 10s")
+                except Exception:
+                    logger.debug("Orphan reaper error", exc_info=True)
+            else:
+                result["orphan_reaper_skipped"] = "graph_reconcile_not_confirmed"
 
         queue_snapshot: dict[str, int] = {}
         try:
@@ -2388,7 +2662,9 @@ class SwarmManager:
             except Exception:
                 pass
         if allow_autonomous_generation and not _has_real_tasks:
-            import time as _t; _t0 = _t.monotonic()
+            import time as _t
+
+            _t0 = _t.monotonic()
             try:
                 reopened = await asyncio.wait_for(
                     self.spawn_latent_gold_tasks(), timeout=20.0

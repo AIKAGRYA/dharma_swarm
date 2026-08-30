@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+from enum import Enum
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -653,6 +654,80 @@ def test_cmd_health_uses_absorbed_ecosystem_map(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "Ecosystem: 3 OK, 1 MISSING" in out
     assert "~/missing/path -- MISSING -- example" in out
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("healthy", 0),
+        ("degraded", 1),
+        ("critical", 2),
+        ("unknown", 3),
+        ("not-a-health-status", 3),
+    ],
+)
+def test_health_check_exit_code_for_string_status(status, expected):
+    from dharma_swarm.terminal_commands.diagnostics import _health_check_exit_code
+
+    assert _health_check_exit_code(status) == expected
+
+
+def test_health_check_exit_code_for_enum_status():
+    from dharma_swarm.terminal_commands.diagnostics import _health_check_exit_code
+
+    class HealthVerdict(Enum):
+        HEALTHY = "healthy"
+        DEGRADED = "degraded"
+        CRITICAL = "critical"
+        UNKNOWN = "unknown"
+
+    assert _health_check_exit_code(HealthVerdict.HEALTHY) == 0
+    assert _health_check_exit_code(HealthVerdict.DEGRADED) == 1
+    assert _health_check_exit_code(HealthVerdict.CRITICAL) == 2
+    assert _health_check_exit_code(HealthVerdict.UNKNOWN) == 3
+
+
+def test_cmd_health_check_returns_typed_exit_and_always_shuts_down(
+    monkeypatch, capsys
+):
+    import dharma_swarm.terminal_commands.diagnostics as diagnostics
+
+    class FakeSwarm:
+        shut_down = False
+
+        async def health_check(self):
+            return {
+                "overall_status": "critical",
+                "total_traces": 4,
+                "traces_last_hour": 2,
+                "failure_rate": 0.5,
+                "anomalies": [],
+            }
+
+        async def shutdown(self):
+            self.shut_down = True
+
+    swarm = FakeSwarm()
+
+    async def fake_get_swarm():
+        return swarm
+
+    monkeypatch.setattr(diagnostics, "_get_swarm", fake_get_swarm)
+
+    assert diagnostics.cmd_health_check() == 2
+    assert swarm.shut_down is True
+    assert "Overall: critical" in capsys.readouterr().out
+
+
+def test_health_check_exit_code_propagates_through_main():
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "health-check"]):
+        with patch("dharma_swarm.dgc_cli.cmd_health_check", return_value=2):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+    assert exc.value.code == 2
 
 
 def test_dgc_cli_xray_packet_command_dispatch():

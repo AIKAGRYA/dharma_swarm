@@ -11,7 +11,6 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,12 +18,9 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.models import (
-    AgentConfig,
     AgentRole,
     AgentState,
     AgentStatus,
-    Task,
-    TaskPriority,
     TaskStatus,
 )
 from dharma_swarm.swarm import SwarmManager
@@ -758,7 +754,7 @@ class TestTaskQueueSnapshot:
         # or a running task stale >15min, per task_board._READY_QUERY.
         blocking_parent = await board.create("running parent")
         blocked_child = await board.create("blocked child")
-        ready_task = await board.create("independent ready task")
+        await board.create("independent ready task")
         failed_task = await board.create("failed task")
         await _add_dependency(board, blocked_child.id, blocking_parent.id)
 

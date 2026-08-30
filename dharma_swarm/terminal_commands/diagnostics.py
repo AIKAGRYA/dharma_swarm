@@ -56,7 +56,7 @@ def cmd_loops() -> None:
     # Cascade history
     history_path = meta_dir / "cascade_history.jsonl"
     if history_path.exists():
-        lines = [l for l in history_path.read_text().strip().split("\n") if l.strip()]
+        lines = [line for line in history_path.read_text().strip().split("\n") if line.strip()]
         print(f"\nCascade history: {len(lines)} runs")
         for line in lines[-5:]:
             try:
@@ -82,7 +82,7 @@ def cmd_loops() -> None:
 
     # Domain summary (latest scores per domain)
     if history_path.exists():
-        all_lines = [l for l in history_path.read_text().strip().split("\n") if l.strip()]
+        all_lines = [line for line in history_path.read_text().strip().split("\n") if line.strip()]
         latest_by_domain: dict[str, dict] = {}
         for line in all_lines:
             try:
@@ -164,7 +164,7 @@ def cmd_invariants() -> None:
     try:
         archive_path = state_dir / "evolution" / "archive.jsonl"
         if archive_path.exists():
-            entries = [json.loads(l) for l in archive_path.read_text().strip().split("\n") if l.strip()]
+            entries = [json.loads(line) for line in archive_path.read_text().strip().split("\n") if line.strip()]
             if entries:
                 genome_length = max(len(entries), 9)
                 # Estimate mutation rate from recent entries
@@ -186,10 +186,10 @@ def cmd_invariants() -> None:
         if marks_path.exists():
             lines = marks_path.read_text().strip().split("\n")[-100:]  # last 100 marks
             agents = set()
-            for l in lines:
-                if l.strip():
+            for line in lines:
+                if line.strip():
                     try:
-                        m = json.loads(l)
+                        m = json.loads(line)
                         agents.add(m.get("agent", ""))
                     except json.JSONDecodeError:
                         pass
@@ -252,7 +252,7 @@ def cmd_transcendence() -> None:
             print(f"  Aggregation Lift:     {report.get('aggregation_lift', 'N/A')}")
             print(f"  Transcended:          {report.get('transcended', 'N/A')}")
         if report.get("individual_briers"):
-            print(f"\n  Individual Brier Scores:")
+            print("\n  Individual Brier Scores:")
             for src, score in sorted(report["individual_briers"].items()):
                 print(f"    {src}: {score}")
     except Exception as e:
@@ -282,27 +282,42 @@ def cmd_health(*, as_json: bool = False) -> None:
             print("ecosystem_map not available")
 
 
-def cmd_health_check() -> None:
-    """Monitor-based system health check (v0.2.0)."""
-    async def _check():
-        swarm = await _get_swarm()
-        report = await swarm.health_check()
-        status = report.get("overall_status", "unknown")
-        print(f"Overall: {status}")
-        print(f"  Total traces: {report.get('total_traces', 0)}")
-        print(f"  Traces last hour: {report.get('traces_last_hour', 0)}")
-        print(f"  Failure rate: {report.get('failure_rate', 0):.1%}")
-        mean_f = report.get("mean_fitness")
-        if mean_f is not None:
-            print(f"  Mean fitness: {mean_f:.3f}")
-        anomalies = report.get("anomalies", [])
-        if anomalies:
-            print(f"\nAnomalies ({len(anomalies)}):")
-            for a in anomalies:
-                print(f"  [{a.get('severity', '?')}] {a.get('description', '')}")
-        await swarm.shutdown()
+def _health_check_exit_code(status: object) -> int:
+    """Project the typed health verdict into a fail-closed process exit code."""
+    value = getattr(status, "value", status)
+    normalized = str(value).strip().lower()
+    exit_codes = {"healthy": 0, "degraded": 1, "critical": 2, "unknown": 3}
+    return exit_codes.get(normalized, 3)
 
-    _run(_check())
+
+def cmd_health_check() -> int:
+    """Monitor-based system health check with an authority-bearing exit code."""
+    async def _check() -> int:
+        swarm = await _get_swarm()
+        try:
+            report = await swarm.health_check()
+            status = report.get("overall_status", "unknown")
+            normalized_status = getattr(status, "value", status)
+            print(f"Overall: {normalized_status}")
+            print(f"  Total traces: {report.get('total_traces', 0)}")
+            print(f"  Traces last hour: {report.get('traces_last_hour', 0)}")
+            print(f"  Failure rate: {report.get('failure_rate', 0):.1%}")
+            mean_f = report.get("mean_fitness")
+            if mean_f is not None:
+                print(f"  Mean fitness: {mean_f:.3f}")
+            anomalies = report.get("anomalies", [])
+            if anomalies:
+                print(f"\nAnomalies ({len(anomalies)}):")
+                for anomaly in anomalies:
+                    print(
+                        f"  [{anomaly.get('severity', '?')}] "
+                        f"{anomaly.get('description', '')}"
+                    )
+            return _health_check_exit_code(status)
+        finally:
+            await swarm.shutdown()
+
+    return int(_run(_check()))
 
 
 def cmd_doctor(
@@ -383,8 +398,8 @@ def cmd_ui(surface: str = "list") -> None:
         lines.extend(
             [
                 "TUI",
-                f"- primary operator cockpit: dgc dashboard",
-                f"- direct module: python3 -m dharma_swarm.tui",
+                "- primary operator cockpit: dgc dashboard",
+                "- direct module: python3 -m dharma_swarm.tui",
                 f"- code: {root / 'dharma_swarm' / 'tui' / 'app.py'}",
             ]
         )
@@ -467,7 +482,7 @@ def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
         print(f"  Agents:   {result.agent_count}")
         if result.invariants:
             inv = result.invariants
-            print(f"  Invariants:")
+            print("  Invariants:")
             print(f"    Criticality:  {inv.criticality:.4f} ({inv.criticality_status})")
             print(f"    Closure:      {inv.closure_ratio:.4f} ({inv.closure_status})")
             print(f"    Info Retain:   {inv.info_retention:.6f} ({inv.info_retention_status})")
@@ -475,17 +490,17 @@ def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
             print(f"    Overall:      {inv.overall}")
         if result.transcendence_metrics:
             tm = result.transcendence_metrics
-            print(f"  Transcendence:")
+            print("  Transcendence:")
             print(f"    Margin:    {tm.transcendence_margin:.4f}")
             print(f"    Diversity: {tm.behavioral_div:.4f}")
             print(f"    Families:  {tm.n_model_families}")
         if result.prediction:
-            print(f"  Self-Prediction:")
+            print("  Self-Prediction:")
             print(f"    Predicted: {result.prediction.predicted_duration_ms:.0f}ms")
             if result.prediction.duration_error is not None:
                 print(f"    Error:     {result.prediction.duration_error:.0f}ms")
             if result.prediction.surprise:
-                print(f"    SURPRISE detected!")
+                print("    SURPRISE detected!")
         print(f"  Stages: {result.stage_timings}")
 
     asyncio.run(_run())
