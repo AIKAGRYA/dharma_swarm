@@ -718,7 +718,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_eauto.add_argument("--model", default="")
     p_eauto.add_argument("--context", default="", help="Focus area or context for the LLM")
     p_eauto.add_argument("--single-model", action="store_true", help="Use only --model instead of full roster")
-    p_eauto.add_argument("--shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs")
+    p_eauto.add_argument("--shadow", dest="shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs (default)")
+    p_eauto.add_argument("--live", dest="shadow", action="store_false", help="Apply diffs (requires --promotion)")
+    p_eauto.add_argument("--promotion", default=None, help="Path to a Forge verify_promotion packet authorizing live apply")
+    p_eauto.add_argument("--trusted-judge-key", action="append", default=[], help="Trusted judge public key (may be given multiple times)")
     p_eauto.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=unlimited)")
 
     p_edaemon = evolve_sub.add_parser("daemon", help="Run continuous autonomous evolution")
@@ -727,7 +730,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_edaemon.add_argument("--model", default="")
     p_edaemon.add_argument("--cycles", type=int, default=None, help="Max cycles (default: infinite)")
     p_edaemon.add_argument("--single-model", action="store_true", help="Use only --model instead of full roster")
-    p_edaemon.add_argument("--shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs")
+    p_edaemon.add_argument("--shadow", dest="shadow", action="store_true", default=True, help="Dry-run: generate proposals but don't apply diffs (default)")
+    p_edaemon.add_argument("--live", dest="shadow", action="store_false", help="Apply diffs (requires --promotion)")
+    p_edaemon.add_argument("--promotion", default=None, help="Path to a Forge verify_promotion packet authorizing live apply")
+    p_edaemon.add_argument("--trusted-judge-key", action="append", default=[], help="Trusted judge public key (may be given multiple times)")
     p_edaemon.add_argument("--token-budget", type=int, default=0, help="Max tokens per session (0=unlimited)")
 
     # -- dharma --
@@ -1673,6 +1679,14 @@ def main() -> None:
                 case _:
                     parser.parse_args(["task", "--help"])
         case "evolve":
+            if (
+                args.evolve_cmd in {"auto", "daemon"}
+                and not args.shadow
+                and not args.promotion
+            ):
+                # Refuse before any engine or daemon startup: a live run without
+                # a promotion packet can only perform refused no-op cycles.
+                parser.error(f"evolve {args.evolve_cmd} --live requires --promotion")
             match args.evolve_cmd:
                 case "propose":
                     cmd_evolve_propose(
@@ -1693,6 +1707,8 @@ def main() -> None:
                         single_model=args.single_model,
                         shadow=args.shadow,
                         token_budget=args.token_budget,
+                        promotion_path=args.promotion,
+                        trusted_judge_public_keys=args.trusted_judge_key,
                     )
                 case "daemon":
                     cmd_evolve_daemon(
@@ -1700,6 +1716,8 @@ def main() -> None:
                         single_model=args.single_model,
                         shadow=args.shadow,
                         token_budget=args.token_budget,
+                        promotion_path=args.promotion,
+                        trusted_judge_public_keys=args.trusted_judge_key,
                     )
                 case _:
                     parser.parse_args(["evolve", "--help"])

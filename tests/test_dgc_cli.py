@@ -2804,3 +2804,122 @@ def test_cmd_gates_json_emits_valid_json(capsys):
     assert "decision" in data
     assert "action" in data
     assert data["action"] == "check status"
+
+
+def test_evolve_auto_parser_honors_live_and_promotion_args():
+    """dgc evolve auto --live --promotion PKT --trusted-judge-key K sets the right namespace."""
+    import dharma_swarm.dgc_cli as cli
+
+    parser = cli._build_parser()
+    args = parser.parse_args(
+        [
+            "evolve",
+            "auto",
+            "--live",
+            "--promotion",
+            "promotion.json",
+            "--trusted-judge-key",
+            "key1",
+            "--trusted-judge-key",
+            "key2",
+        ]
+    )
+    assert args.command == "evolve"
+    assert args.evolve_cmd == "auto"
+    assert args.shadow is False
+    assert args.promotion == "promotion.json"
+    assert args.trusted_judge_key == ["key1", "key2"]
+
+
+def test_evolve_daemon_parser_honors_live_and_promotion_args():
+    """dgc evolve daemon --live --promotion PKT sets shadow=False and carries the promotion path."""
+    import dharma_swarm.dgc_cli as cli
+
+    parser = cli._build_parser()
+    args = parser.parse_args(
+        ["evolve", "daemon", "--live", "--promotion", "promotion.json"]
+    )
+    assert args.command == "evolve"
+    assert args.evolve_cmd == "daemon"
+    assert args.shadow is False
+    assert args.promotion == "promotion.json"
+    assert args.trusted_judge_key == []
+
+
+def test_evolve_daemon_live_without_promotion_exits_before_startup(monkeypatch):
+    """dgc evolve daemon --live with no --promotion must exit nonzero before the daemon starts."""
+    import dharma_swarm.dgc_cli as cli
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("cmd_evolve_daemon must not start without a promotion packet")
+
+    monkeypatch.setattr(cli, "cmd_evolve_daemon", _fail_if_called)
+    monkeypatch.setattr(sys, "argv", ["dgc", "evolve", "daemon", "--live", "--single-model"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2
+
+
+def test_evolve_auto_live_without_promotion_exits_before_startup(monkeypatch):
+    """dgc evolve auto --live with no --promotion must exit nonzero before any cycle runs."""
+    import dharma_swarm.dgc_cli as cli
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("cmd_evolve_auto must not run without a promotion packet")
+
+    monkeypatch.setattr(cli, "cmd_evolve_auto", _fail_if_called)
+    monkeypatch.setattr(sys, "argv", ["dgc", "evolve", "auto", "--live"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2
+
+
+def test_evolve_commands_reject_bad_promotion_packet_before_swarm_init(
+    monkeypatch, tmp_path
+):
+    """A missing or malformed promotion packet must fail before the swarm exists."""
+    import dharma_swarm.terminal_commands.evolution as evo
+
+    def _fail_if_called():
+        raise AssertionError("swarm must not initialize when the packet is invalid")
+
+    monkeypatch.setattr(evo, "_get_swarm", _fail_if_called)
+
+    missing = tmp_path / "nope.json"
+    malformed = tmp_path / "bad.json"
+    malformed.write_text("{not json", encoding="utf-8")
+
+    for path in (missing, malformed):
+        with pytest.raises(SystemExit):
+            evo.cmd_evolve_auto(None, "m", "ctx", promotion_path=str(path))
+        with pytest.raises(SystemExit):
+            evo.cmd_evolve_daemon(60.0, 0.5, "m", 1, promotion_path=str(path))
+
+
+def test_load_promotion_packet_parses_valid_json(tmp_path):
+    """The pre-init loader returns the parsed packet dict, and None without a path."""
+    import dharma_swarm.terminal_commands.evolution as evo
+
+    packet = tmp_path / "promotion.json"
+    packet.write_text('{"verdict": "promote"}', encoding="utf-8")
+    assert evo._load_promotion_packet(str(packet)) == {"verdict": "promote"}
+    assert evo._load_promotion_packet(None) is None
+
+
+def test_evolve_daemon_live_with_promotion_reaches_command(monkeypatch):
+    """The guard must not block a live daemon that does carry a promotion packet."""
+    import dharma_swarm.dgc_cli as cli
+
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        cli, "cmd_evolve_daemon", lambda *a, **k: calls.append(k)
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["dgc", "evolve", "daemon", "--live", "--promotion", "promotion.json"],
+    )
+    cli.main()
+    assert len(calls) == 1
+    assert calls[0]["promotion_path"] == "promotion.json"
+    assert calls[0]["shadow"] is False
