@@ -353,9 +353,50 @@ active_tracks:
     conflicts_with: []
     admission_scopes: [mac_build]
     owned_surfaces:
-      - dharma_swarm/foundry/**
+      # Custody ruling 2026-08-30 (ONE_WORLD unification, PR #1493): the
+      # guardian-feed surface — dharma_swarm/foundry/guardian_feed.py and
+      # tests/test_foundry_guardian_feed.py — is ceded from this track; see
+      # claim_boundary for the full ruling. The former globs
+      # (dharma_swarm/foundry/**, tests/test_foundry_*.py) are replaced by
+      # explicit file lists so the cession is exact and fail-closed: any NEW
+      # foundry file or test is unowned until a future amendment re-admits it.
+      - dharma_swarm/foundry/__init__.py
+      - dharma_swarm/foundry/army.py
+      - dharma_swarm/foundry/artifacts.py
+      - dharma_swarm/foundry/campaign.py
+      - dharma_swarm/foundry/daemon.py
+      - dharma_swarm/foundry/elite_grid.py
+      - dharma_swarm/foundry/evaluator.py
+      - dharma_swarm/foundry/heldout.py
+      - dharma_swarm/foundry/kill_metrics.py
+      - dharma_swarm/foundry/killswitch.py
+      - dharma_swarm/foundry/loop.py
+      - dharma_swarm/foundry/patches.py
+      - dharma_swarm/foundry/receipts.py
+      - dharma_swarm/foundry/report_card.py
+      - dharma_swarm/foundry/runner_isolation.py
+      - dharma_swarm/foundry/shakti_local_world.py
+      - dharma_swarm/foundry/shakti_system.py
+      - dharma_swarm/foundry/target_ingest.py
+      - dharma_swarm/foundry/targets.py
+      - dharma_swarm/foundry/tripwires.py
       - scripts/foundry/**
-      - tests/test_foundry_*.py
+      - tests/test_foundry_army.py
+      - tests/test_foundry_artifacts.py
+      - tests/test_foundry_campaign.py
+      - tests/test_foundry_daemon.py
+      - tests/test_foundry_evaluator.py
+      - tests/test_foundry_heldout.py
+      - tests/test_foundry_kill_metrics.py
+      - tests/test_foundry_killswitch.py
+      - tests/test_foundry_loop.py
+      - tests/test_foundry_patches.py
+      - tests/test_foundry_receipts.py
+      - tests/test_foundry_report_card.py
+      - tests/test_foundry_runner_isolation.py
+      - tests/test_foundry_shakti_system.py
+      - tests/test_foundry_target_ingest.py
+      - tests/test_foundry_tripwires.py
       - docs/foundry/**
       - dharma_swarm/rudra/**
       - dharma_swarm/terminal_commands/rudra.py
@@ -368,7 +409,7 @@ active_tracks:
       - eval_coverage
       - cost_efficiency
     target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion. RUDRA v0 carve-out (amended 2026-08-28, operator RUDRA ASCENT campaign): the RUDRA v0 release proof — and only that proof, on operator-authored mission contracts under docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md — may drive the operator-authenticated Codex app-server executor with provider egress to the configured model service only and tool network denied. This is not a standing license for track agents: every live-executor run requires its own admitted mission contract, and COMPLETE_REPRODUCED grants no push, merge, deploy, publish, or spend authority."
+    claim_boundary: "The active Sublimation Forge packet authorizes an offline pilot only. Local loops and scorecards do not authorize live providers, deployment, VPS mutation, outreach, or promotion. RUDRA v0 carve-out (amended 2026-08-28, operator RUDRA ASCENT campaign): the RUDRA v0 release proof — and only that proof, on operator-authored mission contracts under docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md — may drive the operator-authenticated Codex app-server executor with provider egress to the configured model service only and tool network denied. This is not a standing license for track agents: every live-executor run requires its own admitted mission contract, and COMPLETE_REPRODUCED grants no push, merge, deploy, publish, or spend authority. Custody ruling 2026-08-30 (ONE_WORLD unification program, docs/plans/ONE_WORLD_2026-08-30.md; PR #1493): the guardian-feed surface — dharma_swarm/foundry/guardian_feed.py and tests/test_foundry_guardian_feed.py — is ceded from this track's owned_surfaces. The ONE_WORLD integration reconciles the Mac silvering (efca57e40: operator_approved flag replacing One Wire quorum arithmetic) with the quorum-pinning guardian-feed tests, and that reconciliation content is already CI-green on #1493; the sole red check was the fail-closed AgentOps packet-scope union of this track's immutable merge-base ownership, which no integration packet could satisfy while the foundry globs stood. Every other foundry and RUDRA surface remains owned by this track; the ceded globs are now explicit file lists, so any NEW foundry file or foundry test is unowned until a future track amendment re-admits it."
     description: |
       Consolidate the existing foundry into the Sublimation Forge: an
       offline-first, held-out, receipted improvement loop whose candidate
