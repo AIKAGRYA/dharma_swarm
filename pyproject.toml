@@ -28,7 +28,6 @@ dependencies = [
     "cryptography>=50.0.0",
     "icontract>=2.6",
     "croniter>=2.0",
-    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]

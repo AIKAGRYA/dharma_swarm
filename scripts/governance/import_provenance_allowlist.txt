@@ -8,7 +8,6 @@ anthropic
 arch
 croniter
 cryptography
-defusedxml
 docker
 fastapi
 fasttext

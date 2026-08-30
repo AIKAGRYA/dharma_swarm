@@ -21,7 +21,7 @@ import re
 import subprocess
 import time
 import uuid
-import defusedxml.ElementTree as ET
+import xml.etree.ElementTree as ET
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Sequence
