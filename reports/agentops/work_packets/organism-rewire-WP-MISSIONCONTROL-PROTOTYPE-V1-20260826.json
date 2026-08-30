@@ -1,0 +1,114 @@
+{
+  "allowed_files": [
+    "api/routers/control_surface.py",
+    "tests/test_control_surface_mission_control.py",
+    "dashboard/src/app/dashboard/cockpit/page.tsx",
+    "dashboard/src/components/cockpit/MissionControlDeck.tsx",
+    "dashboard/src/hooks/useMissionControl.ts",
+    "dashboard/src/lib/types.ts",
+    "reports/agentops/work_packets/organism-rewire-WP-MISSIONCONTROL-PROTOTYPE-V1-20260826.json"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "cc85f31bc7aab6c658e300950a811797a25a655b",
+  "branch": "codex/mission-control-fleet-prototype-20260826",
+  "commit": {
+    "allowed": true,
+    "message": "feat(mission-control): add typed cockpit prototype"
+  },
+  "forbidden_files": [
+    ".github/**",
+    "api/main.py",
+    "dashboard/src/app/globals.css",
+    "dashboard/src/app/layout.tsx",
+    "dashboard/src/app/dashboard/control-surface/**",
+    "dharma_swarm/**",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "CLAUDE.md",
+    "BUILD_SESSION*",
+    "scripts/**",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "gates": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_control_surface_mission_control.py tests/test_control_surface.py tests/test_control_surface_router_threadpool.py",
+      "expected_exit": 0,
+      "name": "mission-control-read-projection-contracts",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check api/routers/control_surface.py tests/test_control_surface_mission_control.py",
+      "expected_exit": 0,
+      "name": "mission-control-api-ruff",
+      "timeout_seconds": 120
+    },
+    {
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "name": "diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "organism-rewire-WP-MISSIONCONTROL-PROTOTYPE-V1-20260826",
+  "intent": "Render one tactile Linear-v1 Mission Control cockpit at the existing dashboard/cockpit front door and add only a bounded explicit-mission GET projection through an injected read-only provider. Preserve TaskBoard plus RuntimeStateStore as authority, retain source uncertainty, and label simulated prototype data so no projection can be mistaken for executor liveness or runtime proof.",
+  "negative_controls": [
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_control_surface_mission_control.py -k 'uninitialized or rejects or mismatch or failure'",
+      "expected_exit": 0,
+      "name": "mission-control-fail-closed-negative-controls",
+      "timeout_seconds": 180
+    }
+  ],
+  "session_entry": {
+    "active_track": "organism-rewire-2026-07",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_mcp.py",
+      "api/routers/control_surface.py",
+      "dashboard/src/app/dashboard/cockpit/page.tsx",
+      "dashboard/src/components/operator-coherence/v2/CockpitV2Board.tsx"
+    ],
+    "collision": {
+      "checked_at_sha": "cc85f31bc7aab6c658e300950a811797a25a655b",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "The API has no default Mission Control provider and therefore reports uninitialized until a trusted embedding injects a read-only provider.",
+      "The tactile fixture is explicitly SIMULATION and is excluded from live health, liveness, and completion claims.",
+      "Mission Control and TaskBoard remain separate databases without an atomic cross-store lifecycle transaction.",
+      "Recorded task, lease, run, heartbeat, acknowledgement, or receipt state never proves an executor process is alive.",
+      "This packet does not deploy, start a daemon, initialize a state store, discover missions, or mutate runtime state."
+    ],
+    "interface_mismatches": [
+      "Canonical owner reads can initialize or migrate stores, so the HTTP projection accepts only a dependency-injected read-only provider and never constructs owner stores during a request.",
+      "There is no canonical unbounded mission-list API; the endpoint and cockpit require one explicit bounded mission identifier.",
+      "The existing cockpit report is a broad repository projection while MissionSnapshot is a typed mission projection; the UI must display their provenance separately.",
+      "The current visual shell predates the locked matte indigo-sumi canon, so this packet scopes the canonical treatment to Mission Control without changing unrelated dashboard routes."
+    ],
+    "owner": "@AmitabhainArunachala",
+    "packet_digest": "41b00bbd62e6ca18a04c44a26e9f1ab89f8e9bb0d46e609bb25f62a4f33f3021",
+    "rollback": "Revert this bounded API and cockpit commit. No canonical owner state, runtime database, transport, daemon, deployment, or external system is changed.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-MISSIONCONTROL-PROTOTYPE-V1-20260826"
+  },
+  "worktree": "."
+}

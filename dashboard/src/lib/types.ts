@@ -891,6 +891,100 @@ export interface ControlSurfaceEnvelope<T> {
   data: T;
 }
 
+export interface MissionControlMissionView {
+  mission_id: string;
+  session_id: string;
+  title: string;
+  goal: string;
+  operator_id: string;
+  status: string;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface MissionControlTaskView {
+  task_id: string;
+  mission_id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assigned_to: string;
+  result: string;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface MissionControlAttemptView {
+  attempt_id: string;
+  mission_id: string;
+  session_id: string;
+  task_id: string;
+  claim_id: string;
+  assigned_to: string;
+  assigned_by: string;
+  status: string;
+  failure_code: string;
+  idempotency_key: string;
+  metadata: Record<string, unknown>;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface MissionControlLeaseView {
+  claim_id: string;
+  mission_id: string;
+  session_id: string;
+  task_id: string;
+  agent_id: string;
+  attempt_id: string;
+  status: string;
+  active: boolean;
+  expired: boolean;
+  heartbeat_at: string | null;
+  stale_after: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface MissionControlReceiptView {
+  receipt_id: string;
+  mission_id: string;
+  task_id: string;
+  attempt_id: string;
+  agent_id: string;
+  receipt_type: string;
+  status: string;
+  idempotency_key: string;
+  payload: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface MissionControlSnapshot {
+  mission: MissionControlMissionView;
+  tasks: MissionControlTaskView[];
+  attempts: MissionControlAttemptView[];
+  leases: MissionControlLeaseView[];
+  receipts: MissionControlReceiptView[];
+  reconciliation: string;
+  observed_at: string;
+  authority: "TaskBoard+RuntimeStateStore";
+  proves_executor_liveness: false;
+}
+
+export interface MissionSnapshotProjection {
+  schema_version: "dharma.control_surface.mission_snapshot_projection.v1";
+  mission_id: string;
+  state: "observed" | "uninitialized" | "unknown";
+  authority: "TaskBoard+RuntimeStateStore";
+  source_mode: "injected_read_only";
+  runtime_projection_mode: "immutable_copy" | "owner_supplied_read_only" | "unavailable";
+  simulation: false;
+  snapshot: MissionControlSnapshot | null;
+  proves_executor_liveness: false;
+}
+
 export interface BoardReceiptRef {
   receipt_id: string;
   kind: string;
