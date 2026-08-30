@@ -62,7 +62,7 @@
       "git",
       "owner_files"
     ],
-    "work_packet": "WP-RSI-EXACT-SYNC-PIN",
+    "work_packet": "WP-EXACT-SYNC-PIN-20260830",
     "active_track": "rsi-lab-meghadharma-2026-08",
     "owner": "@dhyana",
     "collision": {
@@ -81,6 +81,6 @@
       "Witness proves exact code identity only, not campaign health or a positive RSI claim."
     ],
     "rollback": "Revert this commit. Restores the stale b148f55e pin. No runtime, remote-host, credential, or campaign mutation.",
-    "packet_digest": "3f3557c46b995da025d5452e91656db2db67fef517e38660663cf15147db5c07"
+    "packet_digest": "e61c90d7875d1d7a3cb1accc271621fd4f2c203175a823a1996caf825d673175"
   }
 }
