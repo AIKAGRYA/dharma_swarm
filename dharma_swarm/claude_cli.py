@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from typing import Mapping
 
+from dharma_swarm.api_keys import strip_metered_anthropic_key
+
 _MODEL_ALIASES: dict[str, str] = {
     "flash": "haiku",
     "gemini": "haiku",
@@ -77,6 +79,8 @@ def build_claude_headless_env(
     return merged
 
 
+
+
 def unattended_claude_auth_error(
     *,
     bare: bool,
@@ -114,6 +118,8 @@ def run_claude_headless(
     auth_error = unattended_claude_auth_error(bare=bare, env=env)
     if auth_error:
         return auth_error
+    if not bare:
+        strip_metered_anthropic_key(env)
     try:
         result = subprocess.run(
             build_claude_headless_command(
