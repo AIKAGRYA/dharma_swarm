@@ -350,7 +350,7 @@
       "Differential-oracle reseal (operator-directed unification program, 2026-08-30): the one-world merge touched pyproject.toml/uv.lock, which are inside the parity gauntlet's RELEVANT_SOURCE_ROOTS, so the sealed parity evidence on main (58.00/100, stable_digest 5c799bb0... stored) no longer replays \u2014 identical failure at a0a88841 and on nightly main run 33229410291. This head replays 60.00/100 with zero capability/gap deltas vs base replay (oracle-neutral; stable_digest b8602c39... matches the CI replay at this head). The foundry-branch corrective reseal a4cd15dbe (digest d902c4b1) binds its own tree's source digest and cannot transfer; the seal is therefore regenerated at this head with the repo's own tooling (dharmagraph_parity_gauntlet.py --emit builder+judge, reconciliation MATCH). The judge ratification is minted from that real replay evidence and annotated in its judge id as minted by the ONE_WORLD unification program under operator directive, pending operator countersign. Custody of reports/governance/dharmagraph_parity/{builder_receipt.json,judge_receipt.json,PARITY_MATRIX.md} and docs/langgraph_parity/DHARMAGRAPH_JUDGE_RATIFICATIONS_V1.json is admitted to this packet for this reseal."
     ],
     "owner": "@dhyana",
-    "packet_digest": "af40042c91be2858c7513ab93df9d1cb56607ae9012880c0666f94b95c38544c",
+    "packet_digest": "5214a791becb85f0d5f21d58ca90a85810d541069f76ff8a845bde48bb55fbdd",
     "rollback": "git revert the integration merge commit and the repair commits on integrate/one-world-2026-08-30; satellites remain intact on their own branches.",
     "schema": "dharma_swarm.session_entry.v1",
     "tool_versions": {
