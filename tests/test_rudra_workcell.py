@@ -360,3 +360,20 @@ def test_process_cwd_linux_reads_proc_symlink(monkeypatch) -> None:
 
     monkeypatch.setattr(process_owner.os, "readlink", _gone)
     assert process_owner.process_cwd(999999) is None
+
+
+def test_process_command_linux_reads_proc_exe_symlink(monkeypatch) -> None:
+    """On Linux the executable probe is the resolved /proc/<pid>/exe symlink,
+    because ps comm= is the 15-char unresolved execve basename and can never
+    match a realpath'd handle.executable; a missing pid is an honest None."""
+    monkeypatch.setattr(process_owner.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(
+        process_owner.os, "readlink", lambda path: "/usr/bin/python3.11"
+    )
+    assert process_owner.process_command(42) == "/usr/bin/python3.11"
+
+    def _gone(path):
+        raise OSError("No such file or directory")
+
+    monkeypatch.setattr(process_owner.os, "readlink", _gone)
+    assert process_owner.process_command(999999) is None

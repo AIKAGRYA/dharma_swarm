@@ -70,6 +70,15 @@ def process_start_id(pid: int) -> str | None:
 
 
 def process_command(pid: int) -> str | None:
+    if platform.system() == "Linux":
+        # comm= is the 15-char kernel task name, taken from the execve path's
+        # basename before symlink resolution; it can never match a realpath'd
+        # executable. /proc/<pid>/exe is the resolved executable path — the
+        # same observation macOS gets from ps comm=.
+        try:
+            return os.readlink(f"/proc/{pid}/exe")
+        except OSError:
+            return None
     out = subprocess.run(
         ["/bin/ps", "-o", "comm=", "-p", str(pid)],
         capture_output=True, text=True, timeout=10,
