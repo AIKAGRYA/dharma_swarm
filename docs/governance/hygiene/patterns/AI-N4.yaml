@@ -1,0 +1,28 @@
+{
+  "id": "AI-N4",
+  "title": "Check never exercised against an instance it should catch",
+  "cluster": "N",
+  "cluster_title": "Measurement Integrity",
+  "severity": "operational",
+  "stage": "observed",
+  "created": "2026-08-03",
+  "last_verified": "2026-08-03",
+  "next_review": "2026-11-03",
+  "definition": "A gate, guard or regression test is added and observed to pass, but never run against a case it is supposed to fail. It may pass for a reason unrelated to the property it claims -- satisfied by an incidental token elsewhere in the function, measuring state the production path never reaches, or asserting on a ref it never fetched. The same defect applies to a check's EXEMPTIONS: an exemption argued per function when the property only holds at one of several call sites.",
+  "why_it_hurts": "An unfalsified check is decoration that reads as protection, and it is worse than no check because it ends the search. Every measured instance was written by an agent in good faith and passed on the first run: an AST gate satisfied per function by an unrelated `returncode` mention, so the large function it was written for passed for free; a byte-ceiling test that asserted zero and got zero from the fail-open path because it measured a ref it never fetched; two regression tests that built state by hand which the production path never produces. Tightening the first gate to per-call-site immediately surfaced two further unreported defects -- the decoration had been hiding them.",
+  "detector": {"type": "manual", "rationale": "Whether a check has been falsified is a property of the development process, not of the source, so no scan can see it. The mechanical substitute is procedural and cheap: revert the fix, confirm the check goes red AND names the right thing, restore. Note the recursion -- a negative control is itself code and can be wrong for its own reasons, so its failure output must be READ, not merely observed to be red."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": [
+    "tests/test_lane_deliver.py",
+    "tests/test_lane_propose.py",
+    "docs/governance/hygiene/LIFECYCLE.md",
+    "https://github.com/AmitabhainArunachala/dharma_swarm/pull/1200"
+  ],
+  "audit_questions": [
+    "Has this check been run against an input it should reject? Paste the failure output, not the assertion that it would fail.",
+    "Did the negative control fail for the REASON claimed? A control that goes red for an unrelated reason -- a bad revert, a typo, a different error entirely -- proves nothing about the check.",
+    "Does the test exercise the same entry point the fix guards, or a helper the production path reaches differently? Bind to the production path (inspect.getsource of the caller, or drive main()) rather than re-implementing its logic in the test.",
+    "For each exemption the check carries: is the stated justification true at every call site it exempts, or only at the one that was examined when it was written?",
+    "Could this check pass for a reason other than the property it claims to enforce? Name that reason and rule it out."
+  ]
+}
