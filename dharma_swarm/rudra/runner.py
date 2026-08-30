@@ -22,6 +22,7 @@ from typing import Any, Callable
 
 from dharma_swarm.rudra.codex_driver import CodexDriver, deterministic_message_id
 from dharma_swarm.rudra.contracts import (
+    BudgetSpec,
     DerivedStatus,
     ProcessHandle,
     Terminal,
@@ -137,6 +138,59 @@ class MissionRunner:
 
     # --- Core loop (spec 12) -------------------------------------------------
 
+    @staticmethod
+    def _restore_budgets(
+        journal: Journal, budgets: BudgetSpec
+    ) -> tuple[int, int, float, str | None]:
+        """Cumulative budget state rebuilt from the fsynced journal.
+
+        Turns are re-charged from TURN_OBSERVED rows; a turn with missing
+        token counts is charged at the conservative per-turn ceiling, exactly
+        as the live loop charges it. Wall time runs from the first journaled
+        row of the attempt, so downtime counts against the mission instead of
+        resetting the clock. The no-delta streak is rebuilt from consecutive
+        GATE_RESULT digests (the first pair is excluded: the opening turn is
+        never a no-delta turn, matching live-loop semantics). A turn whose
+        post-turn digest was never measured by a later gate row is charged
+        conservatively as a no-delta turn.
+        """
+        tokens_used = 0
+        turns_observed = 0
+        gate_digests: list[str] = []
+        attempt_started: float | None = None
+        for row in journal.rows():
+            if attempt_started is None:
+                attempt_started = float(row.get("at", time.time()))
+            event = row.get("event")
+            if event == "TURN_OBSERVED":
+                turns_observed += 1
+                observation = row["payload"].get("observation", {})
+                if (
+                    observation.get("input_tokens") is None
+                    or observation.get("output_tokens") is None
+                ):
+                    tokens_used += budgets.max_tokens_per_turn
+                else:
+                    tokens_used += (
+                        observation["input_tokens"] + observation["output_tokens"]
+                    )
+            elif event == "GATE_RESULT":
+                gate_digests.append(row["payload"].get("digest"))
+        no_delta = 0
+        for previous, current in zip(gate_digests[1:], gate_digests[2:]):
+            no_delta = no_delta + 1 if current == previous else 0
+        if turns_observed and turns_observed >= len(gate_digests):
+            # A turn completed after the last gate check; its post-turn
+            # digest was never measured. Conservative charge (spec 12).
+            no_delta += 1
+        last_digest = gate_digests[-1] if gate_digests else None
+        return (
+            tokens_used,
+            no_delta,
+            attempt_started if attempt_started is not None else time.time(),
+            last_digest,
+        )
+
     def _loop(self, admitted: AdmittedMission) -> dict[str, Any]:
         contract = admitted.contract
         budgets = contract.budgets
@@ -153,10 +207,12 @@ class MissionRunner:
             contract.repository.base_sha, self.state_root,
         )
         mission_stop = Path(admitted.mission_dir) / "stop.request"
-        started = time.monotonic()
-        tokens_used = 0
-        no_delta = 0
-        last_digest: str | None = None
+        # Spec 12: budget accounting is never optimistically reconstructed.
+        # A supervisor restart must not zero cumulative budgets; they are
+        # rebuilt from the fsynced journal before the loop resumes.
+        tokens_used, no_delta, attempt_started, last_digest = self._restore_budgets(
+            journal, budgets
+        )
 
         if self.driver_factory is None:
             return self._seal(
@@ -177,7 +233,7 @@ class MissionRunner:
                 )
             if turns_used >= budgets.max_turns:
                 return self._seal(journal, Terminal.FAILED_BUDGET, {"budget": "turns"})
-            if time.monotonic() - started >= budgets.max_wall_seconds:
+            if time.time() - attempt_started >= budgets.max_wall_seconds:
                 return self._seal(journal, Terminal.FAILED_BUDGET, {"budget": "wall"})
             if no_delta >= budgets.max_consecutive_no_delta_turns:
                 return self._seal(

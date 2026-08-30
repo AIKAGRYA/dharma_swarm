@@ -14,7 +14,7 @@ import pytest
 
 from dharma_swarm.rudra.goal_gate import GoalGate
 from dharma_swarm.rudra.runner import MissionRunner, RecoveryRequired
-from dharma_swarm.rudra.workcell import ProcessOwner
+from dharma_swarm.rudra.workcell import Journal, ProcessOwner
 from tests.fixtures.rudra.stub_driver import StubCodexDriver, StubTurn
 from tests.fixtures.rudra.helpers import (
     FIXED_TARGET,
@@ -257,3 +257,126 @@ def test_blocked_environment_without_driver(mission) -> None:
     runner = MissionRunner(repo, state_dir=state, driver_factory=None)
     result = runner.run(path)
     assert result["terminal"] == "BLOCKED_ENVIRONMENT"
+
+
+def test_restore_budgets_from_journal(tmp_path: Path) -> None:
+    """Spec 12: token, wall, and no-delta state is rebuilt from the journal,
+    never optimistically zeroed after a supervisor restart."""
+    from dharma_swarm.rudra.contracts import BudgetSpec
+
+    budgets = BudgetSpec(
+        max_turns=10,
+        max_total_tokens=100000,
+        max_tokens_per_turn=20000,
+        max_wall_seconds=900,
+        max_turn_seconds=300,
+        max_verifier_seconds=300,
+        max_cpu_seconds=600,
+        max_memory_bytes=4294967296,
+        max_processes=32,
+        max_disk_bytes=1073741824,
+        max_captured_output_bytes=1048576,
+        max_context_resets=1,
+        max_consecutive_no_delta_turns=3,
+    )
+    journal = Journal(tmp_path / "run.jsonl", "m", "a")
+    first = journal.append("PROPOSAL_VALIDATED", {})
+    journal.append("GATE_RESULT", {"digest": "g0"})
+    journal.append(
+        "TURN_OBSERVED",
+        {"observation": {"input_tokens": 100, "output_tokens": 50}},
+    )
+    journal.append("GATE_RESULT", {"digest": "g1"})  # turn 0 produced a delta
+    journal.append(
+        "TURN_OBSERVED",
+        {"observation": {"input_tokens": None, "output_tokens": None}},
+    )
+    journal.append("GATE_RESULT", {"digest": "g1"})  # turn 1: no delta
+    journal.append(
+        "TURN_OBSERVED",
+        {"observation": {"input_tokens": 10, "output_tokens": 10}},
+    )
+    journal.append("GATE_RESULT", {"digest": "g1"})  # turn 2: no delta again
+
+    tokens, no_delta, started, last = MissionRunner._restore_budgets(
+        journal, budgets
+    )
+    # 150 observed + one conservative per-turn ceiling + 20 observed.
+    assert tokens == 150 + budgets.max_tokens_per_turn + 20
+    assert no_delta == 2  # two trailing gate pairs without a delta
+    assert started == first["at"]  # wall clock runs from the first row
+    assert last == "g1"
+
+    # A turn observed after the last gate row was never measured: charge it.
+    journal.append(
+        "TURN_OBSERVED",
+        {"observation": {"input_tokens": 1, "output_tokens": 1}},
+    )
+    tokens, no_delta, _started, _last = MissionRunner._restore_budgets(
+        journal, budgets
+    )
+    assert tokens == 150 + budgets.max_tokens_per_turn + 20 + 2
+    assert no_delta == 3
+
+    # Fresh attempt: nothing consumed.
+    empty = Journal(tmp_path / "fresh.jsonl", "m", "a")
+    tokens, no_delta, _started, last = MissionRunner._restore_budgets(
+        empty, budgets
+    )
+    assert (tokens, no_delta, last) == (0, 0, None)
+
+
+def test_token_budget_survives_supervisor_restart(tmp_path: Path) -> None:
+    """Invariant 11 + spec 12: a mission killed and restarted cannot spend
+    past its token cap; the restarted supervisor re-charges consumed turns
+    from the journal instead of restarting at zero."""
+    repo, base = make_base_repo(tmp_path)
+    text = make_mission_yaml(
+        repo,
+        base,
+        overrides={
+            "budgets.max_total_tokens": 2500,
+            "budgets.max_tokens_per_turn": 2000,
+            "budgets.max_turns": 10,
+            "budgets.max_consecutive_no_delta_turns": 5,
+        },
+    )
+    path = write_mission(tmp_path, text)
+    state = tmp_path / "state"
+    plan = [
+        StubTurn({"src/target.py": "def answer():\n    return 1\n"}),
+        StubTurn({"src/target.py": "def answer():\n    return 2\n"}),
+    ]
+
+    class SupervisorKilled(RuntimeError):
+        pass
+
+    def dying_factory(admitted, workcell_root):
+        stub = StubCodexDriver(
+            workcell_root,
+            plan,
+            allowed_changed_paths=["src/target.py"],
+            attempt_key=admitted.attempt_key,
+            contract_digest=admitted.contract_digest,
+        )
+        original = stub.start_turn
+
+        def die_on_second_turn(**kwargs):
+            if kwargs["logical_seq"] == 1:
+                raise SupervisorKilled  # turn 0 is journaled; then death
+            return original(**kwargs)
+
+        stub.start_turn = die_on_second_turn
+        return stub
+
+    with pytest.raises(SupervisorKilled):
+        MissionRunner(
+            repo, state_dir=state, driver_factory=dying_factory
+        ).run(path)
+    # Turn 0 burned 1500 of 2500. A reset budget would let turn 1 spend
+    # another 1500 and continue; cumulative accounting seals the cap.
+    result = MissionRunner(
+        repo, state_dir=state, driver_factory=_stub_factory(plan)
+    ).run(path)
+    assert result["terminal"] == "FAILED_BUDGET"
+    assert result["budget"] == "tokens"
