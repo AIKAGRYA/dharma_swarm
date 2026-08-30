@@ -262,11 +262,31 @@ def test_stderr_drained_with_bounded_witness(tmp_path: Path) -> None:
     observation = driver.start_turn(prompt="p", logical_seq=0, deadline_seconds=30)
     assert observation.reported_complete
     driver.close()  # kills the tree; the drainer joins at stderr EOF
-    tail = driver.stderr_witness_text()
+    witness = driver._stderr_witness
+    assert witness is not None
+    tail = witness.text()
     assert tail, "server diagnostics were not retained as evidence"
     assert len(tail.encode()) <= 1 << 16  # bounded capture, never unbounded
-    witness = driver._stderr_witness
-    assert witness is not None and witness.dropped_bytes > 0
+    assert witness.dropped_bytes > 0
+
+
+def test_service_tier_echo_mismatch_is_bind_error(tmp_path: Path) -> None:
+    """The pinned v2 schema never echoes serviceTier, so its absence is
+    tolerated; a present-but-mismatching tier echo is a reroute and fails
+    closed like any other containment echo mismatch."""
+    owner = ProcessOwner()
+    driver = make_driver(
+        tmp_path, owner,
+        [
+            {"expect_method": "initialize", "result": {"userAgent": "fake/1.0"}},
+            {"read_request": True},
+            {"expect_method": "thread/start",
+             "result": {**THREAD_ECHO, "serviceTier": "other-tier"}},
+        ],
+    )
+    with pytest.raises(DriverBindError, match="tier reroute"):
+        driver.start_or_resume()
+    driver.close()
 
 
 def test_foreign_turn_usage_event_not_counted(tmp_path: Path) -> None:
@@ -292,6 +312,16 @@ def test_foreign_turn_usage_event_not_counted(tmp_path: Path) -> None:
         usage({"threadId": "th-FOREIGN", "turnId": "t-0"}),
         usage({"threadId": "th-1", "turnId": "t-PRIOR"}),
         usage({"threadId": "th-1"}),  # no turn id: unattributable
+        {"send": {  # foreign diff and delta are likewise never attributed
+            "jsonrpc": "2.0", "method": "turn/diff/updated",
+            "params": {"threadId": "th-1", "turnId": "t-PRIOR",
+                       "diff": "diff --git a/x b/x"},
+        }},
+        {"send": {
+            "jsonrpc": "2.0", "method": "item/agentMessage/delta",
+            "params": {"threadId": "th-FOREIGN", "turnId": "t-0",
+                       "itemId": "i1", "delta": "foreign"},
+        }},
         {"send": {
             "jsonrpc": "2.0", "method": "turn/completed",
             "params": {"threadId": "th-1",
@@ -303,6 +333,8 @@ def test_foreign_turn_usage_event_not_counted(tmp_path: Path) -> None:
     observation = driver.start_turn(prompt="p", logical_seq=0, deadline_seconds=30)
     assert observation.reported_complete
     assert observation.input_tokens is None and observation.output_tokens is None
+    assert observation.aggregate_diff_sha256 is None
+    assert observation.response_sha256 is None
     driver.close()
 
 

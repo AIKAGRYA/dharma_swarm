@@ -194,12 +194,6 @@ class LiveCodexDriver:
             raise DriverBindError(f"app-server handshake failed: {exc}") from exc
         self.server_agent = str(result.get("userAgent", "unknown"))
 
-    def stderr_witness_text(self) -> str:
-        """Bounded tail of server diagnostics retained for evidence rows."""
-        if self._stderr_witness is None:
-            return ""
-        return self._stderr_witness.text()
-
     def _prove_former_tree_dead(self) -> None:
         """Single mutation owner: no new session while the old one may live."""
         if self.handle is None:
@@ -246,6 +240,18 @@ class LiveCodexDriver:
             raise DriverBindError(
                 f"provider reroute: admitted {self.model_provider!r}, "
                 f"server {result.get('modelProvider')!r}"
+            )
+        # The pinned v2 schema never echoes serviceTier, so absence cannot
+        # be distinguished from legitimate schema shape; a mismatching tier
+        # echo is still a reroute and fails closed.
+        tier = result.get("serviceTier")
+        if (
+            self.service_tier is not None
+            and tier is not None
+            and tier != self.service_tier
+        ):
+            raise DriverBindError(
+                f"tier reroute: admitted {self.service_tier!r}, server {tier!r}"
             )
         return thread["id"]
 
@@ -358,16 +364,17 @@ class LiveCodexDriver:
         params = message.get("params")
         if not isinstance(params, dict):
             raise ProtocolError(f"notification without params object: {message!r}")
-        if method == TOKEN_NOTIFICATION:
+        if method in (TOKEN_NOTIFICATION, DIFF_NOTIFICATION, AGENT_DELTA_NOTIFICATION):
             # Telemetry is attributed only to the active thread+turn. A
             # delayed event from a former turn, a foreign thread, or an
-            # event without correlating ids is dropped: the turn's counts
-            # then stay None and the runner charges the conservative
-            # per-turn ceiling — never a foreign measurement.
+            # event without correlating ids is dropped: token counts then
+            # stay None and the runner charges the conservative per-turn
+            # ceiling — never a foreign measurement.
             if params.get("threadId") != self.thread_id:
                 return
             if params.get("turnId") != turn_id:
                 return
+        if method == TOKEN_NOTIFICATION:
             usage = params.get("tokenUsage")
             last = usage.get("last") if isinstance(usage, dict) else None
             if isinstance(last, dict):
