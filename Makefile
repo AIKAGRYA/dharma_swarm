@@ -766,7 +766,12 @@ spine-check:
 # verdict and direct Python CLI retain the exact typed code. Exact edit
 # admission belongs to agent-build-preflight. Documented flags forward via
 # ARGS, e.g. `make onboard ARGS=--json`.
+# The first line is the One World Step 4 branch-TTL advisory: compute-only
+# (never writes the register), stderr-only (stdout stays machine-pure under
+# ARGS=--json), and error-tolerant (advisory, never a session gate). It runs
+# before status so it still prints when the session verdict is nonzero.
 onboard:
+	@-PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/branch_ttl_check.py --advisory
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) scripts/governance/agent_onboard.py $(ARGS)
 
 # Purpose/telos transmission + vision-doc navigation. Read-only projection of

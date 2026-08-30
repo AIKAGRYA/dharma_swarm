@@ -26,7 +26,14 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from . import evidence, nats_status, readiness, render, repository_identity
+from . import (
+    evidence,
+    nats_status,
+    readiness,
+    render,
+    repository_identity,
+    world_identity,
+)
 from .models import ConfigError, RECEIPT_SCHEMA_V1, RECEIPT_SCHEMA_V2
 from .receipt import (
     build_input_manifest,
@@ -55,6 +62,7 @@ _MANIFEST_CATEGORIES: dict[str, list[str]] = {
         "dharma_swarm/operator_core/onboarding/repository_identity.py",
         "dharma_swarm/operator_core/onboarding/receipt.py",
         "dharma_swarm/operator_core/onboarding/render.py",
+        "dharma_swarm/operator_core/onboarding/world_identity.py",
         "dharma_swarm/operator_core/onboarding/broken_register.py",
         "dharma_swarm/memory_kernel/write_receipts.py",
     ],
@@ -237,6 +245,54 @@ def _collect_conditions(
     return conditions
 
 
+def _world_identity_conditions(
+    observation: Mapping[str, Any],
+) -> list[readiness.Condition]:
+    """Advisory world-drift warnings (One World Step 4) — never a session gate.
+
+    Both conditions mirror the ``git_base_distance_observed`` precedent:
+    ``warn`` state, ``info`` class, non-mandatory, so the typed exit code is
+    untouched. The loud rendering lives in ``render.render_compact``.
+    """
+    conditions: list[readiness.Condition] = []
+    behind = observation.get("behind")
+    drift_limit = observation.get("drift_warn_behind")
+    if (
+        isinstance(behind, int)
+        and isinstance(drift_limit, int)
+        and behind > drift_limit
+    ):
+        conditions.append(readiness.Condition(
+            id="world_drift_behind",
+            state="warn",
+            condition_class="info",
+            mandatory=False,
+            reason=(
+                f"checkout is {behind} commits behind local "
+                f"{observation.get('base_ref', world_identity.BASE_REF)} "
+                f"(> {drift_limit}); world drift — rebase or merge toward trunk"
+            )[:200],
+        ))
+    dirty_age = observation.get("oldest_dirty_age_seconds")
+    dirty_limit = observation.get("dirty_warn_age_seconds")
+    if (
+        isinstance(dirty_age, (int, float))
+        and isinstance(dirty_limit, (int, float))
+        and dirty_age > dirty_limit
+    ):
+        conditions.append(readiness.Condition(
+            id="world_dirty_stale",
+            state="warn",
+            condition_class="info",
+            mandatory=False,
+            reason=(
+                f"oldest dirty entry ({observation.get('oldest_dirty_path', '?')}) "
+                f"is older than 24h; stale uncommitted work splits the world"
+            )[:200],
+        ))
+    return conditions
+
+
 def _evaluate_reuse(
     previous: Mapping[str, Any] | None,
     *,
@@ -322,11 +378,13 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
     toolchain = evidence.toolchain_versions()
     freshness = evidence.projection_freshness()
     nats_projection = nats_status.collect_nats_substrate_status()
+    world_observation = world_identity.collect_world_identity(live_state=live_state)
     conditions.extend(_collect_conditions(
         live_state, toolchain, stable_core.get("orientation", {}),
         net=bool(args.net), probe_errors=probe_errors,
         repository_observation=repository_observation,
     ))
+    conditions.extend(_world_identity_conditions(world_observation))
 
     manifest = build_input_manifest(repo_root, _MANIFEST_CATEGORIES)
     key = cache_key(manifest, environment_class=f"py{sys.version_info.major}.{sys.version_info.minor}")
@@ -382,6 +440,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
                     now, stable_core, live_state, conditions, manifest, key,
                     freshness, previous, toolchain=toolchain,
                     nats_projection=nats_projection,
+                    world_observation=world_observation,
                     require_live=bool(args.require_live),
                     cache_hit=cache_hit, miss_reasons=miss_reasons,
                 )
@@ -414,6 +473,7 @@ def assemble_and_run(argv: Sequence[str] | None = None) -> int:
         now, stable_core, live_state, conditions, manifest, key,
         freshness, previous, toolchain=toolchain,
         nats_projection=nats_projection,
+        world_observation=world_observation,
         require_live=bool(args.require_live),
         cache_hit=cache_hit, miss_reasons=miss_reasons,
     )
@@ -440,6 +500,7 @@ def _assemble_v2(
     *,
     toolchain: Mapping[str, str],
     nats_projection: Mapping[str, Any],
+    world_observation: Mapping[str, Any],
     require_live: bool,
     cache_hit: bool = False,
     miss_reasons: Sequence[str] | None = None,
@@ -470,7 +531,10 @@ def _assemble_v2(
         },
         "delta": compute_delta(previous, core, condition_rows),
         "legacy_v1": _legacy_v1_payload(now, core),
-        "extensions": {"nats_substrate": dict(nats_projection)},
+        "extensions": {
+            "nats_substrate": dict(nats_projection),
+            "world_identity": dict(world_observation),
+        },
         "stable_digest": compute_stable_digest(core),
     }
 

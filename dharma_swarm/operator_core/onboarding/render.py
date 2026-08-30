@@ -76,6 +76,72 @@ def _pad_to_minimum(lines: list[str]) -> list[str]:
     return lines
 
 
+def _format_age(seconds: Any) -> str:
+    """Compact human age: ``90`` -> ``2m``, ``7200`` -> ``2h``, ``172800`` -> ``2d``."""
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        return "?"
+    if value >= 86400:
+        return f"{int(value // 86400)}d"
+    if value >= 3600:
+        return f"{int(value // 3600)}h"
+    return f"{int(value // 60)}m"
+
+
+def _world_identity_lines(receipt: Mapping[str, Any]) -> list[str]:
+    """Fetch-free world-identity block (One World Step 4), advisory only."""
+    world = receipt.get("extensions", {}).get("world_identity", {})
+    if not isinstance(world, Mapping) or not world:
+        return []
+    ahead = world.get("ahead")
+    behind = world.get("behind")
+    distance = (
+        f"ahead {ahead if ahead is not None else '?'} · "
+        f"behind {behind if behind is not None else '?'}"
+    )
+    base_line = f"  vs local {world.get('base_ref', 'origin/main')}: {distance}"
+    tip_iso = world.get("base_tip_committer_iso")
+    if tip_iso:
+        base_line += f" · tip committed {tip_iso}"
+    fetch_age = world.get("last_fetch_observed_age_seconds")
+    if fetch_age is not None:
+        base_line += f" · last fetch observed {_format_age(fetch_age)} ago"
+    else:
+        base_line += " · last fetch unobserved; local ref may be stale"
+    lines = [
+        "",
+        "WORLD IDENTITY — FETCH-FREE, ADVISORY ONLY",
+        f"  {world.get('branch', '?')} @ {str(world.get('head', ''))[:12]} "
+        f"· host {world.get('host', '?')}",
+        base_line,
+    ]
+    drift_limit = world.get("drift_warn_behind")
+    if (
+        isinstance(behind, int)
+        and isinstance(drift_limit, int)
+        and behind > drift_limit
+    ):
+        lines.append(
+            f"  WARNING: {behind} commits behind local "
+            f"{world.get('base_ref', 'origin/main')} (> {drift_limit}) — "
+            "world drift; rebase or merge toward trunk"
+        )
+    dirty_age = world.get("oldest_dirty_age_seconds")
+    dirty_limit = world.get("dirty_warn_age_seconds")
+    if (
+        isinstance(dirty_age, (int, float))
+        and isinstance(dirty_limit, (int, float))
+        and dirty_age > dirty_limit
+    ):
+        lines.append(
+            f"  WARNING: oldest dirty entry "
+            f"({world.get('oldest_dirty_path', '?')}) is "
+            f"{_format_age(dirty_age)} old (> 24h) — stale uncommitted work"
+        )
+    return lines
+
+
 def render_compact(receipt: Mapping[str, Any]) -> str:
     """Render the bounded 40–70 line human session-status view."""
     verdict = str(receipt.get("primary_verdict", "UNKNOWN"))
@@ -105,6 +171,7 @@ def render_compact(receipt: Mapping[str, Any]) -> str:
     )
     lines.append("View:    read-only session status")
     lines.append("Authority: none — no edit, merge, or deploy permission")
+    lines.extend(_world_identity_lines(receipt))
     lines.append("")
     if failing:
         lines.append(f"Primary blocker: {failing[0].get('id')}")
