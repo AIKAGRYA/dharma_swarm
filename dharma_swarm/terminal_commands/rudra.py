@@ -3,17 +3,42 @@
 RUDRA is the supervised mission executor (docs/plans/rudra_v0). These
 commands deliberately use the "rudra" name so reproduced execution truth is
 never confused with structural `mission-status` inventory.
+
+Live executor binding: by default no driver is configured and `run` seals
+BLOCKED_ENVIRONMENT. The live app-server binding activates only through an
+explicit config path — operator env ``DHARMA_RUDRA_LIVE_DRIVER=1`` AND the
+admitted contract's ``executor.driver == "codex_app_server_stdio"`` — with
+binary/model/provider/effort/tier taken from the contract's executor spec.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
-from dharma_swarm.rudra.contracts import AdmissionError
-from dharma_swarm.rudra.runner import MissionRunner, RecoveryRequired
-from dharma_swarm.rudra.workcell import JournalConflict, LockHeldError
+from dharma_swarm.rudra.contracts import AdmissionError, parse_mission
+from dharma_swarm.rudra.live_driver import (
+    LIVE_DRIVER_ENV,
+    LIVE_DRIVER_NAME,
+    live_driver_factory,
+)
+from dharma_swarm.rudra.runner import DriverFactory, MissionRunner, RecoveryRequired
+from dharma_swarm.rudra.workcell import JournalConflict, LockHeldError, ProcessOwner
+
+
+def select_driver_factory(
+    environ: dict[str, str], mission_text: str, owner: ProcessOwner
+) -> DriverFactory | None:
+    """Explicit live-binding gate. Any deviation returns None, which keeps
+    the BLOCKED_ENVIRONMENT default; there is no ambient live executor."""
+    if environ.get(LIVE_DRIVER_ENV) != "1":
+        return None
+    contract = parse_mission(mission_text)  # AdmissionError propagates
+    if contract.executor.driver != LIVE_DRIVER_NAME:
+        return None
+    return live_driver_factory(owner)
 
 
 def _world_locus(repo_path: Path) -> str:
@@ -39,6 +64,11 @@ def cmd_rudra_run(
     """Run one admitted mission in the foreground."""
     runner = MissionRunner(Path(repo_path), state_dir=Path(state_dir) if state_dir else None)
     try:
+        factory = select_driver_factory(
+            os.environ, Path(mission_yaml).read_text(), runner.owner
+        )
+        if factory is not None:
+            runner.driver_factory = factory
         result = runner.run(Path(mission_yaml))
     except AdmissionError as exc:
         print(f"RUDRA admission rejected: {exc}")

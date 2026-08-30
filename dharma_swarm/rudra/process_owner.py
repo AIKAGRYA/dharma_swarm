@@ -15,10 +15,11 @@ import platform
 import re
 import signal
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Sequence
+from typing import IO, Any, Sequence
 
 from dharma_swarm.rudra.contracts import DerivedStatus, ProcessHandle
 
@@ -140,6 +141,60 @@ def descendants_of(root_pid: int) -> set[int]:
     return found
 
 
+# --- Bounded stream witness (spec section 11: concurrent size-limited drain) -
+
+
+class BoundedStreamWitness:
+    """Daemon drainer that keeps a piped child stream from blocking its writer.
+
+    A piped-but-undrained stderr deadlocks the pair once the server emits
+    more than the OS pipe buffer: the server blocks on write while the
+    driver blocks on read. This drainer reads continuously and retains only
+    the bounded tail; dropped bytes are counted, never silently lost. The
+    retained tail is forensic evidence of server diagnostics, consistent
+    with the ``signal_failures`` witness-log pattern."""
+
+    def __init__(
+        self, stream: IO[bytes], *, max_bytes: int = 1 << 16
+    ) -> None:
+        self._stream = stream
+        self._max_bytes = max_bytes
+        self._lock = threading.Lock()
+        self._tail = bytearray()
+        self.dropped_bytes = 0
+        self._thread = threading.Thread(
+            target=self._drain, name="rudra-stream-witness", daemon=True
+        )
+        self._thread.start()
+
+    def _drain(self) -> None:
+        while True:
+            try:
+                chunk = self._stream.read(1 << 16)
+            except (OSError, ValueError):
+                return  # closed from under the drainer during teardown
+            if not chunk:
+                return  # EOF: the child closed its end
+            with self._lock:
+                self._tail += chunk
+                if len(self._tail) > self._max_bytes:
+                    excess = len(self._tail) - self._max_bytes
+                    self.dropped_bytes += excess
+                    del self._tail[:excess]
+
+    def text(self) -> str:
+        """The bounded retained tail, lossily decoded for evidence rows."""
+        with self._lock:
+            return bytes(self._tail).decode("utf-8", errors="replace")
+
+    def close(self) -> None:
+        try:
+            self._stream.close()
+        except OSError:
+            pass
+        self._thread.join(timeout=5)
+
+
 # --- ProcessOwner: sole spawn/signal/reap authority (spec sections 7, 10) ---
 
 
@@ -159,6 +214,7 @@ class ProcessOwner:
         *,
         env: dict[str, str],
         cwd: Path,
+        stdin: Any = None,
         stdout: Any = subprocess.PIPE,
         stderr: Any = subprocess.PIPE,
     ) -> tuple[subprocess.Popen[Any], ProcessHandle]:
@@ -166,6 +222,7 @@ class ProcessOwner:
             list(argv),
             env=env,
             cwd=str(cwd),
+            stdin=stdin,
             stdout=stdout,
             stderr=stderr,
             start_new_session=True,

@@ -4,9 +4,10 @@ frozen goal → persistent action → exact workspace → fresh oracle → recov
 
 Normative source: docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md. GoalGate owns
 terminal truth; the executor produces candidate mutations and observations
-only. This package performs no network I/O: v0 ships the provider interface
-plus a deterministic stub executor, and the live app-server binding is a
-later, separately gated step.
+only. The package performs no network I/O of its own: ``codex_driver`` owns
+the narrow protocol framing, ``live_driver`` binds a real app-server process
+through ProcessOwner, and the live binding activates only via the explicit
+env + contract pin in ``terminal_commands.rudra``.
 """
 
 from dharma_swarm.rudra.contracts import (

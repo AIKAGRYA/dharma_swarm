@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from dharma_swarm.rudra.codex_driver import CodexDriver, deterministic_message_id
+from dharma_swarm.rudra.live_driver import DriverBindError
 from dharma_swarm.rudra.contracts import (
     BudgetSpec,
     DerivedStatus,
@@ -252,7 +253,28 @@ class MissionRunner:
                     admitted, journal, driver, workcell, gate
                 )
 
-            driver.start_or_resume()
+            try:
+                driver.start_or_resume()
+            except DriverBindError as exc:
+                # Invariant 9: a bind-time capability failure (spawn,
+                # handshake, containment/model echo) is BLOCKED_ENVIRONMENT,
+                # never a host fallback. A spawn may already have succeeded
+                # before the bind failed; the seal is withheld until every
+                # journaled handle is census-proven dead, so a live unowned
+                # model process can never outlive the terminal row.
+                driver.close()
+                for handle in getattr(driver, "process_handles", []):
+                    if not self.owner.prove_dead(handle):
+                        self.owner.terminate_tree(handle)
+                        if not self.owner.prove_dead(handle):
+                            return self._seal(
+                                journal, Terminal.FAILED_INVARIANT,
+                                {"reason": "model process tree alive at bind failure"},
+                            )
+                return self._seal(
+                    journal, Terminal.BLOCKED_ENVIRONMENT,
+                    {"reason": f"executor bind failed: {exc}"},
+                )
             for handle in getattr(driver, "process_handles", []):
                 journal.append("PROCESS_SPAWNED", {"handle": handle.model_dump()})
             seq = turns_used
