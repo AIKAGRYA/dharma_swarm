@@ -10,6 +10,7 @@ source:
   kind: readme
   origin_signals:
   - spec-forge/consciousness-computing/INTEGRATION_SPEC.md
+  - spec-forge/mandala-world-deck/MASTER_SPEC.md
   - spec-forge/self-evolving-organism/ARCHITECTURE.md
   - spec-forge/self-evolving-organism/CONSTITUTION.md
   cited_urls: []
@@ -24,6 +25,7 @@ inspiration:
 - operator_runtime
 connected_relevant_files:
 - spec-forge/consciousness-computing/INTEGRATION_SPEC.md
+- spec-forge/mandala-world-deck/MASTER_SPEC.md
 - spec-forge/self-evolving-organism/ARCHITECTURE.md
 - spec-forge/self-evolving-organism/CONSTITUTION.md
 - spec-forge/self-evolving-organism/TRACEABILITY.md
@@ -77,6 +79,7 @@ If a document is already the repo's normative contract for a subsystem, it shoul
 
 - `spec-forge/self-evolving-organism/`: active forge cluster for the self-evolving organism build
 - `spec-forge/consciousness-computing/`: narrower integration and RFC-style material
+- `spec-forge/mandala-world-deck/`: candidate non-coder-first visual cockpit consolidation and truth/authority contract
 - `spec-forge/micro-saas-research/`: exploratory research-to-spec incubation material
 
 ## Forge vs Specs
