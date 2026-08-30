@@ -18,6 +18,11 @@ import pytest
 
 from dharma_swarm.rudra.contracts import ProcessHandle
 from dharma_swarm.rudra.goal_gate import GoalGate
+from dharma_swarm.rudra import process_owner
+from dharma_swarm.rudra.process_owner import (
+    ProcessProbeError,
+    parse_proc_stat_btime,
+)
 from dharma_swarm.rudra.workcell import (
     Journal,
     JournalConflict,
@@ -299,3 +304,59 @@ def test_rudra_state_root_not_symlink(tmp_path: Path) -> None:
     link.symlink_to(target)
     with pytest.raises(Exception):
         rudra_state_root(link)
+
+
+# ---------------------------------------------------------------------------
+# Linux platform probes (CI runners are Linux; the operator host is macOS)
+# ---------------------------------------------------------------------------
+
+_PROC_STAT_FIXTURE = """cpu  4705 356 584 1629 23 0 231 0 0 0
+cpu0 4705 356 584 1629 23 0 231 0 0 0
+intr 2005156
+ctxt 3973154
+btime 1756000000
+processes 2145
+procs_running 1
+procs_blocked 0
+"""
+
+
+def test_parse_proc_stat_btime_fixture() -> None:
+    """The btime parser is proven against fixture content, not a live file
+    (/proc/stat does not exist on the macOS operator host)."""
+    assert parse_proc_stat_btime(_PROC_STAT_FIXTURE) == "1756000000"
+    with pytest.raises(ProcessProbeError):
+        parse_proc_stat_btime("cpu  1 2 3\nprocesses 7\n")
+    with pytest.raises(ProcessProbeError):
+        parse_proc_stat_btime("btime notanumber\n")
+
+
+def test_os_boot_id_linux_reads_proc_stat(tmp_path: Path, monkeypatch) -> None:
+    """On Linux the boot identity is the btime epoch from /proc/stat; the
+    macOS sysctl path must not run."""
+    proc_stat = tmp_path / "proc_stat"
+    proc_stat.write_text(_PROC_STAT_FIXTURE, encoding="utf-8")
+    monkeypatch.setattr(process_owner.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(process_owner, "_PROC_STAT_PATH", proc_stat)
+
+    def _no_sysctl(*args, **kwargs):  # pragma: no cover - must never run
+        raise AssertionError("sysctl must not be invoked on Linux")
+
+    monkeypatch.setattr(process_owner.subprocess, "run", _no_sysctl)
+    assert process_owner.os_boot_id() == "1756000000"
+
+
+def test_process_cwd_linux_reads_proc_symlink(monkeypatch) -> None:
+    """On Linux the cwd probe is the /proc/<pid>/cwd symlink; a missing pid
+    is an honest None, never a crash."""
+    monkeypatch.setattr(process_owner.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(
+        process_owner.os, "readlink", lambda path: "/repo/base"
+    )
+    assert process_owner.process_cwd(42) == "/repo/base"
+
+    def _gone(path):
+        raise OSError("No such file or directory")
+
+    monkeypatch.setattr(process_owner.os, "readlink", _gone)
+    assert process_owner.process_cwd(999999) is None

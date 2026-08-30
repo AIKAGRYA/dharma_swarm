@@ -217,6 +217,7 @@
     "route_retrospectives.jsonl",
     "routing_audit.jsonl",
     "routing_decisions.jsonl",
+    "run.jsonl",
     "runs.jsonl",
     "runtime.jsonl",
     "rv_optimization.jsonl",
@@ -307,7 +308,7 @@
   ],
   "summary": {
     "distinct_db_names": 39,
-    "distinct_jsonl_names": 225,
+    "distinct_jsonl_names": 226,
     "ledger_classes": 11,
     "ledger_modules": 14
   }

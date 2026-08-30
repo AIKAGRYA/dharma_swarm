@@ -11,6 +11,7 @@ Normative source: docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md sections 7, 10.
 from __future__ import annotations
 
 import os
+import platform
 import re
 import signal
 import subprocess
@@ -29,8 +30,26 @@ class ProcessProbeError(RuntimeError):
 # --- OS identity helpers (spec section 10) ----------------------------------
 
 
+def parse_proc_stat_btime(text: str) -> str:
+    """Boot epoch from Linux /proc/stat content (the ``btime <epoch>`` line)."""
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] == "btime" and parts[1].isdigit():
+            return parts[1]
+    raise ProcessProbeError("no btime line in /proc/stat content")
+
+
+_PROC_STAT_PATH = Path("/proc/stat")
+
+
 def os_boot_id() -> str:
-    """macOS boot identity; deliberately not spine.identity.process_boot_id."""
+    """Machine boot epoch; deliberately not spine.identity.process_boot_id.
+
+    The value feeds PID-reuse identity (spec section 10), so it must be the
+    host boot epoch on every platform: ``btime`` from /proc/stat on Linux,
+    ``kern.boottime`` via sysctl on Darwin."""
+    if platform.system() == "Linux":
+        return parse_proc_stat_btime(_PROC_STAT_PATH.read_text(encoding="utf-8"))
     out = subprocess.run(
         ["/usr/sbin/sysctl", "-n", "kern.boottime"],
         capture_output=True, text=True, timeout=10, check=True,
@@ -59,6 +78,13 @@ def process_command(pid: int) -> str | None:
 
 
 def process_cwd(pid: int) -> str | None:
+    if platform.system() == "Linux":
+        # lsof lives at /usr/bin on Linux and may be absent on slim runners;
+        # the /proc symlink is the same honest OS observation.
+        try:
+            return os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            return None
     out = subprocess.run(
         ["/usr/sbin/lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
         capture_output=True, text=True, timeout=15,

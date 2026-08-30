@@ -65,7 +65,11 @@ BASELINE_DB_NAMES = 39
 # (the assurance-diff fail-open witness flag; reviewed write-baseline entry in
 # memory_kernel/write_policy.py), -flickers.jsonl (retired by the 11->9 gate
 # silvering). Three merge-introduced stores, one consolidation removal.
-BASELINE_JSONL_NAMES = 225
+# 225 -> 226 (2026-08-30, PR #1498): run.jsonl — the RUDRA v0 per-attempt
+# journal (Journal in rudra/workcell.py; written by runner.py and
+# goal_gate_admission.py under the attempt dir). One append-only witness
+# ledger per attempt, not a second content store.
+BASELINE_JSONL_NAMES = 226
 # 11 -> 12 (2026-07-19): episode_ledger.py — THE_KEEL §6 Episode Ledger
 # schema slice, the justified new organ this ratchet exists to make explicit.
 # 12 -> 13 (2026-08-19): monthly_ledger.py — the Forge monthly spend meter
