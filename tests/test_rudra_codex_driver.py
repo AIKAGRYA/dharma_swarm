@@ -18,10 +18,9 @@ from dharma_swarm.rudra.codex_driver import (
     JsonRpcPeer,
     ProtocolError,
     ServerRequestDenied,
-    StubCodexDriver,
-    StubTurn,
     deterministic_message_id,
 )
+from tests.fixtures.rudra.stub_driver import StubCodexDriver, StubTurn
 
 FAKE_SERVER = Path(__file__).parent / "fixtures" / "rudra" / "fake_app_server.py"
 

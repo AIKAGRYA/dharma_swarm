@@ -2,11 +2,10 @@
 
 Normative source: docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md section 10.
 
-Write zones (spec invariant 5): all supervisor control/evidence writes live
-under ``$DHARMA_STATE_DIR/rudra``; executor mutations live only in the
-mutation workcell; the base checkout receives zero writes. The mission-level
-``fcntl.flock`` fd is held for the supervisor lifetime and is never unlinked;
-age or TTL never authorizes takeover.
+Write zones (spec invariant 5): supervisor writes live only under
+``$DHARMA_STATE_DIR/rudra``; the base checkout receives zero writes. The
+mission-level ``fcntl.flock`` fd is held for the supervisor lifetime and is
+never unlinked; age or TTL never authorizes takeover.
 """
 
 from __future__ import annotations
@@ -53,9 +52,7 @@ class SealedJournalViolation(WorkcellError):
     pass
 
 
-# ---------------------------------------------------------------------------
-# OS identity helpers
-# ---------------------------------------------------------------------------
+# --- OS identity helpers (spec section 10) ----------------------------------
 
 
 def os_boot_id() -> str:
@@ -134,9 +131,7 @@ def descendants_of(root_pid: int) -> set[int]:
     return found
 
 
-# ---------------------------------------------------------------------------
-# State root and mission lock
-# ---------------------------------------------------------------------------
+# --- State root and mission lock --------------------------------------------
 
 
 def rudra_state_root(state_dir: Path | None = None) -> Path:
@@ -198,9 +193,7 @@ class MissionLock:
         self.close()
 
 
-# ---------------------------------------------------------------------------
-# Journal: sequenced, fsynced JSONL with intent/result effects and CAS seal
-# ---------------------------------------------------------------------------
+# --- Journal: sequenced, fsynced JSONL, intent/result effects, CAS seal -----
 
 _TERMINAL_EVENT = "TERMINAL"
 
@@ -352,9 +345,7 @@ class Journal:
         return self.append(_TERMINAL_EVENT, record)
 
 
-# ---------------------------------------------------------------------------
-# Hermetic Git invocation
-# ---------------------------------------------------------------------------
+# --- Hermetic Git invocation (spec section 8 step 4) -----------------------
 
 
 def hermetic_git_env(home: Path) -> dict[str, str]:
@@ -394,9 +385,43 @@ def require_git_ok(proc: subprocess.CompletedProcess[str], what: str) -> str:
     return proc.stdout
 
 
-# ---------------------------------------------------------------------------
-# Workcell: private supervisor-owned Git directory, base byte preservation
-# ---------------------------------------------------------------------------
+def init_private_git(
+    gitdir: Path,
+    worktree: Path,
+    *,
+    alternates: Sequence[str],
+    ref_steps: Sequence[Sequence[str]],
+    env: dict[str, str],
+) -> None:
+    """Fixed workcell construction (spec section 10): bare private gitdir,
+    read-only alternates, caller-chosen ref steps, .git pointer, populated
+    worktree. Never writes worktree metadata, refs, objects, or index state
+    to the base repository."""
+    require_git_ok(run_git(["init", "--bare", str(gitdir)], env=env), "init")
+    alt = gitdir / "objects" / "info" / "alternates"
+    alt.parent.mkdir(parents=True, exist_ok=True)
+    alt.write_text("".join(f"{a}\n" for a in alternates))
+    steps = [
+        *ref_steps,
+        ["config", "core.worktree", str(worktree)],
+        ["config", "core.bare", "false"],
+    ]
+    for step in steps:
+        require_git_ok(run_git(["--git-dir", str(gitdir), *step], env=env), step[0])
+    # .git pointer: target lives under the supervisor state root, outside
+    # the executor-writable policy boundary for git control surfaces.
+    (worktree / ".git").write_text(f"gitdir: {gitdir}\n")
+    for populate in (["read-tree", "HEAD"], ["checkout-index", "-f", "-a"]):
+        require_git_ok(
+            run_git(
+                ["--git-dir", str(gitdir), "--work-tree", str(worktree), *populate],
+                env=env, timeout=300,
+            ),
+            populate[0],
+        )
+
+
+# --- Workcell: private supervisor-owned Git directory, base byte preservation
 
 
 class Workcell:
@@ -422,77 +447,23 @@ class Workcell:
         self.worktree = attempt_dir / "mutation" / "repo"
         self._env_home = attempt_dir / "git-home"
 
-    # -- construction ------------------------------------------------------
-
     def create(self) -> None:
-        """Create the private gitdir and checkout at the exact base.
-
-        Fixed construction (spec section 10): private init, read-only
-        alternate into the base object store, private ref at base, .git
-        pointer file in the worktree. The base repository receives no
-        worktree metadata, refs, objects, or index changes.
-        """
+        """Create the private gitdir and checkout at the exact base (spec
+        section 10): private ref at base, read-only alternate into the base
+        object store. The base repository receives no writes."""
         env = hermetic_git_env(self._env_home)
         self.private_git.mkdir(parents=True)
         self.worktree.mkdir(parents=True)
         self._env_home.mkdir(parents=True, exist_ok=True)
-        require_git_ok(
-            run_git(["init", "--bare", str(self.private_git)], env=env), "init"
-        )
-        base_objects = self.base_repo / ".git" / "objects"
-        alternates = self.private_git / "objects" / "info" / "alternates"
-        alternates.parent.mkdir(parents=True, exist_ok=True)
-        alternates.write_text(str(base_objects) + "\n")
-        require_git_ok(
-            run_git(
-                ["--git-dir", str(self.private_git), "update-ref",
-                 "refs/rudra/work", self.base_sha],
-                env=env,
-            ),
-            "update-ref",
-        )
-        require_git_ok(
-            run_git(
-                ["--git-dir", str(self.private_git), "symbolic-ref",
-                 "HEAD", "refs/rudra/work"],
-                env=env,
-            ),
-            "symbolic-ref",
-        )
-        # .git pointer: target lives under the supervisor state root, outside
-        # the executor-writable policy boundary for git control surfaces.
-        (self.worktree / ".git").write_text(f"gitdir: {self.private_git}\n")
-        require_git_ok(
-            run_git(
-                ["--git-dir", str(self.private_git), "config",
-                 "core.worktree", str(self.worktree)],
-                env=env,
-            ),
-            "config",
-        )
-        require_git_ok(
-            run_git(
-                ["--git-dir", str(self.private_git), "config", "core.bare", "false"],
-                env=env,
-            ),
-            "config",
-        )
-        # Populate the private index and the worktree from the exact base.
-        require_git_ok(
-            run_git(
-                ["--git-dir", str(self.private_git),
-                 "--work-tree", str(self.worktree), "read-tree", "HEAD"],
-                env=env, timeout=300,
-            ),
-            "read-tree",
-        )
-        require_git_ok(
-            run_git(
-                ["--git-dir", str(self.private_git),
-                 "--work-tree", str(self.worktree), "checkout-index", "-f", "-a"],
-                env=env, timeout=300,
-            ),
-            "checkout-index",
+        init_private_git(
+            self.private_git,
+            self.worktree,
+            alternates=[str(self.base_repo / ".git" / "objects")],
+            ref_steps=[
+                ["update-ref", "refs/rudra/work", self.base_sha],
+                ["symbolic-ref", "HEAD", "refs/rudra/work"],
+            ],
+            env=env,
         )
 
     def git(self, *args: str, timeout: float = 60.0) -> str:
@@ -523,9 +494,7 @@ class Workcell:
         return target
 
 
-# ---------------------------------------------------------------------------
-# ProcessOwner: sole spawn/signal/reap authority (spec sections 7, 10)
-# ---------------------------------------------------------------------------
+# --- ProcessOwner: sole spawn/signal/reap authority (spec sections 7, 10) ---
 
 
 class ProcessOwner:
@@ -565,35 +534,33 @@ class ProcessOwner:
         self._procs[proc.pid] = proc
         return proc, handle
 
-    # -- identity ----------------------------------------------------------
-
     def identity_status(self, handle: ProcessHandle) -> str:
-        """alive | dead | ambiguous. Ambiguous never receives a signal."""
+        """alive | dead | ambiguous. Ambiguous never receives a signal.
+
+        Restart matching (spec section 10) compares PID, OS start time, OS
+        boot identity, executable, and cwd; any observation failure is
+        ambiguous, never alive."""
         start = process_start_id(handle.pid)
         if start is None:
             return "dead"
         if handle.os_boot_id != os_boot_id():
             return "dead"  # host rebooted; the pid namespace was reset
-        expected = {
-            "start": handle.process_start_id,
-            "comm": os.path.basename(handle.executable),
-        }
-        actual_comm = process_command(handle.pid)
-        if start != expected["start"]:
+        if start != handle.process_start_id:
             return "dead"  # pid reused by another process
         actual_comm = process_command(handle.pid)
-        if actual_comm is None:
+        actual_cwd = process_cwd(handle.pid)
+        if actual_comm is None or actual_cwd is None:
             return "ambiguous"
         actual_real = (
             os.path.realpath(actual_comm)
             if actual_comm.startswith("/")
             else actual_comm
         )
-        if os.path.basename(actual_real) != expected["comm"]:
+        if os.path.basename(actual_real) != os.path.basename(handle.executable):
+            return "ambiguous"
+        if os.path.realpath(actual_cwd) != os.path.realpath(handle.cwd):
             return "ambiguous"
         return "alive"
-
-    # -- teardown ----------------------------------------------------------
 
     def terminate_tree(
         self, handle: ProcessHandle, grace_seconds: float = 2.0

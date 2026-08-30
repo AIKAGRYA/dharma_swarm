@@ -2,11 +2,9 @@
 
 Normative source: docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md sections 8-9.
 
-GoalGate is the sole completion constructor. Model prose, model JSON, tool
-exit status, receipts, task state, and old verifier results are observations;
-``ReproducedCompletion`` exists only when ``promote`` binds a fresh
-``GoalGatePassed`` produced against the exact candidate commit in a fresh
-detached verification workcell.
+GoalGate is the sole completion constructor: ``ReproducedCompletion`` exists
+only when ``promote`` binds a fresh ``GoalGatePassed`` produced against the
+exact candidate commit in a fresh detached verification workcell.
 """
 
 from __future__ import annotations
@@ -46,8 +44,12 @@ from dharma_swarm.rudra.workcell import (
     Journal,
     ProcessOwner,
     Workcell,
+    WorkcellError,
     hermetic_git_env,
+    init_private_git,
+    require_git_ok,
     rudra_state_root,
+    run_git,
 )
 
 # Environment names that never leak into a verifier subprocess (spec 8).
@@ -106,14 +108,12 @@ def _version_output(path: Path) -> str:
 
 
 def _git(root: Path, env: dict[str, str], *args: str, timeout: float = 60.0) -> str:
-    proc = subprocess.run(
-        ["/usr/bin/git", "-c", "core.hooksPath=/dev/null",
-         "-c", "commit.gpgSign=false", *args],
-        cwd=root, env=env, capture_output=True, text=True, timeout=timeout,
-    )
-    if proc.returncode != 0:
-        raise GoalGateError(f"git {' '.join(args[:1])}: {proc.stderr.strip()}")
-    return proc.stdout
+    try:
+        return require_git_ok(
+            run_git(list(args), cwd=root, env=env, timeout=timeout), args[0]
+        )
+    except WorkcellError as exc:
+        raise GoalGateError(str(exc)) from exc
 
 
 class GoalGateError(RuntimeError):
@@ -141,9 +141,7 @@ class GoalGate:
         self.env = hermetic_git_env(self.git_home)
         self.owner = process_owner or ProcessOwner()
 
-    # ------------------------------------------------------------------
-    # Admission (spec 8 steps 1-10)
-    # ------------------------------------------------------------------
+    # --- Admission (spec 8 steps 1-10) -------------------------------------
 
     def admit(self, proposal_text: str) -> AdmittedMission:
         contract = parse_mission(proposal_text)
@@ -245,9 +243,7 @@ class GoalGate:
     def prove_base_preserved(self, admitted: AdmittedMission) -> bool:
         return self.base_digests() == admitted.base_digests
 
-    # ------------------------------------------------------------------
-    # Binding
-    # ------------------------------------------------------------------
+    # --- Binding (spec 8 steps 2, 5) ---------------------------------------
 
     def _bind_repository(self, contract: RudraMissionContract) -> None:
         actual = _git(self.repo_path, self.env, "config", "--get", "remote.origin.url").strip()
@@ -258,9 +254,8 @@ class GoalGate:
                 AdmissionReject.REJECT_INVALID,
                 f"canonical remote mismatch: {actual!r} != {expected!r}",
             )
-        probe = subprocess.run(
-            ["/usr/bin/git", "cat-file", "-e",
-             f"{contract.repository.base_sha}^{{commit}}"],
+        probe = run_git(
+            ["cat-file", "-e", f"{contract.repository.base_sha}^{{commit}}"],
             cwd=self.repo_path, env=self.env, timeout=15,
         )
         if probe.returncode != 0:
@@ -308,9 +303,7 @@ class GoalGate:
                     f"verifier {command.id} executable not bound in toolchain",
                 )
 
-    # ------------------------------------------------------------------
-    # Scope inventory (spec 8)
-    # ------------------------------------------------------------------
+    # --- Scope inventory (spec 8) -------------------------------------------
 
     def workspace_snapshot(self, root: Path, base_sha: str) -> tuple[list[str], str, str]:
         """(changed paths, HEAD, digest) from raw git state, not a friendly diff.
@@ -394,10 +387,9 @@ class GoalGate:
                     target.read_text(errors="replace").count(literal)
                     if target.is_file() else 0
                 )
-                show = subprocess.run(
-                    ["/usr/bin/git", "show",
-                     f"{contract.repository.base_sha}:{path}"],
-                    cwd=root, env=self.env, capture_output=True, text=True, timeout=30,
+                show = run_git(
+                    ["show", f"{contract.repository.base_sha}:{path}"],
+                    cwd=root, env=self.env, timeout=30,
                 )
                 base_count = show.stdout.count(literal) if show.returncode == 0 else 0
                 if new_count > base_count:
@@ -416,9 +408,7 @@ class GoalGate:
             reasons.append(".git pointer mutated")
         return reasons
 
-    # ------------------------------------------------------------------
-    # Verifier execution (spec 8)
-    # ------------------------------------------------------------------
+    # --- Verifier execution (spec 8) ----------------------------------------
 
     def scrubbed_environment(
         self, contract_env: dict[str, str], artifact_dir: Path
@@ -547,9 +537,7 @@ class GoalGate:
                 )
         return None
 
-    # ------------------------------------------------------------------
-    # Evaluation
-    # ------------------------------------------------------------------
+    # --- Evaluation: always fresh, after the last mutation; nothing cached --
 
     def evaluate(
         self,
@@ -597,9 +585,7 @@ class GoalGate:
             verifier_run_id=run_id,
         )
 
-    # ------------------------------------------------------------------
-    # Candidate freeze and terminal evaluation (spec 8)
-    # ------------------------------------------------------------------
+    # --- Candidate freeze and terminal evaluation (spec 8) ------------------
 
     def freeze_candidate(self, admitted: AdmittedMission, gate: GateResult) -> str:
         """Stage only admitted changed paths in the private gitdir; commit on
@@ -632,9 +618,8 @@ class GoalGate:
             "--git-dir", str(workcell.private_git), "update-ref",
             "refs/rudra/candidate", candidate,
         )
-        ancestor = subprocess.run(
-            ["/usr/bin/git", "merge-base", "--is-ancestor",
-             contract.repository.base_sha, candidate],
+        ancestor = run_git(
+            ["merge-base", "--is-ancestor", contract.repository.base_sha, candidate],
             cwd=root, env=self.env,
         )
         if ancestor.returncode != 0:
@@ -658,19 +643,18 @@ class GoalGate:
         mutation = Workcell(
             attempt_dir, self.repo_path, contract.repository.base_sha, self.state_root
         )
-        _git(attempt_dir, self.env, "init", "--bare", str(vgit))
-        alternates = vgit / "objects" / "info" / "alternates"
-        alternates.parent.mkdir(parents=True, exist_ok=True)
-        alternates.write_text(
-            f"{mutation.private_git}/objects\n{self.repo_path}/.git/objects\n"
+        # Fresh detached verification gitdir at the candidate, built per run;
+        # the mutation gitdir is never reused for final verification (R7/R8).
+        init_private_git(
+            vgit,
+            vroot,
+            alternates=[
+                f"{mutation.private_git}/objects",
+                f"{self.repo_path}/.git/objects",
+            ],
+            ref_steps=[["update-ref", "--no-deref", "HEAD", candidate_sha]],
+            env=self.env,
         )
-        (vroot / ".git").write_text(f"gitdir: {vgit}\n")
-        _git(vroot, self.env, "--git-dir", str(vgit), "config", "core.worktree", str(vroot))
-        _git(vroot, self.env, "--git-dir", str(vgit), "config", "core.bare", "false")
-        _git(vroot, self.env, "--git-dir", str(vgit), "update-ref",
-             "--no-deref", "HEAD", candidate_sha)
-        _git(vroot, self.env, "read-tree", "HEAD")
-        _git(vroot, self.env, "checkout-index", "-f", "-a")
         vpointer_sha = sha256_file(vroot / ".git")
         self._chmod_tree(vroot, read_only=True)
         try:
@@ -710,24 +694,16 @@ class GoalGate:
 
     def _chmod_tree(self, root: Path, *, read_only: bool) -> None:
         for dirpath, dirnames, filenames in os.walk(root):
-            for name in dirnames:
+            for name in (*dirnames, *filenames):
                 path = Path(dirpath) / name
+                restore = 0o700 if path.is_dir() else 0o200
                 try:
                     mode = stat.S_IMODE(path.stat().st_mode)
-                    path.chmod(mode & ~0o222 if read_only else mode | 0o700)
-                except OSError:
-                    pass
-            for name in filenames:
-                path = Path(dirpath) / name
-                try:
-                    mode = stat.S_IMODE(path.stat().st_mode)
-                    path.chmod(mode & ~0o222 if read_only else mode | 0o200)
+                    path.chmod(mode & ~0o222 if read_only else mode | restore)
                 except OSError:
                     pass
 
-    # ------------------------------------------------------------------
-    # The one epistemic type edge (spec 9)
-    # ------------------------------------------------------------------
+    # --- The one epistemic type edge (spec 9) -------------------------------
 
     def promote(
         self,

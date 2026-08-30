@@ -2,12 +2,9 @@
 
 Normative source: docs/plans/rudra_v0/RUDRA_BUILD_SPEC.md section 7.
 
-Admission is the only authority boundary: a mission is parsed by a strict
-YAML loader (no aliases, anchors, merge keys, custom tags, duplicate keys,
-or implicit scalar coercion), validated by strict Pydantic v2 models, and
-bound to one canonical digest. Executor prose, exit codes, receipts, and old
-verifier results never construct ``ReproducedCompletion``; only
-``goal_gate.promote`` can (spec section 9).
+Admission is the only authority boundary: strict YAML, strict frozen
+Pydantic v2 models, one canonical digest. Only ``goal_gate.promote`` can
+construct ``ReproducedCompletion`` (spec section 9).
 """
 
 from __future__ import annotations
@@ -27,6 +24,12 @@ SCHEMA_VERSION = "rudra.mission.v0"
 MISSION_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _require_hex64(value: str, field: str) -> str:
+    if not HEX64_RE.match(value):
+        raise ValueError(f"{field} must be 64 lowercase hex")
+    return value
 
 
 class AdmissionReject(StrEnum):
@@ -60,9 +63,7 @@ class AdmissionError(ValueError):
         self.code = code
 
 
-# ---------------------------------------------------------------------------
-# Strict YAML parsing (spec section 7)
-# ---------------------------------------------------------------------------
+# --- Strict YAML parsing (spec section 7) -----------------------------------
 
 
 class _StrictLoader(yaml.SafeLoader):
@@ -114,9 +115,7 @@ def load_mission_yaml(text: str) -> dict[str, Any]:
     return data
 
 
-# ---------------------------------------------------------------------------
-# Path policy
-# ---------------------------------------------------------------------------
+# --- Path policy (spec section 7) -------------------------------------------
 
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
@@ -139,9 +138,7 @@ def _check_paths(values: list[str]) -> list[str]:
     return [validate_rel_path(v) for v in values]
 
 
-# ---------------------------------------------------------------------------
-# Mission contract models (strict, frozen, extra=forbid)
-# ---------------------------------------------------------------------------
+# --- Mission contract models (strict, frozen, extra=forbid) -----------------
 
 
 class _Strict(BaseModel):
@@ -199,9 +196,7 @@ class LockfileBinding(_Strict):
     @field_validator("sha256")
     @classmethod
     def _hex64(cls, v: str) -> str:
-        if not HEX64_RE.match(v):
-            raise ValueError("sha256 must be 64 lowercase hex")
-        return v
+        return _require_hex64(v, "sha256")
 
 
 class EnvironmentManifest(_Strict):
@@ -219,8 +214,7 @@ class ExecutableBinding(_Strict):
     def _absolute(self) -> "ExecutableBinding":
         if not self.path.startswith("/"):
             raise ValueError("executable path must be absolute")
-        if not HEX64_RE.match(self.sha256):
-            raise ValueError("executable sha256 must be 64 lowercase hex")
+        _require_hex64(self.sha256, "executable sha256")
         return self
 
 
@@ -296,8 +290,7 @@ class ExecutorSpec(_Strict):
 
     @model_validator(mode="after")
     def _pinned(self) -> "ExecutorSpec":
-        if not HEX64_RE.match(self.protocol_schema_sha256):
-            raise ValueError("protocol_schema_sha256 must be 64 lowercase hex")
+        _require_hex64(self.protocol_schema_sha256, "protocol_schema_sha256")
         return self
 
 
@@ -443,15 +436,15 @@ def parse_mission(text: str) -> RudraMissionContract:
         raise AdmissionError(code, str(exc)) from exc
 
 
-# ---------------------------------------------------------------------------
-# Frozen result contracts shared across module boundaries (spec section 7,
-# interface freeze).  These are the only shapes Driver, Workcell, and
-# GoalGate may exchange.
-# ---------------------------------------------------------------------------
+# --- Frozen result contracts shared across module boundaries (spec section 7,
+# interface freeze): the only shapes Driver, Workcell, and GoalGate exchange.
 
 
-class VerifierReceipt(BaseModel):
+class _Frozen(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+
+class VerifierReceipt(_Frozen):
 
     command_id: str
     argv: list[str]
@@ -468,8 +461,7 @@ class VerifierReceipt(BaseModel):
     failure_reason: str | None = None
 
 
-class GateResult(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+class GateResult(_Frozen):
 
     green: bool
     subject_digest: str
@@ -479,8 +471,7 @@ class GateResult(BaseModel):
     verifier_run_id: str
 
 
-class ProcessHandle(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+class ProcessHandle(_Frozen):
 
     pid: int
     pgid: int
@@ -491,8 +482,7 @@ class ProcessHandle(BaseModel):
     run_nonce: str
 
 
-class TurnObservation(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+class TurnObservation(_Frozen):
 
     thread_id: str
     turn_id: str
@@ -504,23 +494,8 @@ class TurnObservation(BaseModel):
     reported_complete: bool = False
 
 
-class RecoveryView(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
-
-    mission_key: str
-    attempt_key: str
-    workcell_path: str
-    private_git_dir: str
-    journal_path: str
-    adopted: bool
-    prior_processes: list[ProcessHandle]
-    status: DerivedStatus | None = None
-
-
-class GoalGatePassed(BaseModel):
+class GoalGatePassed(_Frozen):
     """Exact subject of reproduced completion (spec section 8)."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     mission_id: str
     attempt_id: str
@@ -537,10 +512,8 @@ class GoalGatePassed(BaseModel):
     completed_at: float
 
 
-class ReportedCompletion(BaseModel):
+class ReportedCompletion(_Frozen):
     """Executor-side claim. Carries no authority and cannot be promoted."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     mission_id: str
     attempt_id: str
@@ -551,10 +524,8 @@ class ReportedCompletion(BaseModel):
 _GATE_TOKEN: object = object()  # module-private; exported to goal_gate only
 
 
-class ReproducedCompletion(BaseModel):
+class ReproducedCompletion(_Frozen):
     """MissionCompletion[Reproduced]. No public constructor (spec section 9)."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     mission_id: str
     attempt_id: str

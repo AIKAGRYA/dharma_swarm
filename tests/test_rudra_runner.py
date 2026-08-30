@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.rudra.codex_driver import StubCodexDriver, StubTurn
 from dharma_swarm.rudra.goal_gate import GoalGate
 from dharma_swarm.rudra.runner import MissionRunner, RecoveryRequired
 from dharma_swarm.rudra.workcell import ProcessOwner
+from tests.fixtures.rudra.stub_driver import StubCodexDriver, StubTurn
 from tests.fixtures.rudra.helpers import (
     FIXED_TARGET,
     make_base_repo,

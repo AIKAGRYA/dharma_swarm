@@ -10,9 +10,10 @@ GoalGate runs before the first turn, after every turn, after recovery, and
 after the local candidate commit. A model ``reported_complete`` event only
 requests immediate verification; it never constructs a terminal.
 """
-
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import json
 import os
 import time
@@ -33,6 +34,7 @@ from dharma_swarm.rudra.goal_gate import (
     GoalGate,
     GoalGateError,
     GoalGatePassed,
+    _fsync_file,
 )
 from dharma_swarm.rudra.workcell import (
     Journal,
@@ -60,9 +62,7 @@ class MissionRunner:
         self.owner: ProcessOwner = self.gate.owner
         self.driver_factory = driver_factory
 
-    # ------------------------------------------------------------------
-    # Entry point
-    # ------------------------------------------------------------------
+    # --- Entry point --------------------------------------------------------
 
     def run(self, mission_path: Path) -> dict[str, Any]:
         proposal_text = Path(mission_path).read_text()
@@ -82,20 +82,12 @@ class MissionRunner:
             else:
                 admitted = self.gate.admit(proposal_text)
                 pointer.write_text(admitted.attempt_key + "\n")
-                fd = os.open(pointer, os.O_RDONLY)
-                try:
-                    os.fsync(fd)
-                finally:
-                    os.close(fd)
+                _fsync_file(pointer)
             return self._loop(admitted)
 
-    # ------------------------------------------------------------------
-    # Recovery (spec 13): no new turn until the former tree is proven dead
-    # ------------------------------------------------------------------
+    # --- Recovery (spec 13): no new turn until the former tree is proven dead
 
     def _adopt(self, mission_dir: Path, proposal_text: str) -> AdmittedMission:
-        import hashlib
-
         raw = (mission_dir / "admitted.json").read_bytes().strip()
         contract = parse_mission(proposal_text)
         contract_digest = contract.digest()
@@ -143,9 +135,7 @@ class MissionRunner:
         journal.append("RECOVERED", {"handles": len(handles)})
         return admitted
 
-    # ------------------------------------------------------------------
-    # Core loop (spec 12)
-    # ------------------------------------------------------------------
+    # --- Core loop (spec 12) -------------------------------------------------
 
     def _loop(self, admitted: AdmittedMission) -> dict[str, Any]:
         contract = admitted.contract
@@ -243,9 +233,7 @@ class MissionRunner:
                 no_delta = 0
             last_digest = digest
 
-    # ------------------------------------------------------------------
-    # Freeze, reproduce, seal (spec 8 steps 1-10 of candidate freeze)
-    # ------------------------------------------------------------------
+    # --- Freeze, reproduce, seal (spec 8 candidate freeze; requirements 4-8)
 
     def _freeze_and_reproduce(
         self,
@@ -311,10 +299,7 @@ class MissionRunner:
     def _seal(
         self, journal: Journal, terminal: Terminal, payload: dict[str, Any]
     ) -> dict[str, Any]:
-        try:
-            row = journal.compare_and_seal_terminal(str(terminal), payload)
-        except JournalConflict:
-            raise
+        row = journal.compare_and_seal_terminal(str(terminal), payload)
         return row["payload"]
 
     def _compact_context(
@@ -338,26 +323,28 @@ class MissionRunner:
             parts.append("CONTEXT_DISCONTINUITY: prior thread state is not assumed")
         return "\n".join(parts)
 
-    # ------------------------------------------------------------------
-    # Read-only status and durable stop request
-    # ------------------------------------------------------------------
+    # --- Read-only status and durable stop request ---------------------------
+
+    def _sealed_terminal(self, mission_dir: Path) -> dict[str, Any] | None:
+        """Sealed terminal payload for the current attempt, if any."""
+        pointer = mission_dir / "current-attempt"
+        if not pointer.exists():
+            return None
+        journal = Journal(
+            mission_dir / "attempts" / pointer.read_text().strip() / "run.jsonl",
+            "?", "?",
+        )
+        sealed = journal.terminal()
+        return sealed["payload"] if sealed else None
 
     def status(self, mission_id: str) -> dict[str, Any]:
         mission_dir = self._find_mission_dir(mission_id)
         if mission_dir is None:
             return {"mission_id": mission_id, "status": "UNKNOWN"}
-        pointer = mission_dir / "current-attempt"
-        terminal: dict[str, Any] | None = None
-        if pointer.exists():
-            journal = Journal(
-                mission_dir / "attempts" / pointer.read_text().strip() / "run.jsonl",
-                "?", "?",
-            )
-            try:
-                sealed = journal.terminal()
-                terminal = sealed["payload"] if sealed else None
-            except Exception:
-                return {"mission_id": mission_id, "status": "RECOVERY_REQUIRED"}
+        try:
+            terminal = self._sealed_terminal(mission_dir)
+        except Exception:
+            return {"mission_id": mission_id, "status": "RECOVERY_REQUIRED"}
         if terminal is not None:
             return {
                 "mission_id": mission_id, "status": terminal.get("terminal"),
@@ -369,8 +356,6 @@ class MissionRunner:
         if probe.exists():
             fd = os.open(probe, os.O_RDWR)
             try:
-                import fcntl
-
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     running = False  # lock free: no live supervisor
@@ -387,26 +372,16 @@ class MissionRunner:
         mission_dir = self._find_mission_dir(mission_id)
         if mission_dir is None:
             return {"mission_id": mission_id, "result": "UNKNOWN"}
-        pointer = mission_dir / "current-attempt"
-        if pointer.exists():
-            journal = Journal(
-                mission_dir / "attempts" / pointer.read_text().strip() / "run.jsonl",
-                "?", "?",
-            )
-            sealed = journal.terminal()
-            if sealed is not None:
-                return {
-                    "mission_id": mission_id,
-                    "result": "ALREADY_SEALED",
-                    "terminal": sealed["payload"],
-                }
+        terminal = self._sealed_terminal(mission_dir)
+        if terminal is not None:
+            return {
+                "mission_id": mission_id,
+                "result": "ALREADY_SEALED",
+                "terminal": terminal,
+            }
         stop_file = mission_dir / "stop.request"
         stop_file.write_text(json.dumps({"reason": reason, "at": time.time()}) + "\n")
-        fd = os.open(stop_file, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        _fsync_file(stop_file)
         return {"mission_id": mission_id, "result": "STOP_REQUESTED"}
 
     def _find_mission_dir(self, mission_id: str) -> Path | None:
