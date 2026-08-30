@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -34,6 +35,9 @@ RECOVERY_RECEIPT_TYPE = "mission_attempt_recovery"
 TASK_SCAN_LIMIT = 10_000
 RUNTIME_SCAN_LIMIT = 10_000
 TERMINAL_CAS_STALE_AFTER_SECONDS = 30.0
+PUBLIC_MISSION_IDENTIFIER_MAX_LENGTH = 128
+PUBLIC_MISSION_SNAPSHOT_RECORD_LIMIT = 500
+_PUBLIC_MISSION_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
 
 class MissionControlError(RuntimeError):
@@ -238,6 +242,14 @@ def clean_identifier(value: str, label: str) -> str:
     return cleaned
 
 
+def public_mission_identifier(value: str) -> str:
+    """Validate the narrower mission identifier admitted at the HTTP boundary."""
+    cleaned = clean_identifier(value, "mission_id")
+    if _PUBLIC_MISSION_IDENTIFIER.fullmatch(cleaned) is None:
+        raise MissionControlError("mission_id must be a bounded identifier")
+    return cleaned
+
+
 def session_id(mission_id: str) -> str:
     return f"{SESSION_PREFIX}{clean_identifier(mission_id, 'mission_id')}"
 
@@ -390,6 +402,8 @@ __all__ = [
     "OPEN_CLAIM_STATUSES",
     "OWNER_TERMINAL_ATTEMPT_STATUSES",
     "PUBLIC_TERMINAL_ATTEMPT_STATUSES",
+    "PUBLIC_MISSION_IDENTIFIER_MAX_LENGTH",
+    "PUBLIC_MISSION_SNAPSHOT_RECORD_LIMIT",
     "RECOVERY_RECEIPT_TYPE",
     "RUNTIME_SCAN_LIMIT",
     "ReceiptView",
@@ -407,6 +421,7 @@ __all__ = [
     "lease_view",
     "mission_view",
     "public_attempt_status",
+    "public_mission_identifier",
     "receipt_view",
     "session_id",
     "stable_id",

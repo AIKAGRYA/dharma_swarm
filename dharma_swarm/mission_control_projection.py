@@ -25,6 +25,9 @@ from dharma_swarm.mission_control_contract import (
     utc_now,
 )
 from dharma_swarm.mission_control_reconciliation import reconciliation
+from dharma_swarm.mission_control_snapshot_provider import (
+    ConfiguredMissionSnapshotProvider,
+)
 from dharma_swarm.models import Task, TaskStatus
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -474,6 +477,7 @@ class MissionControlProjectionMixin:
 
 
 __all__ = [
+    "ConfiguredMissionSnapshotProvider",
     "MissionControlProjectionMixin",
     "attempt_view",
     "lease_view",

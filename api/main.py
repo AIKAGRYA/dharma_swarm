@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 _state: dict[str, Any] = {}
 _OPERATOR_STATE_DIR = dharma_state_dir()
 _OPERATOR_PID_FILE = _OPERATOR_STATE_DIR / "operator.pid"
+_FLEET_HUB_MISSION_ID_ENV = "FLEET_HUB_MISSION_ID"
+_FLEET_MISSION_PROVIDER_ATTR = "mission_snapshot_provider"
 
 
 def _publish_operator_pid(pid: int | None = None) -> None:
@@ -223,15 +225,97 @@ def _initialize_agent_directory(swarm: Any) -> None:
     )
 
 
+def _clear_fleet_mission_snapshot_provider(api_app: FastAPI) -> None:
+    """Remove any provider retained on a reused FastAPI application."""
+    if hasattr(api_app.state, _FLEET_MISSION_PROVIDER_ATTR):
+        delattr(api_app.state, _FLEET_MISSION_PROVIDER_ATTR)
+
+
+def _initialize_fleet_mission_snapshot_provider(
+    api_app: FastAPI,
+    swarm: Any,
+    *,
+    swarm_initialized: bool,
+) -> bool:
+    """Compose one read-only Fleet provider over initialized owner instances.
+
+    This composition root deliberately reaches through the existing SwarmManager
+    and Orchestrator owner seams.  It never constructs a TaskBoard or
+    RuntimeStateStore and never opens, selects, or copies their databases.
+    """
+    _clear_fleet_mission_snapshot_provider(api_app)
+    configured_mission_id = os.environ.get(_FLEET_HUB_MISSION_ID_ENV)
+    if configured_mission_id is None or not configured_mission_id.strip():
+        logger.info(
+            "Fleet mission snapshot provider unavailable "
+            "(error_type=MissingConfiguration)"
+        )
+        return False
+    if not swarm_initialized:
+        logger.warning(
+            "Fleet mission snapshot provider unavailable "
+            "(error_type=SwarmInitializationIncomplete)"
+        )
+        return False
+
+    try:
+        from dharma_swarm.mission_control import MissionControl
+        from dharma_swarm.mission_control_contract import public_mission_identifier
+        from dharma_swarm.mission_control_snapshot_provider import (
+            ConfiguredMissionSnapshotProvider,
+        )
+        from dharma_swarm.runtime_state import RuntimeStateStore
+        from dharma_swarm.task_board import TaskBoard
+
+        mission_id = public_mission_identifier(configured_mission_id)
+        task_board = getattr(swarm, "_task_board", None)
+        orchestrator = getattr(swarm, "_orchestrator", None)
+        runtime_lifecycle = getattr(orchestrator, "_runtime_lifecycle", None)
+        runtime_store_getter = getattr(runtime_lifecycle, "_runtime_state_store", None)
+        if not isinstance(task_board, TaskBoard):
+            raise RuntimeError("canonical TaskBoard is unavailable")
+        if (
+            orchestrator is None
+            or getattr(orchestrator, "_board", None) is not task_board
+        ):
+            raise RuntimeError("orchestrator TaskBoard owner is unavailable")
+        if not callable(runtime_store_getter):
+            raise RuntimeError("canonical RuntimeStateStore seam is unavailable")
+        runtime_state = runtime_store_getter()
+        if not isinstance(runtime_state, RuntimeStateStore):
+            raise RuntimeError("canonical RuntimeStateStore is unavailable")
+
+        control = MissionControl(task_board, runtime_state)
+        provider = ConfiguredMissionSnapshotProvider(
+            control,
+            mission_id=mission_id,
+        )
+    except Exception as exc:
+        _clear_fleet_mission_snapshot_provider(api_app)
+        logger.warning(
+            "Fleet mission snapshot provider unavailable (error_type=%s)",
+            type(exc).__name__,
+        )
+        return False
+
+    setattr(api_app.state, _FLEET_MISSION_PROVIDER_ATTR, provider)
+    logger.info("Fleet mission snapshot provider configured read-only")
+    return True
+
+
 # ── Lifespan ──────────────────────────────────────────────────────
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize subsystems on startup, cleanup on shutdown."""
+    _clear_fleet_mission_snapshot_provider(app)
     # WP-0S (TIT-010): production-shaped startup is refused outright when the
     # required authentication material is absent or blank.
-    if dashboard_api_mode() == API_MODE_PRODUCTION and not (_get_api_key() or "").strip():
+    if (
+        dashboard_api_mode() == API_MODE_PRODUCTION
+        and not (_get_api_key() or "").strip()
+    ):
         raise RuntimeError(
             "Refusing production-shaped startup: DASHBOARD_API_KEY is absent or "
             f"blank ({DASHBOARD_API_MODE_ENV}="
@@ -262,12 +346,14 @@ async def lifespan(app: FastAPI):
     # Initialize swarm (connects to existing daemon state)
     swarm = get_swarm()
     swarm_init_task: asyncio.Task[None] | None = None
+    swarm_initialized = False
     try:
         init_timeout = float(os.getenv("DHARMA_SWARM_INIT_TIMEOUT_SECONDS", "3"))
         swarm_init_task = asyncio.create_task(swarm.init())
         _state["swarm_init_task"] = swarm_init_task
         await asyncio.wait_for(asyncio.shield(swarm_init_task), timeout=init_timeout)
         _state.pop("swarm_init_task", None)
+        swarm_initialized = True
     except TimeoutError:
         logger.warning(
             "Swarm init exceeded %.1fs; cancelling warmup to keep dashboard API responsive",
@@ -278,8 +364,14 @@ async def lifespan(app: FastAPI):
             with suppress(asyncio.CancelledError):
                 await swarm_init_task
         _state.pop("swarm_init_task", None)
-    except Exception as e:
-        logger.warning("Swarm init partial: %s", e)
+    except Exception as exc:
+        logger.warning("Swarm init partial (error_type=%s)", type(exc).__name__)
+
+    _initialize_fleet_mission_snapshot_provider(
+        app,
+        swarm,
+        swarm_initialized=swarm_initialized,
+    )
 
     try:
         _initialize_boardstore_shadow(swarm)
@@ -311,6 +403,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("DHARMA COMMAND API shutting down")
+        _clear_fleet_mission_snapshot_provider(app)
         pending_swarm_init = _state.pop("swarm_init_task", None)
         if pending_swarm_init is not None and not pending_swarm_init.done():
             pending_swarm_init.cancel()

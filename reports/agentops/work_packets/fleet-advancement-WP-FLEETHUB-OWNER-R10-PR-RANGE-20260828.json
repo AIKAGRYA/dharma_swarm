@@ -1,0 +1,117 @@
+{
+  "id": "fleet-advancement-WP-FLEETHUB-OWNER-R10-PR-RANGE-20260828",
+  "base_ref": "436ebcdcea9573a3dac93eb47078d1d83dcab7ba",
+  "branch": "agent/fleet-owner-integration-r10-20260827",
+  "worktree": ".",
+  "intent": "Cover the complete PR 1471 committed range that adds one authenticated, bounded, read-only Fleet Mission Control projection over the canonical TaskBoard and RuntimeStateStore owners, wires that projection into the existing API composition root, and keeps the configured adapter in a focused module below the quality ratchet. This packet is committed-range scope evidence only; it does not claim retroactive preflight, gate execution, human approval, deployment, mission discovery, mutation authority, or executor liveness.",
+  "allowed_files": [
+    "api/main.py",
+    "api/routers/control_surface.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_projection.py",
+    "dharma_swarm/mission_control_snapshot_provider.py",
+    "tests/test_api_fleet_mission_wiring.py",
+    "tests/test_control_surface_mission_control.py",
+    "tests/test_fleet_hub_owner_integration.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-FLEETHUB-OWNER-R10-PR-RANGE-20260828.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/task_board.py",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/a2a/**",
+    "dharma_swarm/orchestrator.py",
+    "deploy/**",
+    "docker-compose.yml",
+    ".github/**",
+    "dashboard/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "name": "fleet-owner-pr-range-contracts",
+      "command": "python3 -m pytest -q tests/test_api_fleet_mission_wiring.py tests/test_api_main_bootstrap.py tests/test_control_surface_mission_control.py tests/test_control_surface.py tests/test_control_surface_router_threadpool.py tests/test_fleet_hub_owner_integration.py",
+      "expected_exit": 0,
+      "timeout_seconds": 480
+    },
+    {
+      "name": "fleet-owner-pr-range-ruff",
+      "command": "python3 -m ruff check api/main.py api/routers/control_surface.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_projection.py dharma_swarm/mission_control_snapshot_provider.py tests/test_api_fleet_mission_wiring.py tests/test_control_surface_mission_control.py tests/test_fleet_hub_owner_integration.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "fleet-owner-pr-range-module-budget",
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "timeout_seconds": 240
+    },
+    {
+      "name": "fleet-owner-pr-range-diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "fleet-owner-pr-range-fails-closed",
+      "command": "python3 -m pytest -q tests/test_api_fleet_mission_wiring.py tests/test_control_surface_mission_control.py tests/test_fleet_hub_owner_integration.py -k 'missing or invalid or unavailable or cleanup or partial or reject or mismatch or unauthorized or uninitialized or bounded'",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(mission-control): close Fleet owner PR gates"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-FLEETHUB-OWNER-R10-PR-RANGE-20260828",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "436ebcdcea9573a3dac93eb47078d1d83dcab7ba",
+      "details": []
+    },
+    "interface_mismatches": [
+      "Mission Control exposes an exact configured-mission snapshot but no ratified complete fleet enumeration contract.",
+      "Fleet Hub must consume the existing TaskBoard and RuntimeStateStore owner instances; opening, copying, or shadowing their databases would split authority.",
+      "Recorded attempts, leases, heartbeats, acknowledgements, and replaceable runtime receipts do not prove a live executor or external effect.",
+      "TaskBoard has no atomic expected-version mutation contract, so this pull request exposes no Fleet command path.",
+      "The configured provider is a bounded read adapter and the committed-range packet is CI scope evidence; neither is human approval or production qualification."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control.py",
+      "dharma_swarm/mission_control_contract.py",
+      "dharma_swarm/mission_control_projection.py",
+      "dharma_swarm/mission_control_snapshot_provider.py",
+      "api/routers/control_surface.py",
+      "api/main.py"
+    ],
+    "honest_blockers": [
+      "This pull request does not select or create a production mission and does not prove a live Mission Control session exists on Meghadharma.",
+      "This pull request does not deploy, alter live owner state, authorize commands, mutate NATS or ACLs, or claim production promotion.",
+      "A private owner-instance seam remains confined to the API composition root and fails closed until SwarmManager exposes a ratified public accessor.",
+      "This packet covers the committed PR range and cannot truthfully attest that the two earlier implementation commits were preflighted under this exact final packet."
+    ],
+    "rollback": "Revert the PR 1471 commits. No TaskBoard, RuntimeStateStore, NATS, credential, ACL, daemon, deployment, or live owner data is mutated by the bounded read path.",
+    "packet_digest": "3d0fa81d75dbd968e1150b21efdf31cf51811e100657bc9630e9fec11b7bfd49"
+  }
+}
