@@ -44,8 +44,6 @@ from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.operator_core import (
     build_permission_history_payload,
     build_permission_decision_payload,
-    build_permission_outcome_payload,
-    build_permission_resolution_payload,
     build_agent_routes_payload,
     build_routing_decision_payload,
     build_runtime_snapshot_payload,
@@ -53,7 +51,7 @@ from dharma_swarm.operator_core import (
 )
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
 from dharma_swarm import model_status
-from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
+from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, RuntimeStateStore
 from dharma_swarm.tui import model_routing
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module
@@ -749,32 +747,6 @@ class TerminalBridge(
                     "message": f"✖ {result.get('summary', 'route change failed')}. {result.get('output', '')}".strip(),
                 }
             )
-        if action_type == "approval.resolve" and isinstance(result.get("payload"), dict):
-            runtime_enforcement = await self._record_runtime_approval_resolution(result["payload"])
-            result["payload"]["enforcement_state"] = runtime_enforcement["enforcement_state"]
-            metadata = result["payload"].get("metadata")
-            if isinstance(metadata, dict):
-                if runtime_enforcement.get("runtime_action_id"):
-                    metadata["runtime_action_id"] = runtime_enforcement["runtime_action_id"]
-                if runtime_enforcement.get("runtime_event_id"):
-                    metadata["runtime_event_id"] = runtime_enforcement["runtime_event_id"]
-            outcome_payload = build_permission_outcome_payload(
-                action_id=str(result["payload"].get("action_id", "") or ""),
-                outcome=str(runtime_enforcement.get("outcome") or runtime_enforcement["enforcement_state"]),
-                metadata=metadata if isinstance(metadata, dict) else {},
-            )
-            self._record_permission_payload(result["payload"])
-            self._record_permission_payload(outcome_payload)
-            self._emit_payload_result(
-                "permission.resolution",
-                request_id=request_id,
-                payload=result["payload"],
-            )
-            self._emit_payload_result(
-                "permission.outcome",
-                request_id=request_id,
-                payload=outcome_payload,
-            )
         result.update(
             {
                 "type": "action.result",
@@ -783,66 +755,6 @@ class TerminalBridge(
             }
         )
         self._emit(result)
-
-    async def _record_runtime_approval_resolution(self, payload: dict[str, Any]) -> dict[str, Any]:
-        metadata = payload.get("metadata")
-        metadata_record = metadata if isinstance(metadata, dict) else {}
-        action_id = str(payload.get("action_id", "") or "").strip()
-        resolution = str(payload.get("resolution", "") or "").strip().lower()
-        if not action_id:
-            return {"enforcement_state": "recorded_only"}
-        try:
-            runtime_state = RuntimeStateStore(db_path=DEFAULT_RUNTIME_DB)
-            action = await runtime_state.record_operator_action(
-                OperatorAction(
-                    action_id=f"approval_{action_id}",
-                    action_name="approval.resolve",
-                    actor=str(payload.get("actor", "") or "operator"),
-                    session_id=str(metadata_record.get("session_id", "") or ""),
-                    task_id=str(metadata_record.get("task_id", "") or ""),
-                    run_id=str(metadata_record.get("run_id", "") or ""),
-                    reason=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    payload=dict(payload),
-                )
-            )
-            runtime_outcome = self._classify_runtime_approval_outcome(resolution)
-            runtime_event = await runtime_state.record_session_event(
-                SessionEventRecord(
-                    event_id=f"evt_{uuid.uuid4().hex[:16]}",
-                    session_id=str(metadata_record.get("session_id", "") or ""),
-                    ledger_kind="operator_control",
-                    event_name=f"approval.resolve.{runtime_outcome}",
-                    task_id=str(metadata_record.get("task_id", "") or ""),
-                    run_id=str(metadata_record.get("run_id", "") or ""),
-                    agent_id=str(payload.get("actor", "") or "operator"),
-                    summary=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    event_text=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    payload={
-                        "action_id": action_id,
-                        "resolution": resolution,
-                        "enforcement_state": "runtime_recorded",
-                        "runtime_action_id": action.action_id,
-                        "outcome": runtime_outcome,
-                    },
-                )
-            )
-            return {
-                "enforcement_state": "runtime_recorded",
-                "outcome": runtime_outcome,
-                "runtime_action_id": action.action_id,
-                "runtime_event_id": runtime_event.event_id,
-            }
-        except Exception:
-            return {"enforcement_state": "recorded_only", "outcome": "runtime_record_failed"}
-
-    @staticmethod
-    def _classify_runtime_approval_outcome(resolution: str) -> str:
-        normalized = str(resolution or "").strip().lower()
-        if normalized in {"approved", "resolved"}:
-            return "runtime_applied"
-        if normalized in {"denied", "dismissed"}:
-            return "runtime_rejected"
-        return "runtime_recorded"
 
     async def _handle_intent_resolve(self, request_id: str, request: dict[str, Any]) -> None:
         prompt, error_code, error_message = self._validated_request_prompt(request)
@@ -2552,48 +2464,17 @@ class TerminalBridge(
                     "summary": f"failed /{raw_command or '<empty>'}",
                 }
         if action_type == "approval.resolve":
-            action_id = str(request.get("action_id", "") or "").strip()
-            resolution = str(request.get("resolution", "") or "").strip().lower()
-            if not action_id:
-                return {
-                    "ok": False,
-                    "summary": "approval resolution missing action id",
-                    "target_pane": "approvals",
-                    "output": "Approval resolution requires an action_id.",
-                }
-            if resolution not in {"approved", "denied", "dismissed", "resolved"}:
-                return {
-                    "ok": False,
-                    "summary": f"approval resolution invalid for {action_id}",
-                    "target_pane": "approvals",
-                    "output": f"Unsupported approval resolution: {resolution or 'missing'}.",
-                }
-            metadata = request.get("metadata")
-            payload = build_permission_resolution_payload(
-                action_id=action_id,
-                resolution=resolution,
-                actor=str(request.get("actor", "") or "operator"),
-                note=str(request.get("note", "") or "").strip() or None,
-                metadata=metadata if isinstance(metadata, dict) else {},
-                enforcement_state="recorded_only",
-            )
-            self._remember_action(f"approval.resolve -> {resolution} {action_id}")
             return {
-                "ok": True,
-                "summary": f"{resolution} {action_id}",
+                "ok": False,
+                "outcome": "unsupported",
+                "completed": False,
+                "supported": False,
+                "summary": "approval resolution is unavailable in read-only Helm",
                 "target_pane": "approvals",
-                "output": "\n".join(
-                    [
-                        "# Approval Resolution",
-                        f"Action: {action_id}",
-                        f"Resolution: {resolution}",
-                        f"Actor: {payload['actor']}",
-                        f"Recorded at: {payload['resolved_at']}",
-                        f"Enforcement: {payload['enforcement_state']}",
-                        "Runtime enforcement remains owned by the legacy governance loop until that path is wired.",
-                    ]
+                "output": (
+                    "Unsupported in Helm Slice 1: approval.resolve requires an "
+                    "effectful authority that this read-only terminal does not own."
                 ),
-                "payload": payload,
             }
         return {
             "ok": False,
