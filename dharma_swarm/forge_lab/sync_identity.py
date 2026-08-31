@@ -85,6 +85,7 @@ CRITICAL_FILES = (
     "dharma_swarm/forge_v1/forge_v2/runner_slots.py",
     "scripts/forge_lab/rsi",
     "scripts/forge_lab/RSILAB",
+    "scripts/forge_lab/rsilab_tui.py",
     "scripts/forge_lab/rsi-env",
     "scripts/forge_lab/rsi-provider-refresh",
     "scripts/forge_lab/rsi-provider-refresh-install",

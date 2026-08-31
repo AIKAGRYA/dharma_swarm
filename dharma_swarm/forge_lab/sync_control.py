@@ -204,7 +204,7 @@ def _install_wrappers(root: Path, release: Path, *, node: str) -> dict[str, str]
     bin_dir.mkdir(parents=True, exist_ok=True)
     targets = {
         "rsi": release / "repo" / "scripts" / "forge_lab" / "rsi",
-        "RSILAB": release / "repo" / "scripts" / "forge_lab" / "rsi",
+        "RSILAB": release / "repo" / "scripts" / "forge_lab" / "RSILAB",
         "rsi-lab-env": release / "repo" / "scripts" / "forge_lab" / "rsi-env",
         "rsi-operator-history": release
         / "repo"
