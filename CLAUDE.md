@@ -65,14 +65,14 @@ Command boundaries: `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
      check:  python3 scripts/governance/render_active_track_includes.py --check
      checked by: .github/workflows/active-track.yml, make docops-integrity,
                  tests/test_active_track_governance.py
-     newest track verified_at in source: 2026-08-27 -->
+     newest track verified_at in source: 2026-08-31 -->
 
 **Active portfolio — declared intent only:** 4 co-equal track(s) (WIP warn 5, max 10; scoped WIP: `mac_build` 4 active / max 4; model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned). This stamped digest carries track identity and surface ownership, NOT runtime truth and NOT full track detail (descriptions, next-items, non-goals stay in the YAML). Declared intent comes from `docs/governance/ACTIVE_TRACK.yaml`; evaluate it with `python3 scripts/governance/check_track_status.py`. Never answer runtime or liveness questions from this block or another prose copy. Admission scopes constrain declared build authority; they do not prove where a process is running.
 
 **Spine objectives:** `substrate-nativeness`, `revenue-external-humans-served`, `research-depth` (each covered by at least one active track)
 
-- **`fleet-advancement-2026-08`** — Fleet advancement — Fleet Hub, Mission Control, and HELM operator surfaces (ACTIVE, serves `substrate-nativeness`, verified 2026-08-27, open blocker items: 2)
-  - owns: dharma_swarm/mission_control*.py, tests/test_mission_control.py, dashboard/src/app/dashboard/cockpit/**, dashboard/src/components/cockpit/**, dashboard/src/components/operator-coherence/v2/**, terminal/**, docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md, specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
+- **`fleet-advancement-2026-08`** — Fleet advancement — Fleet Hub, Mission Control, and HELM operator surfaces (ACTIVE, serves `substrate-nativeness`, verified 2026-08-31, open blocker items: 6)
+  - owns: dharma_swarm/mission_control*.py, tests/test_mission_control.py, dashboard/src/app/dashboard/cockpit/**, dashboard/src/components/cockpit/**, dashboard/src/components/operator-coherence/v2/**, terminal/**, dharma_swarm/helm_route_truth*.py, dharma_swarm/operator_core/helm_context*.py, dharma_swarm/terminal_bridge*.py, dharma_swarm/terminal_commands/_helpers.py, dharma_swarm/terminal_commands/surfaces.py, dharma_swarm/tui/model_routing.py, scripts/terminal_guardian_preflight.sh, tests/test_helm_context*.py, tests/test_model_status_projection.py, tests/test_route_verification.py, tests/test_terminal_bridge*.py, tests/test_terminal_surfaces.py, docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md, specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
   - admission scopes: mac_build (declared build authority; not runtime evidence)
 - **`sadhana-10-day-program-2026-08`** — SADHANA — governed 10-day program (ACTIVE, serves `revenue-external-humans-served`, verified 2026-08-27, open blocker items: 2)
   - owns: deploy/sadhana/**, scripts/runtime/sadhana_release.py, tests/test_sadhana_release.py, dashboard/src/app/dashboard/sadhana/**

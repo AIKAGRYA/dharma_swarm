@@ -144,7 +144,7 @@ active_tracks:
     name: Fleet advancement — Fleet Hub, Mission Control, and HELM operator surfaces
     status: ACTIVE
     opened_at: "2026-08-27"
-    verified_at: "2026-08-27"
+    verified_at: "2026-08-31"
     ttl_days: 14
     owner: "@dhyana"
     serves: substrate-nativeness
@@ -162,6 +162,18 @@ active_tracks:
       - dashboard/src/components/cockpit/**
       - dashboard/src/components/operator-coherence/v2/**
       - terminal/**
+      - dharma_swarm/helm_route_truth*.py
+      - dharma_swarm/operator_core/helm_context*.py
+      - dharma_swarm/terminal_bridge*.py
+      - dharma_swarm/terminal_commands/_helpers.py
+      - dharma_swarm/terminal_commands/surfaces.py
+      - dharma_swarm/tui/model_routing.py
+      - scripts/terminal_guardian_preflight.sh
+      - tests/test_helm_context*.py
+      - tests/test_model_status_projection.py
+      - tests/test_route_verification.py
+      - tests/test_terminal_bridge*.py
+      - tests/test_terminal_surfaces.py
       - docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md
       - specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
     moves_vital_signs:
@@ -169,15 +181,16 @@ active_tracks:
       - context_efficiency
       - quality_gates
       - security_guardrails
-    target_closure_kind: CLOSED_NOT_PROD
-    claim_boundary: "Fleet Hub, Mission Control, and HELM are bounded prototype deliverables inside this one program lane. A prototype, local process, or attempt record does not prove a production adapter, command authority, or executor liveness."
+    target_closure_kind: PRODUCTION_READY
+    claim_boundary: "The operator's 2026-08-31 destination admits the current-main Helm as a local-Mac production candidate, not as an already-live product. Production readiness requires the binding read-only boundary, owner-issued fresh projections, evaluator-hard fixed-seat RouteVerification, managed-socket journey and performance receipts, health and rollback proof, No-Mistakes review, and required CI. A prototype, configured route, successful provider reply, local process, attempt record, or model consensus proves none of those authorities. Fleet deployment, credential changes, and an effectful Helm hand remain outside this admission."
     description: |
       Advance the operator-facing fleet as one coherent program. Fleet Hub
       remains the five-destination phone shell (Helm, Chat, Board, Trace,
       Roster); Mission Control remains a typed TaskBoard + RuntimeStateStore
-      projection; HELM remains the terminal operator surface. Their prototype
-      packages may complete independently, but they do not consume extra
-      standing portfolio slots.
+      projection; HELM is the local-Mac production terminal candidate. The
+      program closes only through owner-issued truth, evaluator-hard route
+      evidence, a protected rollback target, and a recorded local cutover;
+      the packages do not consume extra standing portfolio slots.
     prerequisites:
       - id: focus_reset_receipt_valid
         kind: receipt_valid
@@ -194,10 +207,23 @@ active_tracks:
       - id: helm_shell_contract_exists
         kind: file_exists
         file: terminal/tests/nihongaShell.test.ts
+      - id: helm_read_only_boundary_tests_pass
+        kind: test_passes
+        test: tests/test_terminal_bridge.py
+      - id: helm_owner_projection_tests_pass
+        kind: test_passes
+        test: tests/test_terminal_bridge_helm_context.py
+      - id: helm_route_verification_tests_pass
+        kind: test_passes
+        test: tests/test_route_verification.py
+      - id: helm_runtime_shell_tests_pass
+        kind: test_passes
+        test: tests/test_terminal_surfaces.py
     non_goals:
       - Do not add a sixth Fleet Hub destination or turn overlays into navigation.
       - Do not infer missions by parsing prose or claim liveness from attempt records.
-      - Do not deploy, restart production, change credentials/ACLs, or grant mutation authority from prototype evidence.
+      - Do not deploy or restart a protected/default runtime until the governed candidate, health check, rollback proof, and cutover receipt are all present.
+      - Do not change credentials/ACLs, buy provider quota, deploy to the fleet, or grant mutation authority through this track.
     next_items:
       - id: fleet-prototypes-reviewed
         what: "Merge or otherwise land the independently verified Fleet Hub, Mission Control, and HELM prototype packages with their visual evidence."
@@ -206,6 +232,22 @@ active_tracks:
       - id: owner-adapters-qualified
         what: "Qualify real owner adapters and canaries separately before any production claim."
         kind: evidence
+        blocker: true
+      - id: helm-read-only-boundary-restored
+        what: "Close issue #1508 with a bridge-level fail-closed rejection, a zero-write negative control, and removal of the Slice-1 approval affordance."
+        kind: implementation
+        blocker: true
+      - id: helm-route-proof-floor-met
+        what: "Close issues #1405 through #1409 with one canonical evidence owner and an honest fresh fixed-seven-seat N/7 matrix; unavailable seats remain degraded."
+        kind: evidence
+        blocker: true
+      - id: helm-runtime-cutover-proven
+        what: "Close issues #1410 and #1509 with CODEX_MANAGED tmux isolation, structured bridge diagnostics, compatible-Python preflight, real journey/performance receipts, health, and rollback proof."
+        kind: verification
+        blocker: true
+      - id: helm-governed-review-green
+        what: "Pass the full AgentOps closeout, No-Mistakes adversarial review, required CI, and operator merge/cutover boundary on the exact candidate commit."
+        kind: integration
         blocker: true
 
   - id: sadhana-10-day-program-2026-08
