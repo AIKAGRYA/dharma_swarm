@@ -262,6 +262,10 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
 
     rsilab = (REPO_ROOT / "scripts" / "forge_lab" / "RSILAB").read_text(encoding="utf-8")
     assert 'exec "${script_dir}/rsi" "$@"' in rsilab
+    assert "rsilab_tui.py" in rsilab
+    tui = (REPO_ROOT / "scripts" / "forge_lab" / "rsilab_tui.py").read_text(encoding="utf-8")
+    assert "n50 is refused" in tui
+    assert "rsi-unattended-explore" in tui
 
     env_script = (REPO_ROOT / "scripts" / "forge_lab" / "rsi-env").read_text(
         encoding="utf-8"

@@ -1,4 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# Operator menu for supervised Meghadharma rounds. Unknown verbs still fall
+# through to the canonical rsi launcher, including ``RSILAB - NEWRUN``.
+tui="${script_dir}/rsilab_tui.py"
+menu=0
+if [[ $# -eq 0 ]]; then
+    menu=1
+elif [[ "${1}" == "menu" || "${1}" == "status" || "${1}" == "models" || "${1}" == "run" || "${1}" == "halt" ]]; then
+    menu=1
+fi
+if [[ "${menu}" == "1" ]]; then
+    if command -v python3.13 >/dev/null 2>&1; then
+        py=python3.13
+    else
+        py=python3
+    fi
+    exec "${py}" "${tui}" "$@"
+fi
 exec "${script_dir}/rsi" "$@"

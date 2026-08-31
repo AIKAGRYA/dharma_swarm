@@ -154,7 +154,7 @@ def test_activation_is_atomic_idempotent_and_preserves_host_state(
         release / "repo" / "scripts" / "forge_lab" / "rsi"
     )
     assert (root / "bin" / "RSILAB").resolve() == (
-        release / "repo" / "scripts" / "forge_lab" / "rsi"
+        release / "repo" / "scripts" / "forge_lab" / "RSILAB"
     )
     assert (root / "bin" / "rsi-env").read_text(encoding="utf-8") == "legacy env\n"
     assert not (root / "bin" / "rsi-env").is_symlink()
