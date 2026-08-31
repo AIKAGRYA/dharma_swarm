@@ -1,4 +1,4 @@
-import type {AppState, ApprovalQueueEntry, CanonicalPermissionResolution, TabSpec} from "./types";
+import type {AppState, TabSpec} from "./types";
 import {routeLabel} from "./routePolicy";
 
 export type PaneAction = {
@@ -8,15 +8,8 @@ export type PaneAction = {
   payload: Record<string, unknown>;
 };
 
-type ApprovalResolveAction = (
-  entry: ApprovalQueueEntry,
-  resolution: CanonicalPermissionResolution["resolution"],
-  label: string,
-) => PaneAction;
-
 type PaneActionsOptions = {
   sessionCatalogLimit: number;
-  approvalResolveAction: ApprovalResolveAction;
 };
 
 export function paneActionsFor(
@@ -24,7 +17,7 @@ export function paneActionsFor(
   state: AppState,
   options: PaneActionsOptions,
 ): {refresh: PaneAction; primary?: PaneAction; secondary?: PaneAction; tertiary?: PaneAction} {
-  const {sessionCatalogLimit, approvalResolveAction} = options;
+  const {sessionCatalogLimit} = options;
   const modelTarget = routeLabel(state.routePolicy);
   switch (tabId) {
     case "repo":
@@ -107,34 +100,61 @@ export function paneActionsFor(
         secondary: {label: "/archive", summary: "run /archive", payload: {action_type: "command.run", command: "/archive"}},
         tertiary: {label: "/memory", summary: "run /memory", payload: {action_type: "command.run", command: "/memory"}},
       };
-    case "approvals": {
-      const canResolve = state.bridgeStatus === "connected" && state.authoritativeSurfaces.approvals;
-      const selectedEntry = state.approvalPane.selectedActionId
-        ? state.approvalPane.entriesByActionId[state.approvalPane.selectedActionId]
-        : undefined;
-      const primary =
-        canResolve && selectedEntry && selectedEntry.pending
-          ? approvalResolveAction(selectedEntry, "approved", "approve")
-          : canResolve && selectedEntry && selectedEntry.status === "observed"
-            ? approvalResolveAction(selectedEntry, "resolved", "mark resolved")
-            : undefined;
-      const secondary =
-        canResolve && selectedEntry && selectedEntry.pending ? approvalResolveAction(selectedEntry, "denied", "deny") : undefined;
-      const tertiary =
-        canResolve && selectedEntry && selectedEntry.pending
-          ? approvalResolveAction(selectedEntry, "dismissed", "dismiss")
-          : undefined;
+    case "approvals":
       return {
         refresh: {label: "refresh approvals", summary: "refresh approval history", requestType: "permission.history", payload: {limit: 50}},
-        primary: selectedEntry ? primary : undefined,
-        secondary,
-        tertiary,
       };
-    }
     default:
       return {
         refresh: {label: "refresh shell", summary: "refresh live snapshots", payload: {action_type: "surface.refresh", surface: "control"}},
       };
+  }
+}
+
+type InputModifiers = {
+  ctrl?: boolean;
+  meta?: boolean;
+};
+
+export function plainListDirection(input: string, key: InputModifiers): 1 | -1 | undefined {
+  if (key.ctrl || key.meta) {
+    return undefined;
+  }
+  if (input === "j") {
+    return 1;
+  }
+  if (input === "k") {
+    return -1;
+  }
+  return undefined;
+}
+
+export type PaneActionChordDecision =
+  | {handled: false}
+  | {handled: true; action?: PaneAction};
+
+export function paneActionChordDecision(
+  input: string,
+  key: InputModifiers,
+  tabId: string,
+  state: AppState,
+  options: PaneActionsOptions,
+): PaneActionChordDecision {
+  if (!key.ctrl) {
+    return {handled: false};
+  }
+  const actions = paneActionsFor(tabId, state, options);
+  switch (input) {
+    case "l":
+      return {handled: true, action: actions.refresh};
+    case "x":
+      return {handled: true, action: actions.primary};
+    case "f":
+      return {handled: true, action: actions.secondary};
+    case "v":
+      return {handled: true, action: actions.tertiary};
+    default:
+      return {handled: false};
   }
 }
 
@@ -144,16 +164,24 @@ export function footerHintFor(
   options: PaneActionsOptions,
   compact = false,
 ): string {
+  const withApprovalBoundary = (hint: string): string =>
+    tabId === "approvals" ? `read-only history | ${hint}` : hint;
   if (state.uiMode.activeOverlay.kind === "paneSwitcher") {
-    return compact ? "j/k choose | Enter jump | Esc close" : "j/k or ↑/↓ choose pane | Enter jump | Esc close | ^K switcher";
+    return withApprovalBoundary(
+      compact ? "j/k choose | Enter jump | Esc close" : "j/k or ↑/↓ choose pane | Enter jump | Esc close | ^K switcher",
+    );
   }
   if (state.uiMode.activeOverlay.kind === "modelPicker") {
-    return compact ? "j/k choose | Enter apply | Esc close" : "j/k or ↑/↓ choose route | Enter apply | Esc close";
+    return withApprovalBoundary(
+      compact ? "j/k choose | Enter apply | Esc close" : "j/k or ↑/↓ choose route | Enter apply | Esc close",
+    );
   }
   if (state.uiMode.keyboardFocus === "composer") {
-    return compact
-      ? "compose | Enter send | ^J newline | Esc navigate"
-      : "composer owns keys | Enter send | ^J newline | Esc navigation";
+    return withApprovalBoundary(
+      compact
+        ? "compose | Enter send | ^J newline | Esc navigate"
+        : "composer owns keys | Enter send | ^J newline | Esc navigation",
+    );
   }
   if (compact) {
     const actions = paneActionsFor(tabId, state, options);
@@ -161,7 +189,7 @@ export function footerHintFor(
     if (actions.primary) {
       parts.push(`^X ${actions.primary.label}`);
     }
-    return parts.join(" | ");
+    return withApprovalBoundary(parts.join(" | "));
   }
   const actions = paneActionsFor(tabId, state, options);
   const parts = [state.footerHint, "↑/↓ scroll", `^L ${actions.refresh.label}`];
@@ -177,9 +205,6 @@ export function footerHintFor(
   }
   if (tabId === "approvals") {
     parts.push("j/k or ↑/↓ select");
-    if (state.bridgeStatus !== "connected" || !state.authoritativeSurfaces.approvals) {
-      parts.push("resolution held pending owner history");
-    }
   }
   if (tabId === "models") {
     parts.push("j/k or ↑/↓ select route");
@@ -208,7 +233,7 @@ export function footerHintFor(
   if (actions.tertiary) {
     parts.push(`^V ${actions.tertiary.label}`);
   }
-  return parts.join(" | ");
+  return withApprovalBoundary(parts.join(" | "));
 }
 
 export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): string {
@@ -225,7 +250,7 @@ export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): s
     return "session list";
   }
   if (activeTab?.kind === "approvals") {
-    return "approval queue";
+    return "approval history · read-only";
   }
   if (activeTab?.kind === "repo" || activeTab?.kind === "control" || activeTab?.kind === "runtime") {
     return "pane section focus";

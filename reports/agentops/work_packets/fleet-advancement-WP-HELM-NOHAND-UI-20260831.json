@@ -1,0 +1,108 @@
+{
+  "id": "fleet-advancement-WP-HELM-NOHAND-UI-20260831",
+  "base_ref": "18f90e58d49e87971fba94bc25c1b8cd49db03cf",
+  "branch": "codex/helm-prod-20260831",
+  "worktree": ".",
+  "intent": "Close the operator-facing half of issue #1508 by making the Slice-1 approval pane inspect-and-refresh only: no fresh owner projection, pending row, or key chord may construct an approval.resolve action, while inbound approval history, selection, and externally owned resolution/outcome projections remain readable.",
+  "allowed_files": [
+    "terminal/src/shellControls.ts",
+    "terminal/src/app.tsx",
+    "terminal/tests/shellControls.test.ts",
+    "reports/agentops/work_packets/fleet-advancement-WP-HELM-NOHAND-UI-20260831.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/terminal_bridge.py",
+    "terminal/src/protocol.ts",
+    "terminal/src/types.ts",
+    "terminal/src/components/ApprovalsPane.tsx",
+    "deploy/sadhana/**",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "dashboard/src/app/dashboard/sadhana/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/forge_lab/**",
+    "tests/forge_lab_v1/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**",
+    "tests/test_foundry_*.py",
+    "docs/foundry/**",
+    "dharma_swarm/rudra/**",
+    "dharma_swarm/terminal_commands/rudra.py",
+    "tests/test_rudra_*.py",
+    "tests/fixtures/rudra/**",
+    "reports/rudra/**",
+    "docs/plans/rudra_v0/**"
+  ],
+  "gates": [
+    {
+      "name": "helm-no-hand-bridge-regression",
+      "command": "python3 -m pytest -q tests/test_terminal_bridge_helm_context.py -k approval_resolve",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "server-backstop-effect-is-detected",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('dharma_swarm/terminal_bridge.py'); t=p.read_text(); old='        if action_type == \\\"approval.resolve\\\":\\n            return {\\n'; t.count(old) == 1 or sys.exit(3); new='        if action_type == \\\"approval.resolve\\\":\\n            self._remember_action(\\\"forbidden approval mutation\\\")\\n            return {\\n'; p.write_text(t.replace(old,new,1)); sys.exit(subprocess.run([sys.executable,'-m','pytest','-q','tests/test_terminal_bridge_helm_context.py','-k','approval_resolve']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(helm): remove approval effect affordances"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELM-NOHAND-UI-20260831",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "18f90e58d49e87971fba94bc25c1b8cd49db03cf",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The bridge now rejects approval.resolve without effects, but the Bun shell still promotes a fresh approval-history boolean into approve, deny, dismiss, or mark-resolved actions.",
+      "Observed approval history and effect authority are distinct: the former may populate the read-only pane and history refresh, but cannot construct a local mutation command.",
+      "Inbound permission decisions, resolutions, outcomes, and history remain protocol observations owned by external runtime/governance paths and must not be deleted with the local affordance."
+    ],
+    "closest_existing_implementation": [
+      "terminal/src/shellControls.ts",
+      "terminal/src/app.tsx",
+      "terminal/tests/shellControls.test.ts",
+      "docs/plans/helm_legone/HELM_LEGONE_SPEC.md"
+    ],
+    "honest_blockers": [
+      "This packet removes only local approval effect affordances. It does not prove owner context, seven-seat liveness, performance, packaging, or production cutover.",
+      "The protected live Helm process remains on its old source until a later isolated proof and explicit cutover.",
+      "The Terminal Guardian harness still uses a private but nonconforming socket name; the separate tmux-isolation packet will migrate it to the concrete CODEX_MANAGED_PURPOSE_PID naming scheme."
+    ],
+    "rollback": "Revert this packet commit to restore the previous TypeScript approval controls. No runtime state or stored approval history is migrated or deleted by this UI-only change.",
+    "packet_digest": "2d0a7bae601b9ec9d2c5cd07c32e12fba370f9991648f2c09ccb61ccfb8e2d9f"
+  }
+}
