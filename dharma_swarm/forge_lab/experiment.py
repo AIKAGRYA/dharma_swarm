@@ -7,6 +7,12 @@ is enforced at preflight; inside it, mutation is free.
 Each generation samples fresh tasks, grades a content-addressed mutation from
 the novelty-weighted archive, persists its result, and emits an honest
 closeout. Leaf modules hold configuration, git identity, preflight, and closeout concerns.
+
+Fail-closed: ANY exception inside the run (seed grade, envelope validation,
+the generation loop) still writes closeout.json as ``blocked_with_evidence``
+plus after_run_notes naming the exception, records the failed candidate via
+``CandidateStore.append_errored``, increments ``counters["errored"]``, and
+then re-raises — a run never dies silently and never pretends success.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+import traceback
 from typing import Any
 
 from dharma_swarm.forge_lab import grade_explore, ids, mutation, selection
@@ -125,6 +132,8 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
     generation_observations_total = 0
     budget_observations_total = 0
     stopped_early = ""
+    candidate_error_recorded = False  # set by _grade_and_archive before re-raise
+    seed_soft_cap_exceeded = False
 
     async def _tasks_for_generation(gen: int) -> dict[str, tuple[dict, dict]]:
         receipt = await asyncio.to_thread(
@@ -149,6 +158,7 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
         nonlocal infrastructure_observations_total
         nonlocal generation_observations_total
         nonlocal budget_observations_total
+        nonlocal candidate_error_recorded
         checked = check_genome(genome)
         if not checked.executable:
             await store.append_blocked(
@@ -170,67 +180,93 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
                     reasons=checked.reasons,
                 ),
             )
-        outcome = await asyncio.to_thread(
-            grade_explore.grade_genome_explore,
-            genome, contexts,
-            seams=seams.grade,
-            budget_cap_tokens=cfg.budget_cap_tokens,
-            budget_cap_usd=cfg.budget_cap_usd,
-            propose_timeout_s=cfg.propose_timeout_s,
-            grade_timeout_s=cfg.grade_timeout_s,
-            soft_token_cap=cfg.soft_token_cap,
-        )
-        tokens_spent_total += outcome.tokens_used
-        comparable_observations_total += outcome.comparable_observations
-        infrastructure_count = sum(
-            row.get("evidence_class") == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
-            for row in outcome.per_task
-        )
-        infrastructure_observations_total += infrastructure_count
-        generation_count = sum(
-            row.get("evidence_class") == grade_explore.INCONCLUSIVE_GENERATION
-            for row in outcome.per_task
-        )
-        budget_count = sum(
-            row.get("evidence_class") == grade_explore.INCONCLUSIVE_BUDGET
-            for row in outcome.per_task
-        )
-        generation_observations_total += generation_count
-        budget_observations_total += budget_count
-        if infrastructure_count:
-            counters["inconclusive_infrastructure"] += 1
-        if generation_count:
-            counters["inconclusive_generation"] += 1
-        if budget_count:
-            counters["inconclusive_budget"] += 1
-        if outcome.error:
+        try:
+            outcome = await asyncio.to_thread(
+                grade_explore.grade_genome_explore,
+                genome, contexts,
+                seams=seams.grade,
+                budget_cap_tokens=cfg.budget_cap_tokens,
+                budget_cap_usd=cfg.budget_cap_usd,
+                propose_timeout_s=cfg.propose_timeout_s,
+                grade_timeout_s=cfg.grade_timeout_s,
+                soft_token_cap=cfg.soft_token_cap,
+            )
+            tokens_spent_total += outcome.tokens_used
+            comparable_observations_total += outcome.comparable_observations
+            infrastructure_count = sum(
+                row.get("evidence_class") == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
+                for row in outcome.per_task
+            )
+            infrastructure_observations_total += infrastructure_count
+            generation_count = sum(
+                row.get("evidence_class") == grade_explore.INCONCLUSIVE_GENERATION
+                for row in outcome.per_task
+            )
+            budget_count = sum(
+                row.get("evidence_class") == grade_explore.INCONCLUSIVE_BUDGET
+                for row in outcome.per_task
+            )
+            generation_observations_total += generation_count
+            budget_observations_total += budget_count
+            if infrastructure_count:
+                counters["inconclusive_infrastructure"] += 1
+            if generation_count:
+                counters["inconclusive_generation"] += 1
+            if budget_count:
+                counters["inconclusive_budget"] += 1
+            if outcome.error:
+                await store.append_errored(
+                    candidate_id=cid, genome=genome, parent_id=parent_id, generation=generation,
+                    loop_iteration=loop_iteration, reasons=[outcome.error], raw_output=raw,
+                )
+                counters["errored"] += 1
+                return _append_result_row(
+                    results_path, _result_row(
+                        exp_id=exp_id, candidate_id=cid, parent_id=parent_id, state="errored",
+                        role=role, op=op, generation=generation, pass_rate=outcome.pass_rate,
+                        per_task=outcome.per_task, budget=outcome.budget, reasons=[outcome.error],
+                    )
+                )
+            envelope = FreeformExploreEnvelope(
+                candidate_id=cid, parent_id=parent_id, experiment_id=exp_id,
+                category=cfg.category, raw_output=raw, notes=notes,
+                artifacts={"operator": op},
+                benchmark_receipt={
+                    "tier": outcome.tier,
+                    "pass_rate": outcome.pass_rate,
+                    "evidence_class": outcome.evidence_class,
+                    "comparable_observations": outcome.comparable_observations,
+                },
+                membrane=membrane,
+            )
+            issues = validate_freeform_explore_envelope(envelope)
+            if issues:
+                raise RuntimeError(f"envelope failed membrane validation: {issues}")
+        except Exception as exc:
+            # Errored lane: the candidate is recorded as evidence, not lost;
+            # the run-level boundary then writes the blocked closeout.
+            reason = f"{type(exc).__name__}: {exc}"
             await store.append_errored(
-                candidate_id=cid, genome=genome, parent_id=parent_id, generation=generation,
-                loop_iteration=loop_iteration, reasons=[outcome.error], raw_output=raw,
+                candidate_id=cid, genome=genome, parent_id=parent_id,
+                generation=generation, loop_iteration=loop_iteration,
+                reasons=[reason], raw_output=raw,
             )
             counters["errored"] += 1
-            return _append_result_row(
-                results_path, _result_row(
-                    exp_id=exp_id, candidate_id=cid, parent_id=parent_id, state="errored",
-                    role=role, op=op, generation=generation, pass_rate=outcome.pass_rate,
-                    per_task=outcome.per_task, budget=outcome.budget, reasons=[outcome.error],
-                )
+            candidate_error_recorded = True
+            _append_result_row(
+                results_path,
+                _result_row(
+                    exp_id=exp_id,
+                    candidate_id=cid,
+                    parent_id=parent_id,
+                    state="errored",
+                    role=role,
+                    op=op,
+                    generation=generation,
+                    reasons=[reason],
+                ),
             )
-        envelope = FreeformExploreEnvelope(
-            candidate_id=cid, parent_id=parent_id, experiment_id=exp_id,
-            category=cfg.category, raw_output=raw, notes=notes,
-            artifacts={"operator": op},
-            benchmark_receipt={
-                "tier": outcome.tier,
-                "pass_rate": outcome.pass_rate,
-                "evidence_class": outcome.evidence_class,
-                "comparable_observations": outcome.comparable_observations,
-            },
-            membrane=membrane,
-        )
-        issues = validate_freeform_explore_envelope(envelope)
-        if issues:
-            raise RuntimeError(f"envelope failed membrane validation: {issues}")
+            raise
         await store.append_graded(
             candidate_id=cid, genome=genome, parent_id=parent_id,
             generation=generation, loop_iteration=loop_iteration, role=role,
@@ -326,158 +362,209 @@ async def run_experiment(cfg: ExperimentConfig, seams: Seams | None = None) -> d
             ),
         )
 
-    # ---- generation 0: seed baseline ----------------------------------------
-    seed = merged_with_defaults(dict(cfg.seed_genome or {}))
-    if not seed.get("generator_model"):
-        seed["generator_model"] = cfg.solver_model
-    if not seed.get("verifier_model"):
-        seed["verifier_model"] = cfg.verifier_model or None
-    seed_cid = ids.candidate_id(seed)
-    contexts = await _tasks_for_generation(0)
-    await _grade_and_archive(
-        seed, cid=seed_cid, parent_id=None, generation=0, loop_iteration=0,
-        role="seed_baseline", contexts=contexts, notes="seed", raw="", op="seed",
-    )
-    graded_after_seed = await store.graded_entries()
-    seed_row = next(
-        (CandidateStore._row(e) for e in graded_after_seed if CandidateStore._row(e).get("role") == "seed_baseline"),
-        {},
-    )
-    seed_budget = seed_row.get("budget") if isinstance(seed_row.get("budget"), dict) else {}
-    if cfg.require_valid_seed and seed_budget.get("hard_invalid"):
-        stopped_early = f"seed_baseline_hard_invalid:{seed_budget.get('hard_invalid_reason')}"
-    seed_soft_cap_exceeded = bool(seed_budget.get("soft_token_cap_exceeded"))
+    # ---- seed grade + generation loop: fail-closed exception boundary --------
+    # Any throw here still produces closeout.json (blocked_with_evidence) and
+    # after_run_notes before the exception propagates — no silent run death.
+    try:
+        # ---- generation 0: seed baseline ----------------------------------------
+        seed = merged_with_defaults(dict(cfg.seed_genome or {}))
+        if not seed.get("generator_model"):
+            seed["generator_model"] = cfg.solver_model
+        if not seed.get("verifier_model"):
+            seed["verifier_model"] = cfg.verifier_model or None
+        seed_cid = ids.candidate_id(seed)
+        contexts = await _tasks_for_generation(0)
+        await _grade_and_archive(
+            seed, cid=seed_cid, parent_id=None, generation=0, loop_iteration=0,
+            role="seed_baseline", contexts=contexts, notes="seed", raw="", op="seed",
+        )
+        graded_after_seed = await store.graded_entries()
+        seed_row = next(
+            (CandidateStore._row(e) for e in graded_after_seed if CandidateStore._row(e).get("role") == "seed_baseline"),
+            {},
+        )
+        seed_budget = seed_row.get("budget") if isinstance(seed_row.get("budget"), dict) else {}
+        if cfg.require_valid_seed and seed_budget.get("hard_invalid"):
+            stopped_early = f"seed_baseline_hard_invalid:{seed_budget.get('hard_invalid_reason')}"
+        seed_soft_cap_exceeded = bool(seed_budget.get("soft_token_cap_exceeded"))
 
-    # ---- generations ---------------------------------------------------------
-    for gen in range(1, cfg.generations + 1):
-        if stopped_early:
-            break
-        if tokens_spent_total >= cfg.max_experiment_tokens:
-            stopped_early = f"token_ceiling_reached:{tokens_spent_total}"
-            break
-        contexts = await _tasks_for_generation(gen)
-        comparison_block_id = f"{exp_id}:generation:{gen}"
-        control_row = await _grade_paired_control(gen, contexts)
-        graded = await store.graded_entries()
-        counts = store.n_children_map()
-        gen_children: list[dict[str, Any]] = []
-        for slot in range(cfg.children):
-            parent = selection.sample_parent(
-                graded, counts, novelty_pressure=cfg.novelty_pressure, rng=rng
-            )
-            parent_row = CandidateStore._row(parent)
-            parent_genome = dict(parent_row.get("genome") or {})
-            failures = [
-                {k: r.get(k) for k in ("task_id", "error", "grade_note") if r.get(k)}
-                for r in parent_row.get("per_task", []) if not r.get("resolved")
-            ]
-            archive_context = [
-                {"genome": CandidateStore._row(e).get("genome"), "pass_rate": CandidateStore._row(e).get("pass_rate")}
-                for e in graded[:6]
-            ]
-            # operator draw: wild by default
-            roll = rng.random()
-            if cfg.dry_run or (not cfg.force_single_llm_mutation and roll < 0.2):
-                result = mutation.parametric_mutation(parent_genome, rng=rng)
-            elif (
-                not cfg.force_single_llm_mutation
-                and roll < 0.4
-                and len(graded) >= 2
-            ):
-                other = rng.choice([e for e in graded if e.id != parent.id] or graded)
-                result = await asyncio.to_thread(
-                    mutation.llm_propose_genome, parent_genome,
-                    complete_fn=seams.mutate_complete, failures=failures,
-                    archive_context=archive_context,
-                    second_parent=dict(CandidateStore._row(other).get("genome") or {}),
+        # ---- generations ---------------------------------------------------------
+        for gen in range(1, cfg.generations + 1):
+            if stopped_early:
+                break
+            if tokens_spent_total >= cfg.max_experiment_tokens:
+                stopped_early = f"token_ceiling_reached:{tokens_spent_total}"
+                break
+            contexts = await _tasks_for_generation(gen)
+            comparison_block_id = f"{exp_id}:generation:{gen}"
+            control_row = await _grade_paired_control(gen, contexts)
+            graded = await store.graded_entries()
+            counts = store.n_children_map()
+            gen_children: list[dict[str, Any]] = []
+            for slot in range(cfg.children):
+                parent = selection.sample_parent(
+                    graded, counts, novelty_pressure=cfg.novelty_pressure, rng=rng
                 )
-            else:
-                result = await asyncio.to_thread(
-                    mutation.llm_propose_genome, parent_genome,
-                    complete_fn=seams.mutate_complete, failures=failures,
-                    archive_context=archive_context,
+                parent_row = CandidateStore._row(parent)
+                parent_genome = dict(parent_row.get("genome") or {})
+                failures = [
+                    {k: r.get(k) for k in ("task_id", "error", "grade_note") if r.get(k)}
+                    for r in parent_row.get("per_task", []) if not r.get("resolved")
+                ]
+                archive_context = [
+                    {"genome": CandidateStore._row(e).get("genome"), "pass_rate": CandidateStore._row(e).get("pass_rate")}
+                    for e in graded[:6]
+                ]
+                # operator draw: wild by default
+                roll = rng.random()
+                if cfg.dry_run or (not cfg.force_single_llm_mutation and roll < 0.2):
+                    result = mutation.parametric_mutation(parent_genome, rng=rng)
+                elif (
+                    not cfg.force_single_llm_mutation
+                    and roll < 0.4
+                    and len(graded) >= 2
+                ):
+                    other = rng.choice([e for e in graded if e.id != parent.id] or graded)
+                    result = await asyncio.to_thread(
+                        mutation.llm_propose_genome, parent_genome,
+                        complete_fn=seams.mutate_complete, failures=failures,
+                        archive_context=archive_context,
+                        second_parent=dict(CandidateStore._row(other).get("genome") or {}),
+                    )
+                else:
+                    result = await asyncio.to_thread(
+                        mutation.llm_propose_genome, parent_genome,
+                        complete_fn=seams.mutate_complete, failures=failures,
+                        archive_context=archive_context,
+                    )
+                if result.genome is None:
+                    blocked_id = ids.candidate_id(
+                        {"blocked_raw": result.raw_output[:2000], "op": result.operator, "gen": gen, "slot": slot}
+                    )
+                    await store.append_blocked(
+                        candidate_id=blocked_id, genome=None, parent_id=parent.id,
+                        generation=gen, loop_iteration=gen,
+                        reasons=list(result.parse_issues) or ["no_genome"], raw_output=result.raw_output,
+                    )
+                    counters["blocked"] += 1
+                    row = _append_result_row(
+                        results_path,
+                        _result_row(
+                            exp_id=exp_id,
+                            candidate_id=blocked_id,
+                            parent_id=parent.id,
+                            state="blocked",
+                            role="candidate",
+                            op=result.operator,
+                            generation=gen,
+                            reasons=list(result.parse_issues) or ["no_genome"],
+                        ),
+                    )
+                    gen_children.append(_result_summary(row))
+                    continue
+                child = merged_with_defaults(result.genome)
+                if not str(child.get("generator_model") or "").strip():
+                    child["generator_model"] = parent_genome.get("generator_model") or cfg.solver_model
+                cid = ids.candidate_id(child)
+                if await store.has(cid):
+                    duplicate_id = f"dup_{cid[5:]}_{gen}_{slot}"
+                    await store.append_duplicate(
+                        candidate_id=duplicate_id, genome=child, parent_id=parent.id,
+                        generation=gen, loop_iteration=gen, reasons=[f"duplicate_of:{cid}"],
+                    )
+                    counters["duplicate"] += 1
+                    row = _append_result_row(
+                        results_path,
+                        _result_row(
+                            exp_id=exp_id,
+                            candidate_id=duplicate_id,
+                            parent_id=parent.id,
+                            state="duplicate",
+                            role="candidate",
+                            op=result.operator,
+                            generation=gen,
+                            reasons=[f"duplicate_of:{cid}"],
+                            duplicate_of=cid,
+                        ),
+                    )
+                    gen_children.append(_result_summary(row))
+                    continue
+                row = await _grade_and_archive(
+                    child, cid=cid, parent_id=parent.id, generation=gen, loop_iteration=gen,
+                    role="candidate", contexts=contexts,
+                    notes=result.notes or f"op:{result.operator}", raw=result.raw_output, op=result.operator,
+                    comparison_block_id=comparison_block_id,
+                    control_pass_rate=control_row.get("pass_rate"),
                 )
-            if result.genome is None:
-                blocked_id = ids.candidate_id(
-                    {"blocked_raw": result.raw_output[:2000], "op": result.operator, "gen": gen, "slot": slot}
-                )
-                await store.append_blocked(
-                    candidate_id=blocked_id, genome=None, parent_id=parent.id,
-                    generation=gen, loop_iteration=gen,
-                    reasons=list(result.parse_issues) or ["no_genome"], raw_output=result.raw_output,
-                )
-                counters["blocked"] += 1
-                row = _append_result_row(
-                    results_path,
-                    _result_row(
-                        exp_id=exp_id,
-                        candidate_id=blocked_id,
-                        parent_id=parent.id,
-                        state="blocked",
-                        role="candidate",
-                        op=result.operator,
-                        generation=gen,
-                        reasons=list(result.parse_issues) or ["no_genome"],
-                    ),
-                )
-                gen_children.append(_result_summary(row))
-                continue
-            child = merged_with_defaults(result.genome)
-            if not str(child.get("generator_model") or "").strip():
-                child["generator_model"] = parent_genome.get("generator_model") or cfg.solver_model
-            cid = ids.candidate_id(child)
-            if await store.has(cid):
-                duplicate_id = f"dup_{cid[5:]}_{gen}_{slot}"
-                await store.append_duplicate(
-                    candidate_id=duplicate_id, genome=child, parent_id=parent.id,
-                    generation=gen, loop_iteration=gen, reasons=[f"duplicate_of:{cid}"],
-                )
-                counters["duplicate"] += 1
-                row = _append_result_row(
-                    results_path,
-                    _result_row(
-                        exp_id=exp_id,
-                        candidate_id=duplicate_id,
-                        parent_id=parent.id,
-                        state="duplicate",
-                        role="candidate",
-                        op=result.operator,
-                        generation=gen,
-                        reasons=[f"duplicate_of:{cid}"],
-                        duplicate_of=cid,
-                    ),
-                )
-                gen_children.append(_result_summary(row))
-                continue
-            row = await _grade_and_archive(
-                child, cid=cid, parent_id=parent.id, generation=gen, loop_iteration=gen,
-                role="candidate", contexts=contexts,
-                notes=result.notes or f"op:{result.operator}", raw=result.raw_output, op=result.operator,
-                comparison_block_id=comparison_block_id,
-                control_pass_rate=control_row.get("pass_rate"),
-            )
-            summary = _result_summary(row)
-            if (
-                int(summary.get("comparable_observations") or 0) > 0
-                and int(summary.get("comparable_observations") or 0)
-                == int(control_row.get("comparable_observations") or 0)
-                and summary.get("pass_rate") is not None
-                and control_row.get("pass_rate") is not None
-            ):
-                summary["paired_delta"] = round(
-                    float(summary["pass_rate"]) - float(control_row["pass_rate"]), 6
-                )
-            else:
-                summary["paired_delta"] = None
-            gen_children.append(summary)
-        _write_json(exp_dir / "receipts" / f"generation_{gen:03}.json", {
-            "schema": GENERATION_RECEIPT_SCHEMA,
-            "generation": gen, "rng_seed": cfg.rng_seed, "task_ids": list(contexts),
-            "comparison_block_id": comparison_block_id,
-            "paired_control": _result_summary(control_row),
-            "children": gen_children, "observations": gen_children, "counters": dict(counters),
-            "tokens_spent_total": tokens_spent_total, "at": _now(),
-        })
+                summary = _result_summary(row)
+                if (
+                    int(summary.get("comparable_observations") or 0) > 0
+                    and int(summary.get("comparable_observations") or 0)
+                    == int(control_row.get("comparable_observations") or 0)
+                    and summary.get("pass_rate") is not None
+                    and control_row.get("pass_rate") is not None
+                ):
+                    summary["paired_delta"] = round(
+                        float(summary["pass_rate"]) - float(control_row["pass_rate"]), 6
+                    )
+                else:
+                    summary["paired_delta"] = None
+                gen_children.append(summary)
+            _write_json(exp_dir / "receipts" / f"generation_{gen:03}.json", {
+                "schema": GENERATION_RECEIPT_SCHEMA,
+                "generation": gen, "rng_seed": cfg.rng_seed, "task_ids": list(contexts),
+                "comparison_block_id": comparison_block_id,
+                "paired_control": _result_summary(control_row),
+                "children": gen_children, "observations": gen_children, "counters": dict(counters),
+                "tokens_spent_total": tokens_spent_total, "at": _now(),
+            })
+
+    except Exception as exc:
+        # Fail-closed closeout: record the block honestly, then re-raise so the
+        # caller still sees the failure (non-zero exit at the CLI).
+        if not candidate_error_recorded:
+            # Throw came from outside a candidate grade (task allocation,
+            # mutation, receipts) — the errored lane still reflects the abort.
+            counters["errored"] += 1
+        chain_ok, chain_info = store.archive.merkle_log.verify_chain()
+        exception_info = {
+            "type": type(exc).__name__,
+            "message": str(exc),
+            "traceback_summary": "".join(
+                traceback.format_exception(type(exc), exc, exc.__traceback__, limit=5)
+            ).strip(),
+        }
+        _closeout(
+            exp_dir, exp_id, "blocked_with_evidence",
+            reasons=[f"run_errored:{exception_info['type']}: {exception_info['message']}"],
+            started_at=started_at,
+            stats={
+                # partial state, honestly: pass rates unknown once the run aborted
+                "counters": counters,
+                "seed_pass_rate": None,
+                "best_pass_rate": None,
+                "tokens_spent_total": tokens_spent_total,
+                "comparable_observations_total": comparable_observations_total,
+                "infrastructure_observations_total": infrastructure_observations_total,
+                "generation_observations_total": generation_observations_total,
+                "budget_observations_total": budget_observations_total,
+                "n_tasks_per_generation": cfg.tasks_per_generation,
+                "seed_soft_token_cap_exceeded": seed_soft_cap_exceeded,
+                "soft_token_cap": cfg.soft_token_cap,
+                "require_valid_seed": cfg.require_valid_seed,
+                "exception": exception_info,
+                "note": "run aborted by exception; closeout records the block (fail-closed)",
+            },
+            merkle_root={"verified": bool(chain_ok), "info": str(chain_info)},
+            wall_seconds=round(time.monotonic() - started_mono, 1),
+            scratch_worktree={
+                "path": str(scratch) if scratch is not None else None,
+                "keep_worktree": cfg.keep_worktree,
+                "state": "not_created" if scratch is None else "aborted_before_cleanup",
+                "removed": None,
+            },
+        )
+        raise
 
     # ---- honest closeout ------------------------------------------------------
     return await finalize_closeout(
