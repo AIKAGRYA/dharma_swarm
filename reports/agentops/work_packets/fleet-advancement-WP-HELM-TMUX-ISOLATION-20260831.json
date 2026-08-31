@@ -1,0 +1,107 @@
+{
+  "id": "fleet-advancement-WP-HELM-TMUX-ISOLATION-20260831",
+  "base_ref": "efb948ce08349b9d4eb7a906fe32b4cf78cdbd90",
+  "branch": "codex/helm-prod-20260831",
+  "worktree": ".",
+  "intent": "Make the first production-critical Helm terminal harnesses incapable of contacting the operator's default tmux server by routing boot, PTY, alternate-screen, and Terminal Guardian calls through one Bash 3.2-compatible CODEX_MANAGED_PURPOSE_PID private-socket helper while preserving exact 80x24 proof and bounded cleanup.",
+  "allowed_files": [
+    "terminal/scripts/lib/codex_managed_tmux.sh",
+    "terminal/scripts/boot_smoke.sh",
+    "terminal/scripts/pty_smoke.sh",
+    "terminal/scripts/alternate_screen_check.sh",
+    "scripts/terminal_guardian_preflight.sh",
+    "tests/test_terminal_tmux_isolation.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-HELM-TMUX-ISOLATION-20260831.json"
+  ],
+  "forbidden_files": [
+    "terminal/src/**",
+    "dharma_swarm/terminal_bridge.py",
+    "terminal/scripts/truecolor_preflight.sh",
+    "terminal/scripts/golden_capture.sh",
+    "terminal/scripts/trace_collapse_check.sh",
+    "terminal/scripts/assistant_event_check.sh",
+    "terminal/scripts/offline_queue_check.sh",
+    "terminal/scripts/slash_feedback_check.sh",
+    "terminal/scripts/model_pool_e2e.py",
+    "deploy/**",
+    "scripts/runtime/**",
+    "dashboard/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/forge_lab/**",
+    "tests/forge_lab_v1/**",
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**",
+    "dharma_swarm/rudra/**"
+  ],
+  "gates": [
+    {
+      "name": "helm-tmux-isolation-contract",
+      "command": "python3 -m pytest -q tests/test_terminal_tmux_isolation.py",
+      "expected_exit": 0,
+      "timeout_seconds": 180
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "bare-default-tmux-regression-is-detected",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('terminal/scripts/boot_smoke.sh'); t=p.read_text(); old='codex_managed_tmux new-session'; t.count(old) == 1 or sys.exit(3); p.write_text(t.replace(old,'tmux new-session',1)); sys.exit(subprocess.run([sys.executable,'-m','pytest','-q','tests/test_terminal_tmux_isolation.py','-k','target_harnesses_use_only_managed_calls']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 180
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "test(helm): isolate production tmux harnesses"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELM-TMUX-ISOLATION-20260831",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "efb948ce08349b9d4eb7a906fe32b4cf78cdbd90",
+      "details": []
+    },
+    "interface_mismatches": [
+      "boot_smoke.sh and pty_smoke.sh currently issue bare tmux commands, so a test can create, inspect, send keys to, or kill a session on the operator's default server.",
+      "alternate_screen_check.sh and terminal_guardian_preflight.sh already use private servers, but their independent naming and cleanup logic do not enforce the shared CODEX_MANAGED_PURPOSE_PID ownership boundary.",
+      "The compact proof contract requires an exact 80x24 pane on a private server with no inherited tmux configuration, not merely a uniquely named session on an unspecified server."
+    ],
+    "closest_existing_implementation": [
+      "terminal/scripts/alternate_screen_check.sh",
+      "scripts/terminal_guardian_preflight.sh",
+      "terminal/scripts/boot_smoke.sh",
+      "terminal/scripts/pty_smoke.sh"
+    ],
+    "honest_blockers": [
+      "This packet migrates four production-critical harnesses only. The explicitly forbidden truecolor, golden-capture, trace, assistant-event, offline-queue, slash-feedback, and model-pool harnesses require later packets and must not be described as isolated by this result.",
+      "The helper proves test-process ownership of a private tmux server; it does not authorize touching, renaming, attaching to, or stopping the operator's live or durable tmux sessions.",
+      "Passing an isolated 80x24 harness is proof of terminal geometry and cleanup, not proof of seven-seat OnCall liveness, route readiness, performance, packaging, or production cutover."
+    ],
+    "rollback": "Revert this packet commit to restore the prior harness-local tmux calls. The packet creates no durable tmux sessions and migrates no operator state; each managed server is PID-qualified and stopped by its owning harness.",
+    "packet_digest": "66f7ab0859c58f2248e0c25fffc27648289cecfbcb4496d2aa664dca26f2eea7"
+  }
+}

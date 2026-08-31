@@ -8,6 +8,8 @@ set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 TERMINAL_DIR=$(dirname "$SCRIPT_DIR")
+# shellcheck source=terminal/scripts/lib/codex_managed_tmux.sh
+source "$SCRIPT_DIR/lib/codex_managed_tmux.sh"
 
 SESS="helm-smoke-$$-$RANDOM"
 STATEDIR=$(mktemp -d)
@@ -18,7 +20,7 @@ EXIT_TIMEOUT=${BOOT_SMOKE_EXIT_TIMEOUT:-10}
 # Invoked indirectly by the EXIT trap.
 # shellcheck disable=SC2329
 cleanup() {
-  tmux kill-session -t "$SESS" 2>/dev/null
+  codex_managed_tmux_cleanup || true
   find "$STATEDIR" -mindepth 1 -delete 2>/dev/null
   rmdir "$STATEDIR" 2>/dev/null
 }
@@ -29,34 +31,43 @@ fail() {
   exit 1
 }
 
-tmux new-session -d -s "$SESS" -x 80 -y 24 \
-  "cd '$TERMINAL_DIR' && COLORTERM=truecolor DHARMA_PYTHON=/nonexistent/python DHARMA_TERMINAL_STATE_DIR='$STATEDIR' DHARMA_TERMINAL_SUPERVISOR_STATE_DIR='$STATEDIR' $START_CMD" \
+codex_managed_tmux_init boot_smoke || fail "could not initialize private tmux server"
+
+codex_managed_tmux new-session -d -s "$SESS" -x 80 -y 24 \
+  "sleep 1; cd '$TERMINAL_DIR' && COLORTERM=truecolor DHARMA_PYTHON=/nonexistent/python DHARMA_TERMINAL_STATE_DIR='$STATEDIR' DHARMA_TERMINAL_SUPERVISOR_STATE_DIR='$STATEDIR' $START_CMD" \
   || fail "could not create tmux session"
+codex_managed_tmux set-option -g status off \
+  || fail "could not disable private tmux status row"
+codex_managed_tmux resize-window -t "$SESS:0" -x 80 -y 24 \
+  || fail "could not resize private tmux window"
+dimensions=$(codex_managed_tmux display-message -p -t "$SESS:0.0" \
+  '#{pane_width}x#{pane_height}')
+[ "$dimensions" = "80x24" ] || fail "expected 80x24 pane, got $dimensions"
 
 # Poll until the offline-degradation text renders (no fixed-sleep-only race).
 frame=""
 deadline=$(( $(date +%s) + BOOT_TIMEOUT ))
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  if ! tmux has-session -t "$SESS" 2>/dev/null; then
+  if ! codex_managed_tmux has-session -t "$SESS" 2>/dev/null; then
     break # app process died before rendering — negative path
   fi
-  frame=$(tmux capture-pane -t "$SESS" -p 2>/dev/null || true)
-  if printf '%s' "$frame" | grep -q "offline"; then
+  frame=$(codex_managed_tmux capture-pane -t "$SESS" -p 2>/dev/null || true)
+  if grep -q "offline" <<<"$frame"; then
     break
   fi
   sleep 0.5
 done
 
 [ -n "$(printf '%s' "$frame" | tr -d '[:space:]')" ] || fail "captured frame is empty"
-printf '%s' "$frame" | grep -q "offline" \
+grep -q "offline" <<<"$frame" \
   || fail "frame lacks 'offline' degradation text; frame was: $(printf '%s' "$frame" | head -c 400)"
 
 printf '%s\n' "$frame"
 
 # Clean exit: Ctrl-C into the app, then poll until the session is gone.
-tmux send-keys -t "$SESS" C-c
+codex_managed_tmux send-keys -t "$SESS" C-c
 deadline=$(( $(date +%s) + EXIT_TIMEOUT ))
-while tmux has-session -t "$SESS" 2>/dev/null; do
+while codex_managed_tmux has-session -t "$SESS" 2>/dev/null; do
   [ "$(date +%s)" -lt "$deadline" ] || fail "app did not exit within ${EXIT_TIMEOUT}s of Ctrl-C"
   sleep 0.5
 done
