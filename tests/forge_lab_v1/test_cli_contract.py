@@ -286,6 +286,47 @@ def test_repo_launcher_defaults_to_the_canonical_environment() -> None:
     )
 
 
+def test_installed_launcher_symlink_terminates_without_self_recursion(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    release = home / ".dharma" / "rsi-lab" / "releases" / ("a" * 40)
+    release.mkdir(parents=True)
+    (release / "repo").symlink_to(REPO_ROOT, target_is_directory=True)
+    (release / ".venv" / "bin").mkdir(parents=True)
+    (release / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    (release / "pydeps").mkdir()
+    (release / "state").mkdir()
+    (home / ".dharma" / "rsi-lab" / "current").symlink_to(
+        release, target_is_directory=True
+    )
+    launcher_dir = home / ".dharma" / "bin"
+    launcher_dir.mkdir(parents=True)
+    installed = launcher_dir / "rsi"
+    installed.symlink_to(REPO_ROOT / "scripts" / "forge_lab" / "rsi")
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    for key in tuple(env):
+        if key.startswith("RSI_LAB_") or key in {"DHARMA_HOME", "PYTHONPATH"}:
+            env.pop(key)
+
+    result = subprocess.run(
+        [str(installed), "version", "--json"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=5,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["command"] == "version"
+    assert payload["result"]["source_commit"]
+
+
 def test_production_launcher_ignores_inherited_source_state_and_pythonpath(
     tmp_path: Path,
 ) -> None:

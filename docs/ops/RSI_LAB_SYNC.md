@@ -237,7 +237,12 @@ rsi daily status --json
 
 The fixed `1 x 1 x 1` run reserves `$1.25`/five logical slots, with hard ceilings
 of `$3`/12 per UTC day and `$40`/120 per UTC month. Reservations are not
-refunded after crashes and are not vendor billing telemetry. Provider receipts,
+refunded after crashes. A digest-bound reconciliation row records complete
+actual provider cost when trustworthy billing evidence exists, or typed
+`null` with `unavailable`/`ambiguous` completeness otherwise. Reconciliation
+never adds a second charge or refund; conflicting replay fails closed, while an
+exact replay returns the original row. Actual cost or logical calls above the
+reservation are durably receipted and reject the run. Provider receipts,
 model profiles, taskpack actions, reconciliation receipts/quarantine, and the
 unattended ledger/receipts/runs live under
 `/root/rsi-lab/state/.dharma/forge_lab/`. Every unattended closeout is
@@ -374,8 +379,8 @@ Activation refuses:
 - an unexpected concurrent `current` change;
 - a non-symlink `current` path;
 - an operator `DEPLOYMENT_BLOCK`;
-- an active Forge/RSI campaign manifest, recognizable tmux session, or known
-  campaign process; or
+- an active Forge/RSI campaign manifest or known campaign process (tmux
+  session names are recorded as operator-console evidence only); or
 - a remote outside the explicit SSH allowlist.
 
 SSH is non-interactive, host-key checked, identity-only, and has agent,

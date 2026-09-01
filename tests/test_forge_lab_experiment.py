@@ -133,7 +133,7 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
     assert manifest["git_identity"]["dirty"] is False
     assert manifest["archive_fitness_authority"] == "one_wire_disabled_explicit_lab_shadow"
     assert all(manifest["membrane"].values()), "membrane must be fully recorded"
-    assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + 3 * 2
+    assert manifest["cost_estimate"]["planned_candidate_grades"] == 1 + (3 + 1) * 2
 
     results = [json.loads(line) for line in (exp_dir / "results.jsonl").read_text().splitlines()]
     result_keys = {
@@ -151,6 +151,11 @@ async def test_dry_loop_end_to_end(cfg, tmp_path):
         "reasons",
         "duplicate_of",
         "at",
+        "evidence_class",
+        "comparable_observations",
+        "comparison_block_id",
+        "control_candidate_id",
+        "control_pass_rate",
     }
     assert results
     assert all(set(r) == result_keys for r in results)

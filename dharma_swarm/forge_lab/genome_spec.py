@@ -10,7 +10,7 @@ ignored genes must never masquerade as evolution.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 ARM_KINDS = ("freeform_single", "self_moa", "verify_chain", "mixed_moa")
@@ -19,7 +19,14 @@ ARM_KINDS = ("freeform_single", "self_moa", "verify_chain", "mixed_moa")
 EXECUTED_FIELDS: dict[str, tuple[str, ...]] = {
     "freeform_single": ("arm_kind", "generator_model", "per_call_tokens", "window_chars", "extra_instruction"),
     "self_moa": ("arm_kind", "generator_model", "k", "per_call_tokens", "window_chars"),
-    "verify_chain": ("arm_kind", "generator_model", "verifier_model", "per_call_tokens", "window_chars"),
+    "verify_chain": (
+        "arm_kind",
+        "generator_model",
+        "verifier_model",
+        "per_call_tokens",
+        "window_chars",
+        "extra_instruction",
+    ),
     "mixed_moa": ("arm_kind", "generator_model", "verifier_model", "per_call_tokens", "window_chars"),
 }
 

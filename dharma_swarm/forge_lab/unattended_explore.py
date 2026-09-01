@@ -47,6 +47,11 @@ from dharma_swarm.forge_lab.unattended_call_shape import (
     validate_child_spec,
     validated_child_result,
 )
+from dharma_swarm.forge_lab.unattended_accounting import (
+    reconcile_budget,
+    reconcile_run_budget,
+    unavailable_usage_accounting,
+)
 from dharma_swarm.forge_lab.unattended_child_support import (
     child_scratch_identity as _child_scratch_identity,
     child_scratch_marker_digest as _child_scratch_marker_digest,
@@ -656,6 +661,14 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             else None
         )
         log_digest = "sha256:" + hashlib.sha256(log_path.read_bytes()).hexdigest()
+        accounting = reconcile_run_budget(
+            control_root / "budget_ledger.jsonl",
+            run_id=run_id,
+            at=_now(),
+            child=child,
+            log_digest=log_digest,
+        )
+        budget_reconciliation = accounting.row
         closeout = _append_receipt(
             control_root,
             {
@@ -673,6 +686,17 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                 "experiment_id": (child or {}).get("experiment_id"),
                 "explore_closeout_state": (child or {}).get("closeout_state"),
                 "logical_provider_calls_used": (child or {}).get("logical_provider_calls_used"),
+                "budget_reconciliation_digest": budget_reconciliation.get(
+                    "ledger_digest"
+                ),
+                "actual_cost_usd": budget_reconciliation.get("actual_cost_usd"),
+                "cost_completeness": budget_reconciliation.get(
+                    "cost_completeness"
+                ),
+                "budget_reconciliation_decision": budget_reconciliation.get(
+                    "decision"
+                ),
+                "budget_error_code": accounting.error_code,
                 "scratch_custody": {
                     "create": scratch_create,
                     "cleanup": scratch_cleanup,
@@ -691,11 +715,18 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
                             or not scratch_parent_cleanup_ok
                             or child is None
                         )
-                        else "EXPLORE_ONLY"
+                        else (
+                            "InconclusiveBudget"
+                            if accounting.error_code is not None
+                            else "EXPLORE_ONLY"
+                        )
                     )
                 ),
                 "positive_rsi_claim": False,
-                "billing_telemetry": "unavailable_reservation_only",
+                "billing_telemetry": (
+                    budget_reconciliation.get("cost_completeness")
+                    or "ambiguous"
+                ),
             },
         )
         successful = bool(
@@ -705,6 +736,8 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             and scratch_parent_cleanup_ok
             and child
             and child.get("closeout_state") in TERMINAL_SUCCESS_STATES
+            and accounting.error_code is None
+            and budget_reconciliation.get("decision") == "accepted"
         )
         return {
             "schema": RUNNER_SCHEMA,
@@ -716,6 +749,12 @@ def run_once(state_root: Path, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
             "halted": halted,
             "returncode": returncode,
             "scratch_cleanup_ok": scratch_parent_cleanup_ok,
+            "budget_reconciliation_digest": budget_reconciliation.get(
+                "ledger_digest"
+            ),
+            "actual_cost_usd": budget_reconciliation.get("actual_cost_usd"),
+            "cost_completeness": budget_reconciliation.get("cost_completeness"),
+            "budget_error_code": accounting.error_code,
             "positive_rsi_claim": False,
         }
 
@@ -812,9 +851,13 @@ def _execute_child_experiment(
         "scratch_cleanup_ok": scratch_cleanup_ok,
         "scratch_custody_attestation": scratch_attestation,
         "experiment_closeout": closeout,
+        "usage_accounting": unavailable_usage_accounting(
+            counter.used,
+            logical_calls_complete=execution_shape_ok,
+        ),
         "epistemic_modality": "EXPLORE_ONLY",
         "positive_rsi_claim": False,
-        "billing_telemetry": "unavailable_reservation_only",
+        "billing_telemetry": "unavailable",
     }
     result["result_digest"] = content_digest(result)
     write_json_exclusive(Path(spec["result_path"]), result)
@@ -918,6 +961,7 @@ __all__ = [
     "admission_status",
     "append_chain",
     "read_chain",
+    "reconcile_budget",
     "reserve_budget",
     "run_child",
     "run_once",

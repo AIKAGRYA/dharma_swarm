@@ -36,9 +36,16 @@ TERMINAL_SUCCESS_STATES = {"inconclusive_low_power", "measured_negative"}
 class UnattendedError(RuntimeError):
     """Typed fail-closed runner refusal."""
 
-    def __init__(self, code: str, message: str):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        receipt: dict[str, object] | None = None,
+    ):
         super().__init__(message)
         self.code = code
+        self.receipt = receipt
 
 
 @dataclass(frozen=True)

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -171,11 +172,34 @@ def _propose_slot(slot, inst: dict, ctx: dict, *, max_tokens: int, timeout_s: in
     if (slot.model_id in WINDOW_MODELS) or window_chars:
         prompt_ctx = window_context(ctx, inst.get("problem_statement", ""),
                                     max_chars=window_chars or 11000)
-    base_prompt = build_repair_prompt(inst, prompt_ctx)
+    repair_prompt = build_repair_prompt(inst, prompt_ctx)
+    extra_instruction = str(extra_instruction or "")
+    base_prompt = repair_prompt
     if extra_instruction:
         base_prompt = extra_instruction + "\n\n" + base_prompt
+    counterfactual_digest = "sha256:" + hashlib.sha256(
+        repair_prompt.encode("utf-8")
+    ).hexdigest()
+    executed_digest = "sha256:" + hashlib.sha256(
+        base_prompt.encode("utf-8")
+    ).hexdigest()
+    gene_digest = (
+        "sha256:" + hashlib.sha256(extra_instruction.encode("utf-8")).hexdigest()
+        if extra_instruction
+        else None
+    )
     rec = {"model": slot.model_id, "provider": slot.provider.value, "tokens": 0,
-           "patch": "", "error": None, "seconds": 0.0}
+           "patch": "", "error": None, "seconds": 0.0,
+           "execution_input_receipt": {
+               "schema": "rsi_lab.execution_input_receipt.v1",
+               "counterfactual_prompt_digest": counterfactual_digest,
+               "executed_prompt_digest": executed_digest,
+               "mutation_gene_digest": gene_digest,
+               "mutation_gene_applied": bool(
+                   gene_digest and executed_digest != counterfactual_digest
+               ),
+               "provider_call_completed": False,
+           }}
     t0 = time.time()
     try:
         prov, wire = _provider_for_slot(slot, timeout_s=timeout_s)
@@ -189,6 +213,7 @@ def _propose_slot(slot, inst: dict, ctx: dict, *, max_tokens: int, timeout_s: in
         for rnd in range(continue_rounds + 1):
             text, toks, stop = _call(prov, wire, messages, max_tokens=max_tokens,
                                      temperature=temp, timeout_s=timeout_s)
+            rec["execution_input_receipt"]["provider_call_completed"] = True
             total += toks
             accumulated += (("\n" if accumulated else "") + text)
             if parse_edit_blocks(accumulated) or parse_full_files(accumulated):
@@ -465,7 +490,7 @@ def run_canonical(instance_ids: list[str], *, strategy: str = "explore", roster_
     return manifest
 
 
-from dharma_swarm.forge_v1.canonical_report import _agg, _finalize, _write_packet  # noqa: E402
+from dharma_swarm.forge_v1.canonical_report import _finalize, _write_packet  # noqa: E402
 
 
 def main(argv=None) -> int:

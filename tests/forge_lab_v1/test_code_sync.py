@@ -259,6 +259,79 @@ def test_campaign_guard_allows_read_only_foreground_argv(argv: str) -> None:
     assert sync._foreground_campaign_argv(argv) is False
 
 
+def test_campaign_guard_treats_idle_operator_tmux_as_observation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    real_run = subprocess.run
+
+    def operator_console_only(
+        command: list[str], *args: object, **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command[:2] == ["tmux", "list-sessions"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "RSI-LAB\nCODEX_MANAGED_RSI_LAB\n",
+                "",
+            )
+        if command[:3] == ["ps", "-eo", "pid=,args="]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", operator_console_only)
+
+    guard = sync._campaign_guard(tmp_path)
+
+    assert guard["ok"] is True
+    assert guard["reasons"] == []
+    assert guard["evidence"]["tmux_sessions"] == [
+        "RSI-LAB",
+        "CODEX_MANAGED_RSI_LAB",
+    ]
+    assert guard["evidence"]["tmux_sessions_are_observational_only"] is True
+
+
+def test_campaign_guard_still_blocks_a_real_runner_process(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    real_run = subprocess.run
+
+    def active_runner(
+        command: list[str], *args: object, **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command[:2] == ["tmux", "list-sessions"]:
+            return subprocess.CompletedProcess(command, 0, "RSI-LAB\n", "")
+        if command[:3] == ["ps", "-eo", "pid=,args="]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "123 python -m dharma_swarm.forge_lab campaign run --manifest x\n",
+                "",
+            )
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", active_runner)
+
+    guard = sync._campaign_guard(tmp_path)
+
+    assert guard["ok"] is False
+    assert guard["reasons"] == ["active RSI process count: 1"]
+    assert guard["evidence"]["active_process_count"] == 1
+
+
+def test_exact_release_identity_covers_foundation_execution_semantics() -> None:
+    required = {
+        "dharma_swarm/forge_lab/agent_bundle.py",
+        "dharma_swarm/forge_lab/genome_spec.py",
+        "dharma_swarm/forge_lab/unattended_accounting.py",
+        "dharma_swarm/forge_v1/forge_v2/arms.py",
+    }
+
+    assert required <= set(sync.CRITICAL_FILES)
+
+
 def test_nonterminal_active_manifest_blocks_release_switch(tmp_path: Path) -> None:
     root, _, plan = _make_release(tmp_path)
     active = root / "state" / ".dharma" / "forge_lab" / "active_campaign.json"

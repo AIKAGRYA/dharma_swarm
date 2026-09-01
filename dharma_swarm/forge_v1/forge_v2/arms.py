@@ -66,22 +66,56 @@ def self_moa_arm(generator, inst, ctx, budget: Budget, *, k: int, per_call_token
 
 
 def verify_chain_arm(generator, verifier, inst, ctx, budget: Budget, *, per_call_tokens: int,
-                     timeout_s: int, window_chars: int | None = None) -> dict:
+                     timeout_s: int, window_chars: int | None = None,
+                     extra_instruction: str = "") -> dict:
     """Generator (SAME model as self_moa) produces a patch; an independent
     CROSS-FAMILY verifier reviews/repairs it. One final patch, graded once."""
     grec = _propose_slot(generator, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
-                        window_chars=_win(generator, window_chars))
+                        window_chars=_win(generator, window_chars),
+                        extra_instruction=extra_instruction)
     budget.charge("generation", grec["tokens"], is_free_route=_is_free_route(generator))
     final_patch = grec["patch"]
-    if final_patch.strip() and not budget.invalid:
+    generated_patch = bool(final_patch.strip())
+    verifier_called = False
+    vrec = None
+    if not budget.invalid:
+        verifier_called = True
+        proposed_patch = final_patch[:2000] if generated_patch else "<EMPTY_PATCH>"
         vrec = _propose_slot(verifier, inst, ctx, max_tokens=per_call_tokens, timeout_s=timeout_s,
                             window_chars=_win(verifier, window_chars),
-                            extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + final_patch[:2000])
+                            extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + proposed_patch)
         budget.charge("verification", vrec["tokens"], is_free_route=_is_free_route(verifier))
-        if vrec["patch"].strip():
+        # The verifier must still execute for an empty generator result so the
+        # experimental call shape remains complete. It cannot silently become
+        # a verifier-only generator: an empty generator result stays a valid
+        # negative generation observation rather than being laundered into a
+        # different arm.
+        if generated_patch and vrec["patch"].strip():
             final_patch = vrec["patch"]
     return {"arm": "verify_chain", "final_patch": final_patch, "generator": generator.model_id,
-            "verifier": verifier.model_id}
+            "verifier": verifier.model_id,
+            "execution_evidence": {
+                "schema": "rsi_lab.verify_chain_execution.v1",
+                "generator_input": grec.get("execution_input_receipt"),
+                "generator_empty_patch": not generated_patch,
+                "generator_error": grec.get("error"),
+                "generator_infrastructure_error": bool(grec.get("error")),
+                "verifier_called": verifier_called,
+                "verifier_error": (
+                    vrec.get("error") if isinstance(vrec, dict) else None
+                ),
+                "verifier_input": (
+                    vrec.get("execution_input_receipt")
+                    if isinstance(vrec, dict)
+                    else None
+                ),
+                "verifier_empty_patch": (
+                    not bool(str(vrec.get("patch") or "").strip())
+                    if isinstance(vrec, dict)
+                    else None
+                ),
+                "final_patch_empty": not bool(str(final_patch or "").strip()),
+            }}
 
 
 def mixed_moa_arm(generators, selector, inst, ctx, budget: Budget, *, per_call_tokens: int,

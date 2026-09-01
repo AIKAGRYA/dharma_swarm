@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -56,6 +57,41 @@ def _exact_provider_call_map(value: Any) -> bool:
             for role, expected in EXPECTED_PROVIDER_CALLS.items()
         )
     )
+
+
+def _valid_usage_accounting(value: Any, *, used: int) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if (
+        value.get("schema") != "rsi_lab.usage_accounting.v1"
+        or value.get("cost_completeness")
+        not in {"complete", "unavailable", "ambiguous"}
+        or type(value.get("observed_logical_calls")) is not int
+        or value.get("observed_logical_calls") != used
+        or value.get("logical_calls_complete") is not True
+        or type(value.get("transport_retries_complete")) is not bool
+        or type(value.get("cost_includes_transport_retries")) is not bool
+    ):
+        return False
+    retry_count = value.get("transport_retry_count")
+    if (
+        retry_count is not None
+        and (type(retry_count) is not int or retry_count < 0)
+    ):
+        return False
+    if value.get("transport_retries_complete") and retry_count is None:
+        return False
+    actual_cost = value.get("actual_cost_usd")
+    if value.get("cost_completeness") == "complete":
+        return bool(
+            actual_cost is not None
+            and not isinstance(actual_cost, bool)
+            and isinstance(actual_cost, (int, float))
+            and math.isfinite(float(actual_cost))
+            and float(actual_cost) >= 0
+            and value.get("cost_includes_transport_retries") is True
+        )
+    return actual_cost is None
 
 
 def _build_state_anchored_explore_allocator(
@@ -224,6 +260,10 @@ def validated_child_result(
         or limit != policy.logical_provider_call_slots
         or not _exact_provider_call_map(payload.get("logical_provider_calls_by_role"))
         or not _exact_provider_call_map(payload.get("expected_provider_calls_by_role"))
+        or not _valid_usage_accounting(
+            payload.get("usage_accounting"),
+            used=used,
+        )
         or payload.get("execution_shape_ok") is not True
         or payload.get("scratch_cleanup_ok") is not True
         or payload.get("epistemic_modality") != "EXPLORE_ONLY"
@@ -390,6 +430,7 @@ def build_bounded_child_seams(
         per_call_tokens: int,
         timeout_s: int,
         window_chars: int | None = None,
+        extra_instruction: str = "",
     ) -> dict[str, Any]:
         counter.consume("candidate_solver")
         generated = original_propose(
@@ -400,6 +441,7 @@ def build_bounded_child_seams(
             timeout_s=timeout_s,
             continue_rounds=0,
             window_chars=_win(generator, window_chars),
+            extra_instruction=extra_instruction,
         )
         budget.charge(
             "generation",
@@ -407,8 +449,13 @@ def build_bounded_child_seams(
             is_free_route=_is_free_route(generator),
         )
         patch = str(generated.get("patch") or "")
-        if patch.strip() and not budget.invalid:
+        generated_patch = bool(patch.strip())
+        verifier_called = False
+        verified = None
+        if not budget.invalid:
             counter.consume("candidate_verifier")
+            verifier_called = True
+            proposed_patch = patch[:2000] if generated_patch else "<EMPTY_PATCH>"
             verified = original_propose(
                 verifier,
                 inst,
@@ -417,20 +464,42 @@ def build_bounded_child_seams(
                 timeout_s=timeout_s,
                 continue_rounds=0,
                 window_chars=_win(verifier, window_chars),
-                extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + patch[:2000],
+                extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + proposed_patch,
             )
             budget.charge(
                 "verification",
                 int(verified.get("tokens") or 0),
                 is_free_route=_is_free_route(verifier),
             )
-            if str(verified.get("patch") or "").strip():
+            if generated_patch and str(verified.get("patch") or "").strip():
                 patch = str(verified["patch"])
         return {
             "arm": "verify_chain",
             "final_patch": patch,
             "generator": generator.model_id,
             "verifier": verifier.model_id,
+            "execution_evidence": {
+                "schema": "rsi_lab.verify_chain_execution.v1",
+                "generator_input": generated.get("execution_input_receipt"),
+                "generator_empty_patch": not generated_patch,
+                "generator_error": generated.get("error"),
+                "generator_infrastructure_error": bool(generated.get("error")),
+                "verifier_called": verifier_called,
+                "verifier_error": (
+                    verified.get("error") if isinstance(verified, dict) else None
+                ),
+                "verifier_input": (
+                    verified.get("execution_input_receipt")
+                    if isinstance(verified, dict)
+                    else None
+                ),
+                "verifier_empty_patch": (
+                    not bool(str(verified.get("patch") or "").strip())
+                    if isinstance(verified, dict)
+                    else None
+                ),
+                "final_patch_empty": not bool(patch.strip()),
+            },
         }
 
     grade = replace(
