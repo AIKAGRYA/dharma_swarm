@@ -19,7 +19,9 @@ function resolveGitCommonDir(repoRoot: string): string | undefined {
     const commonDir = execFileSync(
       "git",
       ["-C", repoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-      {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]},
+      // Bounded: a hung mount must degrade to the next candidate, never block
+      // the bridge spawn (and with it the whole UI) indefinitely.
+      {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1_500},
     ).trim();
     return commonDir || undefined;
   } catch {

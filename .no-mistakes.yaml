@@ -1,0 +1,8 @@
+# dharma_swarm no-mistakes overrides.
+#
+# Pin the Test step to the helm-scope validation contract so a pipeline run
+# neither improvises test discovery (burning constrained agent budget mid-run,
+# the 2026-09-02 failure mode) nor trips over absent run-worktree node_modules.
+# scripts/helm_validation_test.sh owns the contract; CI owns broad regression.
+commands:
+  test: 'bash scripts/helm_validation_test.sh'

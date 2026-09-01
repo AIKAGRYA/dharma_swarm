@@ -6,7 +6,21 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/terminal_tui_tmux_common.sh"
 terminal_tui_tmux_init
 
-ROOT="${DHARMA_TERMINAL_ROOT:-$(cd -- "${SCRIPT_DIR}/.." && pwd)}"
+SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+ROOT="${DHARMA_TERMINAL_ROOT:-${SCRIPT_REPO_ROOT}}"
+ROOT_SOURCE="script-tree"
+if [[ "${ROOT}" != "${SCRIPT_REPO_ROOT}" ]]; then
+  ROOT_SOURCE="env-override"
+  if [[ "${DHARMA_TERMINAL_ROOT_OVERRIDE_OK:-0}" != "1" ]]; then
+    echo "DHARMA_TERMINAL_ROOT points this launcher at another tree's cockpit:" >&2
+    echo "  override root: ${ROOT}" >&2
+    echo "  script's tree: ${SCRIPT_REPO_ROOT}" >&2
+    echo "A cockpit must not silently run another checkout's code (configured != served)." >&2
+    echo "Set DHARMA_TERMINAL_ROOT_OVERRIDE_OK=1 to proceed deliberately, or unset DHARMA_TERMINAL_ROOT." >&2
+    exit 2
+  fi
+  echo "WARNING: booting override root ${ROOT} (this launcher lives in ${SCRIPT_REPO_ROOT})" >&2
+fi
 SESSION="${TERMINAL_TUI_TMUX_SESSION}"
 STATE_DIR="${TERMINAL_TUI_TMUX_STATE_DIR}"
 LOG_FILE="${STATE_DIR}/session.log"
@@ -131,6 +145,7 @@ CREATED_SESSION_BY_THIS_INVOCATION=0
 
 echo "Started and verified terminal TUI session '${SESSION}'"
 echo "Terminal dir: ${TERMINAL_DIR}"
+echo "Root: ${ROOT} (${ROOT_SOURCE})"
 echo "Python: ${PYTHON_BIN:-python3}"
 echo "State dir: ${STATE_DIR}"
 echo "Log file: ${LOG_FILE}"
