@@ -11,7 +11,6 @@ from typing import Any
 from dharma_swarm.operator_core.session_lifecycle import SessionLifecycleRecorder
 from dharma_swarm.terminal_bridge_chat import _SERVER_OWNED_CHAT_CONTEXT_KEY
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
-from dharma_swarm.tui import model_routing
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module
 except ImportError:
@@ -227,18 +226,10 @@ class TerminalBridgeSessionRuntimeMixin:
         owned_request["active_tab"] = self._canonical_active_tab(
             request.get("active_tab")
         )
-        default_target = model_routing.default_target()
-        provider_id = str(request.get("provider", "") or default_target.provider_id).strip().lower()
-        model_id = str(request.get("model", "") or "").strip()
-        adapter = self._adapters.get(provider_id)
-        if not model_id and adapter is not None:
-            model_id = str(adapter.get_profile(None).model_id)
-        if not model_id:
-            model_id = default_target.model_id
-        if str(canonical_intent.get("kind", "chat")) == "chat":
-            lanes = self._chat_lanes(provider_id, model_id)
-            if lanes:
-                provider_id, model_id, _, _ = lanes[0]
+        provider_id, model_id, _, _ = self._resolve_session_route(
+            request,
+            canonical_intent,
+        )
         server_bootstrap, context_disposition = (
             self._consume_server_owned_session_bootstrap(
             bootstrap_request_id,

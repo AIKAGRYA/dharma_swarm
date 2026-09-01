@@ -318,7 +318,10 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
             )
 
             store.finalize_session(session_id, status="completed", total_turns=1)
-            self.assertEqual(store.verify_session_replay(session_id), (True, []))
+            self.assertEqual(
+                store.verify_session_replay(session_id),
+                (True, ["replay_unproven_pre_receipt_era"]),
+            )
             meta = store.load_meta(session_id)
             self.assertEqual(
                 (meta["provider_id"], meta["model_id"]),

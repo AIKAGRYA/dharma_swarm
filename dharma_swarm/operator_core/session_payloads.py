@@ -170,8 +170,11 @@ def _bounded_session_detail_events(
         ("error", True),
         ("usage", True),
     )
+    anchor_budget = page_limit // 2
     selected: set[int] = set()
     for event_type, prefer_last in anchor_preferences:
+        if len(selected) >= anchor_budget:
+            break
         matching = [
             index
             for index, event in enumerate(events)
@@ -180,8 +183,6 @@ def _bounded_session_detail_events(
         if not matching:
             continue
         selected.add(matching[-1] if prefer_last else matching[0])
-        if len(selected) >= page_limit:
-            break
 
     for index in range(len(events) - 1, -1, -1):
         if len(selected) >= page_limit:

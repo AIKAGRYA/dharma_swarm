@@ -499,11 +499,15 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
             : [
                 `Session ${String(event.session_id ?? "").trim() || "pending"}`,
                 `${String(event.provider ?? "").trim()}:${String(event.model ?? "").trim()}`.replace(/^:/, "") || "route pending",
-                `Initial lane context ${String(event.context_disposition ?? "").trim() || "missing"}${
-                  String(event.context_digest ?? "").trim()
-                    ? ` · ${String(event.context_digest).trim().slice(0, 23)}`
-                    : ""
-                }`,
+                ...(event.context_disposition === undefined
+                  ? []
+                  : [
+                      `Initial lane context ${String(event.context_disposition ?? "").trim() || "missing"}${
+                        String(event.context_digest ?? "").trim()
+                          ? ` · ${String(event.context_digest).trim().slice(0, 23)}`
+                          : ""
+                      }`,
+                    ]),
               ],
         timestamp: timestampFromEvent(event),
       }),

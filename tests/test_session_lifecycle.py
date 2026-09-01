@@ -395,7 +395,10 @@ def test_restart_recovers_previous_bridge_turn_once_as_failed(tmp_path: Path) ->
     assert len(terminal_events) == 1
     assert terminal_events[0].success is False
     assert terminal_events[0].error_code == "bridge_interrupted"
-    assert reopened.verify_session_replay(recorder.session_id) == (True, [])
+    assert reopened.verify_session_replay(recorder.session_id) == (
+        True,
+        ["replay_unproven_pre_receipt_era"],
+    )
 
     assert reopened.recover_orphaned_sessions(
         cwd="/repo",
@@ -824,7 +827,10 @@ def test_restart_repairs_metadata_after_real_terminal_without_duplicate(
         isinstance(event, SessionEnd)
         for event in store.load_transcript(recorder.session_id)
     ) == 1
-    assert store.verify_session_replay(recorder.session_id) == (True, [])
+    assert store.verify_session_replay(recorder.session_id) == (
+        True,
+        ["replay_unproven_pre_receipt_era"],
+    )
 
 
 def test_restart_leaves_turn_owned_by_other_live_process_running(

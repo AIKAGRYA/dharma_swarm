@@ -1604,25 +1604,58 @@ class TerminalBridge(
             normalized = "\n".join([normalized.rstrip(), "", "--- Terminal Control ---", *terminal_lines])
         return normalized
 
+    def _resolve_session_route(
+        self,
+        request: dict[str, Any],
+        intent: dict[str, Any],
+    ) -> tuple[str, str, str, dict[str, Any]]:
+        """Resolve one canonical route for both bootstrap build and admission.
+
+        Bootstrap caching and session admission must derive identical
+        provider/model identities from the same request fields, or the
+        one-shot bootstrap handoff misses on route mismatch.
+        """
+
+        default_provider, default_model = self._terminal_default_route()
+        provider_id = str(
+            request.get("provider", "") or default_provider
+        ).strip().lower()
+        model_id = str(request.get("model", "") or "").strip()
+        strategy = model_routing.resolve_strategy(
+            str(request.get("strategy", "") or "")
+        )
+        explicit_model = bool(model_id)
+        if not model_id:
+            provider_id = provider_id or default_provider
+            model_id = default_model
+        elif not provider_id:
+            provider_id = default_provider
+        model_policy = self._build_model_policy_summary(
+            selected_provider=provider_id,
+            selected_model=model_id,
+            strategy=strategy or "responsive",
+        )
+        if not explicit_model:
+            provider_id = str(model_policy.get("selected_provider", provider_id))
+            model_id = str(model_policy.get("selected_model", model_id))
+        if str(intent.get("kind", "chat")) == "chat":
+            lanes = self._chat_lanes(provider_id, model_id)
+            if lanes:
+                provider_id, model_id, _, _ = lanes[0]
+        return provider_id, model_id, strategy, model_policy
+
     def _build_session_bootstrap(self, request: dict[str, Any]) -> dict[str, Any]:
         prompt, error_code, error_message = self._validated_request_prompt(request)
         if prompt is None:
             raise ValueError(f"{error_code}: {error_message}")
         active_tab = self._canonical_active_tab(request.get("active_tab"))
-        default_provider, default_model = self._terminal_default_route()
-        selected_provider = str(
-            request.get("provider", "") or default_provider
-        ).strip().lower()
-        selected_model = str(request.get("model", "") or "").strip()
         intent = self._resolve_prompt_intent(prompt)
-        explicit_strategy = model_routing.resolve_strategy(
-            str(request.get("strategy", "") or "")
-        )
-        if not selected_model:
-            selected_provider = selected_provider or default_provider
-            selected_model = default_model
-        elif not selected_provider:
-            selected_provider = default_provider
+        (
+            selected_provider,
+            selected_model,
+            explicit_strategy,
+            model_policy,
+        ) = self._resolve_session_route(request, intent)
 
         workspace_snapshot = self._build_workspace_snapshot()
         ontology_snapshot = self._build_ontology_snapshot()
@@ -1633,13 +1666,6 @@ class TerminalBridge(
         workspace_preview = self._build_workspace_preview(workspace_snapshot)
         runtime_preview = self._build_runtime_preview(runtime_snapshot)
         command_graph = self._build_command_graph_summary()
-        model_policy = self._build_model_policy_summary(
-            selected_provider=selected_provider,
-            selected_model=selected_model,
-            strategy=explicit_strategy or "responsive",
-        )
-        selected_provider = str(model_policy.get("selected_provider", selected_provider))
-        selected_model = str(model_policy.get("selected_model", selected_model))
         orientation_packet = build_orientation_packet(
             role="operator",
             claims=[],

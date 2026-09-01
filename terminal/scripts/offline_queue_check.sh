@@ -96,7 +96,7 @@ codex_managed_tmux_init offline_queue \
   || fail "could not initialize private tmux server"
 
 codex_managed_tmux new-session -d -s "$SESS" -x 120 -y 40 \
-  "sleep 1; cd $TERMINAL_DIR && COLORTERM=truecolor DHARMA_PYTHON=$GATE DHARMA_TERMINAL_STATE_DIR=$STATEDIR DHARMA_TERMINAL_SUPERVISOR_STATE_DIR=$STATEDIR bun run start" \
+  "sleep 1; cd '$TERMINAL_DIR' && COLORTERM=truecolor DHARMA_PYTHON='$GATE' DHARMA_TERMINAL_STATE_DIR='$STATEDIR' DHARMA_TERMINAL_SUPERVISOR_STATE_DIR='$STATEDIR' bun run start" \
   || fail "tmux session failed to start"
 codex_managed_tmux set-option -g status off \
   || fail "could not disable private tmux status row"

@@ -134,9 +134,11 @@ codex_managed_tmux_cleanup() {
   codex_managed_tmux kill-server >/dev/null 2>&1 &
   client_pid=$!
   if ! _codex_managed_tmux_stop_client "$client_pid"; then
-    _codex_managed_tmux_error \
-      "kill-server timed out; refusing to unlink a potentially live socket"
-    return 1
+    if codex_managed_tmux list-sessions >/dev/null 2>&1; then
+      _codex_managed_tmux_error \
+        "kill-server timed out; refusing to unlink a potentially live socket"
+      return 1
+    fi
   fi
 
   # tmux can leave a dead socket after kill-server. Remove only the exact,

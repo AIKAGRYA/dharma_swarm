@@ -34,6 +34,27 @@ cleanup_invocation_created_session() {
 
 trap cleanup_invocation_created_session EXIT
 
+find_descendant_bridge_pid() {
+  local parent_pid="$1"
+  local child_pid=""
+  local found=""
+
+  while IFS= read -r child_pid; do
+    [[ -z "${child_pid}" ]] && continue
+    if ps -p "${child_pid}" -o command= 2>/dev/null \
+      | grep -q "dharma_swarm.terminal_bridge stdio"; then
+      echo "${child_pid}"
+      return 0
+    fi
+    found="$(find_descendant_bridge_pid "${child_pid}")"
+    if [[ -n "${found}" ]]; then
+      echo "${found}"
+      return 0
+    fi
+  done < <(pgrep -P "${parent_pid}" 2>/dev/null || true)
+  return 1
+}
+
 verify_terminal_executor_liveness() {
   local deadline_seconds=$((SECONDS + LIVENESS_TIMEOUT_SECONDS))
   local pane_state=""
@@ -60,11 +81,7 @@ verify_terminal_executor_liveness() {
       echo "Terminal TUI executor is not live (${pane_state:-no pane state})." >&2
       return 1
     fi
-    bridge_pid="$(
-      ps -axo pid=,ppid=,command= \
-        | awk -v parent_pid="${pane_pid}" \
-          '$2 == parent_pid && !bridge_pid && index($0, "dharma_swarm.terminal_bridge stdio") { bridge_pid = $1 } END { if (bridge_pid) print bridge_pid }'
-    )"
+    bridge_pid="$(find_descendant_bridge_pid "${pane_pid}" || true)"
     if [[ "${bridge_pid}" =~ ^[1-9][0-9]*$ ]] \
       && kill -0 "${bridge_pid}" 2>/dev/null; then
       echo "Executor: pid=${pane_pid} command=${pane_command} bridge_pid=${bridge_pid} bridge_process=live"

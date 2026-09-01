@@ -701,7 +701,22 @@ class SessionStore:
         )
         transcript_issues = self._transcript_integrity_issues(session_id)
         issues = [*snapshot_issues, *transcript_issues]
-        return snapshot_ok and not transcript_issues, issues
+        replay_ok = snapshot_ok and not transcript_issues
+        if replay_ok and not self._transcript_has_context_receipt(session_id):
+            # Pre-receipt-era transcripts stay replayable but are typed as
+            # unproven: no ContextReceipt exists to validate against, and no
+            # validity is grandfathered or backfilled.
+            issues.append("replay_unproven_pre_receipt_era")
+        return replay_ok, issues
+
+    def _transcript_has_context_receipt(self, session_id: str) -> bool:
+        try:
+            return any(
+                getattr(event, "type", "") == "context_receipt"
+                for event in self.load_transcript(session_id)
+            )
+        except Exception:
+            return False
 
     def _transcript_integrity_issues(self, session_id: str) -> list[str]:
         """Validate replay semantics, not only snapshot checksums."""

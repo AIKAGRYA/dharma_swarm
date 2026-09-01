@@ -511,11 +511,17 @@ class SessionLifecycleRecorder:
                 and self._staged_context_receipt is not None
                 and not self._context_receipt_recorded
             ):
-                self._store.update_session_route(
-                    self._session_id,
-                    provider_id=self._staged_context_receipt.provider_id,
-                    model_id=self._staged_context_receipt.model_id,
-                )
+                try:
+                    self._store.update_session_route(
+                        self._session_id,
+                        provider_id=self._staged_context_receipt.provider_id,
+                        model_id=self._staged_context_receipt.model_id,
+                    )
+                except Exception:
+                    # The transcript receipt below is the canonical route
+                    # record; a transient meta rewrite failure must not block
+                    # terminal persistence.
+                    pass
                 self._provider_id = self._staged_context_receipt.provider_id
                 self._model_id = self._staged_context_receipt.model_id
                 interrupted_context = replace(
