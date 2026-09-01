@@ -8,6 +8,10 @@ terminal_tui_tmux_init
 
 SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ROOT="${DHARMA_TERMINAL_ROOT:-${SCRIPT_REPO_ROOT}}"
+if CANONICAL_ROOT="$(cd -- "${ROOT}" 2>/dev/null && pwd -P)"; then
+  ROOT="${CANONICAL_ROOT}"
+fi
+SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_REPO_ROOT}" && pwd -P)"
 ROOT_SOURCE="script-tree"
 if [[ "${ROOT}" != "${SCRIPT_REPO_ROOT}" ]]; then
   ROOT_SOURCE="env-override"
