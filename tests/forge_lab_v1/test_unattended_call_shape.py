@@ -358,6 +358,16 @@ def _valid_child_result(scratch_root: Path) -> dict[str, Any]:
         "logical_provider_calls_by_role": dict(call_shape.EXPECTED_PROVIDER_CALLS),
         "expected_provider_calls_by_role": dict(call_shape.EXPECTED_PROVIDER_CALLS),
         "execution_shape_ok": True,
+        "usage_accounting": {
+            "schema": "rsi_lab.usage_accounting.v1",
+            "actual_cost_usd": None,
+            "cost_completeness": "unavailable",
+            "observed_logical_calls": 5,
+            "logical_calls_complete": True,
+            "transport_retry_count": None,
+            "transport_retries_complete": False,
+            "cost_includes_transport_retries": False,
+        },
         "scratch_cleanup_ok": True,
         "scratch_custody_attestation": {
             "schema": "rsi_lab.unattended_scratch_proof.v1",
@@ -440,6 +450,11 @@ def test_validated_child_result_requires_exact_nested_cleanup_evidence(
         (("logical_provider_calls_by_role", "mutation"), 1.0),
         (("expected_provider_calls_by_role", "candidate_solver"), 2),
         (("expected_provider_calls_by_role", "candidate_solver"), 1.0),
+        (("usage_accounting", "observed_logical_calls"), 4),
+        (("usage_accounting", "logical_calls_complete"), False),
+        (("usage_accounting", "actual_cost_usd"), 0.1),
+        (("usage_accounting", "cost_completeness"), "unknown"),
+        (("usage_accounting", "transport_retry_count"), -1),
         (("epistemic_modality",), "CONFIRM"),
         (("scratch_custody_attestation", "operation"), "create"),
         (

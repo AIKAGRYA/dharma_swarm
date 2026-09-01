@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -56,6 +57,41 @@ def _exact_provider_call_map(value: Any) -> bool:
             for role, expected in EXPECTED_PROVIDER_CALLS.items()
         )
     )
+
+
+def _valid_usage_accounting(value: Any, *, used: int) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if (
+        value.get("schema") != "rsi_lab.usage_accounting.v1"
+        or value.get("cost_completeness")
+        not in {"complete", "unavailable", "ambiguous"}
+        or type(value.get("observed_logical_calls")) is not int
+        or value.get("observed_logical_calls") != used
+        or value.get("logical_calls_complete") is not True
+        or type(value.get("transport_retries_complete")) is not bool
+        or type(value.get("cost_includes_transport_retries")) is not bool
+    ):
+        return False
+    retry_count = value.get("transport_retry_count")
+    if (
+        retry_count is not None
+        and (type(retry_count) is not int or retry_count < 0)
+    ):
+        return False
+    if value.get("transport_retries_complete") and retry_count is None:
+        return False
+    actual_cost = value.get("actual_cost_usd")
+    if value.get("cost_completeness") == "complete":
+        return bool(
+            actual_cost is not None
+            and not isinstance(actual_cost, bool)
+            and isinstance(actual_cost, (int, float))
+            and math.isfinite(float(actual_cost))
+            and float(actual_cost) >= 0
+            and value.get("cost_includes_transport_retries") is True
+        )
+    return actual_cost is None
 
 
 def _build_state_anchored_explore_allocator(
@@ -224,6 +260,10 @@ def validated_child_result(
         or limit != policy.logical_provider_call_slots
         or not _exact_provider_call_map(payload.get("logical_provider_calls_by_role"))
         or not _exact_provider_call_map(payload.get("expected_provider_calls_by_role"))
+        or not _valid_usage_accounting(
+            payload.get("usage_accounting"),
+            used=used,
+        )
         or payload.get("execution_shape_ok") is not True
         or payload.get("scratch_cleanup_ok") is not True
         or payload.get("epistemic_modality") != "EXPLORE_ONLY"

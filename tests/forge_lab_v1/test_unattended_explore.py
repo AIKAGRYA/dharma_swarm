@@ -1114,6 +1114,16 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
                 "candidate_verifier": 1,
             },
             "execution_shape_ok": True,
+            "usage_accounting": {
+                "schema": "rsi_lab.usage_accounting.v1",
+                "actual_cost_usd": None,
+                "cost_completeness": "unavailable",
+                "observed_logical_calls": unattended.LOGICAL_PROVIDER_CALL_SLOTS,
+                "logical_calls_complete": True,
+                "transport_retry_count": None,
+                "transport_retries_complete": False,
+                "cost_includes_transport_retries": False,
+            },
             "scratch_cleanup_ok": True,
             "scratch_custody_attestation": attestation,
             "experiment_closeout": {
@@ -1161,10 +1171,24 @@ def test_parent_oneshot_reserves_then_seals_admission_and_closeout(
         schema=unattended.RECEIPT_SCHEMA,
         digest_field="receipt_digest",
     )
-    assert len(ledger) == 1
+    assert len(ledger) == 2
+    assert [row["kind"] for row in ledger] == ["reservation", "reconciliation"]
+    assert ledger[1]["reservation_digest"] == ledger[0]["ledger_digest"]
+    assert ledger[1]["actual_cost_usd"] is None
+    assert ledger[1]["cost_completeness"] == "unavailable"
+    assert ledger[1]["observed_logical_calls"] == unattended.LOGICAL_PROVIDER_CALL_SLOTS
+    assert ledger[1]["incremental_charge_usd"] == 0.0
+    assert ledger[1]["reservation_refunded"] is False
     assert [row["kind"] for row in receipts] == ["run_admitted", "run_closeout"]
     assert receipts[-1]["epistemic_modality"] == "EXPLORE_ONLY"
     assert receipts[-1]["positive_rsi_claim"] is False
+    assert receipts[-1]["budget_reconciliation_digest"] == ledger[1]["ledger_digest"]
+    assert receipts[-1]["actual_cost_usd"] is None
+    assert receipts[-1]["cost_completeness"] == "unavailable"
+    assert receipts[-1]["budget_reconciliation_decision"] == "accepted"
+    assert result["budget_reconciliation_digest"] == ledger[1]["ledger_digest"]
+    assert result["actual_cost_usd"] is None
+    assert result["cost_completeness"] == "unavailable"
 
     halted_scratch: list[Path] = []
 

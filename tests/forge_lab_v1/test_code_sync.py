@@ -321,6 +321,17 @@ def test_campaign_guard_still_blocks_a_real_runner_process(
     assert guard["evidence"]["active_process_count"] == 1
 
 
+def test_exact_release_identity_covers_foundation_execution_semantics() -> None:
+    required = {
+        "dharma_swarm/forge_lab/agent_bundle.py",
+        "dharma_swarm/forge_lab/genome_spec.py",
+        "dharma_swarm/forge_lab/unattended_accounting.py",
+        "dharma_swarm/forge_v1/forge_v2/arms.py",
+    }
+
+    assert required <= set(sync.CRITICAL_FILES)
+
+
 def test_nonterminal_active_manifest_blocks_release_switch(tmp_path: Path) -> None:
     root, _, plan = _make_release(tmp_path)
     active = root / "state" / ".dharma" / "forge_lab" / "active_campaign.json"
