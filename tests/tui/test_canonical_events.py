@@ -5,6 +5,7 @@ from __future__ import annotations
 from dharma_swarm.tui.engine.events import (
     EVENT_TYPES,
     CanonicalEvent,
+    ContextReceipt,
     ErrorEvent,
     PermissionDecisionEvent,
     PermissionOutcomeEvent,
@@ -63,6 +64,7 @@ def test_all_event_types_instantiable() -> None:
         PermissionDecisionEvent(),
         PermissionResolutionEvent(),
         PermissionOutcomeEvent(),
+        ContextReceipt(),
     ]
     assert all(ev.schema_version == 1 for ev in events)
     assert all(isinstance(ev.type, str) and ev.type for ev in events)
@@ -91,5 +93,6 @@ def test_event_registry_complete() -> None:
         "permission_decision",
         "permission_resolution",
         "permission_outcome",
+        "context_receipt",
     }
     assert set(EVENT_TYPES) == expected
