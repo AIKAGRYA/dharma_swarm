@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from dharma_swarm.forge_lab import grade_explore
+from dharma_swarm.forge_lab.genome_spec import check_genome, merged_with_defaults
 
 
 class _Budget:
@@ -85,6 +86,63 @@ def test_empty_model_patch_is_noncomparable_generation_not_negative() -> None:
     assert outcome.evidence_class == grade_explore.INCONCLUSIVE_GENERATION
     assert outcome.comparable_observations == 0
     assert outcome.per_task[0]["error"] == "empty_patch"
+
+
+def test_verify_chain_executes_mutation_gene_and_preserves_empty_evidence() -> None:
+    observed: dict[str, object] = {}
+    execution_evidence = {
+        "schema": "rsi_lab.verify_chain_execution.v1",
+        "generator_input": {
+            "schema": "rsi_lab.execution_input_receipt.v1",
+            "mutation_gene_applied": True,
+            "counterfactual_prompt_digest": "sha256:" + "1" * 64,
+            "executed_prompt_digest": "sha256:" + "2" * 64,
+            "mutation_gene_digest": "sha256:" + "3" * 64,
+        },
+        "generator_empty_patch": True,
+        "verifier_called": True,
+        "verifier_empty_patch": True,
+        "final_patch_empty": True,
+    }
+
+    def verify_chain(*_args, **kwargs):
+        observed.update(kwargs)
+        return {"final_patch": "", "execution_evidence": execution_evidence}
+
+    seams = grade_explore.GradeSeams(
+        slot_for_id=lambda model_id: SimpleNamespace(model_id=model_id),
+        propose_slot=lambda *_args, **_kwargs: {"patch": "", "tokens": 0},
+        self_moa_arm=lambda *_args, **_kwargs: {"final_patch": ""},
+        verify_chain_arm=verify_chain,
+        mixed_moa_arm=lambda *_args, **_kwargs: {"final_patch": ""},
+        grade_task=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("empty patch must not reach the evaluator")
+        ),
+        budget_factory=_Budget,
+    )
+    genome = merged_with_defaults(
+        {
+            "arm_kind": "verify_chain",
+            "generator_model": "generator",
+            "verifier_model": "verifier",
+            "extra_instruction": "EXECUTE THIS GENE",
+        }
+    )
+
+    outcome = grade_explore.grade_genome_explore(
+        genome,
+        {"t1": ({}, {})},
+        seams=seams,
+        budget_cap_tokens=1000,
+        budget_cap_usd=1.0,
+    )
+
+    assert observed["extra_instruction"] == "EXECUTE THIS GENE"
+    assert outcome.per_task[0]["error"] == "empty_patch"
+    assert outcome.per_task[0]["execution_evidence"] == execution_evidence
+    checked = check_genome(genome)
+    assert "extra_instruction" in checked.executed_fields
+    assert "extra_instruction" not in checked.ignored_fields
 
 
 def test_resolved_verdict_is_measured_task_outcome() -> None:

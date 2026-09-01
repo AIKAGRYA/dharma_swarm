@@ -296,7 +296,15 @@ class _ExploreOpenBudget:
         return data
 
 
-def _final_patch(genome: dict[str, Any], inst: dict, ctx: dict, budget: Any, *, seams: GradeSeams, timeout_s: int) -> tuple[str, int]:
+def _final_patch(
+    genome: dict[str, Any],
+    inst: dict,
+    ctx: dict,
+    budget: Any,
+    *,
+    seams: GradeSeams,
+    timeout_s: int,
+) -> tuple[str, int, dict[str, Any]]:
     kind = genome["arm_kind"]
     per_call = int(genome.get("per_call_tokens", 6000))
     window = int(genome.get("window_chars", 11000))
@@ -317,13 +325,18 @@ def _final_patch(genome: dict[str, Any], inst: dict, ctx: dict, budget: Any, *, 
         )
         tokens = int(rec.get("tokens") or 0)
         budget.charge("generation", tokens)
-        return str(rec.get("patch") or ""), tokens
+        evidence = rec.get("execution_input_receipt")
+        return (
+            str(rec.get("patch") or ""),
+            tokens,
+            {"generator_input": evidence} if isinstance(evidence, dict) else {},
+        )
     if kind == "self_moa":
         out = seams.self_moa_arm(
             gen_slot, inst, ctx, budget,
             k=int(genome.get("k", 3)), per_call_tokens=per_call, timeout_s=timeout_s, window_chars=window,
         )
-        return str(out.get("final_patch") or ""), int(budget.spent)
+        return str(out.get("final_patch") or ""), int(budget.spent), {}
     ver_slot = seams.slot_for_id(str(genome.get("verifier_model") or ""))
     if ver_slot is None:
         raise ExploreInfrastructureError(
@@ -333,6 +346,7 @@ def _final_patch(genome: dict[str, Any], inst: dict, ctx: dict, budget: Any, *, 
         out = seams.verify_chain_arm(
             gen_slot, ver_slot, inst, ctx, budget,
             per_call_tokens=per_call, timeout_s=timeout_s, window_chars=window,
+            extra_instruction=str(genome.get("extra_instruction") or ""),
         )
     elif kind == "mixed_moa":
         out = seams.mixed_moa_arm(
@@ -341,7 +355,12 @@ def _final_patch(genome: dict[str, Any], inst: dict, ctx: dict, budget: Any, *, 
         )
     else:
         raise ExploreGenerationError(f"unknown_arm_kind:{kind}")
-    return str(out.get("final_patch") or ""), int(budget.spent)
+    evidence = out.get("execution_evidence")
+    return (
+        str(out.get("final_patch") or ""),
+        int(budget.spent),
+        dict(evidence) if isinstance(evidence, dict) else {},
+    )
 
 
 def grade_genome_explore(
@@ -375,12 +394,14 @@ def grade_genome_explore(
                 row["error"] = f"budget_invalid:{getattr(budget, 'invalid_reason', '')}"
                 noncomparable_kind = "budget"
             else:
-                patch, tokens = _final_patch(
+                patch, tokens, execution_evidence = _final_patch(
                     genome, inst, ctx, budget, seams=seams, timeout_s=propose_timeout_s
                 )
                 tokens_total = int(getattr(budget, "spent", tokens))
                 row["tokens_spent"] = tokens
                 row["budget_soft_token_cap_exceeded"] = bool(getattr(budget, "soft_token_cap_exceeded", False))
+                if execution_evidence:
+                    row["execution_evidence"] = execution_evidence
                 if not patch.strip():
                     row["error"] = "empty_patch"
                     noncomparable_kind = "generation"

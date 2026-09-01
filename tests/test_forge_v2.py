@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
+from dharma_swarm.forge_v1 import canonical
+from dharma_swarm.forge_v1.forge_v2 import arms
 from dharma_swarm.forge_v1.forge_v2 import CLOSEOUT_STATES
 from dharma_swarm.forge_v1.forge_v2.arms import _win
 from dharma_swarm.forge_v1.forge_v2.budget import Budget
@@ -47,6 +50,109 @@ def test_budget_invalidates_token_overrun() -> None:
 def test_first_slice_windows_all_models_to_fit_budget_before_big_context_calls() -> None:
     assert _win(Slot("glm-5.2")) == 11000
     assert _win(Slot("moonshotai/kimi-k2.6")) == 11000
+
+
+def test_proposal_receipts_prove_mutation_gene_prompt_causality(
+    monkeypatch,
+) -> None:
+    prompts: list[str] = []
+    slot = SimpleNamespace(
+        model_id="digest-test-model",
+        provider=SimpleNamespace(value="test"),
+    )
+    monkeypatch.setattr(canonical, "build_repair_prompt", lambda _inst, _ctx: "BASE")
+    monkeypatch.setattr(
+        canonical,
+        "_provider_for_slot",
+        lambda _slot, timeout_s: (object(), "wire"),
+    )
+
+    def capture_call(_provider, _wire, messages, **_kwargs):
+        prompts.append(messages[0]["content"])
+        return "", 0, None
+
+    monkeypatch.setattr(canonical, "_call", capture_call)
+
+    control = canonical._propose_slot(
+        slot,
+        {"problem_statement": "problem"},
+        {},
+        max_tokens=10,
+        timeout_s=1,
+        continue_rounds=0,
+    )
+    mutated = canonical._propose_slot(
+        slot,
+        {"problem_statement": "problem"},
+        {},
+        max_tokens=10,
+        timeout_s=1,
+        continue_rounds=0,
+        extra_instruction="EXECUTE THIS GENE",
+    )
+
+    assert prompts == ["BASE", "EXECUTE THIS GENE\n\nBASE"]
+    control_receipt = control["execution_input_receipt"]
+    mutated_receipt = mutated["execution_input_receipt"]
+    assert control_receipt["mutation_gene_applied"] is False
+    assert control_receipt["executed_prompt_digest"] == control_receipt[
+        "counterfactual_prompt_digest"
+    ]
+    assert mutated_receipt["mutation_gene_applied"] is True
+    assert mutated_receipt["mutation_gene_digest"]
+    assert mutated_receipt["counterfactual_prompt_digest"] == control_receipt[
+        "counterfactual_prompt_digest"
+    ]
+    assert mutated_receipt["executed_prompt_digest"] != mutated_receipt[
+        "counterfactual_prompt_digest"
+    ]
+
+
+def test_verify_chain_calls_verifier_for_empty_generator_without_laundering_arm(
+    monkeypatch,
+) -> None:
+    calls: list[dict] = []
+    generator = SimpleNamespace(
+        model_id="generator",
+        provider=SimpleNamespace(value="test"),
+    )
+    verifier = SimpleNamespace(
+        model_id="verifier",
+        provider=SimpleNamespace(value="test"),
+    )
+
+    def propose(slot, _inst, _ctx, **kwargs):
+        calls.append({"model": slot.model_id, **kwargs})
+        return {
+            "patch": "" if slot is generator else "verifier-only patch",
+            "tokens": 2,
+            "execution_input_receipt": {
+                "schema": "rsi_lab.execution_input_receipt.v1",
+                "mutation_gene_applied": bool(kwargs.get("extra_instruction")),
+            },
+        }
+
+    monkeypatch.setattr(arms, "_propose_slot", propose)
+    result = arms.verify_chain_arm(
+        generator,
+        verifier,
+        {},
+        {},
+        Budget(cap_tokens=100, cap_usd=1.0),
+        per_call_tokens=10,
+        timeout_s=1,
+        extra_instruction="EXECUTE THIS GENE",
+    )
+
+    assert [call["model"] for call in calls] == ["generator", "verifier"]
+    assert calls[0]["extra_instruction"] == "EXECUTE THIS GENE"
+    assert "<EMPTY_PATCH>" in calls[1]["extra_instruction"]
+    assert result["final_patch"] == ""
+    evidence = result["execution_evidence"]
+    assert evidence["generator_empty_patch"] is True
+    assert evidence["verifier_called"] is True
+    assert evidence["verifier_empty_patch"] is False
+    assert evidence["final_patch_empty"] is True
 
 
 def test_kimi_code_alias_uses_window_and_temperature_wall_repairs() -> None:

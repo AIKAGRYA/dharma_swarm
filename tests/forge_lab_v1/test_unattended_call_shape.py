@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
@@ -223,6 +224,106 @@ def test_state_anchored_bridge_refuses_receipt_drift(
         allocate(count=1, epoch_id="run-1_gen0", lane_id="unattended")
 
     assert error.value.code == "TASK_ALLOCATION_RECEIPT"
+
+
+def test_bounded_verify_chain_accounts_for_empty_patch_and_consumes_gene(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dharma_swarm import api_keys
+    from dharma_swarm.forge_lab import grade_explore, unattended_context
+    from dharma_swarm.forge_v1 import providers
+
+    calls: list[dict[str, Any]] = []
+    consumed: list[str] = []
+    generator = SimpleNamespace(
+        model_id="generator",
+        provider=SimpleNamespace(value="test"),
+    )
+    verifier = SimpleNamespace(
+        model_id="verifier",
+        provider=SimpleNamespace(value="test"),
+    )
+
+    def propose(slot: Any, _inst: Any, _ctx: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append({"model": slot.model_id, **kwargs})
+        return {
+            "patch": "" if slot is generator else "verifier-only patch",
+            "tokens": 2,
+            "execution_input_receipt": {
+                "schema": "rsi_lab.execution_input_receipt.v1",
+                "mutation_gene_applied": bool(kwargs.get("extra_instruction")),
+            },
+        }
+
+    class FakePoolCompletion:
+        def __init__(self, model_id: str) -> None:
+            self.model_id = model_id
+
+        def complete(self, _prompt: str) -> tuple[str, int]:
+            return "gene", 1
+
+    base = grade_explore.GradeSeams(
+        slot_for_id=lambda _model_id: None,
+        propose_slot=propose,
+        self_moa_arm=lambda *_args, **_kwargs: {},
+        verify_chain_arm=lambda *_args, **_kwargs: {},
+        mixed_moa_arm=lambda *_args, **_kwargs: {},
+        grade_task=lambda *_args, **_kwargs: (False, 0.0, None),
+        budget_factory=lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(api_keys, "bootstrap_runtime_env", lambda: None)
+    monkeypatch.setattr(
+        unattended_context, "sanitize_unattended_docker_env", lambda: None
+    )
+    monkeypatch.setattr(grade_explore, "production_seams", lambda: base)
+    monkeypatch.setattr(providers, "PoolCompletion", FakePoolCompletion)
+
+    counter = SimpleNamespace(
+        consume=lambda label: consumed.append(label),
+    )
+    seams = call_shape.build_bounded_child_seams(
+        {
+            "state_root": str(tmp_path),
+            "task_id": "task-1",
+            "task_context_binding_digest": "sha256:" + "1" * 64,
+            "role_bindings": {
+                "mutator": {"model_id": "mutator"},
+                "solver": {"model_id": "generator"},
+                "verifier": {"model_id": "verifier"},
+            },
+        },
+        counter,
+        per_call_tokens=10,
+        error_factory=call_shape.CallShapeError,
+        clone_scratch=lambda *_args, **_kwargs: tmp_path,
+        remove_clone_scratch=lambda *_args, **_kwargs: None,
+    )
+
+    class FakeBudget:
+        invalid = False
+
+        def charge(self, *_args: Any, **_kwargs: Any) -> int:
+            return 0
+
+    result = seams.grade.verify_chain_arm(
+        generator,
+        verifier,
+        {},
+        {},
+        FakeBudget(),
+        per_call_tokens=10,
+        timeout_s=1,
+        extra_instruction="EXECUTE THIS GENE",
+    )
+
+    assert consumed == ["candidate_solver", "candidate_verifier"]
+    assert [call["model"] for call in calls] == ["generator", "verifier"]
+    assert calls[0]["extra_instruction"] == "EXECUTE THIS GENE"
+    assert "<EMPTY_PATCH>" in calls[1]["extra_instruction"]
+    assert result["final_patch"] == ""
+    assert result["execution_evidence"]["verifier_called"] is True
+    assert result["execution_evidence"]["final_patch_empty"] is True
 
 
 def _runner_policy() -> call_shape.RunnerPolicy:

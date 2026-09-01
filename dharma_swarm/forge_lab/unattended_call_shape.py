@@ -390,6 +390,7 @@ def build_bounded_child_seams(
         per_call_tokens: int,
         timeout_s: int,
         window_chars: int | None = None,
+        extra_instruction: str = "",
     ) -> dict[str, Any]:
         counter.consume("candidate_solver")
         generated = original_propose(
@@ -400,6 +401,7 @@ def build_bounded_child_seams(
             timeout_s=timeout_s,
             continue_rounds=0,
             window_chars=_win(generator, window_chars),
+            extra_instruction=extra_instruction,
         )
         budget.charge(
             "generation",
@@ -407,8 +409,13 @@ def build_bounded_child_seams(
             is_free_route=_is_free_route(generator),
         )
         patch = str(generated.get("patch") or "")
-        if patch.strip() and not budget.invalid:
+        generated_patch = bool(patch.strip())
+        verifier_called = False
+        verified = None
+        if not budget.invalid:
             counter.consume("candidate_verifier")
+            verifier_called = True
+            proposed_patch = patch[:2000] if generated_patch else "<EMPTY_PATCH>"
             verified = original_propose(
                 verifier,
                 inst,
@@ -417,20 +424,37 @@ def build_bounded_child_seams(
                 timeout_s=timeout_s,
                 continue_rounds=0,
                 window_chars=_win(verifier, window_chars),
-                extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + patch[:2000],
+                extra_instruction=VERIFY_TEMPLATE + "\n\nProposed patch:\n" + proposed_patch,
             )
             budget.charge(
                 "verification",
                 int(verified.get("tokens") or 0),
                 is_free_route=_is_free_route(verifier),
             )
-            if str(verified.get("patch") or "").strip():
+            if generated_patch and str(verified.get("patch") or "").strip():
                 patch = str(verified["patch"])
         return {
             "arm": "verify_chain",
             "final_patch": patch,
             "generator": generator.model_id,
             "verifier": verifier.model_id,
+            "execution_evidence": {
+                "schema": "rsi_lab.verify_chain_execution.v1",
+                "generator_input": generated.get("execution_input_receipt"),
+                "generator_empty_patch": not generated_patch,
+                "verifier_called": verifier_called,
+                "verifier_input": (
+                    verified.get("execution_input_receipt")
+                    if isinstance(verified, dict)
+                    else None
+                ),
+                "verifier_empty_patch": (
+                    not bool(str(verified.get("patch") or "").strip())
+                    if isinstance(verified, dict)
+                    else None
+                ),
+                "final_patch_empty": not bool(patch.strip()),
+            },
         }
 
     grade = replace(
