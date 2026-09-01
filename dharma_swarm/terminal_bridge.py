@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 from typing import Any
 from dharma_swarm.terminal_bridge_text import (
@@ -89,6 +90,8 @@ from dharma_swarm.tui.engine.events import (
 )
 
 _HELM_LOCAL_PREVIEW_MODEL_ENV = "DHARMA_HELM_LOCAL_PREVIEW_MODEL"
+_MAX_PENDING_SESSION_BOOTSTRAPS = 32
+_SESSION_BOOTSTRAP_TTL_SECONDS = 5 * 60
 
 
 def _json_default(value: object) -> object:
@@ -138,6 +141,10 @@ class TerminalBridge(
         )
         self._session_recovery_complete = False
         self._session_store = session_store if session_store is not None else SessionStore()
+        self._server_owned_session_bootstraps: dict[
+            str,
+            tuple[float, dict[str, Any]],
+        ] = {}
         self._initialize_helm_context(helm_context_sources=helm_context_sources)
         self._chat_history: list[dict[str, str]] = []
         self._ensure_adapters()
@@ -861,13 +868,71 @@ class TerminalBridge(
             )
             return
         payload = await asyncio.to_thread(self._build_session_bootstrap, request)
-        payload.update(
+        self._cache_server_owned_session_bootstrap(request_id, payload)
+        wire_payload = dict(payload)
+        wire_payload.update(
             {
                 "type": "session.bootstrap.result",
                 "request_id": request_id,
             }
         )
-        self._emit(payload)
+        self._emit(wire_payload)
+
+    def _cache_server_owned_session_bootstrap(
+        self,
+        request_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Retain one bounded, process-local bootstrap for later admission.
+
+        The wire payload is only a projection. The cache is the provenance
+        boundary that lets ``session.start`` distinguish the payload built by
+        this bridge process from caller-authored lookalikes.
+        """
+
+        if not request_id:
+            return
+        self._server_owned_session_bootstraps.pop(request_id, None)
+        self._server_owned_session_bootstraps[request_id] = (
+            time.monotonic(),
+            dict(payload),
+        )
+        while len(self._server_owned_session_bootstraps) > _MAX_PENDING_SESSION_BOOTSTRAPS:
+            oldest_request_id = next(iter(self._server_owned_session_bootstraps))
+            self._server_owned_session_bootstraps.pop(oldest_request_id, None)
+
+    def _consume_server_owned_session_bootstrap(
+        self,
+        request_id: str,
+        *,
+        prompt: str,
+        provider_id: str,
+        model_id: str,
+    ) -> tuple[dict[str, Any] | None, str]:
+        """Consume once and return a bounded admission disposition."""
+
+        if not request_id:
+            return None, "missing_request_id"
+        cached = self._server_owned_session_bootstraps.pop(request_id, None)
+        if cached is None:
+            return None, "cache_miss"
+        cached_at, payload = cached
+        cache_age = time.monotonic() - cached_at
+        if cache_age < 0 or cache_age >= _SESSION_BOOTSTRAP_TTL_SECONDS:
+            return None, "expired"
+        cached_prompt = payload.get("prompt")
+        cached_provider = str(payload.get("selected_provider", "") or "").strip().lower()
+        cached_model = str(payload.get("selected_model", "") or "").strip()
+        cached_system_prompt = payload.get("system_prompt")
+        if not isinstance(cached_prompt, str) or cached_prompt != prompt:
+            return None, "prompt_mismatch"
+        if cached_provider != provider_id:
+            return None, "provider_mismatch"
+        if cached_model != model_id:
+            return None, "model_mismatch"
+        if not isinstance(cached_system_prompt, str) or not cached_system_prompt.strip():
+            return None, "invalid_server_bootstrap"
+        return payload, "matched"
 
     def _navigator_manifest(self) -> str:
         # The agent drives the Helm by emitting directives in its reply. The TS
@@ -1032,6 +1097,16 @@ class TerminalBridge(
             task.cancel()
         if task is not None and task is not asyncio.current_task():
             await asyncio.gather(task, return_exceptions=True)
+        # A task cancelled before its coroutine executes never enters
+        # _run_active_session's exception/finally blocks.  The lifecycle row
+        # already exists at that point, so finalize and clear it here as an
+        # idempotent backstop.  No ContextReceipt is minted: no provider lane
+        # reached construction or attempted a context boundary.
+        if not run.terminal_emitted:
+            self._emit_cancelled_terminal(run)
+        run.phase = "complete"
+        self._remember_completed_session_request(run.request_id)
+        self._clear_active_run(run)
         return provider_cancel_error
 
     def _set_active_run(self, run: _ActiveSessionRun) -> None:
@@ -1094,6 +1169,11 @@ class TerminalBridge(
             )
             terminal = run.lifecycle.terminal_event
         if terminal is not None and not run.terminal_emitted:
+            auto_context_receipt = (
+                run.lifecycle.take_auto_context_receipt_for_emission()
+            )
+            if auto_context_receipt is not None:
+                self._emit_recorded_session_event(run, auto_context_receipt)
             self._mark_terminal_emitted(run)
             self._emit(
                 {
@@ -1528,7 +1608,7 @@ class TerminalBridge(
         prompt, error_code, error_message = self._validated_request_prompt(request)
         if prompt is None:
             raise ValueError(f"{error_code}: {error_message}")
-        active_tab = str(request.get("active_tab", "") or "chat")
+        active_tab = self._canonical_active_tab(request.get("active_tab"))
         default_provider, default_model = self._terminal_default_route()
         selected_provider = str(
             request.get("provider", "") or default_provider

@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
+import fcntl
 import json
 import logging
+import os
 import secrets
+import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +21,7 @@ from dharma_swarm.session_event_bridge import SessionEventBridge
 from dharma_swarm.tui.engine.events import (
     CanonicalEvent,
     CanonicalEventType,
+    ContextReceipt,
     EVENT_TYPES,
 )
 
@@ -22,6 +29,9 @@ HOME = Path.home()
 DEFAULT_ROOT = HOME / ".dharma" / "sessions"
 LEGACY_OWNER_GRACE_SECONDS = 300.0
 logger = logging.getLogger(__name__)
+
+_SESSION_RECOVERY_LOCKS: dict[Path, threading.RLock] = {}
+_SESSION_RECOVERY_LOCKS_GUARD = threading.Lock()
 
 
 def _now_iso() -> str:
@@ -31,6 +41,14 @@ def _now_iso() -> str:
 def _new_session_id() -> str:
     now = datetime.now(timezone.utc)
     return f"dgc-{now:%Y%m%d}-{now:%H%M%S}-{secrets.token_hex(2)}"
+
+
+def _session_recovery_thread_lock(path: Path) -> threading.RLock:
+    """Return the shared in-process half of a session recovery lock."""
+
+    key = path.resolve()
+    with _SESSION_RECOVERY_LOCKS_GUARD:
+        return _SESSION_RECOVERY_LOCKS.setdefault(key, threading.RLock())
 
 
 def _pid_is_alive(pid: int) -> bool:
@@ -54,6 +72,63 @@ def cwd_matches(meta_cwd: str, expected_cwd: str) -> bool:
     return _normalize_cwd(meta_cwd) == _normalize_cwd(expected_cwd)
 
 
+def _observe_git_branch(cwd: str) -> str:
+    """Sample the branch at session creation without making Git authoritative."""
+
+    normalized_cwd = _normalize_cwd(cwd)
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "--no-optional-locks",
+                "-C",
+                normalized_cwd,
+                "branch",
+                "--show-current",
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Replace one JSON owner file without exposing a truncated target."""
+
+    temp_path = path.with_name(
+        f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+    )
+    encoded = json.dumps(payload, indent=2)
+    try:
+        with open(temp_path, "w", encoding="utf-8") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+        except OSError:
+            directory_fd = -1
+        if directory_fd >= 0:
+            try:
+                os.fsync(directory_fd)
+            except OSError:
+                pass
+            finally:
+                os.close(directory_fd)
+    finally:
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 class SessionStore:
     """Stores canonical event transcripts and session metadata."""
 
@@ -64,7 +139,10 @@ class SessionStore:
         self._bridges: dict[str, SessionEventBridge] = {}
         self._last_snapshot_failure: tuple[str, str, str] | None = None
         if not self._index_path.exists():
-            self._index_path.write_text(json.dumps({"schema_version": 1, "sessions": []}))
+            _atomic_write_json(
+                self._index_path,
+                {"schema_version": 1, "sessions": []},
+            )
 
     def create_session(
         self,
@@ -94,7 +172,7 @@ class SessionStore:
             "provider_session_id": provider_session_id,
             "title": title or "",
             "cwd": cwd,
-            "git_branch": "",
+            "git_branch": _observe_git_branch(cwd),
             "tags": [],
             "total_cost_usd": 0.0,
             "total_turns": 0,
@@ -111,14 +189,18 @@ class SessionStore:
                 else None
             ),
         }
-        (sp / "meta.json").write_text(json.dumps(meta, indent=2))
+        self._write_meta(sid, meta)
         (sp / "transcript.jsonl").touch(exist_ok=True)
         (sp / "audit.jsonl").touch(exist_ok=True)
         (sp / "runtime.jsonl").touch(exist_ok=True)
         (sp / "snapshots.jsonl").touch(exist_ok=True)
 
         index = self._read_index()
-        sessions = index.get("sessions", [])
+        sessions = [
+            entry
+            for entry in self._merged_index_sessions()
+            if entry.get("session_id") != sid
+        ]
         sessions.append(
             {
                 "session_id": sid,
@@ -133,7 +215,10 @@ class SessionStore:
             }
         )
         index["sessions"] = sessions
-        self._write_index(index)
+        try:
+            self._write_index(index)
+        except OSError as exc:
+            logger.warning("session index write failed for %s (%s)", sid, type(exc).__name__)
         try:
             self._bridge_for(sid).session_start(
                 sid,
@@ -155,8 +240,18 @@ class SessionStore:
         if strip_raw:
             payload["raw"] = None
         tp = self.root / session_id / "transcript.jsonl"
-        with open(tp, "a") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        encoded = (json.dumps(payload, ensure_ascii=True) + "\n").encode("utf-8")
+        with open(tp, "a+b") as handle:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() > 0:
+                handle.seek(-1, os.SEEK_END)
+                if handle.read(1) != b"\n":
+                    handle.seek(0, os.SEEK_END)
+                    handle.write(b"\n")
+            handle.seek(0, os.SEEK_END)
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
         try:
             self._bridge_for(session_id).record_canonical_event(event)
         except Exception:
@@ -281,6 +376,7 @@ class SessionStore:
         provider_session_id: str | None = None,
     ) -> None:
         meta = self.load_meta(session_id)
+        meta.pop("pending_context_receipt", None)
         meta["updated_at"] = _now_iso()
         meta["status"] = status
         if total_cost_usd is not None:
@@ -338,6 +434,24 @@ class SessionStore:
             pid_is_alive=_pid_is_alive,
         )
 
+    @contextmanager
+    def session_recovery_lock(self, session_id: str) -> Iterator[None]:
+        """Serialize one orphan-recovery decision across stores and processes.
+
+        The retained sidecar keeps a stable inode for the host-local advisory
+        lock. ``flock`` alone does not serialize independent store instances in
+        every same-process runtime, so a shared thread lock protects that case.
+        """
+
+        lock_path = self.root / session_id / ".recovery.lock"
+        with _session_recovery_thread_lock(lock_path):
+            with lock_path.open("a+b") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
     def load_meta(self, session_id: str) -> dict[str, Any]:
         return json.loads((self.root / session_id / "meta.json").read_text())
 
@@ -385,6 +499,53 @@ class SessionStore:
                 type(exc).__name__,
             )
 
+    def stage_context_receipt(
+        self,
+        session_id: str,
+        receipt: ContextReceipt,
+    ) -> None:
+        """Durably stage a context boundary before provider work begins."""
+
+        if receipt.lane_outcome != "pending":
+            raise ValueError("only a pending context receipt may be staged")
+        payload = asdict(receipt)
+        payload["raw"] = None
+        meta = self.load_meta(session_id)
+        meta["pending_context_receipt"] = payload
+        meta["updated_at"] = _now_iso()
+        self._write_meta(session_id, meta)
+        self._upsert_index_entry(session_id, {"updated_at": meta["updated_at"]})
+
+    def load_staged_context_receipt(
+        self,
+        session_id: str,
+    ) -> ContextReceipt | None:
+        payload = self.load_meta(session_id).get("pending_context_receipt")
+        if not isinstance(payload, dict):
+            return None
+        try:
+            receipt = ContextReceipt(**payload)
+        except (TypeError, ValueError):
+            return None
+        if (
+            receipt.lane_outcome != "pending"
+            or not receipt.provider_id.strip()
+            or not receipt.model_id.strip()
+            or receipt.boundary_timestamp <= 0
+        ):
+            return None
+        return receipt
+
+    def clear_staged_context_receipt(self, session_id: str) -> bool:
+        meta = self.load_meta(session_id)
+        if "pending_context_receipt" not in meta:
+            return False
+        del meta["pending_context_receipt"]
+        meta["updated_at"] = _now_iso()
+        self._write_meta(session_id, meta)
+        self._upsert_index_entry(session_id, {"updated_at": meta["updated_at"]})
+        return True
+
     def _touch_session(self, session_id: str) -> None:
         meta = self.load_meta(session_id)
         meta["updated_at"] = _now_iso()
@@ -392,7 +553,7 @@ class SessionStore:
         self._upsert_index_entry(session_id, {"updated_at": meta["updated_at"]})
 
     def _write_meta(self, session_id: str, meta: dict[str, Any]) -> None:
-        (self.root / session_id / "meta.json").write_text(json.dumps(meta, indent=2))
+        _atomic_write_json(self.root / session_id / "meta.json", meta)
 
     def _read_index(self) -> dict[str, Any]:
         try:
@@ -401,22 +562,105 @@ class SessionStore:
             return {"schema_version": 1, "sessions": []}
 
     def _write_index(self, index: dict[str, Any]) -> None:
-        self._index_path.write_text(json.dumps(index, indent=2))
+        _atomic_write_json(self._index_path, index)
+
+    @staticmethod
+    def _index_entry_from_meta(meta: dict[str, Any]) -> dict[str, Any] | None:
+        session_id = str(meta.get("session_id", "") or "").strip()
+        if not session_id:
+            return None
+        return {
+            "session_id": session_id,
+            "title": str(meta.get("title", "") or ""),
+            "provider_id": str(meta.get("provider_id", "") or ""),
+            "model_id": str(meta.get("model_id", "") or ""),
+            "created_at": str(meta.get("created_at", "") or ""),
+            "updated_at": str(meta.get("updated_at", "") or ""),
+            "status": str(meta.get("status", "") or ""),
+            "total_cost_usd": float(meta.get("total_cost_usd", 0.0) or 0.0),
+            "total_turns": int(meta.get("total_turns", 0) or 0),
+        }
+
+    def _discovered_index_entries(self) -> list[dict[str, Any]]:
+        discovered: list[dict[str, Any]] = []
+        try:
+            session_paths = sorted(self.root.iterdir(), key=lambda path: path.name)
+        except OSError:
+            return discovered
+        for session_path in session_paths:
+            if not session_path.is_dir() or session_path.name.startswith("."):
+                continue
+            meta_path = session_path / "meta.json"
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                continue
+            if not isinstance(meta, dict):
+                continue
+            entry = self._index_entry_from_meta(meta)
+            if entry is None or entry["session_id"] != session_path.name:
+                continue
+            discovered.append(entry)
+        return discovered
+
+    def _merged_index_sessions(self) -> list[dict[str, Any]]:
+        raw_sessions = self._read_index().get("sessions", [])
+        sessions: list[dict[str, Any]] = []
+        positions: dict[str, int] = {}
+        if isinstance(raw_sessions, list):
+            for raw_entry in raw_sessions:
+                if not isinstance(raw_entry, dict):
+                    continue
+                session_id = str(raw_entry.get("session_id", "") or "").strip()
+                if not session_id or session_id in positions:
+                    continue
+                positions[session_id] = len(sessions)
+                sessions.append(dict(raw_entry))
+        for discovered in self._discovered_index_entries():
+            session_id = str(discovered["session_id"])
+            position = positions.get(session_id)
+            if position is None:
+                positions[session_id] = len(sessions)
+                sessions.append(discovered)
+            else:
+                sessions[position] = {**sessions[position], **discovered}
+        return sessions
 
     def _upsert_index_entry(self, session_id: str, updates: dict[str, Any]) -> None:
         index = self._read_index()
-        sessions = index.get("sessions", [])
+        raw_sessions = index.get("sessions", [])
+        sessions = [
+            dict(entry)
+            for entry in raw_sessions
+            if isinstance(entry, dict)
+            and str(entry.get("session_id", "") or "").strip()
+        ] if isinstance(raw_sessions, list) else []
+        found = False
         for entry in sessions:
             if entry.get("session_id") == session_id:
                 entry.update(updates)
+                found = True
                 break
+        if not found:
+            try:
+                meta_entry = self._index_entry_from_meta(self.load_meta(session_id))
+            except (OSError, ValueError, TypeError):
+                meta_entry = None
+            if meta_entry is not None:
+                meta_entry.update(updates)
+                sessions.append(meta_entry)
         index["sessions"] = sessions
-        self._write_index(index)
+        try:
+            self._write_index(index)
+        except OSError as exc:
+            logger.warning(
+                "session index update failed for %s (%s)",
+                session_id,
+                type(exc).__name__,
+            )
 
     def list_sessions(self) -> list[dict[str, Any]]:
-        index = self._read_index()
-        sessions = index.get("sessions", [])
-        return sessions if isinstance(sessions, list) else []
+        return self._merged_index_sessions()
 
     def latest_session(
         self,

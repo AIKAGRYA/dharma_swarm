@@ -125,6 +125,7 @@ def _event_compaction_preview(events: list[Any]) -> dict[str, Any]:
         kind
         for kind in (
             "user_prompt",
+            "context_receipt",
             "session_start",
             "tool_call_complete",
             "tool_result",
@@ -141,6 +142,52 @@ def _event_compaction_preview(events: list[Any]) -> dict[str, Any]:
         "protected_event_types": protected,
         "recent_event_types": recent_event_types,
     }
+
+
+def _bounded_session_detail_events(
+    events: list[Any],
+    *,
+    limit: int,
+) -> list[Any]:
+    """Keep context/lifecycle anchors visible while bounding detail payloads."""
+
+    page_limit = max(0, int(limit))
+    if page_limit == 0 or not events:
+        return []
+    if len(events) <= page_limit:
+        return list(events)
+
+    # ContextReceipt is the durable evidence for what crossed the model
+    # boundary, so it receives first reservation.  The remaining lifecycle
+    # anchors keep the selected tail intelligible after restart.  At most one
+    # occurrence of each boundary kind is pinned; verbose/provider events use
+    # the remaining newest slots.
+    anchor_preferences = (
+        ("context_receipt", False),
+        ("user_prompt", False),
+        ("session_start", False),
+        ("session_end", True),
+        ("error", True),
+        ("usage", True),
+    )
+    selected: set[int] = set()
+    for event_type, prefer_last in anchor_preferences:
+        matching = [
+            index
+            for index, event in enumerate(events)
+            if getattr(event, "type", "") == event_type
+        ]
+        if not matching:
+            continue
+        selected.add(matching[-1] if prefer_last else matching[0])
+        if len(selected) >= page_limit:
+            break
+
+    for index in range(len(events) - 1, -1, -1):
+        if len(selected) >= page_limit:
+            break
+        selected.add(index)
+    return [events[index] for index in sorted(selected)]
 
 
 def build_session_catalog_payload(
@@ -198,7 +245,11 @@ def build_session_detail_payload(
     """Build a shell-neutral session detail payload."""
 
     meta = store.load_meta(session_id)
-    events = store.load_transcript(session_id, limit=transcript_limit)
+    all_events = store.load_transcript(session_id)
+    events = _bounded_session_detail_events(
+        all_events,
+        limit=transcript_limit,
+    )
     replay_ok, replay_issues = store.verify_session_replay(session_id)
     envelopes = [event_envelope_from_legacy_event(event) for event in events]
     session_permission_entries = _permission_history_entries_for_session(store, session_id)
@@ -208,7 +259,7 @@ def build_session_detail_payload(
         "session": _session_payload(session_from_meta(meta)),
         "replay_ok": replay_ok,
         "replay_issues": list(replay_issues),
-        "compaction_preview": _event_compaction_preview(events),
+        "compaction_preview": _event_compaction_preview(all_events),
         "recent_events": [_event_payload(envelope) for envelope in envelopes],
         "approval_history": {
             "version": PERMISSION_PAYLOAD_VERSION,

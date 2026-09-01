@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 import stat
 from typing import Any
@@ -14,6 +15,7 @@ from dharma_swarm import model_status
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
+    ContextReceipt,
     EVENT_TYPES,
     SCHEMA_VERSION,
     SessionEnd,
@@ -316,6 +318,9 @@ class TerminalBridgeRouteTruthMixin:
         decoded_transcript = transcript or []
 
         starts = [event for event in decoded_transcript if isinstance(event, SessionStart)]
+        context_receipts = [
+            event for event in decoded_transcript if isinstance(event, ContextReceipt)
+        ]
         prompts = [event for event in decoded_transcript if isinstance(event, UserPrompt)]
         replies = [
             event
@@ -337,11 +342,58 @@ class TerminalBridgeRouteTruthMixin:
             for index, event in enumerate(decoded_transcript)
             if isinstance(event, SessionEnd)
         ]
+        context_receipt_positions = [
+            index
+            for index, event in enumerate(decoded_transcript)
+            if isinstance(event, ContextReceipt)
+        ]
+        context_receipt = (
+            context_receipts[0] if len(context_receipts) == 1 else None
+        )
+        receipt_timestamps_valid = False
+        if context_receipt is not None and start is not None and durable_terminal is not None:
+            timestamp_values = (
+                context_receipt.timestamp,
+                context_receipt.boundary_timestamp,
+                start.timestamp,
+                durable_terminal.timestamp,
+                context_receipt.outcome_timestamp,
+            )
+            if all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+                for value in timestamp_values
+            ):
+                (
+                    receipt_timestamp,
+                    boundary_timestamp,
+                    start_timestamp,
+                    terminal_timestamp,
+                    outcome_timestamp,
+                ) = (float(value) for value in timestamp_values)
+                receipt_timestamps_valid = (
+                    receipt_timestamp > 0
+                    and receipt_timestamp == boundary_timestamp
+                    and boundary_timestamp <= start_timestamp
+                    and start_timestamp <= terminal_timestamp
+                    and terminal_timestamp <= outcome_timestamp
+                )
+        context_receipt_valid = (
+            context_receipt is not None
+            and context_receipt.provider_id == source.requested_provider_id
+            and context_receipt.model_id == source.requested_model_id
+            and context_receipt.source == "server_bootstrap_cache"
+            and context_receipt.authority == "NONE"
+            and context_receipt.lane_outcome == "completed"
+            and receipt_timestamps_valid
+        )
         canonical_event_order = (
             len(prompts) == 1
             and bool(decoded_transcript)
             and isinstance(decoded_transcript[0], UserPrompt)
-            and start_positions == [1]
+            and context_receipt_positions == [1]
+            and start_positions == [2]
             and terminal_positions == [len(decoded_transcript) - 1]
         )
         served_provider = (
@@ -393,6 +445,7 @@ class TerminalBridgeRouteTruthMixin:
                 replay_ok,
                 not replay_issues,
                 canonical_event_order,
+                context_receipt_valid,
                 len(prompts) == 1,
                 (
                     prompts[0].content == source.expected_prompt

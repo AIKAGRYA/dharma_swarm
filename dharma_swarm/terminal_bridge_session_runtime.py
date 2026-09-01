@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict
+import hashlib
+import secrets
 from typing import Any
 
 from dharma_swarm.operator_core.session_lifecycle import SessionLifecycleRecorder
+from dharma_swarm.terminal_bridge_chat import _SERVER_OWNED_CHAT_CONTEXT_KEY
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui import model_routing
 try:
@@ -112,6 +115,37 @@ def _is_unconsumed_command_action(action: object) -> bool:
 class TerminalBridgeSessionRuntimeMixin:
     """Own session admission, lifecycle recording, and provider streaming."""
 
+    def _mint_server_owned_context_source_epoch(
+        self,
+        *,
+        bootstrap_request_id: str,
+        admission_request_id: str,
+        provider_id: str,
+        model_id: str,
+        context_digest: str,
+    ) -> str:
+        """Mint an opaque, process-bound epoch for one context issuance.
+
+        Client correlation IDs are useful lookup keys but are not provenance.
+        Bind them to this bridge's server-owned runtime identity and a fresh
+        issuance nonce, then expose only the digest. Reusing the same client
+        IDs, even inside one bridge process, therefore cannot recreate an
+        earlier source epoch.
+        """
+
+        fields = (
+            "dharma.helm.context-source.v1",
+            str(self._runtime_owner_id),
+            bootstrap_request_id,
+            admission_request_id,
+            provider_id,
+            model_id,
+            context_digest,
+            secrets.token_hex(32),
+        )
+        material = "\x00".join(fields).encode("utf-8")
+        return "sha256:" + hashlib.sha256(material).hexdigest()
+
     @staticmethod
     def _validated_request_prompt(
         request: dict[str, Any],
@@ -178,11 +212,21 @@ class TerminalBridgeSessionRuntimeMixin:
             return None
 
         owned_request = dict(request)
+        # Caller-authored system material has no path across the bridge trust
+        # boundary. This private slot is overwritten before any provider work.
+        owned_request.pop("system_prompt", None)
+        owned_request[_SERVER_OWNED_CHAT_CONTEXT_KEY] = None
         canonical_intent = self._resolve_prompt_intent(prompt)
         supplied_bootstrap = request.get("bootstrap")
-        bootstrap = dict(supplied_bootstrap) if isinstance(supplied_bootstrap, dict) else {}
-        bootstrap["intent"] = canonical_intent
-        owned_request["bootstrap"] = bootstrap
+        bootstrap_request_id = ""
+        if isinstance(supplied_bootstrap, dict):
+            supplied_request_id = supplied_bootstrap.get("request_id")
+            if isinstance(supplied_request_id, str):
+                bootstrap_request_id = supplied_request_id.strip()
+        owned_request["bootstrap"] = {"intent": canonical_intent}
+        owned_request["active_tab"] = self._canonical_active_tab(
+            request.get("active_tab")
+        )
         default_target = model_routing.default_target()
         provider_id = str(request.get("provider", "") or default_target.provider_id).strip().lower()
         model_id = str(request.get("model", "") or "").strip()
@@ -195,6 +239,51 @@ class TerminalBridgeSessionRuntimeMixin:
             lanes = self._chat_lanes(provider_id, model_id)
             if lanes:
                 provider_id, model_id, _, _ = lanes[0]
+        server_bootstrap, context_disposition = (
+            self._consume_server_owned_session_bootstrap(
+            bootstrap_request_id,
+            prompt=prompt,
+            provider_id=provider_id,
+            model_id=model_id,
+            )
+        )
+        source_epoch = ""
+        context_content = ""
+        context_digest = ""
+        if server_bootstrap is not None:
+            owned_request["active_tab"] = self._canonical_active_tab(
+                server_bootstrap.get("active_tab")
+            )
+            server_owned_context, redaction_count = (
+                self._render_server_owned_chat_context(
+                server_bootstrap,
+                prompt=prompt,
+                )
+            )
+            if server_owned_context:
+                context_content = server_owned_context
+                context_digest = "sha256:" + hashlib.sha256(
+                    server_owned_context.encode("utf-8")
+                ).hexdigest()
+                context_disposition = (
+                    "attached_redacted" if redaction_count else "attached"
+                )
+            source_epoch = self._mint_server_owned_context_source_epoch(
+                bootstrap_request_id=bootstrap_request_id,
+                admission_request_id=request_id,
+                provider_id=provider_id,
+                model_id=model_id,
+                context_digest=context_digest,
+            )
+        owned_request[_SERVER_OWNED_CHAT_CONTEXT_KEY] = {
+            "provider_id": provider_id,
+            "model_id": model_id,
+            "content": context_content,
+            "disposition": context_disposition,
+            "context_digest": context_digest,
+            "source_epoch": source_epoch,
+        }
+        owned_request["bootstrap"]["context_disposition"] = context_disposition
         adapter = self._adapters.get(provider_id)
         if adapter is None:
             self._emit(
@@ -259,6 +348,12 @@ class TerminalBridgeSessionRuntimeMixin:
         *,
         extra: dict[str, Any] | None = None,
     ) -> None:
+        if isinstance(event, SessionEnd):
+            auto_context_receipt = (
+                run.lifecycle.take_auto_context_receipt_for_emission()
+            )
+            if auto_context_receipt is not None:
+                self._emit_recorded_session_event(run, auto_context_receipt)
         payload = asdict(event)
         payload["request_id"] = run.request_id
         if event.type in _NARRATION_EVENT_TYPES:
