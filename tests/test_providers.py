@@ -418,7 +418,6 @@ def test_openrouter_free_auto_discovery():
 
 def test_memory_survival_directive_in_subprocess_prompt():
     """Memory survival directive is injected into subprocess prompts."""
-    from dharma_swarm.providers import MEMORY_SURVIVAL_DIRECTIVE
     provider = ClaudeCodeProvider(timeout=10)
     request = LLMRequest(
         model="claude-code",
@@ -442,7 +441,6 @@ def test_memory_survival_directive_content():
 @pytest.mark.asyncio
 async def test_model_router_injects_survival_directive():
     """ModelRouter.complete injects survival directive into system prompt."""
-    from dharma_swarm.providers import MEMORY_SURVIVAL_DIRECTIVE
 
     captured_request = None
 
