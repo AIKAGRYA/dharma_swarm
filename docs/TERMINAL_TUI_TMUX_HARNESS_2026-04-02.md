@@ -20,7 +20,8 @@ Defaults:
   `TMUX_TMPDIR` `/tmp` (`DHARMA_TERMINAL_TMUX_TMPDIR`)
 
 Root provenance is fail-closed: if `DHARMA_TERMINAL_ROOT` points at a tree
-other than the one the launcher lives in (paths are canonicalized first), the
+other than the one the launcher lives in (paths are resolved to their real
+locations first), the
 launcher refuses with exit 2 unless `DHARMA_TERMINAL_ROOT_OVERRIDE_OK=1` is
 set. The launcher also verifies liveness of the Python bridge process after
 boot and tears down a session it created if the boot is unhealthy.

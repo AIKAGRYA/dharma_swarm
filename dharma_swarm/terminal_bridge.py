@@ -65,6 +65,7 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
+from dharma_swarm.terminal_bridge_chat_context import TerminalBridgeChatContextMixin
 from dharma_swarm.terminal_bridge_external_preview import (
     GPT_5_6_SOL_MODEL_ID,
     KIMI_K3_MODEL_ID,
@@ -106,6 +107,7 @@ class TerminalBridge(
     TerminalBridgeSessionRuntimeMixin,
     TerminalBridgeRouteTruthMixin,
     TerminalBridgeChatMixin,
+    TerminalBridgeChatContextMixin,
     TerminalBridgeHelmContextMixin,
 ):
     """Minimal stdio protocol server for a terminal frontend."""

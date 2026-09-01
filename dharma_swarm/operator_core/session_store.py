@@ -1,4 +1,9 @@
-"""Canonical session persistence for the shared operator core."""
+"""Canonical session persistence for the shared operator core.
+
+# closure-layer-role: canonical-store — SessionStore owns the durable session
+# transcript/audit/meta layout under ~/.dharma/sessions (state_dir.sessions in
+# ACTIVE_SURFACE_MANIFEST.yaml); physical I/O lives in session_store_fs.
+"""
 
 from __future__ import annotations
 
@@ -6,13 +11,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
-import fcntl
 import json
 import logging
-import os
-import secrets
-import subprocess
-import threading
 from pathlib import Path
 from typing import Any
 
@@ -22,111 +22,35 @@ from dharma_swarm.tui.engine.events import (
     CanonicalEvent,
     CanonicalEventType,
     ContextReceipt,
-    EVENT_TYPES,
 )
+
+from . import session_store_fs as _fs
+from .session_store_fs import cwd_matches
+
+__all__ = ["SessionStore", "cwd_matches"]
 
 HOME = Path.home()
 DEFAULT_ROOT = HOME / ".dharma" / "sessions"
 LEGACY_OWNER_GRACE_SECONDS = 300.0
 logger = logging.getLogger(__name__)
 
-_SESSION_RECOVERY_LOCKS: dict[Path, threading.RLock] = {}
-_SESSION_RECOVERY_LOCKS_GUARD = threading.Lock()
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _new_session_id() -> str:
-    now = datetime.now(timezone.utc)
-    return f"dgc-{now:%Y%m%d}-{now:%H%M%S}-{secrets.token_hex(2)}"
-
-
-def _session_recovery_thread_lock(path: Path) -> threading.RLock:
-    """Return the shared in-process half of a session recovery lock."""
-
-    key = path.resolve()
-    with _SESSION_RECOVERY_LOCKS_GUARD:
-        return _SESSION_RECOVERY_LOCKS.setdefault(key, threading.RLock())
+_now_iso = _fs.now_iso
+_new_session_id = _fs.new_session_id
+_atomic_write_json = _fs.atomic_write_json
 
 
 def _pid_is_alive(pid: int) -> bool:
     """Compatibility seam used by recovery tests and runtime injection."""
 
-    from .session_lifecycle import _pid_is_alive as check_pid
+    from .session_recovery import _pid_is_alive as check_pid
 
     return check_pid(pid)
 
 
-def _normalize_cwd(cwd: str) -> str:
-    try:
-        return str(Path(cwd).expanduser().resolve())
-    except Exception:
-        return str(Path(cwd).expanduser())
-
-
-def cwd_matches(meta_cwd: str, expected_cwd: str) -> bool:
-    if meta_cwd == expected_cwd:
-        return True
-    return _normalize_cwd(meta_cwd) == _normalize_cwd(expected_cwd)
-
-
 def _observe_git_branch(cwd: str) -> str:
-    """Sample the branch at session creation without making Git authoritative."""
+    """Compatibility seam kept for tests that stub branch observation."""
 
-    normalized_cwd = _normalize_cwd(cwd)
-    try:
-        result = subprocess.run(
-            [
-                "git",
-                "--no-optional-locks",
-                "-C",
-                normalized_cwd,
-                "branch",
-                "--show-current",
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    if result.returncode != 0:
-        return ""
-    return result.stdout.strip()
-
-
-def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-    """Replace one JSON owner file without exposing a truncated target."""
-
-    temp_path = path.with_name(
-        f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
-    )
-    encoded = json.dumps(payload, indent=2)
-    try:
-        with open(temp_path, "w", encoding="utf-8") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp_path, path)
-        try:
-            directory_fd = os.open(path.parent, os.O_RDONLY)
-        except OSError:
-            directory_fd = -1
-        if directory_fd >= 0:
-            try:
-                os.fsync(directory_fd)
-            except OSError:
-                pass
-            finally:
-                os.close(directory_fd)
-    finally:
-        try:
-            temp_path.unlink()
-        except FileNotFoundError:
-            pass
+    return _fs.observe_git_branch(cwd)
 
 
 class SessionStore:
@@ -241,17 +165,7 @@ class SessionStore:
             payload["raw"] = None
         tp = self.root / session_id / "transcript.jsonl"
         encoded = (json.dumps(payload, ensure_ascii=True) + "\n").encode("utf-8")
-        with open(tp, "a+b") as handle:
-            handle.seek(0, os.SEEK_END)
-            if handle.tell() > 0:
-                handle.seek(-1, os.SEEK_END)
-                if handle.read(1) != b"\n":
-                    handle.seek(0, os.SEEK_END)
-                    handle.write(b"\n")
-            handle.seek(0, os.SEEK_END)
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
+        _fs.append_jsonl_record(tp, encoded)
         try:
             self._bridge_for(session_id).record_canonical_event(event)
         except Exception:
@@ -266,32 +180,7 @@ class SessionStore:
         limit: int | None = None,
     ) -> list[CanonicalEventType]:
         tp = self.root / session_id / "transcript.jsonl"
-        if not tp.exists():
-            return []
-
-        events: list[CanonicalEventType] = []
-        for raw_line in tp.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            event_type = str(payload.get("type", "") or "").strip()
-            if not event_type or (include_types is not None and event_type not in include_types):
-                continue
-            event_cls = EVENT_TYPES.get(event_type)
-            if event_cls is None:
-                continue
-            try:
-                events.append(event_cls(**payload))
-            except Exception:
-                continue
-
-        if limit is not None and limit >= 0:
-            return events[-limit:]
-        return events
+        return _fs.read_transcript_events(tp, include_types=include_types, limit=limit)
 
     def append_audit(self, session_id: str, entry: dict[str, Any]) -> None:
         ap = self.root / session_id / "audit.jsonl"
@@ -299,8 +188,7 @@ class SessionStore:
         payload.setdefault("timestamp", datetime.now(timezone.utc).timestamp())
         payload.setdefault("created_at", _now_iso())
         payload.setdefault("session_id", session_id)
-        with open(ap, "a") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        _fs.append_jsonl_line(ap, payload)
         self._touch_session(session_id)
 
     def load_audit(
@@ -311,58 +199,11 @@ class SessionStore:
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         ap = self.root / session_id / "audit.jsonl"
-        if not ap.exists():
-            return []
-
-        entries: list[dict[str, Any]] = []
-        for raw_line in ap.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            if not isinstance(payload, dict):
-                continue
-            domain = str(payload.get("domain", "") or "").strip()
-            if include_domains is not None and domain not in include_domains:
-                continue
-            entries.append(payload)
-
-        if limit is not None and limit >= 0:
-            return entries[-limit:]
-        return entries
+        return _fs.read_audit_entries(ap, include_domains=include_domains, limit=limit)
 
     def prune_audit_domains(self, session_id: str, *, domains: set[str]) -> int:
         ap = self.root / session_id / "audit.jsonl"
-        if not ap.exists():
-            return 0
-
-        kept_lines: list[str] = []
-        removed = 0
-        for raw_line in ap.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                kept_lines.append(raw_line)
-                continue
-            if not isinstance(payload, dict):
-                kept_lines.append(raw_line)
-                continue
-            domain = str(payload.get("domain", "") or "").strip()
-            if domain in domains:
-                removed += 1
-                continue
-            kept_lines.append(raw_line)
-
-        with open(ap, "w", encoding="utf-8") as handle:
-            for kept_line in kept_lines:
-                handle.write(kept_line.rstrip("\n") + "\n")
-        return removed
+        return _fs.prune_audit_domains(ap, domains=domains)
 
     def finalize_session(
         self,
@@ -422,7 +263,7 @@ class SessionStore:
 
         # Imported lazily to keep the store/lifecycle dependency acyclic while
         # preserving this long-standing public SessionStore entry point.
-        from .session_lifecycle import recover_orphaned_sessions
+        from .session_recovery import recover_orphaned_sessions
 
         return recover_orphaned_sessions(
             self,
@@ -444,13 +285,8 @@ class SessionStore:
         """
 
         lock_path = self.root / session_id / ".recovery.lock"
-        with _session_recovery_thread_lock(lock_path):
-            with lock_path.open("a+b") as handle:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                try:
-                    yield
-                finally:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        with _fs.session_recovery_file_lock(lock_path):
+            yield
 
     def load_meta(self, session_id: str) -> dict[str, Any]:
         return json.loads((self.root / session_id / "meta.json").read_text())
@@ -566,90 +402,22 @@ class SessionStore:
 
     @staticmethod
     def _index_entry_from_meta(meta: dict[str, Any]) -> dict[str, Any] | None:
-        session_id = str(meta.get("session_id", "") or "").strip()
-        if not session_id:
-            return None
-        return {
-            "session_id": session_id,
-            "title": str(meta.get("title", "") or ""),
-            "provider_id": str(meta.get("provider_id", "") or ""),
-            "model_id": str(meta.get("model_id", "") or ""),
-            "created_at": str(meta.get("created_at", "") or ""),
-            "updated_at": str(meta.get("updated_at", "") or ""),
-            "status": str(meta.get("status", "") or ""),
-            "total_cost_usd": float(meta.get("total_cost_usd", 0.0) or 0.0),
-            "total_turns": int(meta.get("total_turns", 0) or 0),
-        }
+        return _fs.index_entry_from_meta(meta)
 
     def _discovered_index_entries(self) -> list[dict[str, Any]]:
-        discovered: list[dict[str, Any]] = []
-        try:
-            session_paths = sorted(self.root.iterdir(), key=lambda path: path.name)
-        except OSError:
-            return discovered
-        for session_path in session_paths:
-            if not session_path.is_dir() or session_path.name.startswith("."):
-                continue
-            meta_path = session_path / "meta.json"
-            try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError, TypeError):
-                continue
-            if not isinstance(meta, dict):
-                continue
-            entry = self._index_entry_from_meta(meta)
-            if entry is None or entry["session_id"] != session_path.name:
-                continue
-            discovered.append(entry)
-        return discovered
+        return _fs.discovered_index_entries(self.root)
 
     def _merged_index_sessions(self) -> list[dict[str, Any]]:
-        raw_sessions = self._read_index().get("sessions", [])
-        sessions: list[dict[str, Any]] = []
-        positions: dict[str, int] = {}
-        if isinstance(raw_sessions, list):
-            for raw_entry in raw_sessions:
-                if not isinstance(raw_entry, dict):
-                    continue
-                session_id = str(raw_entry.get("session_id", "") or "").strip()
-                if not session_id or session_id in positions:
-                    continue
-                positions[session_id] = len(sessions)
-                sessions.append(dict(raw_entry))
-        for discovered in self._discovered_index_entries():
-            session_id = str(discovered["session_id"])
-            position = positions.get(session_id)
-            if position is None:
-                positions[session_id] = len(sessions)
-                sessions.append(discovered)
-            else:
-                sessions[position] = {**sessions[position], **discovered}
-        return sessions
+        return _fs.merged_index_sessions(self._read_index().get("sessions", []), self.root)
 
     def _upsert_index_entry(self, session_id: str, updates: dict[str, Any]) -> None:
         index = self._read_index()
-        raw_sessions = index.get("sessions", [])
-        sessions = [
-            dict(entry)
-            for entry in raw_sessions
-            if isinstance(entry, dict)
-            and str(entry.get("session_id", "") or "").strip()
-        ] if isinstance(raw_sessions, list) else []
-        found = False
-        for entry in sessions:
-            if entry.get("session_id") == session_id:
-                entry.update(updates)
-                found = True
-                break
-        if not found:
-            try:
-                meta_entry = self._index_entry_from_meta(self.load_meta(session_id))
-            except (OSError, ValueError, TypeError):
-                meta_entry = None
-            if meta_entry is not None:
-                meta_entry.update(updates)
-                sessions.append(meta_entry)
-        index["sessions"] = sessions
+        index["sessions"] = _fs.upsert_index_sessions(
+            index.get("sessions", []),
+            session_id=session_id,
+            updates=updates,
+            meta_loader=self.load_meta,
+        )
         try:
             self._write_index(index)
         except OSError as exc:
@@ -669,31 +437,13 @@ class SessionStore:
         provider_id: str | None = None,
         min_turns: int | None = None,
     ) -> dict[str, Any] | None:
-        latest_meta: dict[str, Any] | None = None
-        latest_key = ""
-        for entry in self.list_sessions():
-            sid = str(entry.get("session_id", "")).strip()
-            if not sid:
-                continue
-            try:
-                meta = self.load_meta(sid)
-            except Exception:
-                continue
-            if cwd and not cwd_matches(str(meta.get("cwd", "")), cwd):
-                continue
-            if provider_id and str(meta.get("provider_id", "")) != provider_id:
-                continue
-            if min_turns is not None:
-                turns = int(meta.get("total_turns", 0) or 0)
-                if turns < int(min_turns):
-                    continue
-            updated = str(meta.get("updated_at", ""))
-            created = str(meta.get("created_at", ""))
-            key = updated or created
-            if key and key > latest_key:
-                latest_key = key
-                latest_meta = meta
-        return latest_meta
+        return _fs.latest_session_meta(
+            self.list_sessions(),
+            meta_loader=self.load_meta,
+            cwd=cwd,
+            provider_id=provider_id,
+            min_turns=min_turns,
+        )
 
     def verify_session_replay(self, session_id: str) -> tuple[bool, list[str]]:
         snapshot_ok, snapshot_issues = verify_replay_integrity(
@@ -739,17 +489,4 @@ class SessionStore:
 
     @staticmethod
     def _snapshot_state(meta: dict[str, Any], *, reason: str) -> dict[str, Any]:
-        return {
-            "snapshot_reason": reason,
-            "session_id": str(meta.get("session_id", "")),
-            "provider_id": str(meta.get("provider_id", "")),
-            "model_id": str(meta.get("model_id", "")),
-            "provider_session_id": str(meta.get("provider_session_id", "")),
-            "cwd": str(meta.get("cwd", "")),
-            "status": str(meta.get("status", "")),
-            "total_turns": int(meta.get("total_turns", 0) or 0),
-            "total_input_tokens": int(meta.get("total_input_tokens", 0) or 0),
-            "total_output_tokens": int(meta.get("total_output_tokens", 0) or 0),
-            "total_cost_usd": float(meta.get("total_cost_usd", 0.0) or 0.0),
-            "updated_at": str(meta.get("updated_at", "")),
-        }
+        return _fs.snapshot_state(meta, reason=reason)

@@ -9,7 +9,7 @@ import secrets
 from typing import Any
 
 from dharma_swarm.operator_core.session_lifecycle import SessionLifecycleRecorder
-from dharma_swarm.terminal_bridge_chat import _SERVER_OWNED_CHAT_CONTEXT_KEY
+from dharma_swarm.terminal_bridge_chat_context import _SERVER_OWNED_CHAT_CONTEXT_KEY
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module

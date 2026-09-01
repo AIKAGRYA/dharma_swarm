@@ -24,6 +24,7 @@ def _run_launcher(
     tmp_path: Path,
     *,
     root_override: Path | None = None,
+    root_override_ok: bool = True,
     bridge_live: bool = True,
     preexisting_session: bool = False,
 ) -> tuple[subprocess.CompletedProcess[str], list[list[str]], dict[str, object]]:
@@ -86,6 +87,24 @@ with open(os.environ["FAKE_BUN_LOG"], "w", encoding="utf-8") as handle:
 """,
     )
     _write_executable(
+        fake_bin / "pgrep",
+        f"""#!{sys.executable}
+import os
+import sys
+
+# BSD pgrep excludes ancestors of itself, so the real binary can never report
+# the launcher shell as a child of the fake pane pid. Model the process tree
+# instead: the fake pane has exactly one child (itself) while the bridge is
+# live, and no children otherwise.
+args = sys.argv[1:]
+if args[:1] == ["-P"] and args[1:2] == [os.environ["FAKE_PANE_PID"]]:
+    if os.environ.get("FAKE_BRIDGE_LIVE") == "1":
+        print(os.environ["FAKE_PANE_PID"])
+        raise SystemExit(0)
+raise SystemExit(1)
+""",
+    )
+    _write_executable(
         fake_bin / "ps",
         f"""#!{sys.executable}
 import os
@@ -116,8 +135,11 @@ if os.environ.get("FAKE_BRIDGE_LIVE") == "1":
         "TERMINAL_TUI_LIVENESS_TIMEOUT_SECONDS": "1",
     }
     env.pop("DHARMA_TERMINAL_TMUX_TMPDIR", None)
+    env.pop("DHARMA_TERMINAL_ROOT_OVERRIDE_OK", None)
     if root_override is not None:
         env["DHARMA_TERMINAL_ROOT"] = str(root_override)
+        if root_override_ok:
+            env["DHARMA_TERMINAL_ROOT_OVERRIDE_OK"] = "1"
     else:
         env.pop("DHARMA_TERMINAL_ROOT", None)
 
@@ -129,7 +151,11 @@ if os.environ.get("FAKE_BRIDGE_LIVE") == "1":
         text=True,
         check=False,
     )
-    tmux_calls = [json.loads(line) for line in tmux_log.read_text().splitlines()]
+    tmux_calls = (
+        [json.loads(line) for line in tmux_log.read_text().splitlines()]
+        if tmux_log.exists()
+        else []
+    )
     bun_call = json.loads(bun_log.read_text()) if bun_log.exists() else {}
     return result, tmux_calls, bun_call
 
@@ -168,6 +194,18 @@ def test_tmux_launcher_respects_root_override_with_spaces(tmp_path: Path) -> Non
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert bun_call["cwd"] == str(root_override / "terminal")
+
+
+def test_tmux_launcher_refuses_root_override_without_consent(tmp_path: Path) -> None:
+    root_override = tmp_path / "alternate checkout"
+    (root_override / "terminal").mkdir(parents=True)
+
+    result, tmux_calls, bun_call = _run_launcher(tmp_path, root_override=root_override, root_override_ok=False)
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "another tree's cockpit" in result.stderr
+    assert tmux_calls == []
+    assert bun_call == {}
 
 
 def test_tmux_launcher_removes_only_a_new_unhealthy_session(tmp_path: Path) -> None:
