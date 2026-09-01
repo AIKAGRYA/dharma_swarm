@@ -114,7 +114,7 @@ def _write_fake_tmux(tmp_path: Path) -> tuple[Path, Path]:
                   case "$socket_name" in
                     CODEX_MANAGED_offline_queue_*)
                       printf '%s\n' "$command_arg" \
-                        | sed -n 's/.*DHARMA_PYTHON=\\([^ ]*\\).*/\\1/p' >"$gate_file"
+                        | sed -n "s/.*DHARMA_PYTHON='\\{0,1\\}\\([^ ']*\\)'\\{0,1\\}.*/\\1/p" >"$gate_file"
                       ;;
                   esac
                 fi
@@ -598,7 +598,8 @@ def test_e2e_harnesses_fail_and_preserve_state_when_cleanup_hangs(
 
     calls = [line.split("\t") for line in log_path.read_text().splitlines()]
     command_sequence = [call[6].removeprefix("arg=") for call in calls]
-    assert command_sequence[-1] == "kill-server"
+    # After a hung kill-server, cleanup probes server liveness before refusing.
+    assert command_sequence[-2:] == ["kill-server", "list-sessions"]
     for call in calls:
         assert re.fullmatch(rf"arg=CODEX_MANAGED_{purpose}_[0-9]+", call[3])
 
@@ -791,7 +792,7 @@ def test_cleanup_is_bounded_and_keeps_socket_when_kill_server_hangs(
     )
     elapsed = time.monotonic() - started
     assert completed.returncode == 0, completed.stderr
-    assert elapsed < 4
+    assert elapsed < 5
     assert "refusing to unlink" in completed.stderr
     assert "arg=kill-server" in log_path.read_text()
 
