@@ -240,14 +240,8 @@ def _campaign_guard(root: Path) -> dict[str, Any]:
         sessions = [line.strip() for line in tmux.stdout.splitlines() if line.strip()]
     except (OSError, subprocess.SubprocessError):
         sessions = []
-    active_sessions = [
-        name
-        for name in sessions
-        if re.search(r"(^|[-_])(rsi|forge[-_]lab)([-_]|$)", name, re.I)
-    ]
     evidence["tmux_sessions"] = sessions
-    if active_sessions:
-        reasons.append(f"active RSI tmux sessions: {', '.join(active_sessions)}")
+    evidence["tmux_sessions_are_observational_only"] = True
 
     try:
         processes = subprocess.run(

@@ -374,8 +374,8 @@ Activation refuses:
 - an unexpected concurrent `current` change;
 - a non-symlink `current` path;
 - an operator `DEPLOYMENT_BLOCK`;
-- an active Forge/RSI campaign manifest, recognizable tmux session, or known
-  campaign process; or
+- an active Forge/RSI campaign manifest or known campaign process (tmux
+  session names are recorded as operator-console evidence only); or
 - a remote outside the explicit SSH allowlist.
 
 SSH is non-interactive, host-key checked, identity-only, and has agent,
