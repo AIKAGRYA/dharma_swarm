@@ -329,14 +329,26 @@ def _final_patch(
         return (
             str(rec.get("patch") or ""),
             tokens,
-            {"generator_input": evidence} if isinstance(evidence, dict) else {},
+            {
+                "schema": "rsi_lab.execution_evidence.v1",
+                "arm": kind,
+                "generator_input": evidence if isinstance(evidence, dict) else None,
+            },
         )
     if kind == "self_moa":
         out = seams.self_moa_arm(
             gen_slot, inst, ctx, budget,
             k=int(genome.get("k", 3)), per_call_tokens=per_call, timeout_s=timeout_s, window_chars=window,
         )
-        return str(out.get("final_patch") or ""), int(budget.spent), {}
+        return (
+            str(out.get("final_patch") or ""),
+            int(budget.spent),
+            {
+                "schema": "rsi_lab.execution_evidence.v1",
+                "arm": kind,
+                "generator_input": None,
+            },
+        )
     ver_slot = seams.slot_for_id(str(genome.get("verifier_model") or ""))
     if ver_slot is None:
         raise ExploreInfrastructureError(
@@ -355,11 +367,24 @@ def _final_patch(
         )
     else:
         raise ExploreGenerationError(f"unknown_arm_kind:{kind}")
-    evidence = out.get("execution_evidence")
+    raw_evidence = out.get("execution_evidence")
+    evidence = {
+        "schema": "rsi_lab.execution_evidence.v1",
+        "arm": kind,
+        "generator_input": None,
+    }
+    if isinstance(raw_evidence, dict):
+        evidence.update(
+            {
+                key: value
+                for key, value in raw_evidence.items()
+                if key != "schema"
+            }
+        )
     return (
         str(out.get("final_patch") or ""),
         int(budget.spent),
-        dict(evidence) if isinstance(evidence, dict) else {},
+        evidence,
     )
 
 

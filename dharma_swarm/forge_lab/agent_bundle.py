@@ -203,14 +203,34 @@ def evaluate_promotion(
     mutation_receipt: Mapping[str, Any],
     evaluation_receipt: Mapping[str, Any],
     authority_receipt: Mapping[str, Any],
+    receipt_chain: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Evaluate the sole Explore→Confirmed promotion rule from evidence."""
 
     evidence_error = None
+    chain = list(
+        receipt_chain
+        if receipt_chain is not None
+        else [mutation_receipt, evaluation_receipt, authority_receipt]
+    )
     try:
-        verify_receipt_chain(
-            [mutation_receipt, evaluation_receipt, authority_receipt]
-        )
+        verify_receipt_chain(chain)
+        chain_digests = [
+            str(receipt.get("receipt_digest") or "") for receipt in chain
+        ]
+        evidence_digests = [
+            str(receipt.get("receipt_digest") or "")
+            for receipt in (
+                mutation_receipt,
+                evaluation_receipt,
+                authority_receipt,
+            )
+        ]
+        positions = [chain_digests.index(digest) for digest in evidence_digests]
+        if positions != sorted(set(positions)):
+            raise ValueError(
+                "promotion evidence receipts are missing, duplicated, or out of order"
+            )
     except ValueError as exc:
         evidence_error = str(exc)
     evidence_chain_valid = evidence_error is None

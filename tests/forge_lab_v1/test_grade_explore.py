@@ -91,7 +91,8 @@ def test_empty_model_patch_is_noncomparable_generation_not_negative() -> None:
 def test_verify_chain_executes_mutation_gene_and_preserves_empty_evidence() -> None:
     observed: dict[str, object] = {}
     execution_evidence = {
-        "schema": "rsi_lab.verify_chain_execution.v1",
+        "schema": "rsi_lab.execution_evidence.v1",
+        "arm": "verify_chain",
         "generator_input": {
             "schema": "rsi_lab.execution_input_receipt.v1",
             "mutation_gene_applied": True,
@@ -107,7 +108,14 @@ def test_verify_chain_executes_mutation_gene_and_preserves_empty_evidence() -> N
 
     def verify_chain(*_args, **kwargs):
         observed.update(kwargs)
-        return {"final_patch": "", "execution_evidence": execution_evidence}
+        return {
+            "final_patch": "",
+            "execution_evidence": {
+                key: value
+                for key, value in execution_evidence.items()
+                if key not in {"schema", "arm"}
+            },
+        }
 
     seams = grade_explore.GradeSeams(
         slot_for_id=lambda model_id: SimpleNamespace(model_id=model_id),

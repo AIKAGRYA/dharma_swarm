@@ -90,6 +90,57 @@ def _promotion_receipts() -> tuple[dict, dict, dict]:
     return mutation, evaluation, authority
 
 
+def _interleaved_promotion_chain() -> tuple[list[dict], dict, dict, dict]:
+    receipts: list[dict] = []
+    previous = None
+
+    def append(kind: str, payload: dict) -> dict:
+        nonlocal previous
+        receipt = build_receipt(
+            kind,
+            payload,
+            previous_digest=previous,
+            observed_at=f"2026-09-02T00:0{len(receipts)}:00Z",
+        )
+        receipts.append(receipt)
+        previous = receipt["receipt_digest"]
+        return receipt
+
+    append("observation", {"status": "admitted"})
+    mutation = append(
+        "mutation",
+        {
+            "generator_input": {
+                "counterfactual_prompt_digest": "sha256:" + "4" * 64,
+                "executed_prompt_digest": "sha256:" + "5" * 64,
+                "mutation_gene_digest": "sha256:" + "6" * 64,
+                "mutation_gene_applied": True,
+                "provider_call_completed": True,
+            }
+        },
+    )
+    append("budget", {"reserved_usd": 1.25})
+    append("containment", {"network": "disabled"})
+    evaluation = append(
+        "evaluation",
+        {
+            "evaluation_complete": True,
+            "baseline_digest": "sha256:" + "7" * 64,
+            "candidate_digest": "sha256:" + "8" * 64,
+            "comparison_digest": "sha256:" + "9" * 64,
+            "baseline_score": 0.0,
+            "candidate_score": 1.0,
+            "improvement_demonstrated": True,
+        },
+    )
+    append("lineage", {"parent": "candidate-parent"})
+    authority = append(
+        "decision",
+        {"authority_allowed": True, "authority": "bounded-rsi-evaluator"},
+    )
+    return receipts, mutation, evaluation, authority
+
+
 def test_agent_bundle_manifest_binds_all_components_and_kernel_boundary() -> None:
     manifest = _manifest()
 
@@ -132,6 +183,30 @@ def test_typed_promotion_requires_all_four_evidence_obligations() -> None:
     assert decision["source_type"] == "Candidate<Explore>"
     assert decision["target_type"] == "Candidate<Confirmed>"
     assert decision["failed_obligations"] == []
+
+
+def test_typed_promotion_accepts_ordered_evidence_from_full_interleaved_chain() -> None:
+    chain, mutation, evaluation, authority = _interleaved_promotion_chain()
+
+    decision = evaluate_promotion(
+        mutation_receipt=mutation,
+        evaluation_receipt=evaluation,
+        authority_receipt=authority,
+        receipt_chain=chain,
+    )
+
+    assert verify_receipt_chain(chain) is True
+    assert [receipt["kind"] for receipt in chain] == [
+        "observation",
+        "mutation",
+        "budget",
+        "containment",
+        "evaluation",
+        "lineage",
+        "decision",
+    ]
+    assert decision["evidence_chain_valid"] is True
+    assert decision["decision"] == "promoted"
 
 
 @pytest.mark.parametrize(
