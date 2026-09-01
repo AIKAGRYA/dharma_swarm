@@ -333,6 +333,8 @@ def _final_patch(
                 "schema": "rsi_lab.execution_evidence.v1",
                 "arm": kind,
                 "generator_input": evidence if isinstance(evidence, dict) else None,
+                "generator_error": rec.get("error"),
+                "generator_infrastructure_error": bool(rec.get("error")),
             },
         )
     if kind == "self_moa":
@@ -428,8 +430,22 @@ def grade_genome_explore(
                 if execution_evidence:
                     row["execution_evidence"] = execution_evidence
                 if not patch.strip():
-                    row["error"] = "empty_patch"
-                    noncomparable_kind = "generation"
+                    generator_error = (
+                        execution_evidence.get("generator_error")
+                        if isinstance(execution_evidence, dict)
+                        else None
+                    )
+                    if generator_error or (
+                        isinstance(execution_evidence, dict)
+                        and execution_evidence.get("generator_infrastructure_error")
+                    ):
+                        row["error"] = (
+                            f"generator_infrastructure_error:{generator_error}"[:500]
+                        )
+                        noncomparable_kind = "infrastructure"
+                    else:
+                        row["error"] = "empty_patch"
+                        noncomparable_kind = "generation"
                 elif getattr(budget, "invalid", False):
                     row["error"] = f"budget_invalid:{getattr(budget, 'invalid_reason', '')}"
                     noncomparable_kind = "budget"

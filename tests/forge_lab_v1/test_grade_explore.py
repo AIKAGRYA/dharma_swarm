@@ -188,3 +188,118 @@ def test_explore_closeout_vocabulary_cannot_encode_positive_lift() -> None:
     assert "positive_lift_candidate" not in EXPLORE_CLOSEOUTS
     assert "inconclusive_infrastructure" in EXPLORE_CLOSEOUTS
     assert all("positive" not in state for state in EXPLORE_CLOSEOUTS)
+
+
+def _verify_chain_grade(generator_rec: dict, verifier_rec: dict, calls: list) -> grade_explore.GradeOutcome:
+    from dharma_swarm.forge_v1.forge_v2 import arms
+
+    def fake_propose(slot, *_args, **kwargs):
+        calls.append({"model_id": slot.model_id, "extra_instruction": kwargs.get("extra_instruction", "")})
+        return dict(generator_rec if len(calls) == 1 else verifier_rec)
+
+    real_verify_chain = arms.verify_chain_arm
+
+    def patched_verify_chain(*args, **kwargs):
+        original = arms._propose_slot
+        arms._propose_slot = fake_propose
+        try:
+            return real_verify_chain(*args, **kwargs)
+        finally:
+            arms._propose_slot = original
+
+    seams = grade_explore.GradeSeams(
+        slot_for_id=lambda model_id: SimpleNamespace(model_id=model_id, provider="ollama"),
+        propose_slot=fake_propose,
+        self_moa_arm=lambda *_args, **_kwargs: {"final_patch": ""},
+        verify_chain_arm=patched_verify_chain,
+        mixed_moa_arm=lambda *_args, **_kwargs: {"final_patch": ""},
+        grade_task=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("empty patch must not reach the evaluator")
+        ),
+        budget_factory=_Budget,
+    )
+    return grade_explore.grade_genome_explore(
+        {
+            "arm_kind": "verify_chain",
+            "generator_model": "gen:cloud",
+            "verifier_model": "ver:cloud",
+            "per_call_tokens": 10,
+            "window_chars": 100,
+        },
+        {"t1": ({}, {})},
+        seams=seams,
+        budget_cap_tokens=1000,
+        budget_cap_usd=1.0,
+    )
+
+
+def test_generator_infra_error_empty_patch_still_verifies_and_grades_infrastructure() -> None:
+    calls: list = []
+    outcome = _verify_chain_grade(
+        {"patch": "", "tokens": 5, "error": "route: TimeoutError: boom"},
+        {"patch": "", "tokens": 5, "error": None},
+        calls,
+    )
+    assert len(calls) == 2
+    assert calls[1]["model_id"] == "ver:cloud"
+    assert "<EMPTY_PATCH>" in calls[1]["extra_instruction"]
+    row = outcome.per_task[0]
+    evidence = row["execution_evidence"]
+    assert evidence["generator_error"] == "route: TimeoutError: boom"
+    assert evidence["generator_infrastructure_error"] is True
+    assert evidence["verifier_called"] is True
+    assert evidence["verifier_error"] is None
+    assert row["evidence_class"] == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
+    assert outcome.evidence_class == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
+
+
+def test_clean_empty_patch_still_verifies_and_grades_generation() -> None:
+    calls: list = []
+    outcome = _verify_chain_grade(
+        {"patch": "", "tokens": 5, "error": None},
+        {"patch": "", "tokens": 5, "error": None},
+        calls,
+    )
+    assert len(calls) == 2
+    row = outcome.per_task[0]
+    evidence = row["execution_evidence"]
+    assert evidence["generator_error"] is None
+    assert evidence["generator_infrastructure_error"] is False
+    assert evidence["verifier_called"] is True
+    assert row["error"] == "empty_patch"
+    assert row["evidence_class"] == grade_explore.INCONCLUSIVE_GENERATION
+    assert outcome.evidence_class == grade_explore.INCONCLUSIVE_GENERATION
+
+
+def test_freeform_single_evidence_carries_generator_error() -> None:
+    seams = _seams(grade_explore.GraderResult.executed_verdict(False, 0.0), patch="")
+    seams = grade_explore.GradeSeams(
+        slot_for_id=seams.slot_for_id,
+        propose_slot=lambda *_args, **_kwargs: {
+            "patch": "",
+            "tokens": 3,
+            "error": "no edit block",
+        },
+        self_moa_arm=seams.self_moa_arm,
+        verify_chain_arm=seams.verify_chain_arm,
+        mixed_moa_arm=seams.mixed_moa_arm,
+        grade_task=seams.grade_task,
+        budget_factory=_Budget,
+    )
+    outcome = grade_explore.grade_genome_explore(
+        {
+            "arm_kind": "freeform_single",
+            "generator_model": "offline-fixture",
+            "per_call_tokens": 10,
+            "window_chars": 100,
+        },
+        {"task-1": ({"instance_id": "task-1"}, {"f.py": "x"})},
+        seams=seams,
+        budget_cap_tokens=100,
+        budget_cap_usd=0.0,
+    )
+    row = outcome.per_task[0]
+    assert row["execution_evidence"]["generator_error"] == "no edit block"
+    assert row["execution_evidence"]["generator_infrastructure_error"] is True
+    assert row["evidence_class"] == grade_explore.INCONCLUSIVE_INFRASTRUCTURE
+    assert outcome.evidence_class == grade_explore.INCONCLUSIVE_INFRASTRUCTURE

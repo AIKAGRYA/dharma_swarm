@@ -442,7 +442,12 @@ def build_bounded_child_seams(
                 "schema": "rsi_lab.verify_chain_execution.v1",
                 "generator_input": generated.get("execution_input_receipt"),
                 "generator_empty_patch": not generated_patch,
+                "generator_error": generated.get("error"),
+                "generator_infrastructure_error": bool(generated.get("error")),
                 "verifier_called": verifier_called,
+                "verifier_error": (
+                    verified.get("error") if isinstance(verified, dict) else None
+                ),
                 "verifier_input": (
                     verified.get("execution_input_receipt")
                     if isinstance(verified, dict)
