@@ -7,7 +7,12 @@ import re
 from dharma_swarm.terminal_bridge_external_preview import (
     external_preview_tool_usage_disposition,
 )
-from dharma_swarm.tui.engine.events import SessionStart
+from dharma_swarm.tui.engine.events import (
+    CanonicalEventType,
+    ErrorEvent,
+    SessionEnd,
+    SessionStart,
+)
 
 _ALLOWED_CHAT_EVENT_TYPES = frozenset(
     {
@@ -193,3 +198,32 @@ def _normalize_structural_label(value: object) -> str:
 def chat_session_start_has_tool_authority(event: SessionStart) -> bool:
     capabilities = {_normalize_structural_label(item) for item in event.capabilities}
     return bool(event.tools_available) or bool(capabilities & _CHAT_TOOL_CAPABILITIES)
+
+def failure_events(
+    *,
+    provider_id: str,
+    session_id: str,
+    code: str,
+    message: str,
+    retryable: bool,
+) -> list[CanonicalEventType]:
+    """One lane-failure buffer: a typed error followed by a failed end."""
+
+    return [
+        ErrorEvent(
+            provider_id=provider_id,
+            session_id=session_id,
+            code=code,
+            message=message,
+            retryable=retryable,
+        ),
+        SessionEnd(
+            provider_id=provider_id,
+            session_id=session_id,
+            success=False,
+            error_code=code,
+            error_message=message,
+        ),
+    ]
+
+

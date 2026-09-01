@@ -1,0 +1,167 @@
+{
+  "id": "fleet-advancement-WP-HELM-PROD-ADMISSION-20260831",
+  "base_ref": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
+  "branch": "codex/helm-prod-20260831",
+  "worktree": ".",
+  "intent": "Record the operator's explicit 2026-08-31 production destination for the current-main Helm, expand the Fleet track to the exact bridge and verification surfaces needed to close that destination, and bind local cutover to truthful owner projections, evaluator-hard route evidence, an isolated terminal journey, rollback proof, No-Mistakes review, and green CI.",
+  "allowed_files": [
+    ".no-mistakes.yaml",
+    "CLAUDE.md",
+    "dharma_swarm/key_oracle.py",
+    "dharma_swarm/model_catalog.py",
+    "dharma_swarm/operator_core/adapters.py",
+    "dharma_swarm/operator_core/helm_context.py",
+    "dharma_swarm/operator_core/session_lifecycle.py",
+    "dharma_swarm/operator_core/session_payloads.py",
+    "dharma_swarm/operator_core/session_recovery.py",
+    "dharma_swarm/operator_core/session_store.py",
+    "dharma_swarm/operator_core/session_store_fs.py",
+    "dharma_swarm/terminal_bridge.py",
+    "dharma_swarm/terminal_bridge_chat.py",
+    "dharma_swarm/terminal_bridge_chat_context.py",
+    "dharma_swarm/terminal_bridge_chat_membrane.py",
+    "dharma_swarm/terminal_bridge_external_preview.py",
+    "dharma_swarm/terminal_bridge_route_evidence.py",
+    "dharma_swarm/terminal_bridge_route_truth.py",
+    "dharma_swarm/terminal_bridge_session_runtime.py",
+    "dharma_swarm/tui/engine/adapters/claude_preview_protocol.py",
+    "dharma_swarm/tui/engine/events.py",
+    "docs/TERMINAL_TUI_TMUX_HARNESS_2026-04-02.md",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/REPO_GOVERNANCE_AUDIT.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/plans/helm_legone/HELM_WAYFINDER_E2E_PROTOTYPE_PLAN_20260901.md",
+    "reports/agentops/work_packets/fleet-advancement-WP-HELM-PROD-ADMISSION-20260831.json",
+    "scripts/capture_terminal_tui_tmux.sh",
+    "scripts/helm_validation_test.sh",
+    "scripts/send_terminal_tui_keys.sh",
+    "scripts/start_terminal_tui_tmux.sh",
+    "scripts/status_terminal_tui_tmux.sh",
+    "scripts/stop_terminal_tui_tmux.sh",
+    "scripts/terminal_guardian_preflight.sh",
+    "scripts/terminal_tui_tmux_common.sh",
+    "terminal/scripts/alternate_screen_check.sh",
+    "terminal/scripts/assistant_event_check.sh",
+    "terminal/scripts/boot_smoke.sh",
+    "terminal/scripts/lib/codex_managed_tmux.sh",
+    "terminal/scripts/offline_queue_check.sh",
+    "terminal/scripts/pty_smoke.sh",
+    "terminal/scripts/slash_feedback_check.sh",
+    "terminal/scripts/trace_collapse_check.sh",
+    "terminal/src/app.tsx",
+    "terminal/src/bridge.ts",
+    "terminal/src/executionLog.ts",
+    "terminal/src/shellControls.ts",
+    "terminal/src/uiIntents.ts",
+    "terminal/tests/app.test.ts",
+    "terminal/tests/bridge.test.ts",
+    "terminal/tests/executionLog.test.ts",
+    "terminal/tests/shellControls.test.ts",
+    "terminal/tests/sidebar.test.ts",
+    "terminal/tests/uiIntents.test.ts",
+    "tests/test_claude_preview_protocol.py",
+    "tests/test_key_oracle_live_filter.py",
+    "tests/test_operator_core_adapters.py",
+    "tests/test_operator_core_session_views.py",
+    "tests/test_session_lifecycle.py",
+    "tests/test_terminal_bridge.py",
+    "tests/test_terminal_bridge_external_preview.py",
+    "tests/test_terminal_bridge_helm_context.py",
+    "tests/test_terminal_tmux_isolation.py",
+    "tests/test_terminal_tui_tmux_root.py",
+    "tests/tui/test_canonical_events.py"
+  ],
+  "forbidden_files": [
+    "deploy/sadhana/**",
+    "scripts/runtime/sadhana_release.py",
+    "tests/test_sadhana_release.py",
+    "dashboard/src/app/dashboard/sadhana/**",
+    "dharma_swarm/forge_lab/**",
+    "scripts/forge_lab/**",
+    "tests/forge_lab_v1/**",
+    "docs/ops/RSI_LAB_SYNC.md",
+    "dharma_swarm/foundry/**",
+    "scripts/foundry/**",
+    "tests/test_foundry_*.py",
+    "docs/foundry/**",
+    "dharma_swarm/rudra/**",
+    "dharma_swarm/terminal_commands/rudra.py",
+    "tests/test_rudra_*.py",
+    "tests/fixtures/rudra/**",
+    "reports/rudra/**",
+    "docs/plans/rudra_v0/**"
+  ],
+  "gates": [
+    {
+      "name": "active-track-contracts",
+      "command": "python3 -m pytest -q tests/test_active_track_governance.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "stale-active-track-include-is-rejected",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('CLAUDE.md'); t=p.read_text(); old='Fleet advancement \u2014 Fleet Hub, Mission Control, and HELM operator surfaces'; t.count(old) >= 1 or sys.exit(3); p.write_text(t.replace(old,'BROKEN HELM TRACK',1)); sys.exit(subprocess.run([sys.executable,'scripts/governance/render_active_track_includes.py','--check']).returncode)\"",
+      "expected_exit": 1,
+      "timeout_seconds": 120
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "governance: admit Helm production closure"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-HELM-PROD-ADMISSION-20260831",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "status": "clear",
+      "checked_at_sha": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
+      "details": []
+    },
+    "interface_mismatches": [
+      "The Fleet track describes Helm as a bounded prototype and owns terminal/**, while current-main product behavior also depends on unowned terminal_bridge, route-truth, HelmContext, launcher, and focused test surfaces.",
+      "The operator's new production destination changes the target closure kind but does not itself prove runtime liveness, model identity, owner authority, or deployment safety.",
+      "The existing local live terminal demonstrates a process and refresh loop, but raw bridge stderr corrupts its alternate screen and its owner projections remain unavailable."
+    ],
+    "closest_existing_implementation": [
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "docs/plans/helm_legone/HELM_LEGONE_SPEC.md",
+      "terminal/",
+      "dharma_swarm/terminal_bridge.py",
+      "dharma_swarm/terminal_bridge_helm_context.py"
+    ],
+    "honest_blockers": [
+      "Current fresh evidence is LIVE_DEGRADED at 0/7 evaluator-verified seats. Real Codex and Grok responses lacked exact-identity proof; Kimi is expired; Claude reported insufficient credit; Fugu Ultra and Opus 5 lack current product lanes.",
+      "This packet authorizes a governance amendment only. It does not change credentials, open keychain prompts, buy quota, deploy to the fleet, mutate a protected tmux seat, merge a pull request, or claim production readiness.",
+      "Local cutover remains blocked until the no-hand boundary, owner projections, route verification, runtime shell integrity, performance journey, rollback proof, No-Mistakes gate, and required CI all pass."
+    ],
+    "rollback": "Revert the governance-admission commit to restore the bounded CLOSED_NOT_PROD target. That repository rollback does not alter any running terminal, tmux server, credential, runtime state, or provider account.",
+    "packet_digest": "ea17003ac642417246780767c0d0c925b427d03b83c47dffa95b17ab31527d9b"
+  }
+}

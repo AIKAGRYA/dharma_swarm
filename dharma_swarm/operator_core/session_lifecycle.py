@@ -9,13 +9,13 @@ through :meth:`record`.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
-import os
 from threading import RLock
-from typing import Any, Callable, cast
+import time
+from typing import cast
 
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
+    ContextReceipt,
     SessionEnd,
     SessionStart,
     TextComplete,
@@ -23,7 +23,7 @@ from dharma_swarm.tui.engine.events import (
     UserPrompt,
 )
 
-from .session_store import SessionStore, cwd_matches
+from .session_store import SessionStore
 
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
@@ -39,153 +39,6 @@ class SessionUsage:
     thinking_tokens: int = 0
     total_cost_usd: float | None = None
 
-
-def _parse_iso_datetime(value: object) -> datetime | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
-def _pid_is_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
-
-
-def _owner_is_orphaned(
-    meta: dict[str, Any],
-    *,
-    active_owner_id: str,
-    active_owner_pid: int,
-    observed_at: datetime,
-    legacy_owner_grace: timedelta,
-    pid_is_alive: Callable[[int], bool],
-) -> bool:
-    owner_id = str(meta.get("runtime_owner_id", "") or "").strip()
-    try:
-        owner_pid = int(meta.get("runtime_owner_pid", 0) or 0)
-    except (TypeError, ValueError):
-        owner_pid = 0
-
-    if owner_id == active_owner_id and owner_pid == active_owner_pid:
-        return False
-    if owner_pid > 0 and owner_pid != active_owner_pid and pid_is_alive(owner_pid):
-        return False
-    if owner_id or owner_pid > 0:
-        return True
-
-    updated_at = _parse_iso_datetime(meta.get("updated_at"))
-    if updated_at is None:
-        return True
-    return observed_at - updated_at >= legacy_owner_grace
-
-
-def recover_orphaned_sessions(
-    store: SessionStore,
-    *,
-    cwd: str,
-    active_owner_id: str,
-    active_owner_pid: int,
-    legacy_owner_grace_seconds: float,
-    now: datetime | None = None,
-    pid_is_alive: Callable[[int], bool] = _pid_is_alive,
-) -> list[str]:
-    """Finalize durable turns abandoned by an earlier terminal bridge.
-
-    Turns owned by another live PID remain untouched. Ownerless legacy rows
-    are recovered only after the caller-provided grace window. A real terminal
-    event is reused when present so recovery stays idempotent.
-    """
-
-    owner_id = active_owner_id.strip()
-    if not owner_id:
-        raise ValueError("active_owner_id must not be empty")
-    if active_owner_pid <= 0:
-        raise ValueError("active_owner_pid must be positive")
-
-    recovered: list[str] = []
-    observed_at = now or datetime.now(timezone.utc)
-    if observed_at.tzinfo is None:
-        observed_at = observed_at.replace(tzinfo=timezone.utc)
-    grace = timedelta(seconds=max(0.0, float(legacy_owner_grace_seconds)))
-
-    for entry in list(store.list_sessions()):
-        session_id = str(entry.get("session_id", "") or "").strip()
-        if not session_id:
-            continue
-        try:
-            meta = store.load_meta(session_id)
-        except Exception:
-            continue
-        status = str(meta.get("status", "") or "").strip().lower()
-        if status in TERMINAL_SESSION_STATUSES:
-            continue
-        if not cwd_matches(str(meta.get("cwd", "") or ""), cwd):
-            continue
-        if not _owner_is_orphaned(
-            meta,
-            active_owner_id=owner_id,
-            active_owner_pid=active_owner_pid,
-            observed_at=observed_at,
-            legacy_owner_grace=grace,
-            pid_is_alive=pid_is_alive,
-        ):
-            continue
-
-        transcript = store.load_transcript(session_id)
-        terminal_events = [event for event in transcript if event.type == "session_end"]
-        if terminal_events:
-            terminal = terminal_events[-1]
-            error_code = str(getattr(terminal, "error_code", "") or "").strip().lower()
-            terminal_status = (
-                "cancelled"
-                if error_code == "cancelled"
-                else "completed"
-                if bool(getattr(terminal, "success", False))
-                else "failed"
-            )
-        else:
-            terminal = SessionEnd(
-                provider_id=str(meta.get("provider_id", "") or ""),
-                session_id=session_id,
-                success=False,
-                error_code="bridge_interrupted",
-                error_message=(
-                    "previous terminal bridge process ended before session finalization"
-                ),
-            )
-            store.append_event(session_id, terminal)
-            terminal_status = "failed"
-
-        store.finalize_session(
-            session_id,
-            status=terminal_status,
-            total_cost_usd=float(meta.get("total_cost_usd", 0.0) or 0.0),
-            total_turns=int(meta.get("total_turns", 0) or 0),
-            total_input_tokens=int(meta.get("total_input_tokens", 0) or 0),
-            total_output_tokens=int(meta.get("total_output_tokens", 0) or 0),
-            provider_session_id=(
-                str(meta.get("provider_session_id", "") or "").strip() or None
-            ),
-        )
-        recovered.append(session_id)
-
-    return recovered
 
 
 class SessionLifecycleRecorder:
@@ -219,9 +72,13 @@ class SessionLifecycleRecorder:
         self._total_cost_usd = 0.0
         self._cost_reported = False
         self._terminal_event: SessionEnd | None = None
+        self._staged_context_receipt: ContextReceipt | None = None
+        self._context_receipt_recorded = False
+        self._auto_context_receipt_for_emission: ContextReceipt | None = None
         self._status: str | None = None
         self._finalization_attempted = False
         self._finalized = False
+        self._last_nonfatal_persistence_error: tuple[str, str] | None = None
         self._lock = RLock()
 
     @classmethod
@@ -342,6 +199,43 @@ class SessionLifecycleRecorder:
             self._model_id = model
             return True
 
+    def stage_context_receipt(self, receipt: ContextReceipt) -> ContextReceipt:
+        """Durably stage one provider-bound context boundary before execution."""
+
+        with self._lock:
+            if self._terminal_event is not None:
+                raise RuntimeError("cannot stage context after session finalization")
+            if self._context_receipt_recorded:
+                raise RuntimeError("the final context receipt is already durable")
+            provider = receipt.provider_id.strip()
+            model = receipt.model_id.strip()
+            if not provider or not model:
+                raise ValueError("staged context receipt requires provider and model")
+            if receipt.lane_outcome != "pending":
+                raise ValueError("staged context receipt must be pending")
+            if receipt.boundary_timestamp <= 0:
+                raise ValueError("staged context receipt requires a boundary timestamp")
+            if provider != self._provider_id or model != self._model_id:
+                self._store.update_session_route(
+                    self._session_id,
+                    provider_id=provider,
+                    model_id=model,
+                )
+            canonical = replace(receipt, session_id=self._session_id)
+            self._store.stage_context_receipt(self._session_id, canonical)
+            self._provider_id = provider
+            self._model_id = model
+            self._staged_context_receipt = canonical
+            return canonical
+
+    def take_auto_context_receipt_for_emission(self) -> ContextReceipt | None:
+        """Return a backstop receipt once so transport can wire it before terminal."""
+
+        with self._lock:
+            receipt = self._auto_context_receipt_for_emission
+            self._auto_context_receipt_for_emission = None
+            return receipt
+
     def record(self, event: CanonicalEventType) -> CanonicalEventType | None:
         """Persist and return one accepted operator-visible canonical event.
 
@@ -359,6 +253,72 @@ class SessionLifecycleRecorder:
                 CanonicalEventType,
                 replace(event, session_id=self._session_id),
             )
+            if isinstance(canonical, ContextReceipt):
+                if self._context_receipt_recorded:
+                    return None
+                if canonical.lane_outcome not in {
+                    "completed",
+                    "failed",
+                    "membrane_rejected",
+                    "cancelled",
+                    "interrupted",
+                }:
+                    raise ValueError("context receipt requires a terminal lane outcome")
+                if self._staged_context_receipt is not None and (
+                    canonical.provider_id != self._staged_context_receipt.provider_id
+                    or canonical.model_id != self._staged_context_receipt.model_id
+                    or canonical.source != self._staged_context_receipt.source
+                    or canonical.source_epoch
+                    != self._staged_context_receipt.source_epoch
+                    or canonical.context_digest
+                    != self._staged_context_receipt.context_digest
+                    or canonical.authority != self._staged_context_receipt.authority
+                    or canonical.boundary_timestamp
+                    != self._staged_context_receipt.boundary_timestamp
+                ):
+                    raise ValueError("final context receipt does not match its staged boundary")
+                if (
+                    self._staged_context_receipt is not None
+                    and canonical.outcome_timestamp
+                    < canonical.boundary_timestamp
+                ):
+                    raise ValueError("context outcome cannot precede its boundary")
+                if (
+                    self._staged_context_receipt is not None
+                    and canonical.disposition
+                    != self._staged_context_receipt.disposition
+                    and not (
+                        self._staged_context_receipt.disposition
+                        == "offered_unconfirmed"
+                        and canonical.disposition in {"attached", "attached_redacted"}
+                    )
+                ):
+                    raise ValueError("final context disposition is not a truthful upgrade")
+            if (
+                isinstance(canonical, SessionEnd)
+                and self._staged_context_receipt is not None
+                and not self._context_receipt_recorded
+            ):
+                try:
+                    self._store.update_session_route(
+                        self._session_id,
+                        provider_id=self._staged_context_receipt.provider_id,
+                        model_id=self._staged_context_receipt.model_id,
+                    )
+                except Exception as exc:
+                    # The transcript receipt below is the canonical route
+                    # record; a transient meta rewrite failure must not block
+                    # terminal persistence.
+                    self._last_nonfatal_persistence_error = ("update_session_route", repr(exc))
+                self._provider_id = self._staged_context_receipt.provider_id
+                self._model_id = self._staged_context_receipt.model_id
+                interrupted_context = replace(
+                    self._staged_context_receipt,
+                    outcome_timestamp=time.time(),
+                    lane_outcome="interrupted",
+                )
+                self._persist_context_receipt(interrupted_context)
+                self._auto_context_receipt_for_emission = interrupted_context
             if isinstance(canonical, SessionStart):
                 if self._session_started:
                     return None
@@ -378,7 +338,10 @@ class SessionLifecycleRecorder:
                     model=model,
                 )
 
-            self._store.append_event(self._session_id, canonical)
+            if isinstance(canonical, ContextReceipt):
+                self._persist_context_receipt(canonical)
+            else:
+                self._store.append_event(self._session_id, canonical)
 
             if isinstance(canonical, SessionStart):
                 self._session_started = True
@@ -399,6 +362,26 @@ class SessionLifecycleRecorder:
                 self._finalize_once(self._status_for(canonical))
 
             return canonical
+
+    def _persist_context_receipt(self, receipt: ContextReceipt) -> None:
+        """Make one receipt durable despite post-append metadata failures."""
+
+        try:
+            self._store.append_event(self._session_id, receipt)
+        except Exception:
+            if not any(
+                isinstance(event, ContextReceipt) and event == receipt
+                for event in self._store.load_transcript(self._session_id)
+            ):
+                raise
+        self._staged_context_receipt = None
+        self._context_receipt_recorded = True
+        try:
+            self._store.clear_staged_context_receipt(self._session_id)
+        except Exception as exc:
+            # The transcript is the canonical receipt. Terminal finalization
+            # and orphan recovery both remove a stale derived staging field.
+            self._last_nonfatal_persistence_error = ("clear_staged_context_receipt", repr(exc))
 
     def fail(
         self,

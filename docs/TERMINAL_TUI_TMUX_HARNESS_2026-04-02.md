@@ -10,9 +10,21 @@ This is the operator-side harness for driving the Bun TUI through a real TTY.
 - `scripts/capture_terminal_tui_tmux.sh`
 - `scripts/send_terminal_tui_keys.sh`
 
-Default tmux session name:
+Shared boundary: `scripts/terminal_tui_tmux_common.sh` — all of the scripts
+above run tmux on a private managed server socket, not the default one.
 
-- `dharma_terminal_tui`
+Defaults:
+
+- tmux session name: `dharma_terminal_tui` (`DHARMA_TERMINAL_TMUX_SESSION`)
+- tmux socket: `CODEX_MANAGED_helm_tui` (`DHARMA_TERMINAL_TMUX_SOCKET`), under
+  `TMUX_TMPDIR` `/tmp` (`DHARMA_TERMINAL_TMUX_TMPDIR`)
+
+Root provenance is fail-closed: if `DHARMA_TERMINAL_ROOT` points at a tree
+other than the one the launcher lives in (paths are resolved to their real
+locations first), the
+launcher refuses with exit 2 unless `DHARMA_TERMINAL_ROOT_OVERRIDE_OK=1` is
+set. The launcher also verifies liveness of the Python bridge process after
+boot and tears down a session it created if the boot is unhealthy.
 
 ## Commands
 
@@ -52,11 +64,15 @@ cd /Users/dhyana/dharma_swarm
 ./scripts/send_terminal_tui_keys.sh h e l l o
 ```
 
-Attach directly:
+Attach directly (the session lives on the managed socket, so a plain
+`tmux attach -t dharma_terminal_tui` will not find it):
 
 ```bash
-tmux attach -t dharma_terminal_tui
+env -u TMUX TMUX_TMPDIR=/tmp tmux -L CODEX_MANAGED_helm_tui -f /dev/null attach -t '=dharma_terminal_tui'
 ```
+
+`./scripts/status_terminal_tui_tmux.sh` prints the exact attach and capture
+commands for the current configuration.
 
 ## Important implementation note
 

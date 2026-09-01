@@ -344,6 +344,42 @@ describe("canonicalEventsFromBridgeEvent", () => {
     expect(summary).not.toContain("grok_oauth:grok-4.6 ·");
   });
 
+  test("session acknowledgement exposes the bounded owned-context disposition", () => {
+    const [acknowledgement] = canonicalEventsFromBridgeEvent({
+      type: "session.ack",
+      session_id: "session-context-1",
+      provider: "claude",
+      model: "claude-sonnet-5",
+      context_disposition: "attached_redacted",
+      context_digest: `sha256:${"a".repeat(64)}`,
+    });
+
+    expect(acknowledgement?.detail).toContain("Initial lane context attached_redacted · sha256:aaaaaaaaaaaaaaaa");
+  });
+
+  test("final context receipt exposes the winning lane disposition", () => {
+    const [receipt] = canonicalEventsFromBridgeEvent({
+      type: "context_receipt",
+      provider_id: "fallback",
+      model_id: "winner-model",
+      disposition: "not_attached_fallback",
+      context_digest: "",
+      source_epoch: `sha256:${"b".repeat(64)}`,
+      authority: "NONE",
+      lane_outcome: "completed",
+      timestamp: 100,
+      boundary_timestamp: 100,
+      outcome_timestamp: 123,
+    });
+
+    expect(receipt?.title).toBe("context boundary sealed");
+    expect(receipt?.summary).toBe("fallback:winner-model");
+    expect(receipt?.detail).toContain("Final lane context not_attached_fallback");
+    expect(receipt?.detail).toContain("Lane completed");
+    expect(receipt?.detail).toContain("Authority NONE");
+    expect(receipt?.timestamp).toBe("123");
+  });
+
   test("F-173: assistant bridge event renders its message as the turn's response in the chat transcript", () => {
     const sessionHex = "9f86d081884c7d659a2feaa0c55ad015";
     const answer = "I am the Helm. Identity intents route straight through me.";

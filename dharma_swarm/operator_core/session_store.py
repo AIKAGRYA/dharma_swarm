@@ -1,12 +1,18 @@
-"""Canonical session persistence for the shared operator core."""
+"""Canonical session persistence for the shared operator core.
+
+# closure-layer-role: canonical-store — SessionStore owns the durable session
+# transcript/audit/meta layout under ~/.dharma/sessions (state_dir.sessions in
+# ACTIVE_SURFACE_MANIFEST.yaml); physical I/O lives in session_store_fs.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
 import logging
-import secrets
 from pathlib import Path
 from typing import Any
 
@@ -15,43 +21,36 @@ from dharma_swarm.session_event_bridge import SessionEventBridge
 from dharma_swarm.tui.engine.events import (
     CanonicalEvent,
     CanonicalEventType,
-    EVENT_TYPES,
+    ContextReceipt,
 )
+
+from . import session_store_fs as _fs
+from .session_store_fs import cwd_matches
+
+__all__ = ["SessionStore", "cwd_matches"]
 
 HOME = Path.home()
 DEFAULT_ROOT = HOME / ".dharma" / "sessions"
 LEGACY_OWNER_GRACE_SECONDS = 300.0
 logger = logging.getLogger(__name__)
 
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _new_session_id() -> str:
-    now = datetime.now(timezone.utc)
-    return f"dgc-{now:%Y%m%d}-{now:%H%M%S}-{secrets.token_hex(2)}"
+_now_iso = _fs.now_iso
+_new_session_id = _fs.new_session_id
+_atomic_write_json = _fs.atomic_write_json
 
 
 def _pid_is_alive(pid: int) -> bool:
     """Compatibility seam used by recovery tests and runtime injection."""
 
-    from .session_lifecycle import _pid_is_alive as check_pid
+    from .session_recovery import _pid_is_alive as check_pid
 
     return check_pid(pid)
 
 
-def _normalize_cwd(cwd: str) -> str:
-    try:
-        return str(Path(cwd).expanduser().resolve())
-    except Exception:
-        return str(Path(cwd).expanduser())
+def _observe_git_branch(cwd: str) -> str:
+    """Compatibility seam kept for tests that stub branch observation."""
 
-
-def cwd_matches(meta_cwd: str, expected_cwd: str) -> bool:
-    if meta_cwd == expected_cwd:
-        return True
-    return _normalize_cwd(meta_cwd) == _normalize_cwd(expected_cwd)
+    return _fs.observe_git_branch(cwd)
 
 
 class SessionStore:
@@ -64,7 +63,10 @@ class SessionStore:
         self._bridges: dict[str, SessionEventBridge] = {}
         self._last_snapshot_failure: tuple[str, str, str] | None = None
         if not self._index_path.exists():
-            self._index_path.write_text(json.dumps({"schema_version": 1, "sessions": []}))
+            _atomic_write_json(
+                self._index_path,
+                {"schema_version": 1, "sessions": []},
+            )
 
     def create_session(
         self,
@@ -94,7 +96,7 @@ class SessionStore:
             "provider_session_id": provider_session_id,
             "title": title or "",
             "cwd": cwd,
-            "git_branch": "",
+            "git_branch": _observe_git_branch(cwd),
             "tags": [],
             "total_cost_usd": 0.0,
             "total_turns": 0,
@@ -111,14 +113,18 @@ class SessionStore:
                 else None
             ),
         }
-        (sp / "meta.json").write_text(json.dumps(meta, indent=2))
+        self._write_meta(sid, meta)
         (sp / "transcript.jsonl").touch(exist_ok=True)
         (sp / "audit.jsonl").touch(exist_ok=True)
         (sp / "runtime.jsonl").touch(exist_ok=True)
         (sp / "snapshots.jsonl").touch(exist_ok=True)
 
         index = self._read_index()
-        sessions = index.get("sessions", [])
+        sessions = [
+            entry
+            for entry in self._merged_index_sessions()
+            if entry.get("session_id") != sid
+        ]
         sessions.append(
             {
                 "session_id": sid,
@@ -133,7 +139,10 @@ class SessionStore:
             }
         )
         index["sessions"] = sessions
-        self._write_index(index)
+        try:
+            self._write_index(index)
+        except OSError as exc:
+            logger.warning("session index write failed for %s (%s)", sid, type(exc).__name__)
         try:
             self._bridge_for(sid).session_start(
                 sid,
@@ -155,8 +164,8 @@ class SessionStore:
         if strip_raw:
             payload["raw"] = None
         tp = self.root / session_id / "transcript.jsonl"
-        with open(tp, "a") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        encoded = (json.dumps(payload, ensure_ascii=True) + "\n").encode("utf-8")
+        _fs.append_jsonl_record(tp, encoded)
         try:
             self._bridge_for(session_id).record_canonical_event(event)
         except Exception:
@@ -171,32 +180,7 @@ class SessionStore:
         limit: int | None = None,
     ) -> list[CanonicalEventType]:
         tp = self.root / session_id / "transcript.jsonl"
-        if not tp.exists():
-            return []
-
-        events: list[CanonicalEventType] = []
-        for raw_line in tp.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            event_type = str(payload.get("type", "") or "").strip()
-            if not event_type or (include_types is not None and event_type not in include_types):
-                continue
-            event_cls = EVENT_TYPES.get(event_type)
-            if event_cls is None:
-                continue
-            try:
-                events.append(event_cls(**payload))
-            except Exception:
-                continue
-
-        if limit is not None and limit >= 0:
-            return events[-limit:]
-        return events
+        return _fs.read_transcript_events(tp, include_types=include_types, limit=limit)
 
     def append_audit(self, session_id: str, entry: dict[str, Any]) -> None:
         ap = self.root / session_id / "audit.jsonl"
@@ -204,8 +188,7 @@ class SessionStore:
         payload.setdefault("timestamp", datetime.now(timezone.utc).timestamp())
         payload.setdefault("created_at", _now_iso())
         payload.setdefault("session_id", session_id)
-        with open(ap, "a") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        _fs.append_jsonl_line(ap, payload)
         self._touch_session(session_id)
 
     def load_audit(
@@ -216,58 +199,11 @@ class SessionStore:
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         ap = self.root / session_id / "audit.jsonl"
-        if not ap.exists():
-            return []
-
-        entries: list[dict[str, Any]] = []
-        for raw_line in ap.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            if not isinstance(payload, dict):
-                continue
-            domain = str(payload.get("domain", "") or "").strip()
-            if include_domains is not None and domain not in include_domains:
-                continue
-            entries.append(payload)
-
-        if limit is not None and limit >= 0:
-            return entries[-limit:]
-        return entries
+        return _fs.read_audit_entries(ap, include_domains=include_domains, limit=limit)
 
     def prune_audit_domains(self, session_id: str, *, domains: set[str]) -> int:
         ap = self.root / session_id / "audit.jsonl"
-        if not ap.exists():
-            return 0
-
-        kept_lines: list[str] = []
-        removed = 0
-        for raw_line in ap.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                kept_lines.append(raw_line)
-                continue
-            if not isinstance(payload, dict):
-                kept_lines.append(raw_line)
-                continue
-            domain = str(payload.get("domain", "") or "").strip()
-            if domain in domains:
-                removed += 1
-                continue
-            kept_lines.append(raw_line)
-
-        with open(ap, "w", encoding="utf-8") as handle:
-            for kept_line in kept_lines:
-                handle.write(kept_line.rstrip("\n") + "\n")
-        return removed
+        return _fs.prune_audit_domains(ap, domains=domains)
 
     def finalize_session(
         self,
@@ -281,6 +217,7 @@ class SessionStore:
         provider_session_id: str | None = None,
     ) -> None:
         meta = self.load_meta(session_id)
+        meta.pop("pending_context_receipt", None)
         meta["updated_at"] = _now_iso()
         meta["status"] = status
         if total_cost_usd is not None:
@@ -326,7 +263,7 @@ class SessionStore:
 
         # Imported lazily to keep the store/lifecycle dependency acyclic while
         # preserving this long-standing public SessionStore entry point.
-        from .session_lifecycle import recover_orphaned_sessions
+        from .session_recovery import recover_orphaned_sessions
 
         return recover_orphaned_sessions(
             self,
@@ -337,6 +274,19 @@ class SessionStore:
             now=now,
             pid_is_alive=_pid_is_alive,
         )
+
+    @contextmanager
+    def session_recovery_lock(self, session_id: str) -> Iterator[None]:
+        """Serialize one orphan-recovery decision across stores and processes.
+
+        The retained sidecar keeps a stable inode for the host-local advisory
+        lock. ``flock`` alone does not serialize independent store instances in
+        every same-process runtime, so a shared thread lock protects that case.
+        """
+
+        lock_path = self.root / session_id / ".recovery.lock"
+        with _fs.session_recovery_file_lock(lock_path):
+            yield
 
     def load_meta(self, session_id: str) -> dict[str, Any]:
         return json.loads((self.root / session_id / "meta.json").read_text())
@@ -385,6 +335,53 @@ class SessionStore:
                 type(exc).__name__,
             )
 
+    def stage_context_receipt(
+        self,
+        session_id: str,
+        receipt: ContextReceipt,
+    ) -> None:
+        """Durably stage a context boundary before provider work begins."""
+
+        if receipt.lane_outcome != "pending":
+            raise ValueError("only a pending context receipt may be staged")
+        payload = asdict(receipt)
+        payload["raw"] = None
+        meta = self.load_meta(session_id)
+        meta["pending_context_receipt"] = payload
+        meta["updated_at"] = _now_iso()
+        self._write_meta(session_id, meta)
+        self._upsert_index_entry(session_id, {"updated_at": meta["updated_at"]})
+
+    def load_staged_context_receipt(
+        self,
+        session_id: str,
+    ) -> ContextReceipt | None:
+        payload = self.load_meta(session_id).get("pending_context_receipt")
+        if not isinstance(payload, dict):
+            return None
+        try:
+            receipt = ContextReceipt(**payload)
+        except (TypeError, ValueError):
+            return None
+        if (
+            receipt.lane_outcome != "pending"
+            or not receipt.provider_id.strip()
+            or not receipt.model_id.strip()
+            or receipt.boundary_timestamp <= 0
+        ):
+            return None
+        return receipt
+
+    def clear_staged_context_receipt(self, session_id: str) -> bool:
+        meta = self.load_meta(session_id)
+        if "pending_context_receipt" not in meta:
+            return False
+        del meta["pending_context_receipt"]
+        meta["updated_at"] = _now_iso()
+        self._write_meta(session_id, meta)
+        self._upsert_index_entry(session_id, {"updated_at": meta["updated_at"]})
+        return True
+
     def _touch_session(self, session_id: str) -> None:
         meta = self.load_meta(session_id)
         meta["updated_at"] = _now_iso()
@@ -392,7 +389,7 @@ class SessionStore:
         self._upsert_index_entry(session_id, {"updated_at": meta["updated_at"]})
 
     def _write_meta(self, session_id: str, meta: dict[str, Any]) -> None:
-        (self.root / session_id / "meta.json").write_text(json.dumps(meta, indent=2))
+        _atomic_write_json(self.root / session_id / "meta.json", meta)
 
     def _read_index(self) -> dict[str, Any]:
         try:
@@ -401,22 +398,37 @@ class SessionStore:
             return {"schema_version": 1, "sessions": []}
 
     def _write_index(self, index: dict[str, Any]) -> None:
-        self._index_path.write_text(json.dumps(index, indent=2))
+        _atomic_write_json(self._index_path, index)
+
+    @staticmethod
+    def _index_entry_from_meta(meta: dict[str, Any]) -> dict[str, Any] | None:
+        return _fs.index_entry_from_meta(meta)
+
+    def _discovered_index_entries(self) -> list[dict[str, Any]]:
+        return _fs.discovered_index_entries(self.root)
+
+    def _merged_index_sessions(self) -> list[dict[str, Any]]:
+        return _fs.merged_index_sessions(self._read_index().get("sessions", []), self.root)
 
     def _upsert_index_entry(self, session_id: str, updates: dict[str, Any]) -> None:
         index = self._read_index()
-        sessions = index.get("sessions", [])
-        for entry in sessions:
-            if entry.get("session_id") == session_id:
-                entry.update(updates)
-                break
-        index["sessions"] = sessions
-        self._write_index(index)
+        index["sessions"] = _fs.upsert_index_sessions(
+            index.get("sessions", []),
+            session_id=session_id,
+            updates=updates,
+            meta_loader=self.load_meta,
+        )
+        try:
+            self._write_index(index)
+        except OSError as exc:
+            logger.warning(
+                "session index update failed for %s (%s)",
+                session_id,
+                type(exc).__name__,
+            )
 
     def list_sessions(self) -> list[dict[str, Any]]:
-        index = self._read_index()
-        sessions = index.get("sessions", [])
-        return sessions if isinstance(sessions, list) else []
+        return self._merged_index_sessions()
 
     def latest_session(
         self,
@@ -425,31 +437,13 @@ class SessionStore:
         provider_id: str | None = None,
         min_turns: int | None = None,
     ) -> dict[str, Any] | None:
-        latest_meta: dict[str, Any] | None = None
-        latest_key = ""
-        for entry in self.list_sessions():
-            sid = str(entry.get("session_id", "")).strip()
-            if not sid:
-                continue
-            try:
-                meta = self.load_meta(sid)
-            except Exception:
-                continue
-            if cwd and not cwd_matches(str(meta.get("cwd", "")), cwd):
-                continue
-            if provider_id and str(meta.get("provider_id", "")) != provider_id:
-                continue
-            if min_turns is not None:
-                turns = int(meta.get("total_turns", 0) or 0)
-                if turns < int(min_turns):
-                    continue
-            updated = str(meta.get("updated_at", ""))
-            created = str(meta.get("created_at", ""))
-            key = updated or created
-            if key and key > latest_key:
-                latest_key = key
-                latest_meta = meta
-        return latest_meta
+        return _fs.latest_session_meta(
+            self.list_sessions(),
+            meta_loader=self.load_meta,
+            cwd=cwd,
+            provider_id=provider_id,
+            min_turns=min_turns,
+        )
 
     def verify_session_replay(self, session_id: str) -> tuple[bool, list[str]]:
         snapshot_ok, snapshot_issues = verify_replay_integrity(
@@ -457,7 +451,22 @@ class SessionStore:
         )
         transcript_issues = self._transcript_integrity_issues(session_id)
         issues = [*snapshot_issues, *transcript_issues]
-        return snapshot_ok and not transcript_issues, issues
+        replay_ok = snapshot_ok and not transcript_issues
+        if replay_ok and not self._transcript_has_context_receipt(session_id):
+            # Pre-receipt-era transcripts stay replayable but are typed as
+            # unproven: no ContextReceipt exists to validate against, and no
+            # validity is grandfathered or backfilled.
+            issues.append("replay_unproven_pre_receipt_era")
+        return replay_ok, issues
+
+    def _transcript_has_context_receipt(self, session_id: str) -> bool:
+        try:
+            return any(
+                getattr(event, "type", "") == "context_receipt"
+                for event in self.load_transcript(session_id)
+            )
+        except Exception:
+            return False
 
     def _transcript_integrity_issues(self, session_id: str) -> list[str]:
         """Validate replay semantics, not only snapshot checksums."""
@@ -480,17 +489,4 @@ class SessionStore:
 
     @staticmethod
     def _snapshot_state(meta: dict[str, Any], *, reason: str) -> dict[str, Any]:
-        return {
-            "snapshot_reason": reason,
-            "session_id": str(meta.get("session_id", "")),
-            "provider_id": str(meta.get("provider_id", "")),
-            "model_id": str(meta.get("model_id", "")),
-            "provider_session_id": str(meta.get("provider_session_id", "")),
-            "cwd": str(meta.get("cwd", "")),
-            "status": str(meta.get("status", "")),
-            "total_turns": int(meta.get("total_turns", 0) or 0),
-            "total_input_tokens": int(meta.get("total_input_tokens", 0) or 0),
-            "total_output_tokens": int(meta.get("total_output_tokens", 0) or 0),
-            "total_cost_usd": float(meta.get("total_cost_usd", 0.0) or 0.0),
-            "updated_at": str(meta.get("updated_at", "")),
-        }
+        return _fs.snapshot_state(meta, reason=reason)

@@ -28,7 +28,7 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
-import {closestCommand, tourLines, type UiIntent} from "./uiIntents.ts";
+import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
@@ -44,7 +44,12 @@ import {
   messagesForNextTurn,
   sessionResumeEligibility,
 } from "./sessionContinuity.ts";
-import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
+import {
+  focusModeFor,
+  paneActionChordDecision,
+  plainListDirection,
+  type PaneAction,
+} from "./shellControls.ts";
 import {
   SESSION_CATALOG_LIMIT,
   authoritativeResyncComplete,
@@ -115,7 +120,7 @@ import {
 import {initialState, reduceApp} from "./state.ts";
 import {unknownOnCallTruthState} from "./onCallTruth.ts";
 import {helmOnCallProjectionFromEvent} from "./protocol/onCallTruth.ts";
-import type {ActiveTurnState, AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+import type {ActiveTurnState, AppAction, AppState, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
 
 export {continuityStateFromSession} from "./sessionContinuity.ts";
 export {
@@ -159,7 +164,6 @@ export function decideTurnCancellation(activeTurn: ActiveTurnState): TurnCancell
 
 const shellControlOptions = {
   sessionCatalogLimit: SESSION_CATALOG_LIMIT,
-  approvalResolveAction,
 };
 
 function bridgeRouteState(state: AppState): {provider: string; model: string; strategy: string} {
@@ -839,23 +843,11 @@ function approvalPaneFromHistory(history: NonNullable<ReturnType<typeof permissi
   };
 }
 
-function approvalResolveAction(entry: ApprovalQueueEntry, resolution: CanonicalPermissionResolution["resolution"], label: string): PaneAction {
-  return {
-    label,
-    summary: `${resolution} ${entry.decision.action_id}`,
-    payload: {
-      action_type: "approval.resolve",
-      action_id: entry.decision.action_id,
-      resolution,
-      metadata: entry.decision.metadata,
-    },
-  };
-}
-
 type PendingBootstrap = {
   prompt: string;
   provider: string;
   model: string;
+  activeTabId: string;
   messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
   resumeSessionId?: string;
   cancelled?: boolean;
@@ -2031,6 +2023,7 @@ export function createBridgeEventHandler({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
+            active_tab: String(typed.active_tab ?? pending.activeTabId),
             messages: pending.messages,
             resume_session_id: pending.resumeSessionId,
             bootstrap: typed,
@@ -2046,6 +2039,7 @@ export function createBridgeEventHandler({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
+            active_tab: String(typed.active_tab ?? pending.activeTabId),
             messages: pending.messages,
             resume_session_id: pending.resumeSessionId,
             bootstrap: typed,
@@ -2057,6 +2051,7 @@ export function createBridgeEventHandler({
           provider: selectedProvider,
           model: selectedModel,
           prompt: pending.prompt,
+          active_tab: String(typed.active_tab ?? pending.activeTabId),
           messages: pending.messages,
           resume_session_id: pending.resumeSessionId,
           bootstrap: typed,
@@ -2637,6 +2632,7 @@ export function App(): React.ReactElement {
           prompt: entry.prompt,
           provider: entry.provider,
           model: entry.model,
+          activeTabId: entry.activeTabId,
           messages: entry.messages,
           resumeSessionId,
         };
@@ -2767,12 +2763,31 @@ export function App(): React.ReactElement {
       respond(`Requesting route -> ${intent.target.provider}:${intent.target.model}`);
       return;
     }
+    if (intent.kind === "model_ambiguous") {
+      const matches = intent.targets
+        .map((target) => `  ${target.provider}:${target.model}`)
+        .join("\n");
+      dispatch({
+        type: "modelPicker.open",
+        returnTabId: stateRef.current.uiMode.activeTabId,
+      });
+      respond(
+        `More than one route matches "${intent.query}":\n${matches}\nName the exact model or choose it in the picker.`,
+        null,
+      );
+      return;
+    }
     if (intent.kind === "model_unknown") {
       const menu = selectableRouteTargets(stateRef.current.routePolicy)
         .map((target) => `  ${target.provider}:${target.model}`)
         .join("\n");
+      dispatch({
+        type: "modelPicker.open",
+        returnTabId: stateRef.current.uiMode.activeTabId,
+      });
       respond(
         `No route matches "${intent.query}". Available right now:\n${menu || "  (none — backend offline)"}\nSay "switch to <one of these>" or /model for the picker.`,
+        null,
       );
       return;
     }
@@ -2976,6 +2991,17 @@ export function App(): React.ReactElement {
       dispatch({type: "status.set", value: "route picker ready"});
       return;
     }
+    const plainLanguageIntent = exactLocalInput && !exactSlashCommand
+      ? matchUiIntent(
+          rawPrompt,
+          stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title})),
+          selectableRouteTargets(stateRef.current.routePolicy),
+        )
+      : null;
+    if (plainLanguageIntent) {
+      runLocalUiAction(rawPrompt, plainLanguageIntent);
+      return;
+    }
     if (!exactSlashCommand && stateRef.current.activeTurn.phase !== "idle") {
       dispatch({type: "status.set", value: "a turn is already running; cancel it before starting another"});
       return;
@@ -3082,6 +3108,7 @@ export function App(): React.ReactElement {
         prompt: rawPrompt,
         provider: state.routePolicy.provider,
         model: state.routePolicy.model,
+        activeTabId: state.uiMode.activeTabId,
         messages,
         resumeSessionId,
       };
@@ -3100,14 +3127,6 @@ export function App(): React.ReactElement {
       return;
     }
     const currentState = stateRef.current;
-    const actionType = String(action.payload.action_type ?? "");
-    if (
-      actionType === "approval.resolve"
-      && (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.approvals)
-    ) {
-      dispatch({type: "status.set", value: "approval resolution held: fresh permission history required"});
-      return;
-    }
     if (
       action.requestType === "session.detail"
       && (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.sessions)
@@ -3377,16 +3396,9 @@ export function App(): React.ReactElement {
       }
     }
     if (activeTab?.kind === "approvals") {
-      if (input === "j") {
-        const nextActionId = stepApprovalSelection(stateRef.current, 1);
-        if (nextActionId) {
-          dispatch({type: "approval.select", actionId: nextActionId});
-          dispatch({type: "status.set", value: `approval -> ${nextActionId}`});
-        }
-        return;
-      }
-      if (input === "k") {
-        const nextActionId = stepApprovalSelection(stateRef.current, -1);
+      const direction = plainListDirection(input, key);
+      if (direction) {
+        const nextActionId = stepApprovalSelection(stateRef.current, direction);
         if (nextActionId) {
           dispatch({type: "approval.select", actionId: nextActionId});
           dispatch({type: "status.set", value: `approval -> ${nextActionId}`});
@@ -3464,24 +3476,19 @@ export function App(): React.ReactElement {
       }
       return;
     }
-    if (key.ctrl && input === "l") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).refresh);
+    const paneActionChord = paneActionChordDecision(
+      input,
+      key,
+      activeTab?.id ?? "chat",
+      state,
+      shellControlOptions,
+    );
+    if (paneActionChord.handled) {
+      runPaneAction(paneActionChord.action);
       return;
     }
     if (key.ctrl && input === "w" && activeTab?.closable) {
       dispatch({type: "tab.close", tabId: activeTab.id});
-      return;
-    }
-    if (key.ctrl && input === "x") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).primary);
-      return;
-    }
-    if (key.ctrl && input === "f") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).secondary);
-      return;
-    }
-    if (key.ctrl && input === "v") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).tertiary);
       return;
     }
     // F-159: the shift+tab branch must run BEFORE the plain-tab branch —

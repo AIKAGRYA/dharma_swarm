@@ -28,7 +28,7 @@ from dharma_swarm.operator_core.contracts import (
     PermissionRisk,
     RuntimeHealth,
 )
-from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionResolutionEvent, ToolCallComplete, ToolResult, UserPrompt
+from dharma_swarm.tui.engine.events import ContextReceipt, PermissionDecisionEvent, PermissionResolutionEvent, ToolCallComplete, ToolResult, UserPrompt
 from dharma_swarm.operator_core.permissions import GovernancePolicy
 from dharma_swarm.operator_core.session_store import SessionStore
 
@@ -68,6 +68,21 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(envelope.event_type, "user_prompt")
         self.assertEqual(str(envelope.source), "operator")
         self.assertEqual(envelope.payload["content"], "continue the audit")
+
+    def test_context_receipt_envelope_is_runtime_owned(self) -> None:
+        envelope = event_envelope_from_legacy_event(
+            ContextReceipt(
+                session_id="sess-1",
+                provider_id="fallback",
+                model_id="winner-model",
+                disposition="not_attached_fallback",
+                lane_outcome="completed",
+            )
+        )
+
+        self.assertEqual(envelope.event_type, "context_receipt")
+        self.assertEqual(str(envelope.source), "runtime")
+        self.assertEqual(envelope.payload["authority"], "NONE")
 
     def test_session_from_meta(self) -> None:
         session = session_from_meta(

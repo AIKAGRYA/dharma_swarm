@@ -31,6 +31,8 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 DEFAULT_TTL_S = 900  # 15 min interactive default (operator decision in GOAL doc)
+_STALE_WARNING_FINGERPRINTS: set[tuple[str, float, float]] = set()
+_MAX_STALE_WARNING_FINGERPRINTS = 32
 
 # Glyphs (or any field) that count as a live key. oauth rows carry ✓ already;
 # we also accept an explicit "oauth" marker defensively.
@@ -254,12 +256,17 @@ def live_providers(
         # Clock skew / future timestamp: treat as fresh rather than stale.
         age = 0.0
     if age > ttl_s:
-        logger.warning(
-            "key_oracle: keys_status.json is stale (age=%.0fs > ttl=%.0fs); "
-            "falling back to env-presence (run `dkeys test`).",
-            age,
-            ttl_s,
-        )
+        fingerprint = (str(_status_path(home)), last_test_f, float(ttl_s))
+        if fingerprint not in _STALE_WARNING_FINGERPRINTS:
+            if len(_STALE_WARNING_FINGERPRINTS) >= _MAX_STALE_WARNING_FINGERPRINTS:
+                _STALE_WARNING_FINGERPRINTS.clear()
+            _STALE_WARNING_FINGERPRINTS.add(fingerprint)
+            logger.warning(
+                "key_oracle: keys_status.json is stale (age=%.0fs > ttl=%.0fs); "
+                "falling back to env-presence (run `dkeys test`).",
+                age,
+                ttl_s,
+            )
         return None
 
     live: set[str] = _detect_keyless_live()

@@ -659,3 +659,74 @@ def test_context_request_does_not_construct_runtime_owners_or_write_state(
     assert _file_snapshot(tmp_path) == before
     assert not list(tmp_path.rglob("*.db"))
     assert not list(tmp_path.rglob("*.sqlite"))
+
+
+def test_approval_resolve_is_unsupported_and_zero_write(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bridge, session_store, emitted = _bridge(monkeypatch, tmp_path)
+    bridge._state_dir = tmp_path / "terminal-state"
+    session_id = session_store.create_session(
+        provider_id="codex",
+        model_id="gpt-5.6-sol",
+        cwd=str(bridge._repo_root),
+        session_id="session-no-hand",
+    )
+    runtime_store_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    permission_payloads: list[dict[str, Any]] = []
+
+    def runtime_store_spy(*args: object, **kwargs: object) -> object:
+        runtime_store_calls.append((args, kwargs))
+        raise AssertionError("approval.resolve constructed the effectful runtime owner")
+
+    monkeypatch.setattr(
+        "dharma_swarm.terminal_bridge.RuntimeStateStore",
+        runtime_store_spy,
+    )
+    monkeypatch.setattr(bridge, "_record_permission_payload", permission_payloads.append)
+    before = _file_snapshot(tmp_path)
+
+    asyncio.run(
+        bridge._handle_request(
+            {
+                "id": "approval-no-hand",
+                "type": "action.run",
+                "action_type": "  APPROVAL.Resolve  ",
+                "action_id": "permission-123",
+                "resolution": "approved",
+                "actor": "operator",
+                "metadata": {
+                    "session_id": session_id,
+                    "task_id": "task-123",
+                    "run_id": "run-123",
+                },
+            }
+        )
+    )
+
+    assert runtime_store_calls == []
+    assert permission_payloads == []
+    assert _file_snapshot(tmp_path) == before
+    assert emitted == [
+        {
+            "type": "action.result",
+            "request_id": "approval-no-hand",
+            "action_type": "approval.resolve",
+            "ok": False,
+            "outcome": "unsupported",
+            "completed": False,
+            "supported": False,
+            "summary": "approval resolution is unavailable in read-only Helm",
+            "target_pane": "approvals",
+            "output": (
+                "Unsupported in Helm Slice 1: approval.resolve requires an effectful "
+                "authority that this read-only terminal does not own."
+            ),
+        }
+    ]
+    encoded = json.dumps(emitted[0], sort_keys=True)
+    assert "payload" not in emitted[0]
+    assert "enforcement_state" not in encoded
+    assert "runtime_action_id" not in encoded
+    assert "runtime_event_id" not in encoded

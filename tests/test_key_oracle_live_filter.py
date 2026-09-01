@@ -184,6 +184,28 @@ def test_live_providers_stale_returns_none(tmp_path: Path, monkeypatch) -> None:
     assert "openai" in fresh
 
 
+def test_stale_oracle_warning_is_emitted_once_per_observation(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _write_status(
+        tmp_path,
+        {"openai": _row("✓", status="live")},
+        age_s=10_000,
+    )
+    caplog.set_level("WARNING", logger="dharma_swarm.key_oracle")
+
+    assert live_providers(ttl_s=900, home=tmp_path, now=time.time()) is None
+    assert live_providers(ttl_s=900, home=tmp_path, now=time.time() + 30) is None
+
+    warnings = [
+        record
+        for record in caplog.records
+        if "keys_status.json is stale" in record.getMessage()
+    ]
+    assert len(warnings) == 1
+
+
 def test_live_providers_malformed_returns_none(tmp_path: Path) -> None:
     target = tmp_path / ".dharma"
     target.mkdir(parents=True, exist_ok=True)
