@@ -56,7 +56,17 @@ describe("resolvePython", () => {
 
   test("uses the canonical sibling checkout virtualenv for lightweight worktrees", () => {
     const canonical = "/workspace/dharma_swarm/.venv/bin/python";
-    expect(resolvePython({}, "/workspace/dharma_helm_build", (candidate) => candidate === canonical)).toBe(canonical);
+    expect(resolvePython({}, "/workspace/dharma_helm_build", (candidate) => candidate === canonical, () => undefined)).toBe(canonical);
+  });
+
+  test("uses the Git common checkout virtualenv for nested estate-law worktrees", () => {
+    const canonical = "/Users/dhyana/dharma_swarm/.venv/bin/python";
+    expect(resolvePython(
+      {},
+      "/Users/dhyana/worktrees/dharma_swarm/helm_prod_20260831",
+      (candidate) => candidate === canonical,
+      () => "/Users/dhyana/dharma_swarm/.git",
+    )).toBe(canonical);
   });
 
   test("falls back to python3 when no managed interpreter exists", () => {

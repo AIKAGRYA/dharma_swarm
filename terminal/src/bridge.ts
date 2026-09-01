@@ -1,4 +1,4 @@
-import {spawn, type ChildProcess} from "node:child_process";
+import {execFileSync, spawn, type ChildProcess} from "node:child_process";
 import {existsSync} from "node:fs";
 import path from "node:path";
 import {createInterface} from "node:readline";
@@ -8,27 +8,48 @@ import {BridgeBackgroundScheduler, type BridgeRequest} from "./bridgeScheduler.t
 
 export type BridgeEvent = Record<string, unknown>;
 export type BridgeProcessFactory = () => ChildProcess;
+export type GitCommonDirResolver = (repoRoot: string) => string | undefined;
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 
+function resolveGitCommonDir(repoRoot: string): string | undefined {
+  try {
+    const commonDir = execFileSync(
+      "git",
+      ["-C", repoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]},
+    ).trim();
+    return commonDir || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolvePython(
   env: NodeJS.ProcessEnv = process.env,
   repoRoot = REPO_ROOT,
   pathExists: (candidate: string) => boolean = existsSync,
+  gitCommonDir: GitCommonDirResolver = resolveGitCommonDir,
 ): string {
   const configured = env.DHARMA_PYTHON?.trim();
   if (configured) {
     return configured;
   }
 
+  const commonDir = gitCommonDir(repoRoot);
+  const canonicalCheckout = commonDir && path.basename(commonDir) === ".git"
+    ? path.dirname(commonDir)
+    : "";
   const candidates = [
     path.join(repoRoot, ".venv", "bin", "python"),
     env.VIRTUAL_ENV?.trim() ? path.join(env.VIRTUAL_ENV.trim(), "bin", "python") : "",
+    canonicalCheckout ? path.join(canonicalCheckout, ".venv", "bin", "python") : "",
     // Worktrees intentionally do not duplicate the large Python environment.
     // Fall back to the canonical checkout's venv when Helm runs from a sibling
-    // worktree such as dharma_helm_build.
+    // worktree such as dharma_helm_build. Git's common directory handles the
+    // repository's nested ~/worktrees/<repo>/<stem>_YYYYMMDD estate layout.
     path.join(path.dirname(repoRoot), "dharma_swarm", ".venv", "bin", "python"),
   ];
   for (const candidate of candidates) {

@@ -11,6 +11,7 @@ export type UiIntent =
   | {kind: "layout"; mode: "zen" | "cockpit" | "scroll"}
   | {kind: "pane"; tabId: string; title: string}
   | {kind: "model"; target: RouteTarget}
+  | {kind: "model_ambiguous"; query: string; targets: RouteTarget[]}
   // A clear model-switch ask whose target matched nothing: answered locally
   // with the route menu — NEVER forwarded to a billed backend turn (operator
   // cost incident: "change models to glm 4." ran as an agentic claude turn).
@@ -32,6 +33,10 @@ const SCROLL_WORDS = /\b(manuscript|reading mode|the scroll)\b/i;
 const UI_NOUN = /\b(mode|view|screen|layout|ui|tui|interface|dashboard|cockpit)\b/i;
 
 const PANE_NOUN = /\b(pane|panel|tab|surface|view|plane)\b/i;
+// Local steering accepts one direct instruction, not a compound request whose
+// trailing clause merely happens to resemble a UI command. Compound prose
+// stays byte-for-byte chat input so the matcher cannot silently discard work.
+const COMPOUND_CLAUSE_BOUNDARY = /[,;]|\b(?:and|also|plus|while|then|after that|before that)\b|[.!?:]\s+\S/i;
 
 // Navigator compatibility: legacy rail language resolves to the five-place
 // switcher rather than claiming a persistent rail that no longer renders.
@@ -52,6 +57,9 @@ export function matchUiIntent(
   panes: PaneRef[],
   routeTargets: RouteTarget[],
 ): UiIntent | null {
+  if (COMPOUND_CLAUSE_BOUNDARY.test(prompt)) {
+    return null;
+  }
   const text = normalize(prompt);
   if (!text || text.startsWith("/")) {
     return null;
@@ -137,7 +145,8 @@ export function matchUiIntent(
       .split(" ")
       .map((token) => token.replace(/\.+$/g, ""))
       .filter((token) => token.length > 1 || /\d/.test(token));
-    let best: {target: RouteTarget; score: number} | null = null;
+    let bestScore = 0;
+    let bestTargets: RouteTarget[] = [];
     for (const target of routeTargets) {
       const haystack = normalize(
         `${target.alias} ${target.label} ${target.provider} ${target.model} ${target.provider}:${target.model}`,
@@ -146,14 +155,20 @@ export function matchUiIntent(
       for (const token of queryTokens) {
         if (haystack.includes(token)) score += Math.max(token.length, 2);
       }
-      if (score > 0 && (!best || score > best.score)) {
-        best = {target, score};
+      if (score > bestScore) {
+        bestScore = score;
+        bestTargets = score > 0 ? [target] : [];
+      } else if (score > 0 && score === bestScore) {
+        bestTargets.push(target);
       }
     }
     // A real overlap (≥4 matched chars) keeps "switch to plan b" in chat;
     // short alias+digit asks ("glm 5" = 3+2) clear it too.
-    if (best && best.score >= 4) {
-      return {kind: "model", target: best.target};
+    if (bestScore >= 4 && bestTargets.length === 1) {
+      return {kind: "model", target: bestTargets[0]!};
+    }
+    if (bestScore >= 4 && bestTargets.length > 1) {
+      return {kind: "model_ambiguous", query, targets: bestTargets};
     }
     // The ask was unmistakably a model/route switch but nothing matched:
     // answer locally, never bill a backend turn on a mis-parse.

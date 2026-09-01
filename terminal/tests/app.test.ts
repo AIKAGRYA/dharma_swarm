@@ -9284,7 +9284,109 @@ describe("slashCommandStartActions", () => {
 });
 
 describe("App prompt submission", () => {
-  test("sends compound prose and non-exact slash text byte-identically to Python with zero local effects", async () => {
+  test("executes exact one-line plain-language UI intents locally without starting a backend turn", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {};
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("switch to zen mode");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      stdin.write("open sessions");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      expect(sentMessages.some((message) => message.type === "session.bootstrap")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "session.start")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "action.run")).toBe(false);
+      expect(normalizeTerminalText(rendered)).toContain("Sessions");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
+  test("opens the local model picker for an unknown plain-language route without billing the backend", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {};
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("change models to fancypants ultra");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      expect(sentMessages.some((message) => message.type === "session.bootstrap")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "session.start")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "action.run")).toBe(false);
+      expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
+  test("sends ambiguous, multiline, tour, and non-exact slash text byte-identically to Python with zero local effects", async () => {
     const originalSend = DharmaBridge.prototype.send;
     const originalSendBackground = DharmaBridge.prototype.sendBackground;
     const originalClose = DharmaBridge.prototype.close;
@@ -9296,6 +9398,10 @@ describe("App prompt submission", () => {
     try {
       for (const rawPrompt of [
         "explain status, run swarm, then switch the route to claude opus",
+        "switch to cockpit mode and summarize the current state",
+        "show me what control means in cybernetics",
+        "give me a tour",
+        "open sessions\nand explain what they contain",
         "  /thread attacker-chosen  ",
       ]) {
         const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];

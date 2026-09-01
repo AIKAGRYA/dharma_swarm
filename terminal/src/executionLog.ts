@@ -457,6 +457,31 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     })];
   }
 
+  if (type === "context_receipt") {
+    const provider = String(event.provider_id ?? "").trim();
+    const model = String(event.model_id ?? "").trim();
+    const disposition = String(event.disposition ?? "").trim() || "missing";
+    const contextDigest = String(event.context_digest ?? "").trim();
+    const sourceEpoch = String(event.source_epoch ?? "").trim();
+    return [canonicalEvent(event, {
+      sourceEventType: type,
+      kind: "status",
+      phase: "complete",
+      title: "context boundary sealed",
+      summary: `${provider}:${model}`.replace(/^:|:$/g, "") || undefined,
+      detail: [
+        `Final lane context ${disposition}${contextDigest ? ` · ${contextDigest.slice(0, 23)}` : ""}`,
+        `Lane ${String(event.lane_outcome ?? "").trim() || "unknown"}`,
+        `Authority ${String(event.authority ?? "").trim() || "NONE"}`,
+        ...(sourceEpoch ? [`Source epoch ${sourceEpoch.slice(0, 23)}`] : []),
+      ],
+      timestamp: timestampFromEvent({
+        ...event,
+        timestamp: event.outcome_timestamp ?? event.timestamp,
+      }),
+    })];
+  }
+
   if (type === "session.bootstrap.result" || type === "session.ack") {
     return [
       canonicalEvent(event, {
@@ -474,6 +499,11 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
             : [
                 `Session ${String(event.session_id ?? "").trim() || "pending"}`,
                 `${String(event.provider ?? "").trim()}:${String(event.model ?? "").trim()}`.replace(/^:/, "") || "route pending",
+                `Initial lane context ${String(event.context_disposition ?? "").trim() || "missing"}${
+                  String(event.context_digest ?? "").trim()
+                    ? ` · ${String(event.context_digest).trim().slice(0, 23)}`
+                    : ""
+                }`,
               ],
         timestamp: timestampFromEvent(event),
       }),

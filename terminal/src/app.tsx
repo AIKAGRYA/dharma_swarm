@@ -28,7 +28,7 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
-import {closestCommand, tourLines, type UiIntent} from "./uiIntents.ts";
+import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
@@ -847,6 +847,7 @@ type PendingBootstrap = {
   prompt: string;
   provider: string;
   model: string;
+  activeTabId: string;
   messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
   resumeSessionId?: string;
   cancelled?: boolean;
@@ -2022,6 +2023,7 @@ export function createBridgeEventHandler({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
+            active_tab: String(typed.active_tab ?? pending.activeTabId),
             messages: pending.messages,
             resume_session_id: pending.resumeSessionId,
             bootstrap: typed,
@@ -2037,6 +2039,7 @@ export function createBridgeEventHandler({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
+            active_tab: String(typed.active_tab ?? pending.activeTabId),
             messages: pending.messages,
             resume_session_id: pending.resumeSessionId,
             bootstrap: typed,
@@ -2048,6 +2051,7 @@ export function createBridgeEventHandler({
           provider: selectedProvider,
           model: selectedModel,
           prompt: pending.prompt,
+          active_tab: String(typed.active_tab ?? pending.activeTabId),
           messages: pending.messages,
           resume_session_id: pending.resumeSessionId,
           bootstrap: typed,
@@ -2628,6 +2632,7 @@ export function App(): React.ReactElement {
           prompt: entry.prompt,
           provider: entry.provider,
           model: entry.model,
+          activeTabId: entry.activeTabId,
           messages: entry.messages,
           resumeSessionId,
         };
@@ -2758,12 +2763,31 @@ export function App(): React.ReactElement {
       respond(`Requesting route -> ${intent.target.provider}:${intent.target.model}`);
       return;
     }
+    if (intent.kind === "model_ambiguous") {
+      const matches = intent.targets
+        .map((target) => `  ${target.provider}:${target.model}`)
+        .join("\n");
+      dispatch({
+        type: "modelPicker.open",
+        returnTabId: stateRef.current.uiMode.activeTabId,
+      });
+      respond(
+        `More than one route matches "${intent.query}":\n${matches}\nName the exact model or choose it in the picker.`,
+        null,
+      );
+      return;
+    }
     if (intent.kind === "model_unknown") {
       const menu = selectableRouteTargets(stateRef.current.routePolicy)
         .map((target) => `  ${target.provider}:${target.model}`)
         .join("\n");
+      dispatch({
+        type: "modelPicker.open",
+        returnTabId: stateRef.current.uiMode.activeTabId,
+      });
       respond(
         `No route matches "${intent.query}". Available right now:\n${menu || "  (none — backend offline)"}\nSay "switch to <one of these>" or /model for the picker.`,
+        null,
       );
       return;
     }
@@ -2967,6 +2991,17 @@ export function App(): React.ReactElement {
       dispatch({type: "status.set", value: "route picker ready"});
       return;
     }
+    const plainLanguageIntent = exactLocalInput && !exactSlashCommand
+      ? matchUiIntent(
+          rawPrompt,
+          stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title})),
+          selectableRouteTargets(stateRef.current.routePolicy),
+        )
+      : null;
+    if (plainLanguageIntent) {
+      runLocalUiAction(rawPrompt, plainLanguageIntent);
+      return;
+    }
     if (!exactSlashCommand && stateRef.current.activeTurn.phase !== "idle") {
       dispatch({type: "status.set", value: "a turn is already running; cancel it before starting another"});
       return;
@@ -3073,6 +3108,7 @@ export function App(): React.ReactElement {
         prompt: rawPrompt,
         provider: state.routePolicy.provider,
         model: state.routePolicy.model,
+        activeTabId: state.uiMode.activeTabId,
         messages,
         resumeSessionId,
       };
