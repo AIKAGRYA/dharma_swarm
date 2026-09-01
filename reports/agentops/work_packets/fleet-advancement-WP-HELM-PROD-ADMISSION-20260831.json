@@ -69,7 +69,8 @@
     "tests/test_terminal_bridge_external_preview.py",
     "tests/test_terminal_bridge_helm_context.py",
     "tests/test_terminal_tmux_isolation.py",
-    "tests/test_terminal_tui_tmux_root.py"
+    "tests/test_terminal_tui_tmux_root.py",
+    "tests/tui/test_canonical_events.py"
   ],
   "forbidden_files": [
     "deploy/sadhana/**",
@@ -161,6 +162,6 @@
       "Local cutover remains blocked until the no-hand boundary, owner projections, route verification, runtime shell integrity, performance journey, rollback proof, No-Mistakes gate, and required CI all pass."
     ],
     "rollback": "Revert the governance-admission commit to restore the bounded CLOSED_NOT_PROD target. That repository rollback does not alter any running terminal, tmux server, credential, runtime state, or provider account.",
-    "packet_digest": "4b2f87e8e6928884bd84ab6297a8aafaee551524483834a62ac04f4d6b5daee1"
+    "packet_digest": "ea17003ac642417246780767c0d0c925b427d03b83c47dffa95b17ab31527d9b"
   }
 }
