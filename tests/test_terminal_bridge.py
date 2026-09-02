@@ -61,7 +61,7 @@ def _set_dispatchable(monkeypatch, *providers: str) -> None:
     """Pin the P2.5 key-oracle input instead of inheriting operator state."""
 
     monkeypatch.setattr(
-        "dharma_swarm.terminal_bridge_chat_policy.key_oracle.dispatchable_now",
+        "dharma_swarm.terminal_bridge_chat_policy.key_oracle.dispatchable_cached",
         lambda: set(providers),
     )
 
@@ -356,10 +356,15 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
         asyncio.run(bridge.close())
 
 
-def test_dead_configured_route_falls_to_first_usable_canonical_lane_with_notice(
+def test_dead_configured_route_falls_to_most_powerful_canonical_lane_with_notice(
     monkeypatch,
 ) -> None:
-    """Usability chooses the fallback; evaluator identity truth does not."""
+    """Usability chooses the fallback set; power order picks within it.
+
+    The kimi_code adapter shadows the canonical Kimi row with a preview-only
+    lane, and a preview lane never outranks a usable canonical floor lane even
+    though the historical cheap-first seed lists kimi_code before claude_code.
+    """
 
     dead = model_routing.ModelTarget(
         alias="dead",
@@ -411,7 +416,7 @@ def test_dead_configured_route_falls_to_first_usable_canonical_lane_with_notice(
         lambda: [dead, later_claude, first_kimi],
     )
     monkeypatch.setattr(
-        "dharma_swarm.key_oracle.dispatchable_now",
+        "dharma_swarm.key_oracle.dispatchable_cached",
         lambda: {ProviderType.KIMI_CODE.value, ProviderType.CLAUDE_CODE.value},
     )
     monkeypatch.setattr(
@@ -442,14 +447,22 @@ def test_dead_configured_route_falls_to_first_usable_canonical_lane_with_notice(
     finally:
         asyncio.run(bridge.close())
 
-    assert policy["selected_route"] == f"kimi_code:{KIMI_K3_MODEL_ID}"
+    kimi_preview = next(
+        target
+        for target in policy["targets"]
+        if target["route_id"] == f"kimi_code:{KIMI_K3_MODEL_ID}"
+    )
+    assert kimi_preview["usable_now"] is True
+    assert kimi_preview["preview_only"] is True
+    assert policy["selected_route"] == "claude:claude-opus-4.8"
+    assert policy["default_route"] == "claude:claude-opus-4.8"
     assert policy["fallback_notice"] == {
         "kind": "live_fallback",
         "configured_route": "openrouter:dead-model",
-        "selected_route": f"kimi_code:{KIMI_K3_MODEL_ID}",
+        "selected_route": "claude:claude-opus-4.8",
         "message": (
             "Live fallback: openrouter:dead-model -> "
-            f"kimi_code:{KIMI_K3_MODEL_ID} (configured route not usable now)"
+            "claude:claude-opus-4.8 (configured route not usable now)"
         ),
     }
     assert "\n" not in policy["fallback_notice"]["message"]
@@ -467,11 +480,6 @@ def test_unknown_oracle_refuses_unproven_local_cli_attempts(
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
-    monkeypatch.setattr(
-        bridge,
-        "_local_cli_attempt_authorized",
-        lambda provider_id: provider_id == "codex",
-    )
 
     try:
         policy = bridge._build_model_policy_summary(
@@ -596,11 +604,6 @@ def test_local_preview_is_env_gated_selected_and_strictly_single_lane(
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
-    monkeypatch.setattr(
-        bridge,
-        "_local_cli_attempt_authorized",
-        lambda provider_id: False,
-    )
 
     try:
         assert "ollama" in bridge._adapters
@@ -773,14 +776,15 @@ def test_unknown_or_explicit_dead_oracle_never_admits_unproven_routes(
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
-    monkeypatch.setattr(bridge, "_local_cli_attempt_authorized", lambda provider_id: False)
 
     try:
         _set_dispatchable(monkeypatch)
         assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
 
-        _set_dispatchable(monkeypatch)
-        monkeypatch.setattr(bridge, "_local_cli_attempt_authorized", lambda provider_id: True)
+        monkeypatch.setattr(
+            "dharma_swarm.key_oracle._claude_code_dispatchable_now",
+            lambda **_: True,
+        )
         assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
     finally:
         asyncio.run(bridge.close())

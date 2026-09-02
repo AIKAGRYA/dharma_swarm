@@ -1,3 +1,4 @@
+import {modelPickerShortcut} from "../components/ModelPicker";
 import {nonSelectableRouteTargets, routePolicyFromValue, selectableRouteTargets} from "../routePolicy";
 import type {
   AgentRoutesPayload,
@@ -61,11 +62,7 @@ function appendModelTable(lines: string[], routePolicy: RoutePolicyState): void 
     return;
   }
   routePolicy.targets.forEach((entry, index) => {
-    const key = index < 9
-      ? String(index + 1)
-      : index === 9
-        ? "0"
-        : index < 36 ? String.fromCharCode(87 + index) : "–";
+    const key = modelPickerShortcut(index) ?? "–";
     lines.push(
       `- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}] | key ${key} | usable now ${truthWord(entry.usableNow)} | identity verified ${truthWord(entry.identityVerified)}${entry.availabilityReason ? ` | ${entry.availabilityReason}` : ""}`,
     );

@@ -84,11 +84,14 @@ export function Composer({prompt, focused = true, compact = false, width = 80}: 
           return (
             <>
               {shown.map((line, index) => {
-                const isFirstReal = index === 0 && !overflow;
                 const isLast = index === shown.length - 1;
+                // Focused overflow hides the head (marker on line 0); unfocused
+                // overflow hides the tail (marker on the last shown line).
+                const elided = overflow && (focused ? index === 0 : isLast);
+                const prefix = elided ? "⋮ " : index === 0 ? "> " : "  ";
                 return (
                   <Text key={index} color={THEME.foam} wrap="truncate-end">
-                    <Text color={THEME.stone}>{isFirstReal ? "> " : overflow && index === 0 ? "⋮ " : "  "}</Text>
+                    <Text color={THEME.stone}>{prefix}</Text>
                     {line}
                     {isLast && focused ? <Text color={THEME.foam} inverse> </Text> : null}
                   </Text>

@@ -322,3 +322,14 @@ def test_output_symlink_is_refused(harness, tmp_path: Path, monkeypatch) -> None
     with pytest.raises(harness.HarnessInputError, match="symlink"):
         harness.validate_output_path(link)
     assert target.read_text(encoding="utf-8") == "preserve"
+
+
+def test_report_names_intent_metric_as_roundtrip_not_parser_latency(harness) -> None:
+    report = harness.build_report(
+        measurement=harness.parse_measurement_payload(_measurement()),
+        baseline=harness.parse_baseline_payload(_baseline()),
+    )
+    semantics = report["metric_semantics"]
+    assert set(semantics) == set(harness._SAMPLE_NAMES)
+    assert "round trip" in semantics["intent_parse_ms"]
+    assert "not pure parser time" in semantics["intent_parse_ms"]

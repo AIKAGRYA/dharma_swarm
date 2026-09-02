@@ -18,6 +18,9 @@ PYTHONPATH="$PWD" "$PY" -m pytest \
   tests/test_terminal_bridge_external_preview.py \
   tests/test_route_verification.py \
   tests/test_helm_seat_matrix.py \
+  tests/test_helm_doctor.py \
+  tests/test_helm_perf_soak.py \
+  tests/test_terminal_bridge_model_truth.py \
   tests/test_model_pool.py \
   tests/test_model_status_projection.py \
   tests/test_model_key_routing_guard.py \

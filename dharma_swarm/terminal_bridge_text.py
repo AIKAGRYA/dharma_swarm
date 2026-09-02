@@ -202,15 +202,7 @@ def render_model_policy_text(policy: dict[str, Any]) -> str:
             suffix = f" [{state}]"
             if reason:
                 suffix += f" {reason}"
-            key = (
-                str(index + 1)
-                if index < 9
-                else "0"
-                if index == 9
-                else chr(87 + index)
-                if index < 36
-                else "-"
-            )
+            key = policy_target_key(index) or "-"
             usable = str(target.get("usable_now", "unknown")).lower()
             verified = str(target.get("identity_verified", "unknown")).lower()
             lines.append(
@@ -224,6 +216,37 @@ def render_model_policy_text(policy: dict[str, Any]) -> str:
                 route = item.get("route_id") or f"{item.get('provider', '?')}:{item.get('model', '?')}"
                 lines.append(f"- {item.get('label', route)} ({route})")
     return "\n".join(lines)
+
+
+# Single-key picker scheme shared with the TUI: digits, then letters with the
+# navigation keys j/k skipped so every printed key can actually select.
+_POLICY_TARGET_LETTERS = "abcdefghilmnopqrstuvwxyz"
+
+
+def policy_target_key(index: int) -> str | None:
+    if index < 0:
+        return None
+    if index < 9:
+        return str(index + 1)
+    if index == 9:
+        return "0"
+    letter = index - 10
+    return _POLICY_TARGET_LETTERS[letter] if letter < len(_POLICY_TARGET_LETTERS) else None
+
+
+def policy_target_for_key(policy: dict[str, Any], key: str) -> dict[str, Any] | None:
+    """Resolve a `/model list` key to the policy row it was printed beside."""
+
+    wanted = key.strip().lower()
+    if len(wanted) != 1:
+        return None
+    targets = policy.get("targets")
+    if not isinstance(targets, list):
+        return None
+    for index, target in enumerate(targets):
+        if isinstance(target, dict) and policy_target_key(index) == wanted:
+            return target
+    return None
 
 
 def render_agent_routes_text(routes: dict[str, Any]) -> str:

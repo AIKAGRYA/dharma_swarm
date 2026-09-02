@@ -41,7 +41,7 @@ def _build_model_policy_summary(
 
     terminal_providers = bridge._available_provider_ids()
     dispatchable_providers = {
-        str(provider).strip().lower() for provider in key_oracle.dispatchable_now()
+        str(provider).strip().lower() for provider in key_oracle.dispatchable_cached()
     }
     strict_identities = _strict_verified_identities(bridge)
     seen_routes: set[tuple[str, str]] = set()
@@ -215,7 +215,7 @@ def _build_model_policy_summary(
     )
     usable_targets = sorted(
         (target for target in targets if bool(target.get("usable_now"))),
-        key=_target_hierarchy_rank,
+        key=lambda target: _target_hierarchy_rank(target, strategy),
     )
     fallback_notice: dict[str, Any] | None = None
     if not selected_available:
@@ -331,7 +331,7 @@ def _chat_lanes(
             preview_model
             and requested_model == preview_model
             and "ollama" in bridge._adapters
-            and {"local", "ollama"} & key_oracle.dispatchable_now()
+            and {"local", "ollama"} & key_oracle.dispatchable_cached()
         ):
             return [
                 (

@@ -123,6 +123,22 @@ function eventIsTransportDisconnect(event: PlainEvent): boolean {
  * point of use, and correlated to the one request the UI currently owns.
  * Narrative booleans and other legacy readiness hints never participate.
  */
+/**
+ * A result correlates when it answers the anchored request or any request
+ * issued after it (bridge ids are monotonic per process). Ids that are not
+ * both numeric must match exactly.
+ */
+export function helmContextResultCorrelates(requestId: unknown, pendingRequestId: string): boolean {
+  const actual = String(requestId ?? "").trim();
+  if (!actual) {
+    return false;
+  }
+  if (actual === pendingRequestId) {
+    return true;
+  }
+  return /^\d+$/.test(actual) && /^\d+$/.test(pendingRequestId) && Number(actual) > Number(pendingRequestId);
+}
+
 export function helmContextActionsForBridgeEvent(
   value: unknown,
   helmContext: AppState["helmContext"],
@@ -144,9 +160,9 @@ export function helmContextActionsForBridgeEvent(
   const requestId = event.request_id;
 
   if (eventType === "bridge.error") {
-    return requestId === pendingRequestId ? [{type: "helm.context.reset"}] : [];
+    return helmContextResultCorrelates(requestId, pendingRequestId) ? [{type: "helm.context.reset"}] : [];
   }
-  if (eventType !== "helm.context.result" || requestId !== pendingRequestId) {
+  if (eventType !== "helm.context.result" || !helmContextResultCorrelates(requestId, pendingRequestId)) {
     return [];
   }
 

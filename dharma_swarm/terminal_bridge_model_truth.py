@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from dharma_swarm import key_oracle, model_status
-from dharma_swarm.model_hierarchy import CANONICAL_SEED_ORDER
+from dharma_swarm.model_hierarchy import CANONICAL_SEED_ORDER, intelligence_order
+from dharma_swarm.tui import model_routing
 
 _EXTERNAL_PREVIEW_ORACLE_PROVIDERS: dict[str, tuple[str, ...]] = {
     "claude": ("claude_code",),
@@ -14,7 +15,10 @@ _EXTERNAL_PREVIEW_ORACLE_PROVIDERS: dict[str, tuple[str, ...]] = {
     "kimi_code": ("kimi_code",),
 }
 _CANONICAL_PROVIDER_RANK = {
-    provider.value: index for index, provider in enumerate(CANONICAL_SEED_ORDER)
+    provider.value: index
+    for index, provider in enumerate(
+        intelligence_order(CANONICAL_SEED_ORDER, respect_cost_tiers=False)
+    )
 }
 
 
@@ -58,14 +62,30 @@ def identity_verified(
     return bool(candidate_identities & strict_identities)
 
 
-def target_hierarchy_rank(target: dict[str, Any]) -> tuple[int, int]:
+def target_hierarchy_rank(
+    target: dict[str, Any], strategy: str | None = "responsive"
+) -> tuple[int, int, int]:
+    """Power-first rank: canonical before preview, strategy order, then power.
+
+    A preview-only lane never outranks a canonical floor lane, and within the
+    canonical set the strategy's fallback order wins before the provider's
+    raw intelligence seed. The historical cheap-first seed is not consulted.
+    """
+
+    order = model_routing.strategy_fallback_order(strategy)
+    alias = str(target.get("alias", ""))
+    strategy_rank = order.index(alias) if alias in order else len(order)
     provider_ranks = [
         _CANONICAL_PROVIDER_RANK[provider]
         for provider in target.get("oracle_providers", [])
         if provider in _CANONICAL_PROVIDER_RANK
     ]
     # Providers outside the canonical registry remain deterministically last.
-    return (min(provider_ranks, default=len(_CANONICAL_PROVIDER_RANK)), 0)
+    return (
+        1 if bool(target.get("preview_only")) else 0,
+        strategy_rank,
+        min(provider_ranks, default=len(_CANONICAL_PROVIDER_RANK)),
+    )
 
 
 def fallback_notice(
@@ -100,7 +120,7 @@ def external_preview_oracle_providers(provider_id: str) -> list[str]:
 
 def preview_provider_dispatchable(provider_id: str) -> bool:
     oracle_providers = set(external_preview_oracle_providers(provider_id))
-    return bool(oracle_providers & key_oracle.dispatchable_now())
+    return bool(oracle_providers & key_oracle.dispatchable_cached())
 
 
 __all__ = [

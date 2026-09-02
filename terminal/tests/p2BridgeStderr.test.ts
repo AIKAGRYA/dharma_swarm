@@ -6,7 +6,7 @@ import path from "node:path";
 import {PassThrough} from "node:stream";
 import type {ChildProcess} from "node:child_process";
 
-import {DharmaBridge} from "../src/bridge";
+import {DharmaBridge, bridgeStderrLogPath} from "../src/bridge";
 
 class FakeBridgeProcess extends EventEmitter {
   readonly stdin = new PassThrough();
@@ -81,6 +81,38 @@ describe("P2 F8 bridge stderr isolation", () => {
       expect(events).toEqual([{type: "status.result", request_id: "owned-1", status: "ok"}]);
       expect(JSON.stringify(events)).not.toContain("keys_status.json is stale");
       expect(JSON.stringify(events)).not.toContain("non-json diagnostic");
+    } finally {
+      bridge.close();
+    }
+  });
+});
+
+describe("P2 F8 bridge stderr never vanishes", () => {
+  test("without a state dir the log still lands under ~/.dharma", () => {
+    const resolved = bridgeStderrLogPath({});
+    expect(resolved).toBe(path.join(os.homedir(), ".dharma", "terminal_supervisor", "bridge.stderr.log"));
+  });
+
+  test("a non-zero exit carries the last stderr lines on the bridge.error event", async () => {
+    const stateDir = mkdtempSync(path.join(os.tmpdir(), "dharma-p2-f8-exit-"));
+    tempDirs.push(stateDir);
+    process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    delete process.env.DHARMA_TERMINAL_STATE_DIR;
+
+    const child = new FakeBridgeProcess();
+    const events: Record<string, unknown>[] = [];
+    const bridge = new DharmaBridge((event) => events.push(event), () => child.asChildProcess());
+    try {
+      child.stderr.write("Traceback (most recent call last):\n");
+      child.stderr.write("ModuleNotFoundError: No module named 'dharma_swarm.missing'\n");
+      await flushStreams();
+      child.emit("exit", 1, null);
+
+      const exit = events.find((event) => event.code === "bridge_exit");
+      expect(exit).toBeDefined();
+      expect(String(exit?.message)).toContain("bridge exited (1)");
+      expect(String(exit?.message)).toContain("ModuleNotFoundError: No module named 'dharma_swarm.missing'");
+      expect(String(exit?.stderr_tail)).toContain("Traceback");
     } finally {
       bridge.close();
     }

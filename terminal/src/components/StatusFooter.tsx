@@ -32,6 +32,20 @@ function gateFor(bridgeStatus: string): Gate {
   }
 }
 
+// The right box never shrinks so the typed reason survives narrow widths; the
+// cap keeps a long reason from starving the route label out of the left box.
+// 20 keeps the canonical typed marks (e.g. exact_model_unproven) whole while a
+// 100-column full row still shows the whole route id.
+const REASON_CAP = 20;
+
+export function capReason(reason: string | undefined, _compact: boolean): string | undefined {
+  const trimmed = reason?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed.length <= REASON_CAP ? trimmed : `${trimmed.slice(0, REASON_CAP - 1)}…`;
+}
+
 // FACE-2 command post status line (F-110 + F-164): EXACTLY one row at every
 // size, and the SINGLE source of status truth per frame — mode, route, gate
 // state, provider summary. offline / model name / ready never render anywhere
@@ -40,6 +54,7 @@ function gateFor(bridgeStatus: string): Gate {
 export function StatusFooter({mode, routeLabel, bridgeStatus, routeState, strategy, reason, compact = false}: Props): React.ReactElement {
   const gate = gateFor(bridgeStatus);
   const route = routeStatePresentation(routeState);
+  const shownReason = capReason(reason, compact);
   return (
     <Box paddingX={1} height={1} overflow="hidden">
       <Box flexGrow={1} flexShrink={1} overflow="hidden">
@@ -58,7 +73,7 @@ export function StatusFooter({mode, routeLabel, bridgeStatus, routeState, strate
       </Box>
       <Box flexShrink={0}>
         <Text>
-          {compact && reason ? <Text color={THEME.stone}>{reason} </Text> : null}
+          {compact && shownReason ? <Text color={THEME.stone}>{shownReason} </Text> : null}
           <Text color={THEME.ink}>{compact ? "" : "  ·  "}</Text>
           <Text color={gate.color}>{gate.glyph} {gate.word}</Text>
           {bridgeStatus === "connected" ? (
@@ -67,10 +82,10 @@ export function StatusFooter({mode, routeLabel, bridgeStatus, routeState, strate
               <Text color={route.color}>{route.glyph} {route.word}</Text>
             </>
           ) : null}
-          {!compact && reason ? (
+          {!compact && shownReason ? (
             <>
               <Text color={THEME.ink}>{"  ·  "}</Text>
-              <Text color={THEME.stone}>{reason}</Text>
+              <Text color={THEME.stone}>{shownReason}</Text>
             </>
           ) : null}
         </Text>

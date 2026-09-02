@@ -1,7 +1,7 @@
 import {describe, expect, test} from "bun:test";
 import React from "react";
 
-import {ModelPicker} from "../src/components/ModelPicker";
+import {ModelPicker, modelPickerShortcut, modelPickerShortcutIndex} from "../src/components/ModelPicker";
 import type {RouteTarget} from "../src/types";
 
 function flattenElementText(node: React.ReactNode): string[] {
@@ -47,5 +47,19 @@ describe("ModelPicker /models table", () => {
     expect(text).toContain("dead-verified");
     expect(text).toMatch(/1\D+live-unverified/);
     expect(text).toMatch(/2\D+dead-verified/);
+  });
+});
+
+describe("ModelPicker one-key shortcuts", () => {
+  test("never hands a row the j or k key that navigation consumes first", () => {
+    const keys = Array.from({length: 40}, (_, index) => modelPickerShortcut(index)).filter(Boolean);
+    expect(keys).not.toContain("j");
+    expect(keys).not.toContain("k");
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const [index, key] of keys.entries()) {
+      expect(modelPickerShortcutIndex(key as string)).toBe(index);
+    }
+    expect(modelPickerShortcutIndex("j")).toBeUndefined();
+    expect(modelPickerShortcutIndex("k")).toBeUndefined();
   });
 });

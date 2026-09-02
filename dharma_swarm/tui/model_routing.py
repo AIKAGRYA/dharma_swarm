@@ -333,6 +333,15 @@ def all_targets() -> list[ModelTarget]:
     return list(MODEL_TARGETS)
 
 
+def strategy_fallback_order(strategy: str | None) -> tuple[str, ...]:
+    """Power-first alias order for ``strategy`` (the picker's fallback law)."""
+
+    resolved = resolve_strategy(strategy) or "responsive"
+    return _FALLBACK_ORDER_BY_STRATEGY.get(
+        resolved, _FALLBACK_ORDER_BY_STRATEGY["responsive"]
+    )
+
+
 def route_key(provider_id: str, model_id: str) -> str:
     return f"{provider_id}:{model_id}"
 
@@ -365,7 +374,7 @@ def _resolve_oracle(key_oracle: set[str] | None | object) -> set[str] | None:
     if key_oracle is None:
         return None
     try:
-        return _key_oracle.live_providers()
+        return _key_oracle.live_providers(probe=False)
     except Exception:  # pragma: no cover - oracle must never raise into routing
         return None
 

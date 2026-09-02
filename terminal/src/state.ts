@@ -240,10 +240,15 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
         ),
       };
     case "helm.context.requested":
-      return {
-        ...state,
-        helmContext: {...state.helmContext, pendingRequestId: action.requestId},
-      };
+      // A slow owner fan-out must not be orphaned by the next tick: the
+      // oldest outstanding request stays the correlation anchor and any
+      // result issued after it is accepted (see helmContextResultCorrelates).
+      return state.helmContext.pendingRequestId
+        ? state
+        : {
+            ...state,
+            helmContext: {...state.helmContext, pendingRequestId: action.requestId},
+          };
     case "helm.context.set":
       return {
         ...state,

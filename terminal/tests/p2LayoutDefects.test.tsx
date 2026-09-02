@@ -122,6 +122,28 @@ describe("P2 F1/F9 truth-token width budget", () => {
     }
   });
 
+  test("a long reason is capped so the route label survives at full width", async () => {
+    const reason = "configured route not usable now; live fallback selected after the oracle refreshed";
+    const frame = await renderAt(
+      <StatusFooter
+        mode="compose"
+        routeLabel="claude:claude-opus-5.0"
+        bridgeStatus="connected"
+        routeState="unverified"
+        strategy="responsive"
+        reason={reason}
+        compact={false}
+      />,
+      100,
+      1,
+    );
+
+    expect(frame).toContain("route claude:claude-opus-5.0");
+    expect(frame).toContain("● bridge");
+    expect(frame).toContain("configured route no…");
+    expect(frame).not.toContain(reason);
+  });
+
   test("keeps both usability and evaluator identity truth visible at survival width", async () => {
     const frame = await renderAt(
       <OnCallTruthBand truth={unknownOnCallTruthState()} compact width={44} usableNowCount={12} usableLaneTotal={15} />,
@@ -218,5 +240,22 @@ describe("P2 F6 navigation swallow recovery", () => {
       expect(frame).toContain("change models");
       expect(frame).toMatch(/Esc.*(?:compose|composition|composer)/i);
     }
+  });
+});
+
+describe("Composer unfocused overflow elision", () => {
+  test("an unfocused overflowing draft keeps the prompt cue on line one and marks the hidden tail", () => {
+    const prompt = Array.from({length: 8}, (_, index) => `line ${index + 1}`).join("\n");
+    const unfocused = flattenText(Composer({prompt, focused: false, compact: false, width: 80}));
+
+    expect(unfocused).toMatch(/^> line 1/);
+    expect(unfocused).toMatch(/⋮ line 4/);
+    expect(unfocused).not.toContain("line 5");
+    expect(unfocused).toMatch(/Esc.*compose/i);
+
+    const focused = flattenText(Composer({prompt, focused: true, compact: false, width: 80}));
+    expect(focused).toMatch(/^⋮ line 5/);
+    expect(focused).toContain("line 8");
+    expect(focused).not.toContain("> line");
   });
 });

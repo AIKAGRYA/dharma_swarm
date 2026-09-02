@@ -54,6 +54,19 @@ _LIMIT_NAMES = (
     "rss_peak_growth_bytes",
     "fd_peak_growth",
 )
+# What each sample actually measures. Names are wire-stable (v1 schema); the
+# semantics travel with every report so a reader never mistakes a harness
+# round trip for a pure component latency.
+METRIC_SEMANTICS: dict[str, str] = {
+    "boot_ms": "launcher start-to-return wall time on the private tmux socket",
+    "intent_parse_ms": (
+        "navigation intent round trip: Enter keypress (draft already typed and "
+        "echoed) to first rendered frame change; includes tmux input latency, "
+        "so an upper bound on parser latency, not pure parser time"
+    ),
+    "provider_turn_ms": "offline stub bridge turn: Enter to completion glyph; never a live provider",
+    "render_ms": "F2 surface toggle: keypress to first rendered frame change",
+}
 _ROLLBACK_SHAPE = (
     (1, "stop", "live"),
     (2, "start", "stopped"),
@@ -415,6 +428,7 @@ def build_report(
         "state": "PASS" if all(row["passed"] for row in comparisons) else "FAIL",
         "authority": "MEASURED_LOCAL_ONLY",
         "provider_truth": "OFFLINE_STUB_NOT_LIVE_PROVIDER",
+        "metric_semantics": dict(METRIC_SEMANTICS),
         "generated_at": now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "measurement_sha256": _sha256_json(raw_measurement),
         "baseline_sha256": _sha256_json(raw_baseline),

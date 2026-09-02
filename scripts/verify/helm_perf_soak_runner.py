@@ -7,11 +7,17 @@ private ``CODEX_MANAGED_*`` tmux socket, samples timings and soak growth, walks
 the stop -> start -> replay-valid rollback shape, and takes provider-turn
 timings from the offline stub bridge only. It never dispatches a live provider
 turn and never touches the default tmux socket.
+
+Metric semantics: ``intent_parse_ms`` is a navigation-intent round trip, timed
+from the Enter keypress (the draft is already typed and echoed) to the first
+rendered frame change. It includes tmux input latency, so it is an upper bound
+on parser latency, not a pure parser measurement.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -25,6 +31,16 @@ REPO = Path(__file__).resolve().parents[2]
 SOCKET = "CODEX_MANAGED_p4perf"
 STUB_SESSION = "p4stub"
 LAUNCH_SESSION = "dharma_terminal_tui"
+PROBE_TIMEOUT_S = 10.0
+
+
+def _load_composer():
+    spec = importlib.util.spec_from_file_location(
+        "helm_perf_soak", Path(__file__).resolve().with_name("helm_perf_soak.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _tmux(*args: str, timeout: float = 20.0) -> subprocess.CompletedProcess:
@@ -50,10 +66,28 @@ def _capture(target: str) -> str:
     return out.stdout if out.returncode == 0 else ""
 
 
-def _send_line(target: str, text: str) -> None:
+def _type_draft(target: str, text: str) -> None:
     _tmux("send-keys", "-t", target, "-l", text)
     time.sleep(0.3)
+
+
+def _press_enter(target: str) -> None:
     _tmux("send-keys", "-t", target, "Enter")
+
+
+def _send_line(target: str, text: str) -> None:
+    _type_draft(target, text)
+    _press_enter(target)
+
+
+def _timed_intent(target: str, text: str, timeout_s: float) -> float:
+    """Round trip from Enter to the first frame change; the typed draft is excluded."""
+    _type_draft(target, text)
+    baseline = _capture(target)
+    t0 = time.perf_counter_ns()
+    _press_enter(target)
+    _wait_change(target, baseline, timeout_s)
+    return (time.perf_counter_ns() - t0) / 1e6
 
 
 def _wait_for(target: str, needle: str, timeout_s: float, absent_baseline: int = 0) -> float:
@@ -82,11 +116,18 @@ def _pane_pid(target: str) -> int:
     return int(out.stdout.strip())
 
 
+def _probe(argv: list[str]) -> str:
+    try:
+        return subprocess.run(
+            argv, capture_output=True, text=True, timeout=PROBE_TIMEOUT_S,
+        ).stdout
+    except (subprocess.TimeoutExpired, OSError):
+        return ""
+
+
 def _proc_stats(pid: int) -> tuple[int, int]:
-    rss_kb = int(subprocess.run(["ps", "-o", "rss=", "-p", str(pid)],
-                                capture_output=True, text=True).stdout.strip() or 0)
-    fd = subprocess.run(["lsof", "-p", str(pid)], capture_output=True, text=True)
-    fd_count = max(0, len(fd.stdout.splitlines()) - 1)
+    rss_kb = int(_probe(["ps", "-o", "rss=", "-p", str(pid)]).strip() or 0)
+    fd_count = max(0, len(_probe(["lsof", "-p", str(pid)]).splitlines()) - 1)
     return rss_kb * 1024, fd_count
 
 
@@ -109,31 +150,77 @@ def main() -> int:
     parser.add_argument("--journeys", type=int, default=24)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    composer = _load_composer()
+    output = composer.validate_output_path(args.output)
 
     target = f"={LAUNCH_SESSION}:"
     boot_ms: list[float] = []
     intent_ms: list[float] = []
     render_ms: list[float] = []
     provider_ms: list[float] = []
+    journeys: list[dict] = []
+    rb: list[dict] = []
+    soak_ms = 0.0
 
-    # Clean slate on the private socket.
+    # Clean slate on the private socket; every exit path below tears it down
+    # again so a failed run never leaves a phantom seat for the doctor/census.
     _tmux("kill-server", timeout=10)
+    try:
+        soak_ms = _measure(
+            target, boot_ms, intent_ms, render_ms, provider_ms, journeys, rb, args.journeys
+        )
+    finally:
+        _tmux("kill-session", "-t", f"={STUB_SESSION}:", timeout=10)
+        try:
+            _stop()
+        finally:
+            _tmux("kill-server", timeout=10)
 
+    measurement = {
+        "schema_version": "dharma.helm.perf_soak_measurement.v1",
+        "measurement_id": f"p4-{uuid4().hex[:12]}",
+        "captured_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "clock": "perf_counter_ns",
+        "tmux": {"socket": SOCKET, "session": LAUNCH_SESSION},
+        "execution": {"offline": True, "network_attempted": False,
+                      "provider_mode": "offline_stub"},
+        "samples": {"boot_ms": boot_ms, "intent_parse_ms": intent_ms,
+                    "provider_turn_ms": provider_ms, "render_ms": render_ms},
+        "soak": {"duration_ms": soak_ms, "journeys": journeys},
+        "rollback": {"steps": rb},
+    }
+    composer.parse_measurement_payload(measurement)
+    output.write_text(json.dumps(measurement, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"boot_ms": boot_ms, "intent_roundtrip_ms_from_enter": intent_ms,
+                      "provider_stub_ms": provider_ms, "render_ms": render_ms,
+                      "soak_ms": soak_ms, "journey_failures":
+                      sum(not j["ok"] for j in journeys),
+                      "rollback": [s["observed_state"] for s in rb]}))
+    return 0
+
+
+def _measure(
+    target: str,
+    boot_ms: list[float],
+    intent_ms: list[float],
+    render_ms: list[float],
+    provider_ms: list[float],
+    journeys: list[dict],
+    rb: list[dict],
+    journey_count: int,
+) -> float:
     boot_ms.append(_boot())
     rc, _ = _stop()
     if rc != 0:
         raise RuntimeError("interleaved stop failed")
     boot_ms.append(_boot())
 
-    # Local intent parse latency: alternate two navigation intents; each ack is
-    # counted against how many times its text already appears (history grows).
+    # Navigation intent round trip (Enter -> first frame change). The draft is
+    # typed and echoed before the clock starts so harness typing latency and
+    # the echo repaint never masquerade as parser time.
     for i in range(5):
         text = "open sessions" if i % 2 == 0 else "open the cockpit layout"
-        frame = _capture(target)
-        t0 = time.perf_counter_ns()
-        _send_line(target, text)
-        _wait_change(target, frame, 15.0)
-        intent_ms.append((time.perf_counter_ns() - t0) / 1e6)
+        intent_ms.append(_timed_intent(target, text, 15.0))
 
     # Render latency proxy: F2 toggles zen <-> cockpit; measure until the other
     # surface's marker paints.
@@ -145,16 +232,15 @@ def main() -> int:
         render_ms.append((time.perf_counter_ns() - t0) / 1e6)
 
     # Soak: repeated journeys with RSS/fd growth sampled from the pane process.
+    # A journey is ok only when the intent itself produced a new frame after
+    # Enter, so the counter measures the TUI and not the typing echo.
     pid = _pane_pid(target)
-    journeys: list[dict] = []
     soak_t0 = time.monotonic()
-    for seq in range(1, args.journeys + 1):
+    for seq in range(1, journey_count + 1):
         ok = True
         try:
             text = "open sessions" if seq % 2 == 1 else "open the cockpit layout"
-            frame = _capture(target)
-            _send_line(target, text)
-            _wait_change(target, frame, 15.0)
+            _timed_intent(target, text, 15.0)
         except RuntimeError:
             ok = False
         rss, fd_count = _proc_stats(pid)
@@ -162,7 +248,6 @@ def main() -> int:
     soak_ms = (time.monotonic() - soak_t0) * 1000.0
 
     # Rollback shape: stop (from live) -> start (from stopped) -> replay-valid.
-    rb: list[dict] = []
     rc, elapsed = _stop()
     stopped = _tmux("has-session", "-t", target).returncode != 0
     rb.append({"sequence": 1, "action": "stop", "input_state": "live", "exit_code": rc,
@@ -202,40 +287,16 @@ def main() -> int:
     )
     _tmux("new-session", "-d", "-s", STUB_SESSION, stub_cmd)
     stub_target = f"={STUB_SESSION}:"
-    try:
-        _wait_for(stub_target, "bridge connected", 45.0)
-        time.sleep(1.5)
-        for i in range(3):
-            baseline = _capture(stub_target).count("■")
-            t0 = time.perf_counter_ns()
-            _send_line(stub_target, f"stub turn {i}")
-            _wait_for(stub_target, "■", 20.0, absent_baseline=baseline)
-            provider_ms.append((time.perf_counter_ns() - t0) / 1e6)
-    finally:
-        _tmux("kill-session", "-t", stub_target, timeout=10)
-        _stop()
-        _tmux("kill-server", timeout=10)
-
-    measurement = {
-        "schema_version": "dharma.helm.perf_soak_measurement.v1",
-        "measurement_id": f"p4-{uuid4().hex[:12]}",
-        "captured_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "clock": "perf_counter_ns",
-        "tmux": {"socket": SOCKET, "session": LAUNCH_SESSION},
-        "execution": {"offline": True, "network_attempted": False,
-                      "provider_mode": "offline_stub"},
-        "samples": {"boot_ms": boot_ms, "intent_parse_ms": intent_ms,
-                    "provider_turn_ms": provider_ms, "render_ms": render_ms},
-        "soak": {"duration_ms": soak_ms, "journeys": journeys},
-        "rollback": {"steps": rb},
-    }
-    args.output.write_text(json.dumps(measurement, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"boot_ms": boot_ms, "intent_p95_input": intent_ms,
-                      "provider_stub_ms": provider_ms, "render_ms": render_ms,
-                      "soak_ms": soak_ms, "journey_failures":
-                      sum(not j["ok"] for j in journeys),
-                      "rollback": [s["observed_state"] for s in rb]}))
-    return 0
+    _wait_for(stub_target, "bridge connected", 45.0)
+    time.sleep(1.5)
+    for i in range(3):
+        _type_draft(stub_target, f"stub turn {i}")
+        baseline = _capture(stub_target).count("■")
+        t0 = time.perf_counter_ns()
+        _press_enter(stub_target)
+        _wait_for(stub_target, "■", 20.0, absent_baseline=baseline)
+        provider_ms.append((time.perf_counter_ns() - t0) / 1e6)
+    return soak_ms
 
 
 if __name__ == "__main__":

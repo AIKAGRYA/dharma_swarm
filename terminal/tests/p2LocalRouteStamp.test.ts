@@ -83,20 +83,33 @@ describe("P2 F4 immutable route attribution", () => {
     expect(projected.at(-1)?.text).not.toContain("other:other-model");
   });
 
-  test("stamp-missing provider turns keep today's live-route fallback behavior", () => {
-    const unstampedProviderTurn = [
+  test("stamp-missing provider turns are frozen to the ingest route and survive a later route switch", () => {
+    const servedUnderCodex = [
       userPromptExecutionEvent("provider question", "2026-09-02T04:01:00Z"),
-      ...canonicalEventsFromBridgeEvent({
-        type: "text_complete",
-        content: "provider answer without an owned route stamp",
-        created_at: "2026-09-02T04:01:01Z",
-      }),
+      ...canonicalEventsFromBridgeEvent(
+        {type: "text_complete", content: "provider answer without an owned route stamp", created_at: "2026-09-02T04:01:01Z"},
+        "codex_text:gpt-5.6-sol",
+      ),
+      ...canonicalEventsFromBridgeEvent(
+        {type: "session_end", success: true, created_at: "2026-09-02T04:01:02Z"},
+        "codex_text:gpt-5.6-sol",
+      ),
     ];
 
-    const codex = projectChatTraceLines(unstampedProviderTurn, {routeLabel: "codex_text:gpt-5.6-sol"});
-    const claude = projectChatTraceLines(unstampedProviderTurn, {routeLabel: "claude:claude-sonnet-5"});
+    const beforeSwitch = projectChatTraceLines(servedUnderCodex, {routeLabel: "codex_text:gpt-5.6-sol"});
+    const afterSwitch = projectChatTraceLines(servedUnderCodex, {routeLabel: "claude:claude-sonnet-5"});
 
-    expect(codex.at(-1)?.text).toContain("codex_text:gpt-5.6-sol");
-    expect(claude.at(-1)?.text).toContain("claude:claude-sonnet-5");
+    expect(servedUnderCodex[1]?.route).toBe("codex_text:gpt-5.6-sol");
+    expect(beforeSwitch.at(-1)?.text).toContain("codex_text:gpt-5.6-sol");
+    expect(afterSwitch.at(-1)?.text).toBe(beforeSwitch.at(-1)?.text);
+    expect(afterSwitch.at(-1)?.text).not.toContain("claude-sonnet-5");
+  });
+
+  test("an owned provider identity on the event outranks the ingest route", () => {
+    const [stamped] = canonicalEventsFromBridgeEvent(
+      {type: "text_complete", content: "owned", provider_id: "claude", model_id: "claude-sonnet-5"},
+      "codex_text:gpt-5.6-sol",
+    );
+    expect(stamped?.route).toBe("claude:claude-sonnet-5");
   });
 });

@@ -314,3 +314,50 @@ describe("HELM owner context app boundary", () => {
     }
   });
 });
+
+describe("HELM owner context slow-result correlation", () => {
+  test("a fan-out slower than the resync interval still lands instead of being orphaned by the next tick", () => {
+    const now = new Date();
+    let state: AppState = structuredClone(initialState);
+    state = applyActions(state, [{type: "helm.context.requested", requestId: "7"}]);
+    state = applyActions(state, [{type: "helm.context.requested", requestId: "12"}]);
+    expect(state.helmContext.pendingRequestId).toBe("7");
+
+    const stale = helmContextActionsForBridgeEvent(
+      {type: "helm.context.result", request_id: "3", envelope: freshFixture(now)},
+      state.helmContext,
+      now,
+    );
+    expect(stale).toEqual([]);
+
+    const lateFirstReply = helmContextActionsForBridgeEvent(
+      {type: "helm.context.result", request_id: "7", envelope: freshFixture(now)},
+      state.helmContext,
+      now,
+    );
+    expect(lateFirstReply.map((action) => action.type)).toEqual(["helm.context.set"]);
+
+    const laterTickReply = helmContextActionsForBridgeEvent(
+      {type: "helm.context.result", request_id: "12", envelope: freshFixture(now)},
+      state.helmContext,
+      now,
+    );
+    expect(laterTickReply.map((action) => action.type)).toEqual(["helm.context.set"]);
+
+    state = applyActions(state, laterTickReply);
+    expect(state.helmContext.pendingRequestId).toBeUndefined();
+    expect(state.helmContext.envelope).toBeDefined();
+    state = applyActions(state, [{type: "helm.context.requested", requestId: "20"}]);
+    expect(state.helmContext.pendingRequestId).toBe("20");
+  });
+
+  test("non-numeric correlation ids still require an exact match", () => {
+    const now = new Date();
+    const actions = helmContextActionsForBridgeEvent(
+      {type: "helm.context.result", request_id: "context-later", envelope: freshFixture(now)},
+      {pendingRequestId: "context-expected"},
+      now,
+    );
+    expect(actions).toEqual([]);
+  });
+});

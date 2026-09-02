@@ -10,6 +10,7 @@ import {
   openSync,
   type WriteStream,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {createInterface} from "node:readline";
 import {fileURLToPath} from "node:url";
@@ -24,11 +25,15 @@ const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 
-function bridgeStderrLogPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
+const DEFAULT_BRIDGE_STDERR_DIR = path.join(os.homedir(), ".dharma", "terminal_supervisor");
+const STDERR_TAIL_LIMIT = 4_096;
+
+export function bridgeStderrLogPath(env: NodeJS.ProcessEnv = process.env): string {
   const stateDir = env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR?.trim()
     || env.DHARMA_TERMINAL_STATE_DIR?.trim()
-    || env.DHARMA_TERMINAL_TUI_STATE_DIR?.trim();
-  return stateDir ? path.join(path.resolve(stateDir), "bridge.stderr.log") : undefined;
+    || env.DHARMA_TERMINAL_TUI_STATE_DIR?.trim()
+    || DEFAULT_BRIDGE_STDERR_DIR;
+  return path.join(path.resolve(stateDir), "bridge.stderr.log");
 }
 
 function openBridgeStderrLog(logPath: string | undefined): WriteStream | undefined {
@@ -66,17 +71,21 @@ function openBridgeStderrLog(logPath: string | undefined): WriteStream | undefin
   }
 }
 
-function routeBridgeStderr(child: ChildProcess, env: NodeJS.ProcessEnv = process.env): () => void {
+type StderrRoute = {release: () => void; tail: () => string};
+
+function routeBridgeStderr(child: ChildProcess, env: NodeJS.ProcessEnv = process.env): StderrRoute {
   if (!child.stderr) {
-    return () => {};
+    return {release: () => {}, tail: () => ""};
   }
   const stderr = child.stderr;
   const log = openBridgeStderrLog(bridgeStderrLogPath(env));
   let released = false;
+  let tail = "";
   const onData = (chunk: Buffer | string): void => {
     if (log && !log.destroyed) {
       log.write(chunk);
     }
+    tail = (tail + chunk.toString()).slice(-STDERR_TAIL_LIMIT);
   };
   const onError = (): void => {
     // The transport lifecycle reports stdout/stdin failures. Stderr is an
@@ -84,7 +93,7 @@ function routeBridgeStderr(child: ChildProcess, env: NodeJS.ProcessEnv = process
   };
   stderr.on("data", onData);
   stderr.on("error", onError);
-  return () => {
+  const release = (): void => {
     if (released) {
       return;
     }
@@ -95,6 +104,7 @@ function routeBridgeStderr(child: ChildProcess, env: NodeJS.ProcessEnv = process
       log.end();
     }
   };
+  return {release, tail: () => tail.trim()};
 }
 
 function resolveGitCommonDir(repoRoot: string): string | undefined {
@@ -169,7 +179,8 @@ export class DharmaBridge {
   private spawnChild(): ChildProcess {
     const child = this.processFactory();
     this.alive = true;
-    const releaseStderr = routeBridgeStderr(child);
+    const stderrRoute = routeBridgeStderr(child);
+    const releaseStderr = stderrRoute.release;
     this.stderrCleanup = releaseStderr;
 
     if (!child.stdout || !child.stdin) {
@@ -211,10 +222,15 @@ export class DharmaBridge {
       }
       this.alive = false;
       this.backgroundScheduler.reset();
+      // A crashed bridge's last stderr lines are the only trace of an import
+      // or startup failure; surface them on the exit event instead of losing
+      // them when no log path is writable.
+      const stderrTail = code !== 0 ? stderrRoute.tail().split("\n").slice(-8).join("\n") : "";
       this.onEvent({
         type: "bridge.error",
         code: "bridge_exit",
-        message: `bridge exited (${code ?? "null"}${signal ? `, ${signal}` : ""})`,
+        message: `bridge exited (${code ?? "null"}${signal ? `, ${signal}` : ""})${stderrTail ? `\n${stderrTail}` : ""}`,
+        ...(stderrTail ? {stderr_tail: stderrTail} : {}),
       });
     });
     child.on("error", (error) => {

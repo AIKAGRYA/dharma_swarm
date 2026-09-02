@@ -219,7 +219,22 @@ export function localCommandResultExecutionEvent(
   };
 }
 
-export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): CanonicalExecutionEvent[] {
+// F4: a provider event that carries no owned provider/model identity is stamped
+// with the route in force when it was ingested, so a later route switch can
+// never re-label a settled turn at render time.
+export function canonicalEventsFromBridgeEvent(
+  event: Record<string, unknown>,
+  ingestRoute?: string,
+): CanonicalExecutionEvent[] {
+  const events = unstampedCanonicalEventsFromBridgeEvent(event);
+  const fallback = ingestRoute?.trim();
+  if (!fallback) {
+    return events;
+  }
+  return events.map((entry) => (entry.route ? entry : {...entry, route: fallback}));
+}
+
+function unstampedCanonicalEventsFromBridgeEvent(event: Record<string, unknown>): CanonicalExecutionEvent[] {
   const type = String(event.type ?? "");
 
   if (type === "text_delta" || type === "text_complete") {

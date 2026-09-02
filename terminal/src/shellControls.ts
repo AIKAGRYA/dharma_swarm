@@ -44,7 +44,7 @@ export function paneActionsFor(
             strategy: state.routePolicy.strategy,
           },
         },
-        primary: {label: "claude opus", summary: "route to Claude Opus 4.8 genius", payload: {action_type: "model.set", provider: "claude", model: "claude-opus-4.8", strategy: "genius"}},
+        primary: {label: "claude opus", summary: "route to Claude Opus 5.0 genius", payload: {action_type: "model.set", provider: "claude", model: "claude-opus-5.0", strategy: "genius"}},
         secondary: {label: "codex responsive", summary: "route to GPT-5.5 responsive", payload: {action_type: "model.set", provider: "codex", model: "gpt-5.5", strategy: "responsive"}},
         tertiary: {
           label: "cost on current",

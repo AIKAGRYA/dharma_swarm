@@ -2,8 +2,9 @@
 """Read-only Helm health doctor: sockets, bridge, key freshness, seat truth.
 
 Observes and reports; changes nothing. Exit 0 always in observe mode; with
-``--strict`` exit 1 when any check reports ``down`` (never for ``unknown`` —
-absence of evidence is typed, not punished).
+``--strict`` exit 1 only when a check reports ``down``. ``unknown`` and a
+``stale`` key cache are informational: absence or age of evidence is typed,
+never punished.
 """
 
 from __future__ import annotations
@@ -21,13 +22,23 @@ _SOCKET_DIR = Path("/tmp/tmux-{uid}".format(uid=os.getuid()))
 _SOCKET_RE = re.compile(r"^CODEX_MANAGED_[A-Za-z0-9][A-Za-z0-9_-]*$")
 
 
+_PROBE_TIMEOUT_S = 5.0
+
+
+def _probe(argv: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    """Run one read-only probe; a hang or missing binary reads as not-ok, never a crash."""
+    try:
+        return subprocess.run(
+            argv, capture_output=True, text=True, timeout=_PROBE_TIMEOUT_S, env=env,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return subprocess.CompletedProcess(argv, returncode=124, stdout="", stderr=str(exc))
+
+
 def _tmux(socket: str, *args: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k != "TMUX"}
     env["TMUX_TMPDIR"] = "/tmp"
-    return subprocess.run(
-        ["tmux", "-L", socket, "-f", "/dev/null", *args],
-        capture_output=True, text=True, timeout=10, env=env,
-    )
+    return _probe(["tmux", "-L", socket, "-f", "/dev/null", *args], env=env)
 
 
 def _descendants(pid: int) -> list[str]:
@@ -39,12 +50,12 @@ def _descendants(pid: int) -> list[str]:
         if parent in seen:
             continue
         seen.add(parent)
-        out = subprocess.run(["pgrep", "-P", str(parent)],
-                             capture_output=True, text=True)
+        out = _probe(["pgrep", "-P", str(parent)])
         for child in out.stdout.split():
+            if not child.isdigit():
+                continue
             queue.append(int(child))
-            cmd = subprocess.run(["ps", "-o", "command=", "-p", child],
-                                 capture_output=True, text=True).stdout.strip()
+            cmd = _probe(["ps", "-o", "command=", "-p", child]).stdout.strip()
             if cmd:
                 rows.append(cmd)
     return rows
@@ -79,15 +90,44 @@ def observe_sessions() -> list[dict[str, Any]]:
     return found
 
 
+_LIVE_GLYPHS = frozenset({"✓", "oauth"})
+_DEAD_GLYPHS = frozenset({"✗", "~", "·", "$"})
+
+
+def _row_is_live(row: dict[str, Any]) -> bool:
+    """Mirror dkeys' own verdict: the glyph is authoritative, status text is a fallback."""
+    glyph = str(row.get("glyph", "")).strip()
+    if glyph in _LIVE_GLYPHS:
+        return True
+    if glyph in _DEAD_GLYPHS:
+        return False
+    status = str(row.get("status", "")).strip().lower()
+    return status.startswith("live") or "oauth" in status
+
+
+def _rows(status: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = status.get("rows")
+    if isinstance(rows, dict):
+        return {str(k): v for k, v in rows.items() if isinstance(v, dict)}
+    if isinstance(rows, list):
+        return {
+            str(row.get("name") or row.get("provider") or row.get("id") or ""): row
+            for row in rows
+            if isinstance(row, dict) and (row.get("name") or row.get("provider") or row.get("id"))
+        }
+    return {}
+
+
 def key_freshness(status: dict[str, Any] | None, *, now: float, ttl_s: float = 900.0) -> dict[str, Any]:
-    """Classify the key oracle cache (dkeys keys_status.json): fresh / stale / unknown."""
+    """Classify the key oracle cache (dkeys keys_status.json): fresh / stale / unknown.
+
+    ``stale`` is informational: dkeys only rewrites the cache on ``dkeys test``,
+    so age past ``ttl_s`` means "re-test to be sure", not "down".
+    """
     if not status or not isinstance(status.get("last_test_ts"), (int, float)):
         return {"state": "unknown", "detail": "no readable keys_status snapshot"}
     age = now - float(status["last_test_ts"])
-    live = [
-        k for k, v in (status.get("rows") or {}).items()
-        if isinstance(v, dict) and str(v.get("status", "")).startswith("live")
-    ]
+    live = [name for name, row in _rows(status).items() if _row_is_live(row)]
     state = "fresh" if age <= ttl_s else "stale"
     return {"state": state, "age_seconds": round(age, 1),
             "live_providers": sorted(live),
@@ -123,10 +163,7 @@ def seat_truth(receipt_path: Path | None) -> dict[str, Any]:
 
 def build_report(*, sessions: list[dict[str, Any]], keys: dict[str, Any],
                  seats: dict[str, Any]) -> dict[str, Any]:
-    checks_down = (
-        any(s["bridge"] == "down" for s in sessions)
-        or keys.get("state") == "stale"
-    )
+    checks_down = any(s["bridge"] == "down" for s in sessions)
     return {
         "schema_version": "dharma.helm.doctor.v1",
         "observed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

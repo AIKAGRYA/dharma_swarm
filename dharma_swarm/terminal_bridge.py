@@ -17,13 +17,13 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 import time
 import uuid
 from typing import Any
 from dharma_swarm.terminal_bridge_text import (
+    policy_target_for_key,
     render_working_memory,
     render_git_summary_lines,
     render_command_graph_text,
@@ -350,45 +350,6 @@ class TerminalBridge(
             in {"claude", "codex_text", "grok_oauth", "kimi_code", "openrouter"}
             and self._adapters.get(provider_id) is adapter
         )
-
-    def _local_cli_attempt_authorized(self, provider_id: str) -> bool:
-        """Whether an unverified local CLI lane may be attempted.
-
-        This is deliberately weaker than model availability. It grants only
-        execution authority while the canonical key oracle is unknown; the
-        route remains ``unverified`` until a real provider event succeeds.
-        Keyed HTTP adapters never receive this exception.
-        """
-
-        adapter = self._adapters.get(provider_id)
-        if adapter is None or provider_id not in {"claude", "codex"}:
-            return False
-        cli_path = str(getattr(adapter, "_cli_path", provider_id) or provider_id)
-        binary = shutil.which(cli_path)
-        if binary is None:
-            return False
-
-        if provider_id == "claude":
-            # Claude auth presence is insufficient: a logged-in Max client can
-            # still fail every headless request. Reuse the smoke-proven oracle.
-            from dharma_swarm import key_oracle
-
-            return key_oracle.is_provider_live("claude_code") is True
-
-        try:
-            result = subprocess.run(
-                [binary, "login", "status"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                stdin=subprocess.DEVNULL,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return False
-        # A successful local OAuth-status command permits an attempt, not a
-        # liveness claim. The first actual completion is still the proof.
-        return result.returncode == 0
 
     async def close(self) -> None:
         if self._closing:
@@ -2234,20 +2195,33 @@ class TerminalBridge(
             )
         if mode == "set":
             target = model_routing.resolve_model_target(arg)
-            if target is None and arg.isdigit():
-                target = model_routing.target_by_index(int(arg))
-            if target is None:
-                return f"Unknown model target: {arg or 'missing'}"
-            if not model_routing.is_routable(target):
-                return (
-                    f"Model '{target.alias}' is unroutable "
-                    f"(no live key for {target.provider_id}). "
-                    "Run `dkeys test` or pick a live model with /model list."
+            if target is not None:
+                selected_provider, selected_model = target.provider_id, target.model_id
+                if not model_routing.is_routable(target):
+                    return (
+                        f"Model '{target.alias}' is unroutable "
+                        f"(no live key for {target.provider_id}). "
+                        "Run `dkeys test` or pick a live model with /model list."
+                    )
+            else:
+                # Keys are the positions `/model list` printed, so they must
+                # resolve against the same policy ordering, not the raw registry.
+                keyed = policy_target_for_key(
+                    self._build_model_policy_summary(
+                        selected_provider=current_provider,
+                        selected_model=current_model,
+                        strategy="responsive",
+                    ),
+                    arg,
                 )
+                if keyed is None:
+                    return f"Unknown model target: {arg or 'missing'}"
+                selected_provider = str(keyed.get("provider", ""))
+                selected_model = str(keyed.get("model", ""))
             return self._render_model_policy_text(
                 self._build_model_policy_summary(
-                    selected_provider=target.provider_id,
-                    selected_model=target.model_id,
+                    selected_provider=selected_provider,
+                    selected_model=selected_model,
                     strategy="responsive",
                 )
             )

@@ -11,19 +11,25 @@ type Props = {
   compact?: boolean;
 };
 
+// Letters skip j/k: navigation consumes them first, so a row keyed j or k
+// could never be selected. Mirrors dharma_swarm/terminal_bridge_text.py.
+export const MODEL_PICKER_SHORTCUT_LETTERS = "abcdefghilmnopqrstuvwxyz";
+
 export function modelPickerShortcut(index: number): string | undefined {
   if (index >= 0 && index < 9) return String(index + 1);
   if (index === 9) return "0";
-  return index >= 10 && index < 36 ? String.fromCharCode(87 + index) : undefined;
+  const letter = index - 10;
+  return letter >= 0 && letter < MODEL_PICKER_SHORTCUT_LETTERS.length
+    ? MODEL_PICKER_SHORTCUT_LETTERS[letter]
+    : undefined;
 }
 
 export function modelPickerShortcutIndex(input: string): number | undefined {
   if (/^[1-9]$/.test(input)) return Number.parseInt(input, 10) - 1;
   if (input === "0") return 9;
-  const codePoint = input.toLowerCase().codePointAt(0);
-  return input.length === 1 && codePoint !== undefined && codePoint >= 97 && codePoint <= 122
-    ? codePoint - 87
-    : undefined;
+  if (input.length !== 1) return undefined;
+  const letter = MODEL_PICKER_SHORTCUT_LETTERS.indexOf(input.toLowerCase());
+  return letter >= 0 ? letter + 10 : undefined;
 }
 
 function truthWord(value: boolean | undefined): string {

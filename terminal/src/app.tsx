@@ -1492,7 +1492,10 @@ export function createBridgeEventHandler({
       const projection = helmOnCallProjectionFromEvent(typed);
       apply([projection ? {type: "onCall.projection.set", projection} : {type: "onCall.truth.reset"}]);
     }
-    const canonicalEvents = canonicalEventsFromBridgeEvent(typed);
+    const canonicalEvents = canonicalEventsFromBridgeEvent(
+      typed,
+      `${state.routePolicy.provider}:${state.routePolicy.model}`,
+    );
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
     }
@@ -1583,7 +1586,7 @@ export function createBridgeEventHandler({
         strategy: state.routePolicy.strategy,
       }, ...(policy
         ? [{type: "route.policy.set", policy} as const]
-        : []), ...(policy?.fallbackNotice
+        : []), ...(policy?.fallbackNotice && policy.fallbackNotice !== state.routePolicy.fallbackNotice
         ? [{
             type: "tab.append",
             tabId: "chat",
@@ -1992,7 +1995,9 @@ export function createBridgeEventHandler({
       const selectedModel = String(typed.selected_model ?? pending?.model ?? state.routePolicy.model);
       const selectedStrategy = String(typed.routing_strategy ?? state.routePolicy.strategy ?? "responsive");
       const bootstrapPolicy = routePolicyFromValue(typed.model_policy, state.routePolicy);
-      if (bootstrapPolicy.fallbackNotice) {
+      // The same standing fallback is announced once, not on every reconnect
+      // or bootstrap while it persists.
+      if (bootstrapPolicy.fallbackNotice && bootstrapPolicy.fallbackNotice !== state.routePolicy.fallbackNotice) {
         dispatch({
           type: "tab.append",
           tabId: "chat",
