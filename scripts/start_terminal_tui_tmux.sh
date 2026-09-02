@@ -135,6 +135,7 @@ fi
 mkdir -p "${STATE_DIR}"
 
 START_CMD="cd $(printf '%q' "${TERMINAL_DIR}") && "
+START_CMD+="DHARMA_TERMINAL_TUI_STATE_DIR=$(printf '%q' "${STATE_DIR}") "
 if [[ -n "${PYTHON_BIN}" ]]; then
   START_CMD+="DHARMA_PYTHON=$(printf '%q' "${PYTHON_BIN}") "
 fi

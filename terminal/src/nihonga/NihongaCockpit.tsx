@@ -90,6 +90,7 @@ export function NihongaCockpit(props: Props): React.ReactElement {
   const conversation = (
     <TranscriptPane
       frameless
+      bottomAnchor
       title="Conversation"
       lines={props.transcriptLines}
       scrollOffset={props.transcriptScrollOffset}
@@ -159,6 +160,7 @@ export function NihongaCockpit(props: Props): React.ReactElement {
           <OnCallTruthBand
             truth={props.onCallTruth}
             compact={props.width < 120}
+            width={props.width}
             usableNowCount={props.routePolicy.targets.filter((target) => target.usableNow === true).length}
             usableLaneTotal={props.routePolicy.targets.length}
           />

@@ -19,15 +19,15 @@ function lineColor(line: string): string {
 export function WholeOrganismPlane({projectionLines, activeFacet, compact = false}: Props): React.ReactElement {
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
-      <Text color={THEME.wave} bold flexShrink={0}>WHOLE ORGANISM / OWNER PROJECTIONS</Text>
-      {!compact ? <Text color={THEME.stone} flexShrink={0} wrap="truncate-end">twelve owner-stamped fields · no boolean promotion</Text> : null}
-      {!compact ? <Text color={THEME.ink} flexShrink={0}> </Text> : null}
+      <Box flexShrink={0}><Text color={THEME.wave} bold>WHOLE ORGANISM / OWNER PROJECTIONS</Text></Box>
+      {!compact ? <Box flexShrink={0}><Text color={THEME.stone} wrap="truncate-end">twelve owner-stamped fields · no boolean promotion</Text></Box> : null}
+      {!compact ? <Box flexShrink={0}><Text color={THEME.ink}> </Text></Box> : null}
       {projectionLines.map((line, index) => (
-        <Text key={`${index}-${line}`} color={lineColor(line)} wrap="truncate-end" flexShrink={0}>
-          {String(index + 1).padStart(2, "0")} {line}
-        </Text>
+        <Box key={`${index}-${line}`} flexShrink={0}>
+          <Text color={lineColor(line)} wrap="truncate-end">{String(index + 1).padStart(2, "0")} {line}</Text>
+        </Box>
       ))}
-      {!compact ? <Text color={THEME.stone} wrap="truncate-end" flexShrink={0}>focus · {activeFacet}</Text> : null}
+      {!compact ? <Box flexShrink={0}><Text color={THEME.stone} wrap="truncate-end">focus · {activeFacet}</Text></Box> : null}
     </Box>
   );
 }

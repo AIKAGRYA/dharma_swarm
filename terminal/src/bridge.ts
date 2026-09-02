@@ -1,5 +1,15 @@
 import {execFileSync, spawn, type ChildProcess} from "node:child_process";
-import {existsSync} from "node:fs";
+import {
+  constants as fsConstants,
+  closeSync,
+  createWriteStream,
+  existsSync,
+  fchmodSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  type WriteStream,
+} from "node:fs";
 import path from "node:path";
 import {createInterface} from "node:readline";
 import {fileURLToPath} from "node:url";
@@ -13,6 +23,79 @@ export type GitCommonDirResolver = (repoRoot: string) => string | undefined;
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
+
+function bridgeStderrLogPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const stateDir = env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR?.trim()
+    || env.DHARMA_TERMINAL_STATE_DIR?.trim()
+    || env.DHARMA_TERMINAL_TUI_STATE_DIR?.trim();
+  return stateDir ? path.join(path.resolve(stateDir), "bridge.stderr.log") : undefined;
+}
+
+function openBridgeStderrLog(logPath: string | undefined): WriteStream | undefined {
+  if (!logPath) {
+    return undefined;
+  }
+  try {
+    mkdirSync(path.dirname(logPath), {recursive: true, mode: 0o700});
+    if (existsSync(logPath)) {
+      const current = lstatSync(logPath);
+      if (current.isSymbolicLink() || !current.isFile()) {
+        return undefined;
+      }
+    }
+    const fd = openSync(
+      logPath,
+      fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_WRONLY | fsConstants.O_NOFOLLOW,
+      0o600,
+    );
+    fchmodSync(fd, 0o600);
+    let stream: WriteStream;
+    try {
+      stream = createWriteStream(logPath, {fd, autoClose: true});
+    } catch (error) {
+      closeSync(fd);
+      throw error;
+    }
+    stream.on("error", () => {
+      // An unavailable diagnostic path is not application truth and never
+      // becomes an alternate-screen event.
+    });
+    return stream;
+  } catch {
+    return undefined;
+  }
+}
+
+function routeBridgeStderr(child: ChildProcess, env: NodeJS.ProcessEnv = process.env): () => void {
+  if (!child.stderr) {
+    return () => {};
+  }
+  const stderr = child.stderr;
+  const log = openBridgeStderrLog(bridgeStderrLogPath(env));
+  let released = false;
+  const onData = (chunk: Buffer | string): void => {
+    if (log && !log.destroyed) {
+      log.write(chunk);
+    }
+  };
+  const onError = (): void => {
+    // The transport lifecycle reports stdout/stdin failures. Stderr is an
+    // append-only diagnostic lane and intentionally has no UI projection.
+  };
+  stderr.on("data", onData);
+  stderr.on("error", onError);
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    stderr.off("data", onData);
+    stderr.off("error", onError);
+    if (log && !log.destroyed) {
+      log.end();
+    }
+  };
+}
 
 function resolveGitCommonDir(repoRoot: string): string | undefined {
   try {
@@ -68,6 +151,7 @@ export class DharmaBridge {
   private nextId = 1;
   private alive = false;
   private closed = false;
+  private stderrCleanup?: () => void;
   private readonly onEvent: (event: BridgeEvent) => void;
   private readonly processFactory: BridgeProcessFactory;
   private readonly backgroundScheduler = new BridgeBackgroundScheduler();
@@ -77,7 +161,7 @@ export class DharmaBridge {
     this.processFactory = processFactory ?? (() => spawn(resolvePython(), ["-m", "dharma_swarm.terminal_bridge", "stdio"], {
       cwd: REPO_ROOT,
       env: process.env,
-      stdio: ["pipe", "pipe", "inherit"],
+      stdio: ["pipe", "pipe", "pipe"],
     }));
     this.child = this.spawnChild();
   }
@@ -85,8 +169,12 @@ export class DharmaBridge {
   private spawnChild(): ChildProcess {
     const child = this.processFactory();
     this.alive = true;
+    const releaseStderr = routeBridgeStderr(child);
+    this.stderrCleanup = releaseStderr;
 
     if (!child.stdout || !child.stdin) {
+      releaseStderr();
+      this.stderrCleanup = undefined;
       throw new Error("bridge child process streams are unavailable");
     }
 
@@ -114,6 +202,10 @@ export class DharmaBridge {
       }
     });
     child.on("exit", (code, signal) => {
+      releaseStderr();
+      if (this.stderrCleanup === releaseStderr) {
+        this.stderrCleanup = undefined;
+      }
       if (this.closed || child !== this.child || !this.alive) {
         return;
       }
@@ -183,6 +275,8 @@ export class DharmaBridge {
     }
     this.alive = false;
     this.backgroundScheduler.reset();
+    this.stderrCleanup?.();
+    this.stderrCleanup = undefined;
     if (!child.killed) {
       child.kill("SIGTERM");
     }
@@ -216,6 +310,8 @@ export class DharmaBridge {
     this.closed = true;
     this.alive = false;
     this.backgroundScheduler.reset();
+    this.stderrCleanup?.();
+    this.stderrCleanup = undefined;
     if (!this.child.killed) {
       this.child.kill("SIGTERM");
     }

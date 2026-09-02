@@ -534,6 +534,7 @@ export type CanonicalExecutionEvent = {
   content?: string;
   timestamp?: string;
   correlationId?: string;
+  route?: string;
   raw?: Record<string, unknown>;
 };
 

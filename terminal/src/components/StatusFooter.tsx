@@ -42,34 +42,39 @@ export function StatusFooter({mode, routeLabel, bridgeStatus, routeState, strate
   const route = routeStatePresentation(routeState);
   return (
     <Box paddingX={1} height={1} overflow="hidden">
-      <Text wrap="truncate-end">
-        <Text color={THEME.stone}>{mode}</Text>
-        <Text color={THEME.ink}>{"  ·  "}</Text>
-        <Text color={THEME.stone}>route </Text>
-        <Text color={THEME.parchment}>{routeLabel}</Text>
-        <Text color={THEME.ink}>{"  ·  "}</Text>
-        <Text color={gate.color}>
-          {gate.glyph} {gate.word}
+      <Box flexGrow={1} flexShrink={1} overflow="hidden">
+        <Text wrap="truncate-end">
+          <Text color={THEME.stone}>{mode}</Text>
+          <Text color={THEME.ink}>{"  ·  "}</Text>
+          <Text color={THEME.stone}>route </Text>
+          <Text color={THEME.parchment}>{routeLabel}</Text>
+          {!compact && strategy ? (
+            <>
+              <Text color={THEME.ink}>{"  ·  "}</Text>
+              <Text color={THEME.stone}>{strategy}</Text>
+            </>
+          ) : null}
         </Text>
-        {bridgeStatus === "connected" ? (
-          <>
-            <Text color={THEME.ink}>{"  ·  "}</Text>
-            <Text color={route.color}>{route.glyph} {route.word}</Text>
-          </>
-        ) : null}
-        {!compact && strategy ? (
-          <>
-            <Text color={THEME.ink}>{"  ·  "}</Text>
-            <Text color={THEME.stone}>{strategy}</Text>
-          </>
-        ) : null}
-        {!compact && reason ? (
-          <>
-            <Text color={THEME.ink}>{"  ·  "}</Text>
-            <Text color={THEME.stone}>{reason}</Text>
-          </>
-        ) : null}
-      </Text>
+      </Box>
+      <Box flexShrink={0}>
+        <Text>
+          {compact && reason ? <Text color={THEME.stone}>{reason} </Text> : null}
+          <Text color={THEME.ink}>{compact ? "" : "  ·  "}</Text>
+          <Text color={gate.color}>{gate.glyph} {gate.word}</Text>
+          {bridgeStatus === "connected" ? (
+            <>
+              <Text color={THEME.ink}>{compact ? " " : "  ·  "}</Text>
+              <Text color={route.color}>{route.glyph} {route.word}</Text>
+            </>
+          ) : null}
+          {!compact && reason ? (
+            <>
+              <Text color={THEME.ink}>{"  ·  "}</Text>
+              <Text color={THEME.stone}>{reason}</Text>
+            </>
+          ) : null}
+        </Text>
+      </Box>
     </Box>
   );
 }

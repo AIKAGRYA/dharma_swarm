@@ -7,6 +7,7 @@ import {THEME} from "../theme";
 type Props = {
   truth: OnCallTruthState;
   compact?: boolean;
+  width?: number;
   usableNowCount?: number;
   usableLaneTotal?: number;
 };
@@ -92,32 +93,61 @@ function verdictPresentation(
   };
 }
 
-export function OnCallTruthBand({truth, compact = false, usableNowCount, usableLaneTotal}: Props): React.ReactElement {
+export function OnCallTruthBand({truth, compact = false, width, usableNowCount, usableLaneTotal}: Props): React.ReactElement {
   const aggregate = aggregatePresentation(truth);
   const seats = truth.kind === "authoritative" ? truth.projection.seats : null;
   const explicitUsability = usableNowCount !== undefined && usableLaneTotal !== undefined;
+  const presentations = HELM_SEAT_ORDER.map((_seat, index) => {
+    const verification = seats?.[index];
+    return verification
+      ? verdictPresentation(verification.verdict, verification.reason, verification.evidence?.age_seconds ?? null, compact)
+      : {text: "?", color: THEME.stone};
+  });
+  const fullSeatRowWidth = HELM_SEAT_ORDER.reduce(
+    (width, seat, index) => width + (index > 0 ? 2 : 0) + seat.displayLabel.length + 1 + presentations[index].text.length,
+    0,
+  );
+  // The non-compact shell begins at 120 columns. Preserve full labels while
+  // they fit, then compact labels—not verdict evidence—so all seven truth
+  // tokens remain addressable at that exact breakpoint.
+  const compactSeatLabels = compact
+    || fullSeatRowWidth > 116
+    || (width !== undefined && fullSeatRowWidth > Math.max(1, width - 2));
+  const compactAggregateState = aggregate.state === "LIVE_DEGRADED"
+    ? "DEGRADED"
+    : aggregate.state === "CLOCK_SKEW"
+      ? "SKEW"
+      : aggregate.state;
+  const survivalAggregate = compact && width !== undefined && width < 80;
   return (
     <Box flexDirection="column" height={2} overflow="hidden">
       <Box paddingX={1} height={1} overflow="hidden">
-        <Text color={THEME.stone}>HELM </Text>
-        <Text color={aggregate.color} bold={aggregate.state !== "UNKNOWN"}>
-          {aggregate.glyph} {aggregate.state} {aggregate.count}
-        </Text>
-        {explicitUsability
-          ? <><Text color={THEME.ink}>{" · "}</Text><Text color={THEME.stone}>Usable now {usableNowCount}/{usableLaneTotal} lanes · Identity verified {aggregate.count}</Text></>
-          : <><Text color={THEME.ink}>{"  ·  "}</Text><Text color={THEME.stone}>Python verdict</Text></>}
+        {survivalAggregate && explicitUsability ? (
+          <Text wrap="truncate-end">
+            <Text color={aggregate.color} bold={aggregate.state !== "UNKNOWN"}>{compactAggregateState} {aggregate.count}</Text>
+            <Text color={THEME.ink}> · </Text>
+            <Text color={THEME.stone}>usable {usableNowCount}/{usableLaneTotal} · verified {aggregate.count}</Text>
+          </Text>
+        ) : (
+          <>
+            <Text color={THEME.stone}>HELM </Text>
+            <Text color={aggregate.color} bold={aggregate.state !== "UNKNOWN"}>
+              {aggregate.glyph} {aggregate.state} {aggregate.count}
+            </Text>
+            {explicitUsability
+              ? <><Text color={THEME.ink}>{" · "}</Text><Text color={THEME.stone}>Usable now {usableNowCount}/{usableLaneTotal} lanes · Identity verified {aggregate.count}</Text></>
+              : <><Text color={THEME.ink}>{"  ·  "}</Text><Text color={THEME.stone}>Python verdict</Text></>}
+          </>
+        )}
       </Box>
       <Box paddingX={1} height={1} overflow="hidden">
         <Text wrap="truncate-end">
           {HELM_SEAT_ORDER.map((seat, index) => {
-            const verification = seats?.[index];
-            const presentation = verification
-              ? verdictPresentation(verification.verdict, verification.reason, verification.evidence?.age_seconds ?? null, compact)
-              : {text: "?", color: THEME.stone};
+            const presentation = presentations[index];
             return (
               <React.Fragment key={seat.seatId}>
-                {index > 0 ? <Text color={THEME.ink}>{compact ? " " : "  "}</Text> : null}
-                <Text color={THEME.stone}>{compact ? COMPACT_SEAT_LABELS[index] : seat.displayLabel}</Text>
+                {index > 0 ? <Text color={THEME.ink}>{compactSeatLabels ? " " : "  "}</Text> : null}
+                <Text color={THEME.stone}>{compactSeatLabels ? COMPACT_SEAT_LABELS[index] : seat.displayLabel}</Text>
                 <Text color={THEME.stone}> </Text>
                 <Text color={presentation.color}>{presentation.text}</Text>
               </React.Fragment>

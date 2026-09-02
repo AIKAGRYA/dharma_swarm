@@ -4,7 +4,7 @@ import {Box, Text, useApp, useInput, useStdin, useWindowSize} from "ink";
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {normalizeCommandOutcome} from "./commandOutcome.ts";
 import {activityRowCount} from "./components/ActivityPane.tsx";
-import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
+import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localAssistantExecutionEvent, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
   loadStoredState,
@@ -2759,11 +2759,7 @@ export function App(): React.ReactElement {
           type: "execution.events.ingest",
           events: [
             userPromptExecutionEvent(submitted),
-            ...canonicalEventsFromBridgeEvent({
-              type: "assistant",
-              request_id: `local-ui-${Date.now()}`,
-              message,
-            }),
+            localAssistantExecutionEvent(message),
             localCommandResultExecutionEvent(submitted, message.split("\n")[0] ?? message),
           ],
         },
@@ -3412,6 +3408,11 @@ export function App(): React.ReactElement {
       return;
     }
     if (state.uiMode.keyboardFocus === "composer") {
+      if (key.ctrl && input === "u") {
+        dispatch({type: "prompt.clear"});
+        dispatch({type: "status.set", value: "draft cleared"});
+        return;
+      }
       if (isPlainReturn(input, key.return)) {
         submitPrompt(state.prompt);
         return;
@@ -3679,7 +3680,8 @@ export function App(): React.ReactElement {
   if (
     state.uiMode.layoutMode === "zen" &&
     activeTab?.kind === "chat" &&
-    state.uiMode.activeOverlay.kind === "none"
+    state.uiMode.activeOverlay.kind === "none" &&
+    viewportProfile(terminalWidth, terminalHeight) !== "resize-safe"
   ) {
     const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 9);
     // FACE-1 zen-pure: the status line carries only durable state (route +
@@ -3718,7 +3720,7 @@ export function App(): React.ReactElement {
           />
         </Box>
         <Box flexShrink={0} flexDirection="column" width={zenWidth}>
-          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} width={terminalWidth} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3741,7 +3743,8 @@ export function App(): React.ReactElement {
   if (
     state.uiMode.layoutMode === "scroll" &&
     activeTab?.kind === "chat" &&
-    state.uiMode.activeOverlay.kind === "none"
+    state.uiMode.activeOverlay.kind === "none" &&
+    viewportProfile(terminalWidth, terminalHeight) !== "resize-safe"
   ) {
     const scrollWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 9);
     // Manuscript measure: a touch under the zen clamp — the column is the
@@ -3759,6 +3762,7 @@ export function App(): React.ReactElement {
         <Box flexShrink={0} flexDirection="column" width={scrollMeasure}>
           <TranscriptPane
             frameless
+            bottomAnchor
             title="Chat"
             lines={manuscriptLines(displayedTranscriptLines, scrollMeasure)}
             scrollOffset={activeScrollOffset}
@@ -3766,7 +3770,7 @@ export function App(): React.ReactElement {
             emptyState={transcriptMeta.emptyState}
             accentColor={transcriptMeta.accentColor}
           />
-          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} width={scrollMeasure} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3873,7 +3877,7 @@ export function App(): React.ReactElement {
           compact={compactShell}
         />
         <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
-        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
+        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} width={terminalWidth} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
         <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
         {/* F-021: the 8-row wave renders only when the height budget affords it
             (>= 40 rows) and the chat is still quiet — once real turns arrive the

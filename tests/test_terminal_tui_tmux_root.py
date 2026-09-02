@@ -81,6 +81,7 @@ with open(os.environ["FAKE_BUN_LOG"], "w", encoding="utf-8") as handle:
             "argv": sys.argv[1:],
             "cwd": os.getcwd(),
             "python": os.environ.get("DHARMA_PYTHON"),
+            "state_dir": os.environ.get("DHARMA_TERMINAL_TUI_STATE_DIR"),
         }},
         handle,
     )
@@ -174,6 +175,7 @@ def test_tmux_launcher_resolves_root_from_its_own_checkout(tmp_path: Path) -> No
         "argv": ["run", "src/index.tsx"],
         "cwd": str(REPO_ROOT / "terminal"),
         "python": sys.executable,
+        "state_dir": str(tmp_path / "terminal state"),
     }
     assert [call[0] for call in tmux_calls] == [
         "has-session",
