@@ -10396,6 +10396,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
 
     sent.length = 0;
@@ -10439,6 +10440,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
   });
 
@@ -10503,6 +10505,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
   });
 
@@ -10566,6 +10569,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
 
     sent.length = 0;
@@ -10603,6 +10607,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
   });
 
@@ -10645,6 +10650,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
 
     sent.length = 0;

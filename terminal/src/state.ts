@@ -107,6 +107,7 @@ export const initialState: AppState = {
   activeTurn: {phase: "idle"},
   routePolicy: initialRoutePolicy,
   onCallTruth: unknownOnCallTruthState(),
+  helmContext: {},
   executionEventLog: [],
   chatTraceLines: [],
   chatTraceExpanded: false,
@@ -237,6 +238,21 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
         onCallTruth: unknownOnCallTruthState(
           action.runtimeEpoch === undefined ? state.onCallTruth.runtimeEpoch : action.runtimeEpoch,
         ),
+      };
+    case "helm.context.requested":
+      return {
+        ...state,
+        helmContext: {...state.helmContext, pendingRequestId: action.requestId},
+      };
+    case "helm.context.set":
+      return {
+        ...state,
+        helmContext: {envelope: action.envelope},
+      };
+    case "helm.context.reset":
+      return {
+        ...state,
+        helmContext: {},
       };
     case "execution.events.ingest": {
       const executionEventLog = mergeExecutionEvents(state.executionEventLog, action.events);
@@ -567,6 +583,7 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "surface.truth.reset":
       return {
         ...state,
+        helmContext: {},
         authoritativeSurfaces: {
           repo: false,
           control: false,

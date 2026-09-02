@@ -17,7 +17,6 @@ import type {
 } from "../types";
 import {BoundaryLine, NihongaRoomBand, PlaceCompass} from "./NihongaChrome";
 import {CausalFlowPlane, causalEventRowBudget} from "./CausalFlowPlane";
-import type {OrganismRegionView} from "./organismView";
 import {WholeOrganismPlane} from "./WholeOrganismPlane";
 import {placeForPane, planeForPane, viewportProfile, workspaceLabel} from "./shellModel";
 
@@ -33,7 +32,7 @@ type Props = {
   transcriptSubtitle?: string;
   transcriptEmptyState?: string;
   transcriptAccentColor?: string;
-  regions: OrganismRegionView[];
+  ownerProjectionLines: string[];
   events: CanonicalExecutionEvent[];
   prompt: string;
   composerFocused: boolean;
@@ -101,7 +100,7 @@ export function NihongaCockpit(props: Props): React.ReactElement {
     />
   );
   const contextual = props.activeTab?.kind === "chat"
-    ? <WholeOrganismPlane regions={props.regions} activeFacet={props.activeTab.title} compact={profile !== "panorama"} />
+    ? <WholeOrganismPlane projectionLines={props.ownerProjectionLines} activeFacet={props.activeTab.title} compact={profile !== "panorama"} />
     : props.activeFacet;
   const facetOwnsFrame = props.activeTab?.kind !== "chat";
 

@@ -32,13 +32,17 @@ import {TranscriptPane} from "./components/TranscriptPane.tsx";
 import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
+import {
+  helmContextActionsForBridgeEvent,
+  helmContextProjectionLines,
+  helmContextRequestPayload,
+} from "./helmContext/appProjection.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
 import {ActiveFacet} from "./nihonga/ActiveFacet.tsx";
 import {NihongaCockpit} from "./nihonga/NihongaCockpit.tsx";
-import {projectWholeOrganism} from "./nihonga/organismView.ts";
 import {contextControlForLayout, contextualPlaneNeedsCompact, usesNihongaShell, viewportProfile} from "./nihonga/shellModel.ts";
 import {
   continuityStateFromSession,
@@ -1483,6 +1487,7 @@ export function createBridgeEventHandler({
     const pendingCommand = streamedPendingCommand;
     const typed = enrichSparseCommandResultEvent(event as Record<string, unknown>, pendingCommand);
     const eventType = String(typed.type ?? "");
+    apply(helmContextActionsForBridgeEvent(typed, state.helmContext));
     if (eventType === "helm.on_call_projection") {
       const projection = helmOnCallProjectionFromEvent(typed);
       apply([projection ? {type: "onCall.projection.set", projection} : {type: "onCall.truth.reset"}]);
@@ -1599,7 +1604,16 @@ export function createBridgeEventHandler({
       if (awaitingAuthoritativeResync) {
         awaitingAuthoritativeResync = false;
         resyncPending = true;
-        requestAuthoritativeResync(bridge, provider, model, getState().routePolicy.strategy);
+        const contextRequestId = requestAuthoritativeResync(
+          bridge,
+          provider,
+          model,
+          getState().routePolicy.strategy,
+          helmContextRequestPayload(getState()),
+        );
+        if (contextRequestId) {
+          apply([{type: "helm.context.requested", requestId: contextRequestId}]);
+        }
         apply([{type: "status.set", value: authoritativeResyncStatus(state.authoritativeSurfaces)}]);
       }
     }
@@ -2560,12 +2574,16 @@ export function App(): React.ReactElement {
     requestHandshake("initial");
     const intervalId = setInterval(() => {
       if (stateRef.current.bridgeStatus === "connected") {
-        requestAuthoritativeResync(
+        const contextRequestId = requestAuthoritativeResync(
           bridge,
           stateRef.current.routePolicy.provider,
           stateRef.current.routePolicy.model,
           stateRef.current.routePolicy.strategy,
+          helmContextRequestPayload(stateRef.current),
         );
+        if (contextRequestId) {
+          dispatch({type: "helm.context.requested", requestId: contextRequestId});
+        }
       } else {
         requestHandshake("probe");
       }
@@ -3824,13 +3842,7 @@ export function App(): React.ReactElement {
         transcriptSubtitle={chatMeta.subtitle}
         transcriptEmptyState={chatMeta.emptyState}
         transcriptAccentColor={chatMeta.accentColor}
-        regions={projectWholeOrganism({
-          bridgeStatus: state.bridgeStatus,
-          activeTurn: state.activeTurn,
-          routePolicy: state.routePolicy,
-          onCallTruth: state.onCallTruth,
-          authority: state.authoritativeSurfaces,
-        })}
+        ownerProjectionLines={helmContextProjectionLines(state.helmContext)}
         events={state.executionEventLog}
         prompt={state.prompt}
         composerFocused={state.uiMode.keyboardFocus === "composer"}
@@ -3980,6 +3992,7 @@ export function createInitialAppState(baseState: AppState): AppState {
   return {
     ...baseState,
     onCallTruth: unknownOnCallTruthState(),
+    helmContext: {},
     uiMode: {
       ...baseState.uiMode,
       sidebarVisible: restored?.sidebarVisible ?? baseState.uiMode.sidebarVisible,

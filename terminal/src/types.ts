@@ -1,4 +1,5 @@
 import type {HelmOnCallProjection, OnCallTruthState} from "./onCallTruth";
+import type {HelmContextEnvelope} from "./helmContext/types";
 
 export type PaneKind =
   | "chat"
@@ -542,6 +543,10 @@ export type AppState = {
   activeTurn: ActiveTurnState;
   routePolicy: RoutePolicyState;
   onCallTruth: OnCallTruthState;
+  helmContext: {
+    envelope?: HelmContextEnvelope;
+    pendingRequestId?: string;
+  };
   executionEventLog: CanonicalExecutionEvent[];
   chatTraceLines: TranscriptLine[];
   chatTraceExpanded: boolean;
@@ -581,6 +586,9 @@ export type AppAction =
   | {type: "route.policy.set"; policy: RoutePolicyState}
   | {type: "onCall.projection.set"; projection: HelmOnCallProjection}
   | {type: "onCall.truth.reset"; runtimeEpoch?: string | null}
+  | {type: "helm.context.requested"; requestId: string}
+  | {type: "helm.context.set"; envelope: HelmContextEnvelope}
+  | {type: "helm.context.reset"}
   | {type: "execution.events.ingest"; events: CanonicalExecutionEvent[]}
   | {type: "ui.compact.set"; compact: boolean}
   | {type: "ui.focus.set"; focus: KeyboardFocus}

@@ -6,11 +6,18 @@ import os
 from typing import Any
 
 from dharma_swarm import key_oracle, model_status
-from dharma_swarm.model_hierarchy import CANONICAL_SEED_ORDER
 from dharma_swarm.terminal_bridge_external_preview import (
     explicit_external_preview_lane,
     external_preview_route,
     external_preview_targets,
+)
+from dharma_swarm.terminal_bridge_model_truth import (
+    external_preview_oracle_providers as _external_preview_oracle_providers,
+    fallback_notice as _fallback_notice,
+    identity_verified as _identity_verified,
+    preview_provider_dispatchable as _preview_provider_dispatchable,
+    strict_verified_identities as _strict_verified_identities,
+    target_hierarchy_rank as _target_hierarchy_rank,
 )
 from dharma_swarm.tui import model_routing
 
@@ -19,94 +26,6 @@ _SLICE1_CHAT_PROVIDER_IDS = frozenset(
 )
 _DEDICATED_PREVIEW_PROVIDER_IDS = frozenset({"codex_text", "grok_oauth", "kimi_code"})
 _CANONICAL_CHAT_PROVIDER_IDS = frozenset({"claude", "openrouter"})
-_EXTERNAL_PREVIEW_ORACLE_PROVIDERS: dict[str, tuple[str, ...]] = {
-    "claude": ("claude_code",),
-    "codex_text": ("codex",),
-    "grok_oauth": ("xai",),
-    "kimi_code": ("kimi_code",),
-}
-_CANONICAL_PROVIDER_RANK = {
-    provider.value: index for index, provider in enumerate(CANONICAL_SEED_ORDER)
-}
-
-
-def _strict_verified_identities(bridge) -> set[tuple[str, str]]:
-    """Return only identities admitted by the seven-seat evaluator.
-
-    Generic liveness and model-status receipts are deliberately ignored here:
-    neither is authority to claim that a provider served the requested model.
-    """
-
-    projection = getattr(bridge, "_helm_on_call_projection", None)
-    identities: set[tuple[str, str]] = set()
-    for row in getattr(projection, "seats", ()):
-        if getattr(row, "verdict", None) is not model_status.RouteVerdict.ON_CALL:
-            continue
-        evidence = getattr(row, "evidence", None)
-        provider = str(getattr(evidence, "served_provider", "") or "").strip().lower()
-        model = str(getattr(evidence, "served_model", "") or "").strip()
-        if provider and model:
-            identities.add((provider, model))
-    return identities
-
-
-def _identity_verified(
-    *,
-    route_statuses: list[Any],
-    oracle_providers: list[str],
-    model_id: str,
-    strict_identities: set[tuple[str, str]],
-) -> bool:
-    candidate_identities = {
-        (
-            str(getattr(route_status, "provider", "")).strip().lower(),
-            str(getattr(route_status, "model_id", "")).strip(),
-        )
-        for route_status in route_statuses
-        if str(getattr(route_status, "provider", "")).strip()
-        and str(getattr(route_status, "model_id", "")).strip()
-    }
-    candidate_identities.update((provider, model_id) for provider in oracle_providers)
-    return bool(candidate_identities & strict_identities)
-
-
-def _target_hierarchy_rank(target: dict[str, Any]) -> tuple[int, int]:
-    provider_ranks = [
-        _CANONICAL_PROVIDER_RANK[provider]
-        for provider in target.get("oracle_providers", [])
-        if provider in _CANONICAL_PROVIDER_RANK
-    ]
-    # Providers outside the canonical registry remain deterministically last.
-    return (min(provider_ranks, default=len(_CANONICAL_PROVIDER_RANK)), 0)
-
-
-def _fallback_notice(
-    *, configured_route: str, selected_route: str | None
-) -> dict[str, Any]:
-    if selected_route is None:
-        return {
-            "kind": "no_usable_lane",
-            "configured_route": configured_route,
-            "selected_route": None,
-            "message": (
-                f"No usable model lane for {configured_route} "
-                "(no dispatchable terminal route)"
-            ),
-        }
-    return {
-        "kind": "live_fallback",
-        "configured_route": configured_route,
-        "selected_route": selected_route,
-        "message": (
-            f"Live fallback: {configured_route} -> {selected_route} "
-            "(configured route not usable now)"
-        ),
-    }
-
-
-def _preview_provider_dispatchable(provider_id: str) -> bool:
-    oracle_providers = set(_EXTERNAL_PREVIEW_ORACLE_PROVIDERS.get(provider_id, ()))
-    return bool(oracle_providers & key_oracle.dispatchable_now())
 
 
 def _build_model_policy_summary(
@@ -239,7 +158,7 @@ def _build_model_policy_summary(
     preview_targets = external_preview_targets(terminal_providers)
     for target in preview_targets:
         provider_id = str(target.get("provider", ""))
-        oracle_providers = list(_EXTERNAL_PREVIEW_ORACLE_PROVIDERS.get(provider_id, ()))
+        oracle_providers = _external_preview_oracle_providers(provider_id)
         adapter_available = provider_id in terminal_providers
         transport_available = bool(target.get("chat_executable"))
         oracle_usable = bool(set(oracle_providers) & dispatchable_providers)
