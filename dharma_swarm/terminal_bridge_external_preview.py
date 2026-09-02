@@ -13,6 +13,7 @@ from typing import Any, Iterable
 
 from dharma_swarm.model_catalog import (
     HELM_PREVIEW_CLAUDE_FABLE_5_MODEL_ID,
+    HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID,
     HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID,
     HELM_PREVIEW_GROK_4_6_MODEL_ID,
 )
@@ -26,6 +27,7 @@ from dharma_swarm.tui.engine.events import (
 
 GPT_5_6_SOL_MODEL_ID = HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID
 CLAUDE_FABLE_5_MODEL_ID = HELM_PREVIEW_CLAUDE_FABLE_5_MODEL_ID
+CLAUDE_SONNET_5_MODEL_ID = HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID
 KIMI_K3_MODEL_ID = FORGE_KIMI_CODE_MODEL_ID
 GROK_4_6_MODEL_ID = HELM_PREVIEW_GROK_4_6_MODEL_ID
 
@@ -62,6 +64,13 @@ EXTERNAL_PREVIEW_ROUTES: tuple[ExternalPreviewRoute, ...] = (
         provider_id="claude",
         model_id=CLAUDE_FABLE_5_MODEL_ID,
         label="Claude Fable 5 · Anthropic account · no-tools",
+        account_lane="claude_subscription",
+    ),
+    ExternalPreviewRoute(
+        alias="claude-sonnet-5",
+        provider_id="claude",
+        model_id=CLAUDE_SONNET_5_MODEL_ID,
+        label="Claude Sonnet 5 · Anthropic account · no-tools preview",
         account_lane="claude_subscription",
     ),
     ExternalPreviewRoute(

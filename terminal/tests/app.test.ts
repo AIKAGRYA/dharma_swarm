@@ -9284,7 +9284,217 @@ describe("slashCommandStartActions", () => {
 });
 
 describe("App prompt submission", () => {
-  test("sends compound prose and non-exact slash text byte-identically to Python with zero local effects", async () => {
+  test("executes exact one-line plain-language UI intents locally without starting a backend turn", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {};
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("switch to zen mode");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      stdin.write("open sessions");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      expect(sentMessages.some((message) => message.type === "session.bootstrap")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "session.start")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "action.run")).toBe(false);
+      expect(normalizeTerminalText(rendered)).toContain("Sessions");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
+  test("opens the local model picker for an unknown plain-language route without billing the backend", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {};
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("change models to fancypants ultra");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      expect(sentMessages.some((message) => message.type === "session.bootstrap")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "session.start")).toBe(false);
+      expect(sentMessages.some((message) => message.type === "action.run")).toBe(false);
+      expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
+  test("keeps bare model commands and usable-row selection local while the bridge is offline", async () => {
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    let eventSink: ((event: Record<string, unknown>) => void) | undefined;
+    let bootstrapped = false;
+
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      if (type === "handshake" && !bootstrapped) {
+        bootstrapped = true;
+        eventSink = (this as unknown as {onEvent: (event: Record<string, unknown>) => void}).onEvent;
+        queueMicrotask(() => {
+          eventSink?.({
+            type: "handshake.result",
+            default_provider: "claude",
+            default_model: "claude-opus-4.8",
+            providers: [{provider_id: "claude", default_model: "claude-opus-4.8"}],
+            policy: {
+              selected_provider: "claude",
+              selected_model: "claude-opus-4.8",
+              selected_route: "claude:claude-opus-4.8",
+              targets: [
+                {
+                  alias: "opus",
+                  label: "Claude Opus 4.8",
+                  provider: "claude",
+                  model: "claude-opus-4.8",
+                  route_state: "unavailable",
+                  picker_visible: true,
+                  usable_now: false,
+                  identity_verified: false,
+                  availability_reason: "key_oracle_not_dispatchable",
+                },
+                {
+                  alias: "kimi",
+                  label: "Kimi K3",
+                  provider: "kimi_code",
+                  model: "k3",
+                  route_state: "unverified",
+                  picker_visible: true,
+                  usable_now: true,
+                  identity_verified: false,
+                },
+              ],
+            },
+          });
+          eventSink?.({type: "bridge.error", code: "bridge_send_failed", message: "offline test"});
+        });
+      }
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {
+      originalClose.call(this);
+    };
+
+    const stdin = new TestStdin();
+    let rendered = "";
+    const stdout = new TestStdout();
+    stdout.on("data", (chunk) => { rendered += chunk.toString("utf8"); });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      await flushRender();
+      expect(normalizeTerminalText(rendered)).toContain("offline");
+
+      sentMessages.length = 0;
+      stdin.write("/models");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+      expect(sentMessages).toEqual([]);
+
+      rendered = "";
+      stdin.write("2");
+      await flushRender();
+      expect(sentMessages).toEqual([]);
+      expect(normalizeTerminalText(rendered)).toContain("kimi_code:k3");
+      expect(normalizeTerminalText(rendered)).toContain("unverified");
+
+      stdin.write("/model");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+      expect(sentMessages).toEqual([]);
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
+  test("sends ambiguous, multiline, tour, and non-exact slash text byte-identically to Python with zero local effects", async () => {
     const originalSend = DharmaBridge.prototype.send;
     const originalSendBackground = DharmaBridge.prototype.sendBackground;
     const originalClose = DharmaBridge.prototype.close;
@@ -9296,6 +9506,10 @@ describe("App prompt submission", () => {
     try {
       for (const rawPrompt of [
         "explain status, run swarm, then switch the route to claude opus",
+        "switch to cockpit mode and summarize the current state",
+        "show me what control means in cybernetics",
+        "give me a tour",
+        "open sessions\nand explain what they contain",
         "  /thread attacker-chosen  ",
       ]) {
         const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -9450,8 +9664,8 @@ describe("App prompt submission", () => {
       const normalized = normalizeTerminalText(rendered);
       expect(normalized).toContain("> Reply OK");
       // FACE-1: the zen frame shows the quiet waiting row, not transient statusLine spam.
-      // Default route is the chat brain (Claude Opus 4.8), not the codex driver.
-      expect(normalized).toContain("… thinking · claude:claude-opus-4.8");
+      // Default route is the chat brain (Claude Opus 5.0), not the codex driver.
+      expect(normalized).toContain("… thinking · claude:claude-opus-5.0");
     } finally {
       instance.unmount();
       instance.cleanup();
@@ -10182,6 +10396,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
 
     sent.length = 0;
@@ -10225,6 +10440,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
   });
 
@@ -10289,6 +10505,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
   });
 
@@ -10352,6 +10569,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
 
     sent.length = 0;
@@ -10389,6 +10607,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
   });
 
@@ -10431,6 +10650,7 @@ Loop decision: ready to stop`,
       "model.policy",
       "agent.routes",
       "evolution.surface",
+      "helm.context.request",
     ]);
 
     sent.length = 0;

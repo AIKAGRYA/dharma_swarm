@@ -14,15 +14,16 @@ from dharma_swarm.tui.model_routing import (
 
 def test_default_target_is_floor_claude() -> None:
     target = default_target()
-    # The default chat brain is now a FLOOR Claude (claude-opus-4.8) on the
+    # The default chat brain is a current FLOOR Claude (claude-opus-5.0) on the
     # Claude-Max oauth lane — never a sub-floor model (operator demarcation).
     assert target.provider_id == "claude"
-    assert target.model_id == "claude-opus-4.8"
+    assert target.model_id == "claude-opus-5.0"
 
 
 def test_resolve_alias_and_model_id() -> None:
-    assert resolve_model_target("opus 4.8") is not None
-    assert resolve_model_target("claude-opus-4.8") is not None
+    assert resolve_model_target("opus 5") is not None
+    assert resolve_model_target("claude-opus-5.0") is not None
+    assert resolve_model_target("sonnet 5") is not None
     # gpt-5.5 floor lane resolvable.
     assert resolve_model_target("gpt-5.5") is not None
     kimi = resolve_model_target("kimi")
@@ -64,10 +65,10 @@ def test_inline_switch_detection() -> None:
 
 
 def test_fallback_chain_excludes_current() -> None:
-    chain = fallback_chain("claude", "claude-opus-4.8")
+    chain = fallback_chain("claude", "claude-opus-5.0")
     assert chain
     assert all(
-        not (t.provider_id == "claude" and t.model_id == "claude-opus-4.8")
+        not (t.provider_id == "claude" and t.model_id == "claude-opus-5.0")
         for t in chain
     )
 
@@ -82,8 +83,8 @@ def test_strategy_aliases_resolve() -> None:
 def test_target_by_index_maps_in_model_list_order() -> None:
     first = target_by_index(1)
     assert first is not None
-    # First target (default chat brain) is now the FLOOR Claude opus-4.8.
-    assert first.alias == "opus-4.8"
+    # First target (default chat brain) is the current FLOOR Claude Opus 5.0.
+    assert first.alias == "opus-5.0"
     assert target_by_index(999) is None
 
 

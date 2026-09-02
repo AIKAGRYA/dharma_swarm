@@ -107,6 +107,7 @@ export const initialState: AppState = {
   activeTurn: {phase: "idle"},
   routePolicy: initialRoutePolicy,
   onCallTruth: unknownOnCallTruthState(),
+  helmContext: {},
   executionEventLog: [],
   chatTraceLines: [],
   chatTraceExpanded: false,
@@ -180,7 +181,11 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
       }
       return {
         ...state,
-        activeTurn: {...state.activeTurn, sessionId: action.sessionId ?? state.activeTurn.sessionId},
+        activeTurn: {
+          ...state.activeTurn,
+          sessionId: action.sessionId ?? state.activeTurn.sessionId,
+          route: action.route ?? state.activeTurn.route,
+        },
       };
     case "turn.cancel.request":
       if (state.activeTurn.phase !== "running" || state.activeTurn.requestId !== action.requestId) {
@@ -193,6 +198,7 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           requestId: state.activeTurn.requestId,
           cancelRequestId: action.cancelRequestId,
           sessionId: state.activeTurn.sessionId,
+          route: state.activeTurn.route,
         },
       };
     case "turn.cancel.rejected":
@@ -237,6 +243,26 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
         onCallTruth: unknownOnCallTruthState(
           action.runtimeEpoch === undefined ? state.onCallTruth.runtimeEpoch : action.runtimeEpoch,
         ),
+      };
+    case "helm.context.requested":
+      // A slow owner fan-out must not be orphaned by the next tick: the
+      // oldest outstanding request stays the correlation anchor and any
+      // result issued after it is accepted (see helmContextResultCorrelates).
+      return state.helmContext.pendingRequestId
+        ? state
+        : {
+            ...state,
+            helmContext: {...state.helmContext, pendingRequestId: action.requestId},
+          };
+    case "helm.context.set":
+      return {
+        ...state,
+        helmContext: {envelope: action.envelope},
+      };
+    case "helm.context.reset":
+      return {
+        ...state,
+        helmContext: {},
       };
     case "execution.events.ingest": {
       const executionEventLog = mergeExecutionEvents(state.executionEventLog, action.events);
@@ -567,6 +593,7 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "surface.truth.reset":
       return {
         ...state,
+        helmContext: {},
         authoritativeSurfaces: {
           repo: false,
           control: false,

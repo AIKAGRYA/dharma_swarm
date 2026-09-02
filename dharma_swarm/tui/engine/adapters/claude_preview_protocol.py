@@ -89,6 +89,7 @@ def _strict_rate_limit_telemetry_is_valid(raw: dict[str, Any]) -> bool:
         "isUsingOverage",
         "utilization",
         "surpassedThreshold",
+        "unifiedWindows",
     }
     if not set(info).issubset(allowed):
         return False
@@ -105,6 +106,28 @@ def _strict_rate_limit_telemetry_is_valid(raw: dict[str, Any]) -> bool:
             return False
     for key in ("utilization", "surpassedThreshold"):
         if key in info and not _unit_interval_number(info[key]):
+            return False
+    if "unifiedWindows" in info and not _strict_unified_windows_is_valid(
+        info["unifiedWindows"]
+    ):
+        return False
+    return True
+
+
+def _strict_unified_windows_is_valid(value: object) -> bool:
+    """Admit only Claude's current two-window, scalar telemetry shape."""
+
+    if not isinstance(value, dict) or set(value) != {"five_hour", "seven_day"}:
+        return False
+    for window in value.values():
+        if not isinstance(window, dict) or set(window) != {
+            "utilization",
+            "resetsAt",
+        }:
+            return False
+        if not _unit_interval_number(window.get("utilization")):
+            return False
+        if not _bounded_nonnegative_int(window.get("resetsAt"), maximum=10**15):
             return False
     return True
 

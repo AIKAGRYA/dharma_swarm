@@ -31,6 +31,8 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 DEFAULT_TTL_S = 900  # 15 min interactive default (operator decision in GOAL doc)
+_STALE_WARNING_FINGERPRINTS: set[tuple[str, float, float]] = set()
+_MAX_STALE_WARNING_FINGERPRINTS = 32
 
 # Glyphs (or any field) that count as a live key. oauth rows carry ✓ already;
 # we also accept an explicit "oauth" marker defensively.
@@ -142,15 +144,17 @@ def _claude_code_dispatchable_now(*, now: float | None = None) -> bool:
     return ok
 
 
-def _detect_keyless_live() -> set[str]:
+def _detect_keyless_live(*, probe: bool = True) -> set[str]:
     """The keyless lanes usable RIGHT NOW, detected from the environment.
 
     - ``claude_code`` only when the ``claude`` CLI can complete a headless
       `claude -p` smoke now. Binary presence and `auth status` are insufficient.
+      With ``probe=False`` the smoke is never spawned and ``claude_code`` is
+      left to the cached dkeys row.
     - ``local`` / ``ollama`` when an ollama runtime is reachable.
     """
     live: set[str] = set()
-    if _claude_code_dispatchable_now():
+    if probe and _claude_code_dispatchable_now():
         live.add("claude_code")
     if shutil.which("ollama") or os.environ.get("OLLAMA_HOST"):
         live.add("local")
@@ -217,10 +221,11 @@ def _rows_by_key(data: dict) -> dict[str, dict]:
 
 
 def live_providers(
-    ttl_s: float = DEFAULT_TTL_S,
+    ttl_s: float | None = DEFAULT_TTL_S,
     *,
     home: Path | None = None,
     now: float | None = None,
+    probe: bool = True,
 ) -> set[str] | None:
     """Return the set of provider-value strings with a live key, or None.
 
@@ -253,16 +258,21 @@ def live_providers(
     if age < 0:
         # Clock skew / future timestamp: treat as fresh rather than stale.
         age = 0.0
-    if age > ttl_s:
-        logger.warning(
-            "key_oracle: keys_status.json is stale (age=%.0fs > ttl=%.0fs); "
-            "falling back to env-presence (run `dkeys test`).",
-            age,
-            ttl_s,
-        )
+    if ttl_s is not None and age > ttl_s:
+        fingerprint = (str(_status_path(home)), last_test_f, float(ttl_s))
+        if fingerprint not in _STALE_WARNING_FINGERPRINTS:
+            if len(_STALE_WARNING_FINGERPRINTS) >= _MAX_STALE_WARNING_FINGERPRINTS:
+                _STALE_WARNING_FINGERPRINTS.clear()
+            _STALE_WARNING_FINGERPRINTS.add(fingerprint)
+            logger.warning(
+                "key_oracle: keys_status.json is stale (age=%.0fs > ttl=%.0fs); "
+                "falling back to env-presence (run `dkeys test`).",
+                age,
+                ttl_s,
+            )
         return None
 
-    live: set[str] = _detect_keyless_live()
+    live: set[str] = _detect_keyless_live() if probe else _detect_keyless_live(probe=False)
     for provider_name, row_key in _PROVIDER_TO_ROW.items():
         row = rows.get(row_key)
         if isinstance(row, dict) and _is_row_live(row):
@@ -309,8 +319,22 @@ def dispatchable_now(
     return _detect_keyless_live() | (keyed or set())
 
 
+def dispatchable_cached(*, home: Path | None = None) -> set[str]:
+    """Non-blocking presence truth: providers the last ``dkeys test`` proved live.
+
+    Never spawns the ``claude -p`` smoke or any other subprocess, so it is safe
+    on an event loop, a fresh offline bridge, and every ``/model`` render. The
+    cache is read regardless of age (the caller surfaces oracle freshness
+    separately); a missing or unreadable cache yields an honest empty set plus
+    the reachable local runtime.
+    """
+    keyed = live_providers(None, home=home, probe=False)
+    return _detect_keyless_live(probe=False) | (keyed or set())
+
+
 __all__ = [
     "DEFAULT_TTL_S",
+    "dispatchable_cached",
     "dispatchable_now",
     "is_provider_live",
     "live_providers",

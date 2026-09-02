@@ -14,21 +14,20 @@ from dharma_swarm.terminal_bridge_external_preview import (
 )
 from dharma_swarm.terminal_bridge_chat_membrane import (
     chat_event_contains_tool_evidence as _chat_event_contains_tool_evidence,
+    failure_events as _failure_events,
     chat_event_is_forbidden as _chat_event_is_forbidden,
     chat_session_start_has_tool_authority as _chat_session_start_has_tool_authority,
 )
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
+    ContextReceipt,
     ErrorEvent,
     SessionEnd,
     SessionStart,
     TextComplete,
 )
 
-# Chat-lane sizing: messages sent per turn / retained per bridge process.
-CHAT_HISTORY_SEND_LIMIT = 24
-CHAT_HISTORY_RETAIN = 48
 _MAX_PREVIEW_BUFFER_BYTES = 8 * 1024 * 1024
 _MAX_PREVIEW_ASSISTANT_BYTES = 4 * 1024 * 1024
 # Compatibility projections; policy authority lives in the extracted helper.
@@ -62,7 +61,7 @@ class TerminalBridgeChatMixin:
             if terminal is not None:
                 self._emit_recorded_session_event(run, terminal)
             return
-        active_tab = str(request.get("active_tab", "") or "chat")
+        active_tab = self._canonical_active_tab(request.get("active_tab"))
         requested_provider = str(request.get("provider", "") or "").strip().lower()
         requested_model = str(request.get("model", "") or "").strip()
         requested_resume_id = str(request.get("resume_session_id", "") or "").strip()
@@ -89,25 +88,15 @@ class TerminalBridgeChatMixin:
             return
 
         base_messages = self._build_chat_messages(request, prompt)
-        self._emit(
-            {
-                "type": "session.ack",
-                "request_id": request_id,
-                "session_id": session_id,
-                "provider": lanes[0][0],
-                "model": lanes[0][1],
-                "mode": "chat",
-                "execution_mode": "read_only_no_tools",
-                "tools_enabled": False,
-                "authority": "NONE",
-            }
-        )
 
         lane_queue = list(lanes)
         lane_failures: list[str] = []
         last_buffer: list[CanonicalEventType] = []
         last_route: tuple[str, str] | None = None
+        last_context_receipt: ContextReceipt | None = None
+        last_context_disposition = "missing"
         index = 0
+        acknowledgement_emitted = False
         while index < len(lane_queue):
             if run.cancel_requested:
                 raise asyncio.CancelledError
@@ -118,19 +107,27 @@ class TerminalBridgeChatMixin:
                 continue
             options = self._sealed_chat_options(provider_id, options)
             preview_route = external_preview_route(provider_id, model_id)
-            self._set_active_provider(
-                run,
-                provider_id,
-                model_id,
-                update_selection=True,
-            )
             run.phase = "streaming"
             messages = base_messages
+            server_owned_context = self._server_owned_chat_context_for_lane(
+                request,
+                provider_id=provider_id,
+                model_id=model_id,
+            )
+            context_receipt = self._server_owned_chat_context_receipt_for_lane(
+                request,
+                provider_id=provider_id,
+                model_id=model_id,
+            )
+            advertised_context_disposition = str(
+                context_receipt.get("disposition", "") or "missing"
+            )
             system_prompt: str | None = self._render_chat_system_prompt(
                 provider_id=provider_id,
                 model_id=model_id,
                 active_tab=active_tab,
                 note=note,
+                server_owned_context=server_owned_context,
             )
             resume_id: str | None = None
             if provider_id in {"claude", "codex_text"}:
@@ -148,6 +145,27 @@ class TerminalBridgeChatMixin:
                     # the newest user message and skip re-appending the prompt.
                     messages = base_messages[-1:]
                     system_prompt = None
+            if server_owned_context and system_prompt is None:
+                context_receipt = {
+                    **context_receipt,
+                    "disposition": "omitted_for_native_continuity",
+                }
+                advertised_context_disposition = "omitted_for_native_continuity"
+            pending_context_disposition = (
+                "offered_unconfirmed"
+                if advertised_context_disposition in {"attached", "attached_redacted"}
+                else advertised_context_disposition
+            )
+            if not acknowledgement_emitted:
+                acknowledgement_emitted = True
+                self._emit_chat_ack(
+                    request_id=request_id,
+                    session_id=session_id,
+                    provider_id=provider_id,
+                    model_id=model_id,
+                    context_disposition=pending_context_disposition,
+                    context_receipt=context_receipt,
+                )
             completion = self._completion_request_cls(
                 messages=messages,
                 model=model_id,
@@ -156,6 +174,19 @@ class TerminalBridgeChatMixin:
                 tool_choice="none",
                 resume_session_id=resume_id,
                 provider_options=dict(options),
+            )
+            pending_context_receipt = self._stage_pending_chat_context(
+                run,
+                provider_id=provider_id,
+                model_id=model_id,
+                context_receipt=context_receipt,
+                pending_disposition=pending_context_disposition,
+            )
+            self._set_active_provider(
+                run,
+                provider_id,
+                model_id,
+                update_selection=True,
             )
             buffer: list[CanonicalEventType] = []
             reply_parts: list[str] = []
@@ -229,6 +260,10 @@ class TerminalBridgeChatMixin:
                     if preview_route is not None:
                         event = sanitize_external_preview_event(event)
                     if isinstance(event, SessionStart):
+                        event.system_info = {
+                            **event.system_info,
+                            "helm_context": dict(context_receipt),
+                        }
                         session_start_seen = True
                     if isinstance(event, TextComplete) and event.role == "assistant" and event.content.strip():
                         reply_parts.append(event.content)
@@ -241,11 +276,27 @@ class TerminalBridgeChatMixin:
                             failure_text = str(event.error_message or event.error_code or "provider failed")
                     buffer.append(event)
             except asyncio.CancelledError:
+                self._record_cancelled_chat_lane(
+                    run,
+                    pending_context_receipt,
+                    buffer,
+                    session_start_seen=session_start_seen,
+                    advertised_disposition=advertised_context_disposition,
+                    pending_disposition=pending_context_disposition,
+                )
                 raise
             except Exception as exc:
                 success = False
                 failure_text = f"{type(exc).__name__}: {exc}"
             if run.cancel_requested:
+                self._record_cancelled_chat_lane(
+                    run,
+                    pending_context_receipt,
+                    buffer,
+                    session_start_seen=session_start_seen,
+                    advertised_disposition=advertised_context_disposition,
+                    pending_disposition=pending_context_disposition,
+                )
                 raise asyncio.CancelledError
             preview_start = (
                 next(
@@ -273,6 +324,16 @@ class TerminalBridgeChatMixin:
             if membrane_violation:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
+                self._record_final_context_receipt(
+                    run,
+                    pending_context_receipt,
+                    lane_outcome="membrane_rejected",
+                    disposition=(
+                        advertised_context_disposition
+                        if session_start_seen
+                        else pending_context_disposition
+                    ),
+                )
                 self._record_and_emit_session_event(
                     run,
                     ErrorEvent(
@@ -309,22 +370,28 @@ class TerminalBridgeChatMixin:
                 )
                 failure_text = "preview route produced no usable sealed response"
                 success = False
-                buffer = [
-                    ErrorEvent(
-                        provider_id=provider_id,
-                        session_id=session_id,
-                        code=code,
-                        message=failure_text,
-                        retryable=False,
-                    ),
-                    SessionEnd(
-                        provider_id=provider_id,
-                        session_id=session_id,
-                        success=False,
-                        error_code=code,
-                        error_message=failure_text,
-                    ),
-                ]
+                buffer = _failure_events(
+                    provider_id=provider_id,
+                    session_id=session_id,
+                    code=code,
+                    message=failure_text,
+                    retryable=False,
+                )
+            if preview_route is None and success is True and not session_start_seen:
+                # A clean provider exit is transport evidence only. Without an
+                # accepted start boundary, neither the staged context nor the
+                # requested route can truthfully be promoted to completed.
+                failure_text = (
+                    "provider stream ended successfully without session_start"
+                )
+                success = False
+                buffer = _failure_events(
+                    provider_id=provider_id,
+                    session_id=session_id,
+                    code="missing_session_start",
+                    message=failure_text,
+                    retryable=True,
+                )
             if success:
                 run.phase = "finalizing"
                 run.lifecycle.bind_route(provider_id=provider_id, model_id=model_id)
@@ -336,26 +403,23 @@ class TerminalBridgeChatMixin:
                         preview_exact_model_proven = bool(
                             preview_start.system_info.get("exact_model_proven", False)
                         )
+                self._record_final_context_receipt(
+                    run,
+                    pending_context_receipt,
+                    lane_outcome="completed",
+                    disposition=advertised_context_disposition,
+                )
                 for event in buffer:
                     accepted = self._record_and_emit_session_event(run, event)
                     if isinstance(accepted, SessionEnd) and accepted.success:
                         if preview_route is not None:
-                            self._emit(
-                                {
-                                    "type": "route.receipt",
-                                    "request_id": run.request_id,
-                                    "session_id": run.session_id,
-                                    "provider_id": provider_id,
-                                    "model_id": model_id,
-                                    "requested_model_id": model_id,
-                                    "served_model_id": preview_served_model,
-                                    "route_id": preview_route.route_id,
-                                    "evidence_kind": "preview_provider_completion",
-                                    "success": True,
-                                    "preview_only": True,
-                                    "helm_on_call_eligible": False,
-                                    "exact_model_proven": preview_exact_model_proven,
-                                }
+                            self._emit_preview_route_receipt(
+                                run,
+                                provider_id=provider_id,
+                                model_id=model_id,
+                                route_id=preview_route.route_id,
+                                served_model_id=preview_served_model,
+                                exact_model_proven=preview_exact_model_proven,
                             )
                         else:
                             self._emit_provider_route_receipt(
@@ -371,17 +435,31 @@ class TerminalBridgeChatMixin:
             lane_failures.append(f"{provider_id}:{model_id} — {failure_text or 'failed'}")
             last_buffer = buffer
             last_route = (provider_id, model_id)
+            last_context_receipt = pending_context_receipt
+            last_context_disposition = (
+                advertised_context_disposition
+                if session_start_seen
+                else pending_context_disposition
+            )
             if provider_id == "claude" and resume_id is not None:
                 # A stale resume id must not burn the lane: retry once fresh.
                 requested_resume_id = ""
                 lane_queue.insert(index, (provider_id, model_id, options, f"{note} (fresh session retry)"))
-
         emitted_session_end = False
         run.phase = "finalizing"
         if last_route is not None:
             run.lifecycle.bind_route(
                 provider_id=last_route[0],
                 model_id=last_route[1],
+            )
+        if last_route is not None:
+            if last_context_receipt is None:
+                raise RuntimeError("final chat lane is missing its pending context receipt")
+            self._record_final_context_receipt(
+                run,
+                last_context_receipt,
+                lane_outcome="failed",
+                disposition=last_context_disposition,
             )
         for event in last_buffer:
             accepted = self._record_and_emit_session_event(run, event)
@@ -405,92 +483,3 @@ class TerminalBridgeChatMixin:
             )
             if terminal is not None:
                 self._emit_recorded_session_event(run, terminal)
-
-    def _build_model_policy_summary(
-        self,
-        *,
-        selected_provider: str,
-        selected_model: str,
-        strategy: str,
-    ) -> dict[str, Any]:
-        return _chat_policy._build_model_policy_summary(
-            self,
-            selected_provider=selected_provider,
-            selected_model=selected_model,
-            strategy=strategy,
-        )
-
-    def _chat_lanes(
-        self,
-        requested_provider: str,
-        requested_model: str,
-    ) -> list[tuple[str, str, dict[str, Any], str]]:
-        return _chat_policy._chat_lanes(
-            self,
-            requested_provider,
-            requested_model,
-        )
-
-    def _is_enabled_external_preview_route(
-        self,
-        provider_id: str,
-        model_id: str,
-    ) -> bool:
-        return _chat_policy._is_enabled_external_preview_route(
-            self,
-            provider_id,
-            model_id,
-        )
-
-    def _sealed_chat_options(
-        self,
-        provider_id: str,
-        options: dict[str, Any],
-    ) -> dict[str, Any]:
-        return _chat_policy._sealed_chat_options(self, provider_id, options)
-
-    def _chat_claude_model(self) -> str:
-        return _chat_policy._chat_claude_model(self)
-
-    def _chat_claude_options(self) -> dict[str, Any]:
-        return _chat_policy._chat_claude_options(self)
-
-    def _build_chat_messages(self, request: dict[str, Any], prompt: str) -> list[dict[str, str]]:
-        ts_messages: list[dict[str, str]] = []
-        raw = request.get("messages")
-        if isinstance(raw, list):
-            for item in raw:
-                if not isinstance(item, dict):
-                    continue
-                role = str(item.get("role", "") or "").strip().lower()
-                content = item.get("content")
-                if role not in {"user", "assistant"} or not isinstance(content, str):
-                    continue
-                if content.strip():
-                    ts_messages.append({"role": role, "content": content})
-        history = [dict(item) for item in self._chat_history]
-        if not history and ts_messages:
-            # Bridge restarted mid-conversation: seed from the history the TS
-            # already sends (user turns at minimum).
-            history = ts_messages
-            if history and history[-1]["role"] == "user" and history[-1]["content"] == prompt:
-                history = history[:-1]
-        history = history[-(CHAT_HISTORY_SEND_LIMIT - 1):]
-        return [*history, {"role": "user", "content": prompt}]
-
-    def _remember_chat_exchange(self, prompt: str, reply: str) -> None:
-        self._chat_history.append({"role": "user", "content": prompt})
-        if reply.strip():
-            self._chat_history.append({"role": "assistant", "content": reply.strip()})
-        self._chat_history = self._chat_history[-CHAT_HISTORY_RETAIN:]
-
-    def _render_chat_system_prompt(self, *, provider_id: str, model_id: str, active_tab: str, note: str) -> str:
-        lines = [
-            "You are the Dharma Helm — the conversational operator assistant of the dharma_swarm terminal, speaking in its chat pane.",
-            f"Route: {provider_id}:{model_id} ({note}). Active tab: {active_tab}.",
-            "Stay conversational and concise; keep continuity with the conversation history provided.",
-            "Slice 1 is physically read-only and no-tools. You cannot execute commands, create tasks, dispatch agents, mutate runtime or workspace state, or cause external effects.",
-            "All of your prose is unverified narration with authority NONE. Never claim that requested work was completed or promote task, project, route, organism, or effect state.",
-            "Do not emit Helm directives or machine-action sentinels; respond with narration only.",
-        ]
-        return "\n".join(lines)[:1400]

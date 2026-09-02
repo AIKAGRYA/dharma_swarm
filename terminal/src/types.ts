@@ -1,4 +1,5 @@
 import type {HelmOnCallProjection, OnCallTruthState} from "./onCallTruth";
+import type {HelmContextEnvelope} from "./helmContext/types";
 
 export type PaneKind =
   | "chat"
@@ -72,8 +73,8 @@ export type BridgeStatus = "booting" | "connected" | "degraded" | "offline";
 
 export type ActiveTurnState =
   | {phase: "idle"}
-  | {phase: "running"; requestId: string; sessionId?: string}
-  | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string};
+  | {phase: "running"; requestId: string; sessionId?: string; route?: string}
+  | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string; route?: string};
 
 export type RouteState = "ready" | "unverified" | "degraded" | "slow" | "unavailable" | "invalid";
 
@@ -456,6 +457,11 @@ export type RouteTarget = {
   routeState: RouteState;
   availabilityReason?: string;
   selectable: boolean;
+  /** Current transport/key-oracle usability; absent means the owner did not attest it. */
+  usableNow?: boolean;
+  /** Strict seven-seat evaluator identity verdict; absent means no typed verdict arrived. */
+  identityVerified?: boolean;
+  oracleProviders?: string[];
 };
 
 export type ModelTarget = RouteTarget;
@@ -501,6 +507,7 @@ export type RoutePolicyState = {
   defaultRouteId?: string;
   fallbackChain: string[];
   activeLabel?: string;
+  fallbackNotice?: string;
   targets: RouteTarget[];
 };
 
@@ -527,6 +534,7 @@ export type CanonicalExecutionEvent = {
   content?: string;
   timestamp?: string;
   correlationId?: string;
+  route?: string;
   raw?: Record<string, unknown>;
 };
 
@@ -536,6 +544,10 @@ export type AppState = {
   activeTurn: ActiveTurnState;
   routePolicy: RoutePolicyState;
   onCallTruth: OnCallTruthState;
+  helmContext: {
+    envelope?: HelmContextEnvelope;
+    pendingRequestId?: string;
+  };
   executionEventLog: CanonicalExecutionEvent[];
   chatTraceLines: TranscriptLine[];
   chatTraceExpanded: boolean;
@@ -566,7 +578,7 @@ export type AppAction =
   | {type: "state.replace"; state: AppState}
   | {type: "bridge.status"; status: BridgeStatus}
   | {type: "turn.start"; requestId: string}
-  | {type: "turn.ack"; requestId: string; sessionId?: string}
+  | {type: "turn.ack"; requestId: string; sessionId?: string; route?: string}
   | {type: "turn.cancel.request"; requestId: string; cancelRequestId: string}
   | {type: "turn.cancel.rejected"; requestId: string; cancelRequestId: string}
   | {type: "turn.finish"; requestId: string}
@@ -575,6 +587,9 @@ export type AppAction =
   | {type: "route.policy.set"; policy: RoutePolicyState}
   | {type: "onCall.projection.set"; projection: HelmOnCallProjection}
   | {type: "onCall.truth.reset"; runtimeEpoch?: string | null}
+  | {type: "helm.context.requested"; requestId: string}
+  | {type: "helm.context.set"; envelope: HelmContextEnvelope}
+  | {type: "helm.context.reset"}
   | {type: "execution.events.ingest"; events: CanonicalExecutionEvent[]}
   | {type: "ui.compact.set"; compact: boolean}
   | {type: "ui.focus.set"; focus: KeyboardFocus}

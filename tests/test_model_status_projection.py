@@ -72,7 +72,7 @@ def test_floor_status_projection_uses_dkeys_rows_without_live_calls(
     assert {"kimi-k3", "glm-5.2"} <= projected_ids
     assert all(model.lane == "floor" for model in projection.models)
     by_id = {model.id: model for model in projection.models}
-    assert by_id["claude-opus-4.8"].available is True
+    assert by_id["claude-opus-5.0"].available is True
     assert by_id["kimi-k2.6"].available is True
     assert by_id["gpt-5-codex"].available is False
     assert by_id["gpt-5-codex"].unavailable_reason == "provider_dead"
@@ -90,9 +90,9 @@ def test_live_call_matrix_failure_overrides_dkeys_live_route(
             {
                 "models": [
                     {
-                        "id": "claude-opus-4.8",
+                        "id": "claude-opus-5.0",
                         "actual_live_call": {
-                            "route": "claude_code:claude-opus-4.8",
+                            "route": "claude_code:claude-opus-5.0",
                             "status": "failed",
                             "failure_class": "quota",
                             "reason": "Credit balance is too low",
@@ -110,7 +110,7 @@ def test_live_call_matrix_failure_overrides_dkeys_live_route(
 
     projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
     by_id = {model.id: model for model in projection.models}
-    opus = by_id["claude-opus-4.8"]
+    opus = by_id["claude-opus-5.0"]
 
     assert opus.available is False
     assert opus.status == "unavailable"
@@ -312,8 +312,8 @@ def test_direct_live_probe_receipt_overrides_dkeys_live_routes(
                 "schema_version": "dharma.model_routing_live_probe.v1",
                 "results": [
                     {
-                        "logical_model_id": "claude-opus-4.8",
-                        "route": "claude_code:claude-opus-4.8",
+                        "logical_model_id": "claude-opus-5.0",
+                        "route": "claude_code:claude-opus-5.0",
                         "status": "failed",
                         "failure_class": "timeout",
                         "started_at": "2026-07-01T01:09:06Z",
@@ -343,7 +343,7 @@ def test_direct_live_probe_receipt_overrides_dkeys_live_routes(
 
     projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
     by_id = {model.id: model for model in projection.models}
-    opus = by_id["claude-opus-4.8"]
+    opus = by_id["claude-opus-5.0"]
     kimi = by_id["kimi-k2.6"]
     kimi_routes = {route.route: route for route in kimi.route_statuses}
 
@@ -447,8 +447,8 @@ def test_fresh_live_probe_closeout_is_discovered_without_operator_env(
                 "schema_version": "dharma.model_routing_live_probe.v1",
                 "results": [
                     {
-                        "logical_model_id": "claude-opus-4.8",
-                        "route": "claude_code:claude-opus-4.8",
+                        "logical_model_id": "claude-opus-5.0",
+                        "route": "claude_code:claude-opus-5.0",
                         "status": "failed",
                         "failure_class": "timeout",
                         "started_at": "2026-07-01T01:09:06Z",
@@ -474,7 +474,7 @@ def test_fresh_live_probe_closeout_is_discovered_without_operator_env(
     monkeypatch.setenv(LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV, "100000")
 
     projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
-    opus = {model.id: model for model in projection.models}["claude-opus-4.8"]
+    opus = {model.id: model for model in projection.models}["claude-opus-5.0"]
 
     assert opus.available is False
     assert opus.status == "unavailable"
@@ -497,8 +497,8 @@ def test_stale_auto_discovered_live_probe_closeout_expires(
                 "schema_version": "dharma.model_routing_live_probe.v1",
                 "results": [
                     {
-                        "logical_model_id": "claude-opus-4.8",
-                        "route": "claude_code:claude-opus-4.8",
+                        "logical_model_id": "claude-opus-5.0",
+                        "route": "claude_code:claude-opus-5.0",
                         "status": "failed",
                         "failure_class": "timeout",
                         "started_at": "2020-01-01T00:00:00Z",
@@ -524,7 +524,7 @@ def test_stale_auto_discovered_live_probe_closeout_expires(
     monkeypatch.setenv(LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV, "1")
 
     projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
-    opus = {model.id: model for model in projection.models}["claude-opus-4.8"]
+    opus = {model.id: model for model in projection.models}["claude-opus-5.0"]
 
     assert opus.available is True
     assert opus.status == "live_routable"

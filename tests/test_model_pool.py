@@ -260,11 +260,20 @@ def test_floor_and_grunt_partition_the_pool():
 def test_floor_path_has_a_claude_chat_brain():
     """The REAL path must carry a floor Claude for the default chat brain."""
     floor_ids = {e.id for e in model_pool.floor_entries()}
-    assert "claude-opus-4.8" in floor_ids
-    opus = get_entry("claude-opus-4.8")
+    assert "claude-opus-5.0" in floor_ids
+    opus = get_entry("claude-opus-5.0")
     assert opus is not None and not opus.below_floor
     # Routes via the Claude-Max oauth lane (THE ONE WAY), not the metered API.
     assert ProviderType.CLAUDE_CODE in {r.provider for r in opus.routes}
+
+
+def test_current_claude_defaults_are_exact_and_pool_checked():
+    """Claude-Max uses current CLI ids; direct Anthropic keeps its own spelling."""
+    assert model_pool.default_for_provider(ProviderType.CLAUDE_CODE) == "claude-opus-5.0"
+    assert model_pool.default_for_provider(ProviderType.ANTHROPIC) == "claude-opus-5-0"
+    opus = get_entry("claude-opus-5.0")
+    assert opus is not None
+    assert Route(ProviderType.CLAUDE_CODE, "claude-opus-5.0") in opus.routes
 
 
 def test_named_subfloor_models_are_grunt_only():
@@ -297,8 +306,8 @@ def test_floor_frontier_models_present_and_above_floor():
     """The K2.6-floor frontier the roster must SERVE — all floor (real path)."""
     floor_ids = {e.id for e in model_pool.floor_entries()}
     for use in (
-        "claude-opus-4.8",
-        "claude-sonnet-4.6",
+        "claude-opus-5.0",
+        "claude-sonnet-5",
         "gpt-5.5",
         "kimi-k2.6",
         "kimi-k3",

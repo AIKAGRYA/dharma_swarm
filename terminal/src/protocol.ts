@@ -3299,7 +3299,7 @@ export function sessionBootstrapToLines(payload: Record<string, unknown>): Trans
   const prompt = String(payload.prompt ?? "");
   const activeTab = String(payload.active_tab ?? "chat");
   const selectedProvider = String(payload.selected_provider ?? "claude");
-  const selectedModel = String(payload.selected_model ?? "claude-opus-4.8");
+  const selectedModel = String(payload.selected_model ?? "claude-opus-5.0");
   const routingStrategy = String(payload.routing_strategy ?? "responsive");
   const intent =
     typeof payload.intent === "object" && payload.intent !== null ? (payload.intent as Record<string, unknown>) : {};
@@ -3356,7 +3356,7 @@ export function sessionBootstrapToPreview(payload: Record<string, unknown>): Tab
       : {};
   return {
     Intent: summarizeIntent(intent),
-    Route: `${String(payload.selected_provider ?? "claude")}:${String(payload.selected_model ?? "claude-opus-4.8")}`,
+    Route: `${String(payload.selected_provider ?? "claude")}:${String(payload.selected_model ?? "claude-opus-5.0")}`,
     Strategy: String(payload.routing_strategy ?? "responsive"),
     "Repo root": previewValue(workspacePreview, "Repo root"),
     Branch: previewValue(workspacePreview, "Branch"),

@@ -4,7 +4,7 @@ import {Box, Text, useApp, useInput, useStdin, useWindowSize} from "ink";
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {normalizeCommandOutcome} from "./commandOutcome.ts";
 import {activityRowCount} from "./components/ActivityPane.tsx";
-import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
+import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localAssistantExecutionEvent, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
   loadStoredState,
@@ -19,6 +19,7 @@ import {Composer} from "./components/Composer.tsx";
 import {buildControlPaneSections, buildRuntimePaneSections} from "./components/ControlPane.tsx";
 import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
 import {OnCallTruthBand} from "./components/OnCallTruthBand.tsx";
+import {modelPickerShortcutIndex} from "./components/ModelPicker.tsx";
 import {buildRepoPaneSections} from "./components/RepoPane.tsx";
 import {NavigatorRail} from "./components/NavigatorRail.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
@@ -28,23 +29,32 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
-import {closestCommand, tourLines, type UiIntent} from "./uiIntents.ts";
+import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
+import {
+  helmContextActionsForBridgeEvent,
+  helmContextProjectionLines,
+  helmContextRequestPayload,
+} from "./helmContext/appProjection.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {isPlainReturn, normalizeComposerInput} from "./inputPolicy.ts";
 import {ActiveFacet} from "./nihonga/ActiveFacet.tsx";
 import {NihongaCockpit} from "./nihonga/NihongaCockpit.tsx";
-import {projectWholeOrganism} from "./nihonga/organismView.ts";
 import {contextControlForLayout, contextualPlaneNeedsCompact, usesNihongaShell, viewportProfile} from "./nihonga/shellModel.ts";
 import {
   continuityStateFromSession,
   messagesForNextTurn,
   sessionResumeEligibility,
 } from "./sessionContinuity.ts";
-import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
+import {
+  focusModeFor,
+  paneActionChordDecision,
+  plainListDirection,
+  type PaneAction,
+} from "./shellControls.ts";
 import {
   SESSION_CATALOG_LIMIT,
   authoritativeResyncComplete,
@@ -115,7 +125,7 @@ import {
 import {initialState, reduceApp} from "./state.ts";
 import {unknownOnCallTruthState} from "./onCallTruth.ts";
 import {helmOnCallProjectionFromEvent} from "./protocol/onCallTruth.ts";
-import type {ActiveTurnState, AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+import type {ActiveTurnState, AppAction, AppState, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RuntimeSnapshotPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
 
 export {continuityStateFromSession} from "./sessionContinuity.ts";
 export {
@@ -159,7 +169,6 @@ export function decideTurnCancellation(activeTurn: ActiveTurnState): TurnCancell
 
 const shellControlOptions = {
   sessionCatalogLimit: SESSION_CATALOG_LIMIT,
-  approvalResolveAction,
 };
 
 function bridgeRouteState(state: AppState): {provider: string; model: string; strategy: string} {
@@ -839,23 +848,11 @@ function approvalPaneFromHistory(history: NonNullable<ReturnType<typeof permissi
   };
 }
 
-function approvalResolveAction(entry: ApprovalQueueEntry, resolution: CanonicalPermissionResolution["resolution"], label: string): PaneAction {
-  return {
-    label,
-    summary: `${resolution} ${entry.decision.action_id}`,
-    payload: {
-      action_type: "approval.resolve",
-      action_id: entry.decision.action_id,
-      resolution,
-      metadata: entry.decision.metadata,
-    },
-  };
-}
-
 type PendingBootstrap = {
   prompt: string;
   provider: string;
   model: string;
+  activeTabId: string;
   messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
   resumeSessionId?: string;
   cancelled?: boolean;
@@ -1490,21 +1487,29 @@ export function createBridgeEventHandler({
     const pendingCommand = streamedPendingCommand;
     const typed = enrichSparseCommandResultEvent(event as Record<string, unknown>, pendingCommand);
     const eventType = String(typed.type ?? "");
+    apply(helmContextActionsForBridgeEvent(typed, state.helmContext));
     if (eventType === "helm.on_call_projection") {
       const projection = helmOnCallProjectionFromEvent(typed);
       apply([projection ? {type: "onCall.projection.set", projection} : {type: "onCall.truth.reset"}]);
     }
-    const canonicalEvents = canonicalEventsFromBridgeEvent(typed);
+    const ackedRoute = state.activeTurn.phase === "idle" ? undefined : state.activeTurn.route;
+    const canonicalEvents = canonicalEventsFromBridgeEvent(
+      typed,
+      ackedRoute || `${state.routePolicy.provider}:${state.routePolicy.model}`,
+    );
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
     }
     if (eventType === "session.ack") {
       const requestId = String(typed.request_id ?? "");
       if (requestId) {
+        const ackProvider = String(typed.provider ?? "").trim();
+        const ackModel = String(typed.model ?? "").trim();
         apply([{
           type: "turn.ack",
           requestId,
           sessionId: String(typed.session_id ?? "") || undefined,
+          route: ackProvider && ackModel ? `${ackProvider}:${ackModel}` : undefined,
         }]);
       }
     }
@@ -1585,6 +1590,16 @@ export function createBridgeEventHandler({
         strategy: state.routePolicy.strategy,
       }, ...(policy
         ? [{type: "route.policy.set", policy} as const]
+        : []), ...(policy?.fallbackNotice && policy.fallbackNotice !== state.routePolicy.fallbackNotice
+        ? [{
+            type: "tab.append",
+            tabId: "chat",
+            lines: [{
+              id: `route-fallback-${Date.now()}`,
+              kind: "system",
+              text: policy.fallbackNotice.split(/\r?\n/, 1)[0] ?? "route fallback applied",
+            }],
+          } as AppAction]
         : [])]);
       malformedBridgeEvents = 0;
       reconnectRequested = false;
@@ -1596,7 +1611,16 @@ export function createBridgeEventHandler({
       if (awaitingAuthoritativeResync) {
         awaitingAuthoritativeResync = false;
         resyncPending = true;
-        requestAuthoritativeResync(bridge, provider, model, getState().routePolicy.strategy);
+        const contextRequestId = requestAuthoritativeResync(
+          bridge,
+          provider,
+          model,
+          getState().routePolicy.strategy,
+          helmContextRequestPayload(getState()),
+        );
+        if (contextRequestId) {
+          apply([{type: "helm.context.requested", requestId: contextRequestId}]);
+        }
         apply([{type: "status.set", value: authoritativeResyncStatus(state.authoritativeSurfaces)}]);
       }
     }
@@ -1974,6 +1998,20 @@ export function createBridgeEventHandler({
       const selectedProvider = String(typed.selected_provider ?? pending?.provider ?? state.routePolicy.provider);
       const selectedModel = String(typed.selected_model ?? pending?.model ?? state.routePolicy.model);
       const selectedStrategy = String(typed.routing_strategy ?? state.routePolicy.strategy ?? "responsive");
+      const bootstrapPolicy = routePolicyFromValue(typed.model_policy, state.routePolicy);
+      // The same standing fallback is announced once, not on every reconnect
+      // or bootstrap while it persists.
+      if (bootstrapPolicy.fallbackNotice && bootstrapPolicy.fallbackNotice !== state.routePolicy.fallbackNotice) {
+        dispatch({
+          type: "tab.append",
+          tabId: "chat",
+          lines: [{
+            id: `route-fallback-${Date.now()}`,
+            kind: "system",
+            text: bootstrapPolicy.fallbackNotice.split(/\r?\n/, 1)[0] ?? "route fallback applied",
+          }],
+        });
+      }
       dispatch({type: "bridge.config", provider: selectedProvider, model: selectedModel, strategy: selectedStrategy});
 
       // Ctrl-C can arrive before bootstrap returns. That is a real cancelled
@@ -2031,6 +2069,7 @@ export function createBridgeEventHandler({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
+            active_tab: String(typed.active_tab ?? pending.activeTabId),
             messages: pending.messages,
             resume_session_id: pending.resumeSessionId,
             bootstrap: typed,
@@ -2046,6 +2085,7 @@ export function createBridgeEventHandler({
             provider: selectedProvider,
             model: selectedModel,
             prompt: pending.prompt,
+            active_tab: String(typed.active_tab ?? pending.activeTabId),
             messages: pending.messages,
             resume_session_id: pending.resumeSessionId,
             bootstrap: typed,
@@ -2057,6 +2097,7 @@ export function createBridgeEventHandler({
           provider: selectedProvider,
           model: selectedModel,
           prompt: pending.prompt,
+          active_tab: String(typed.active_tab ?? pending.activeTabId),
           messages: pending.messages,
           resume_session_id: pending.resumeSessionId,
           bootstrap: typed,
@@ -2457,7 +2498,9 @@ export function App(): React.ReactElement {
   const railChatLines = displayedTranscriptLinesForTab(state.tabs.find((tab) => tab.id === "chat"), state);
   const railWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, paneWindowSize - 3);
   const outline = useMemo(() => outlineFromTabs(state.tabs), [state.tabs]);
-  const modelChoices = selectableRouteTargets(state.routePolicy);
+  const modelChoices = state.routePolicy.targets;
+  const usableNowCount = modelChoices.filter((choice) => choice.usableNow === true).length;
+  const usableLaneTotal = modelChoices.length;
   const displayedTranscriptLines = displayedTranscriptLinesForTab(activeTab, state);
   const transcriptMeta = transcriptMetaForTab(activeTab);
   // Display source of truth: name whichever model actually answered the latest
@@ -2540,12 +2583,16 @@ export function App(): React.ReactElement {
     requestHandshake("initial");
     const intervalId = setInterval(() => {
       if (stateRef.current.bridgeStatus === "connected") {
-        requestAuthoritativeResync(
+        const contextRequestId = requestAuthoritativeResync(
           bridge,
           stateRef.current.routePolicy.provider,
           stateRef.current.routePolicy.model,
           stateRef.current.routePolicy.strategy,
+          helmContextRequestPayload(stateRef.current),
         );
+        if (contextRequestId) {
+          dispatch({type: "helm.context.requested", requestId: contextRequestId});
+        }
       } else {
         requestHandshake("probe");
       }
@@ -2637,6 +2684,7 @@ export function App(): React.ReactElement {
           prompt: entry.prompt,
           provider: entry.provider,
           model: entry.model,
+          activeTabId: entry.activeTabId,
           messages: entry.messages,
           resumeSessionId,
         };
@@ -2720,11 +2768,7 @@ export function App(): React.ReactElement {
           type: "execution.events.ingest",
           events: [
             userPromptExecutionEvent(submitted),
-            ...canonicalEventsFromBridgeEvent({
-              type: "assistant",
-              request_id: `local-ui-${Date.now()}`,
-              message,
-            }),
+            localAssistantExecutionEvent(message),
             localCommandResultExecutionEvent(submitted, message.split("\n")[0] ?? message),
           ],
         },
@@ -2767,12 +2811,31 @@ export function App(): React.ReactElement {
       respond(`Requesting route -> ${intent.target.provider}:${intent.target.model}`);
       return;
     }
+    if (intent.kind === "model_ambiguous") {
+      const matches = intent.targets
+        .map((target) => `  ${target.provider}:${target.model}`)
+        .join("\n");
+      dispatch({
+        type: "modelPicker.open",
+        returnTabId: stateRef.current.uiMode.activeTabId,
+      });
+      respond(
+        `More than one route matches "${intent.query}":\n${matches}\nName the exact model or choose it in the picker.`,
+        null,
+      );
+      return;
+    }
     if (intent.kind === "model_unknown") {
       const menu = selectableRouteTargets(stateRef.current.routePolicy)
         .map((target) => `  ${target.provider}:${target.model}`)
         .join("\n");
+      dispatch({
+        type: "modelPicker.open",
+        returnTabId: stateRef.current.uiMode.activeTabId,
+      });
       respond(
         `No route matches "${intent.query}". Available right now:\n${menu || "  (none — backend offline)"}\nSay "switch to <one of these>" or /model for the picker.`,
+        null,
       );
       return;
     }
@@ -2968,12 +3031,27 @@ export function App(): React.ReactElement {
           events: [userPromptExecutionEvent(submitted), localCommandResultExecutionEvent(submitted, "route picker opened")],
         },
       ]);
-      bridge.send("model.policy", {
-        provider: stateRef.current.routePolicy.provider,
-        model: stateRef.current.routePolicy.model,
-        strategy: stateRef.current.routePolicy.strategy,
-      });
-      dispatch({type: "status.set", value: "route picker ready"});
+      if (stateRef.current.bridgeStatus === "connected") {
+        bridge.send("model.policy", {
+          provider: stateRef.current.routePolicy.provider,
+          model: stateRef.current.routePolicy.model,
+          strategy: stateRef.current.routePolicy.strategy,
+        });
+        dispatch({type: "status.set", value: "route picker ready"});
+      } else {
+        dispatch({type: "status.set", value: "route picker ready · offline policy cache"});
+      }
+      return;
+    }
+    const plainLanguageIntent = exactLocalInput && !exactSlashCommand
+      ? matchUiIntent(
+          rawPrompt,
+          stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title})),
+          selectableRouteTargets(stateRef.current.routePolicy),
+        )
+      : null;
+    if (plainLanguageIntent) {
+      runLocalUiAction(rawPrompt, plainLanguageIntent);
       return;
     }
     if (!exactSlashCommand && stateRef.current.activeTurn.phase !== "idle") {
@@ -3082,6 +3160,7 @@ export function App(): React.ReactElement {
         prompt: rawPrompt,
         provider: state.routePolicy.provider,
         model: state.routePolicy.model,
+        activeTabId: state.uiMode.activeTabId,
         messages,
         resumeSessionId,
       };
@@ -3100,14 +3179,6 @@ export function App(): React.ReactElement {
       return;
     }
     const currentState = stateRef.current;
-    const actionType = String(action.payload.action_type ?? "");
-    if (
-      actionType === "approval.resolve"
-      && (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.approvals)
-    ) {
-      dispatch({type: "status.set", value: "approval resolution held: fresh permission history required"});
-      return;
-    }
     if (
       action.requestType === "session.detail"
       && (currentState.bridgeStatus !== "connected" || !currentState.authoritativeSurfaces.sessions)
@@ -3132,7 +3203,7 @@ export function App(): React.ReactElement {
 
   function applyModelChoice(index: number): void {
     const currentState = stateRef.current;
-    const choices = selectableRouteTargets(currentState.routePolicy);
+    const choices = currentState.routePolicy.targets;
     const returnTabId = currentState.uiMode.activeOverlay.kind === "modelPicker"
       ? currentState.uiMode.activeOverlay.returnTabId
       : currentState.uiMode.activeTabId;
@@ -3142,19 +3213,40 @@ export function App(): React.ReactElement {
       dispatch({type: "status.set", value: "no model targets available"});
       return;
     }
+    if (choice.usableNow !== true) {
+      dispatch({
+        type: "status.set",
+        value: `route unavailable now -> ${choice.provider}:${choice.model}${choice.availabilityReason ? ` | ${choice.availabilityReason}` : ""}`,
+      });
+      return;
+    }
     queueAppActions(dispatch, [
       {type: "modelPicker.set", index: clampedIndex},
     ]);
-    bridge.send("action.run", {
-      action_type: "model.set",
-      provider: choice.provider,
-      model: choice.model,
-      strategy: stateRef.current.routePolicy.strategy,
-    });
+    if (currentState.bridgeStatus === "connected") {
+      bridge.send("action.run", {
+        action_type: "model.set",
+        provider: choice.provider,
+        model: choice.model,
+        strategy: stateRef.current.routePolicy.strategy,
+      });
+    } else {
+      dispatch({
+        type: "bridge.config",
+        provider: choice.provider,
+        model: choice.model,
+        strategy: currentState.routePolicy.strategy,
+      });
+    }
     queueAppActions(dispatch, [
       {type: "modelPicker.close"},
       {type: "tab.activate", tabId: returnTabId},
-      {type: "status.set", value: `requesting route -> ${choice.provider}:${choice.model}`},
+      {
+        type: "status.set",
+        value: currentState.bridgeStatus === "connected"
+          ? `requesting route -> ${choice.provider}:${choice.model}`
+          : `offline route preference -> ${choice.provider}:${choice.model} · unverified`,
+      },
     ]);
   }
 
@@ -3297,10 +3389,10 @@ export function App(): React.ReactElement {
         applyModelChoice(state.uiMode.activeOverlay.selectedIndex);
         return;
       }
-      if (/^[1-9]$/.test(input)) {
-        const numericIndex = Number.parseInt(input, 10) - 1;
-        if (numericIndex <= maxIndex) {
-          applyModelChoice(numericIndex);
+      const directIndex = modelPickerShortcutIndex(input);
+      if (directIndex !== undefined) {
+        if (directIndex <= maxIndex) {
+          applyModelChoice(directIndex);
         }
         return;
       }
@@ -3325,6 +3417,11 @@ export function App(): React.ReactElement {
       return;
     }
     if (state.uiMode.keyboardFocus === "composer") {
+      if (key.ctrl && input === "u") {
+        dispatch({type: "prompt.clear"});
+        dispatch({type: "status.set", value: "draft cleared"});
+        return;
+      }
       if (isPlainReturn(input, key.return)) {
         submitPrompt(state.prompt);
         return;
@@ -3377,16 +3474,9 @@ export function App(): React.ReactElement {
       }
     }
     if (activeTab?.kind === "approvals") {
-      if (input === "j") {
-        const nextActionId = stepApprovalSelection(stateRef.current, 1);
-        if (nextActionId) {
-          dispatch({type: "approval.select", actionId: nextActionId});
-          dispatch({type: "status.set", value: `approval -> ${nextActionId}`});
-        }
-        return;
-      }
-      if (input === "k") {
-        const nextActionId = stepApprovalSelection(stateRef.current, -1);
+      const direction = plainListDirection(input, key);
+      if (direction) {
+        const nextActionId = stepApprovalSelection(stateRef.current, direction);
         if (nextActionId) {
           dispatch({type: "approval.select", actionId: nextActionId});
           dispatch({type: "status.set", value: `approval -> ${nextActionId}`});
@@ -3464,24 +3554,19 @@ export function App(): React.ReactElement {
       }
       return;
     }
-    if (key.ctrl && input === "l") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).refresh);
+    const paneActionChord = paneActionChordDecision(
+      input,
+      key,
+      activeTab?.id ?? "chat",
+      state,
+      shellControlOptions,
+    );
+    if (paneActionChord.handled) {
+      runPaneAction(paneActionChord.action);
       return;
     }
     if (key.ctrl && input === "w" && activeTab?.closable) {
       dispatch({type: "tab.close", tabId: activeTab.id});
-      return;
-    }
-    if (key.ctrl && input === "x") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).primary);
-      return;
-    }
-    if (key.ctrl && input === "f") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).secondary);
-      return;
-    }
-    if (key.ctrl && input === "v") {
-      runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).tertiary);
       return;
     }
     // F-159: the shift+tab branch must run BEFORE the plain-tab branch —
@@ -3524,12 +3609,16 @@ export function App(): React.ReactElement {
         type: "modelPicker.open",
         returnTabId: state.uiMode.activeTabId,
       });
-      bridge.send("model.policy", {
-        provider: stateRef.current.routePolicy.provider,
-        model: stateRef.current.routePolicy.model,
-        strategy: stateRef.current.routePolicy.strategy,
-      });
-      dispatch({type: "status.set", value: "route picker ready"});
+      if (stateRef.current.bridgeStatus === "connected") {
+        bridge.send("model.policy", {
+          provider: stateRef.current.routePolicy.provider,
+          model: stateRef.current.routePolicy.model,
+          strategy: stateRef.current.routePolicy.strategy,
+        });
+        dispatch({type: "status.set", value: "route picker ready"});
+      } else {
+        dispatch({type: "status.set", value: "route picker ready · offline policy cache"});
+      }
       return;
     }
     if (key.ctrl && input === "k") {
@@ -3600,7 +3689,8 @@ export function App(): React.ReactElement {
   if (
     state.uiMode.layoutMode === "zen" &&
     activeTab?.kind === "chat" &&
-    state.uiMode.activeOverlay.kind === "none"
+    state.uiMode.activeOverlay.kind === "none" &&
+    viewportProfile(terminalWidth, terminalHeight) !== "resize-safe"
   ) {
     const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 9);
     // FACE-1 zen-pure: the status line carries only durable state (route +
@@ -3639,7 +3729,7 @@ export function App(): React.ReactElement {
           />
         </Box>
         <Box flexShrink={0} flexDirection="column" width={zenWidth}>
-          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} width={terminalWidth} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3662,7 +3752,8 @@ export function App(): React.ReactElement {
   if (
     state.uiMode.layoutMode === "scroll" &&
     activeTab?.kind === "chat" &&
-    state.uiMode.activeOverlay.kind === "none"
+    state.uiMode.activeOverlay.kind === "none" &&
+    viewportProfile(terminalWidth, terminalHeight) !== "resize-safe"
   ) {
     const scrollWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 9);
     // Manuscript measure: a touch under the zen clamp — the column is the
@@ -3680,6 +3771,7 @@ export function App(): React.ReactElement {
         <Box flexShrink={0} flexDirection="column" width={scrollMeasure}>
           <TranscriptPane
             frameless
+            bottomAnchor
             title="Chat"
             lines={manuscriptLines(displayedTranscriptLines, scrollMeasure)}
             scrollOffset={activeScrollOffset}
@@ -3687,7 +3779,7 @@ export function App(): React.ReactElement {
             emptyState={transcriptMeta.emptyState}
             accentColor={transcriptMeta.accentColor}
           />
-          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} width={scrollMeasure} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3763,13 +3855,7 @@ export function App(): React.ReactElement {
         transcriptSubtitle={chatMeta.subtitle}
         transcriptEmptyState={chatMeta.emptyState}
         transcriptAccentColor={chatMeta.accentColor}
-        regions={projectWholeOrganism({
-          bridgeStatus: state.bridgeStatus,
-          activeTurn: state.activeTurn,
-          routePolicy: state.routePolicy,
-          onCallTruth: state.onCallTruth,
-          authority: state.authoritativeSurfaces,
-        })}
+        ownerProjectionLines={helmContextProjectionLines(state.helmContext)}
         events={state.executionEventLog}
         prompt={state.prompt}
         composerFocused={state.uiMode.keyboardFocus === "composer"}
@@ -3800,7 +3886,7 @@ export function App(): React.ReactElement {
           compact={compactShell}
         />
         <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
-        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
+        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} width={terminalWidth} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
         <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
         {/* F-021: the 8-row wave renders only when the height budget affords it
             (>= 40 rows) and the chat is still quiet — once real turns arrive the
@@ -3919,6 +4005,7 @@ export function createInitialAppState(baseState: AppState): AppState {
   return {
     ...baseState,
     onCallTruth: unknownOnCallTruthState(),
+    helmContext: {},
     uiMode: {
       ...baseState.uiMode,
       sidebarVisible: restored?.sidebarVisible ?? baseState.uiMode.sidebarVisible,

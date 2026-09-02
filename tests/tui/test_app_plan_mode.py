@@ -529,13 +529,13 @@ def test_model_set_resets_provider_session_even_same_provider(monkeypatch) -> No
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_save_model_policy", lambda: None)
 
-    # Switch to a DIFFERENT claude model (sonnet-4.6) — same provider, real
+    # Switch to a DIFFERENT current Claude model — same provider, real
     # model switch — so the "resets session even on same provider" path fires.
-    # (The default active model is now the floor opus-4.8, also claude.)
-    app._handle_action("model:set sonnet-4.6", "model set sonnet-4.6")
+    # (The default active model is now floor Opus 5.0, also Claude.)
+    app._handle_action("model:set sonnet-5", "model set sonnet-5")
 
     assert app._active_provider == "claude"
-    assert app._active_model == "claude-sonnet-4.6"
+    assert app._active_model == "claude-sonnet-5"
     assert app._provider_session_id is None
 
 
@@ -614,10 +614,10 @@ def test_inline_switch_short_circuits_send(monkeypatch) -> None:
     sent: list[str] = []
     monkeypatch.setattr(app, "_dispatch_prompt", lambda text, **kwargs: sent.append(text))
 
-    handled = app._maybe_handle_inline_model_switch("please switch to opus 4.8")
+    handled = app._maybe_handle_inline_model_switch("please switch to opus 5")
     assert handled is True
     assert app._active_provider == "claude"
-    assert app._active_model == "claude-opus-4.8"
+    assert app._active_model == "claude-opus-5.0"
     assert sent == []
 
 

@@ -5,11 +5,19 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from dharma_swarm import model_status
+from dharma_swarm import key_oracle, model_status
 from dharma_swarm.terminal_bridge_external_preview import (
     explicit_external_preview_lane,
     external_preview_route,
     external_preview_targets,
+)
+from dharma_swarm.terminal_bridge_model_truth import (
+    external_preview_oracle_providers as _external_preview_oracle_providers,
+    fallback_notice as _fallback_notice,
+    identity_verified as _identity_verified,
+    preview_provider_dispatchable as _preview_provider_dispatchable,
+    strict_verified_identities as _strict_verified_identities,
+    target_hierarchy_rank as _target_hierarchy_rank,
 )
 from dharma_swarm.tui import model_routing
 
@@ -17,6 +25,7 @@ _SLICE1_CHAT_PROVIDER_IDS = frozenset(
     {"claude", "codex_text", "grok_oauth", "kimi_code", "ollama", "openrouter"}
 )
 _DEDICATED_PREVIEW_PROVIDER_IDS = frozenset({"codex_text", "grok_oauth", "kimi_code"})
+_CANONICAL_CHAT_PROVIDER_IDS = frozenset({"claude", "openrouter"})
 
 
 def _build_model_policy_summary(
@@ -31,7 +40,10 @@ def _build_model_policy_summary(
             status_by_model_id[route_status.model_id] = projected
 
     terminal_providers = bridge._available_provider_ids()
-    local_attempt_cache: dict[str, bool] = {}
+    dispatchable_providers = {
+        str(provider).strip().lower() for provider in key_oracle.dispatchable_cached()
+    }
+    strict_identities = _strict_verified_identities(bridge)
     seen_routes: set[tuple[str, str]] = set()
     targets: list[dict[str, Any]] = []
     for target in model_routing.all_targets():
@@ -41,7 +53,8 @@ def _build_model_policy_summary(
             continue
         seen_routes.add(route)
         projected = status_by_model_id.get(target.model_id)
-        provider_values = {provider.value for provider in target.pool_providers}
+        oracle_providers = [provider.value for provider in target.pool_providers]
+        provider_values = set(oracle_providers)
         route_statuses = (
             [
                 route_status
@@ -54,52 +67,28 @@ def _build_model_policy_summary(
         model_available = any(
             route_status.status == "live_routable" for route_status in route_statuses
         )
-        exact_model_proven = bool(
-            projected is not None
-            and getattr(projected.verification, "status", None) == "verified"
+        identity_verified = _identity_verified(
+            route_statuses=route_statuses,
+            oracle_providers=oracle_providers,
+            model_id=target.model_id,
+            strict_identities=strict_identities,
         )
         adapter_available = provider_id in terminal_providers
-        oracle_unverified = bool(route_statuses) and all(
-            route_status.status == "unverified"
-            and route_status.reason == "key_status_unknown"
-            for route_status in route_statuses
-        )
-        local_attempt_authorized = False
-        if adapter_available and oracle_unverified:
-            if provider_id not in local_attempt_cache:
-                local_attempt_cache[provider_id] = bridge._local_cli_attempt_authorized(
-                    provider_id
-                )
-            local_attempt_authorized = local_attempt_cache[provider_id]
-        chat_executable = provider_id in {"claude", "openrouter"}
-        selectable = (
-            adapter_available
-            and chat_executable
-            and (model_available or local_attempt_authorized)
-        )
-        if (
-            adapter_available
-            and not chat_executable
-            and (model_available or local_attempt_authorized)
-        ):
+        chat_executable = provider_id in _CANONICAL_CHAT_PROVIDER_IDS
+        oracle_usable = bool(provider_values & dispatchable_providers)
+        usable_now = adapter_available and chat_executable and oracle_usable
+        if adapter_available and not chat_executable:
             route_state = "unavailable"
             availability_reason = "terminal_chat_transport_unsupported"
-        elif model_available and adapter_available:
-            route_state = "ready" if exact_model_proven else "unverified"
-            availability_reason = None if exact_model_proven else "exact_model_unproven"
-        elif local_attempt_authorized:
-            route_state = "unverified"
-            availability_reason = "local_cli_auth_unverified"
-        elif model_available and not adapter_available:
+        elif not adapter_available:
             route_state = "unavailable"
             availability_reason = "terminal_adapter_missing"
-        else:
+        elif not oracle_usable:
             route_state = "unavailable"
-            availability_reason = (
-                getattr(projected, "unavailable_reason", None) or "no_live_route"
-                if projected is not None
-                else "model_status_missing"
-            )
+            availability_reason = "key_oracle_not_dispatchable"
+        else:
+            route_state = "ready" if identity_verified else "unverified"
+            availability_reason = None if identity_verified else "exact_model_unproven"
         targets.append(
             {
                 "alias": target.alias,
@@ -108,12 +97,15 @@ def _build_model_policy_summary(
                 "label": target.label,
                 "route_id": f"{provider_id}:{target.model_id}",
                 "route_state": route_state,
-                "picker_visible": selectable,
-                "selectable": selectable,
+                "picker_visible": True,
+                "selectable": usable_now,
+                "usable_now": usable_now,
+                "identity_verified": identity_verified,
                 "chat_executable": chat_executable,
-                "exact_model_proven": exact_model_proven,
+                "exact_model_proven": identity_verified,
                 "available": model_available,
                 "availability_reason": availability_reason,
+                "oracle_providers": oracle_providers,
                 "pool_id": getattr(projected, "id", None),
                 "tier": getattr(projected, "tier", "unknown"),
                 "lane": getattr(projected, "lane", "floor"),
@@ -123,7 +115,10 @@ def _build_model_policy_summary(
         )
 
     preview_model = bridge._local_preview_model()
-    preview_selectable = bool(preview_model and "ollama" in terminal_providers)
+    preview_transport = bool(preview_model and "ollama" in terminal_providers)
+    preview_selectable = bool(
+        preview_transport and {"local", "ollama"} & dispatchable_providers
+    )
     if preview_model:
         targets.append(
             {
@@ -132,28 +127,73 @@ def _build_model_policy_summary(
                 "model": preview_model,
                 "label": (f"{preview_model} (local preview; not a Helm OnCall seat)"),
                 "route_id": f"ollama:{preview_model}",
-                "route_state": "unverified",
-                "picker_visible": preview_selectable,
+                "route_state": "unverified" if preview_selectable else "unavailable",
+                "picker_visible": True,
                 "selectable": preview_selectable,
-                "chat_executable": preview_selectable,
+                "usable_now": preview_selectable,
+                "identity_verified": False,
+                "chat_executable": preview_transport,
                 "exact_model_proven": False,
                 "preview_only": True,
                 "helm_on_call_eligible": False,
-                "available": False,
+                "available": preview_selectable,
                 "availability_reason": (
                     "local_preview_exact_model_unproven"
                     if preview_selectable
-                    else "terminal_adapter_missing"
+                    else (
+                        "key_oracle_not_dispatchable"
+                        if preview_transport
+                        else "terminal_adapter_missing"
+                    )
                 ),
+                "oracle_providers": ["ollama", "local"],
                 "pool_id": None,
                 "tier": "preview",
                 "lane": "local_preview",
-                "status": "unverified",
+                "status": "unverified" if preview_selectable else "unavailable",
                 "available_routes": [],
             }
         )
 
     preview_targets = external_preview_targets(terminal_providers)
+    for target in preview_targets:
+        provider_id = str(target.get("provider", ""))
+        oracle_providers = _external_preview_oracle_providers(provider_id)
+        adapter_available = provider_id in terminal_providers
+        transport_available = bool(target.get("chat_executable"))
+        oracle_usable = bool(set(oracle_providers) & dispatchable_providers)
+        usable_now = adapter_available and transport_available and oracle_usable
+        identity_verified = _identity_verified(
+            route_statuses=[],
+            oracle_providers=oracle_providers,
+            model_id=str(target.get("model", "")),
+            strict_identities=strict_identities,
+        )
+        target.update(
+            {
+                "picker_visible": True,
+                "selectable": usable_now,
+                "usable_now": usable_now,
+                # The evaluator may independently verify this exact identity,
+                # but preview authority remains attempt-only and ineligible to
+                # mint or promote the evaluator's verdict.
+                "identity_verified": identity_verified,
+                "exact_model_proven": identity_verified,
+                "available": oracle_usable,
+                "oracle_providers": oracle_providers,
+                "route_state": "unverified" if usable_now else "unavailable",
+                "status": "unverified" if usable_now else "unavailable",
+                "availability_reason": (
+                    "exact_model_unproven"
+                    if usable_now
+                    else (
+                        "terminal_adapter_missing"
+                        if not adapter_available
+                        else "key_oracle_not_dispatchable"
+                    )
+                ),
+            }
+        )
     preview_route_ids = {str(target["route_id"]) for target in preview_targets}
     # A preview route can intentionally reuse a canonical provider/model
     # identity (Kimi K3 does).  Its narrower authority must win instead of
@@ -166,19 +206,32 @@ def _build_model_policy_summary(
     ]
     targets.extend(preview_targets)
 
+    configured_route = f"{selected_provider}:{selected_model}"
     selected_available = any(
         target["provider"] == selected_provider
         and target["model"] == selected_model
-        and bool(target.get("selectable"))
+        and bool(target.get("usable_now"))
         for target in targets
     )
-    if not selected_available and targets:
-        selectable_targets = [
-            target for target in targets if bool(target.get("selectable"))
-        ]
-        fallback_target = selectable_targets[0] if selectable_targets else targets[0]
-        selected_provider = str(fallback_target["provider"])
-        selected_model = str(fallback_target["model"])
+    usable_targets = sorted(
+        (target for target in targets if bool(target.get("usable_now"))),
+        key=lambda target: _target_hierarchy_rank(target, strategy),
+    )
+    fallback_notice: dict[str, Any] | None = None
+    if not selected_available:
+        fallback_target = usable_targets[0] if usable_targets else None
+        if fallback_target is not None:
+            selected_provider = str(fallback_target["provider"])
+            selected_model = str(fallback_target["model"])
+            fallback_notice = _fallback_notice(
+                configured_route=configured_route,
+                selected_route=f"{selected_provider}:{selected_model}",
+            )
+        else:
+            fallback_notice = _fallback_notice(
+                configured_route=configured_route,
+                selected_route=None,
+            )
 
     active_target = next(
         (
@@ -203,25 +256,40 @@ def _build_model_policy_summary(
                 "route_state": str(target["route_state"]),
                 "availability_reason": target.get("availability_reason"),
             }
-            for target in targets
+            for target in usable_targets
             if not (
                 target["provider"] == selected_provider
                 and target["model"] == selected_model
             )
-            and bool(target.get("selectable"))
         ][:6]
     )
     provider_counts: dict[str, int] = {}
     attemptable_provider_counts: dict[str, int] = {}
     for target in targets:
         provider = str(target["provider"])
-        if bool(target.get("available")):
+        if bool(target.get("usable_now")):
             provider_counts[provider] = provider_counts.get(provider, 0) + 1
-        if bool(target.get("selectable")):
+        if bool(target.get("usable_now")):
             attemptable_provider_counts[provider] = (
                 attemptable_provider_counts.get(provider, 0) + 1
             )
     default_provider, default_model = bridge._terminal_default_route()
+    configured_default_route = f"{default_provider}:{default_model}"
+    default_target = next(
+        (
+            target
+            for target in targets
+            if target["provider"] == default_provider
+            and target["model"] == default_model
+            and bool(target.get("usable_now"))
+        ),
+        None,
+    )
+    if default_target is None and usable_targets:
+        default_target = usable_targets[0]
+    if default_target is not None:
+        default_provider = str(default_target["provider"])
+        default_model = str(default_target["model"])
     return {
         "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
         "oracle_state": projection.oracle_state,
@@ -229,9 +297,12 @@ def _build_model_policy_summary(
         "selected_provider": selected_provider,
         "selected_model": selected_model,
         "selected_route": f"{selected_provider}:{selected_model}",
+        "configured_route": configured_route,
+        "fallback_notice": fallback_notice,
         "strategy": strategy,
         "strategies": list(model_routing.ROUTING_STRATEGIES),
         "default_route": f"{default_provider}:{default_model}",
+        "configured_default_route": configured_default_route,
         "active_label": str(active_target["label"])
         if active_target
         else selected_model,
@@ -260,6 +331,7 @@ def _chat_lanes(
             preview_model
             and requested_model == preview_model
             and "ollama" in bridge._adapters
+            and {"local", "ollama"} & key_oracle.dispatchable_cached()
         ):
             return [
                 (
@@ -275,6 +347,8 @@ def _chat_lanes(
 
     preview_route = external_preview_route(requested_provider, requested_model)
     if preview_route is not None:
+        if not _preview_provider_dispatchable(requested_provider):
+            return []
         explicit_lane = explicit_external_preview_lane(
             requested_provider,
             requested_model,
@@ -354,7 +428,8 @@ def _is_enabled_external_preview_route(
     model_id: str,
 ) -> bool:
     return (
-        explicit_external_preview_lane(
+        _preview_provider_dispatchable(provider_id)
+        and explicit_external_preview_lane(
             provider_id,
             model_id,
             bridge._adapters,

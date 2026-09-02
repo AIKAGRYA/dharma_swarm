@@ -1,5 +1,16 @@
-import {spawn, type ChildProcess} from "node:child_process";
-import {existsSync} from "node:fs";
+import {execFileSync, spawn, type ChildProcess} from "node:child_process";
+import {
+  constants as fsConstants,
+  closeSync,
+  createWriteStream,
+  existsSync,
+  fchmodSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  type WriteStream,
+} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {createInterface} from "node:readline";
 import {fileURLToPath} from "node:url";
@@ -8,27 +19,132 @@ import {BridgeBackgroundScheduler, type BridgeRequest} from "./bridgeScheduler.t
 
 export type BridgeEvent = Record<string, unknown>;
 export type BridgeProcessFactory = () => ChildProcess;
+export type GitCommonDirResolver = (repoRoot: string) => string | undefined;
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 
+const DEFAULT_BRIDGE_STDERR_DIR = path.join(os.homedir(), ".dharma", "terminal_supervisor");
+const STDERR_TAIL_LIMIT = 4_096;
+
+export function bridgeStderrLogPath(env: NodeJS.ProcessEnv = process.env): string {
+  const stateDir = env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR?.trim()
+    || env.DHARMA_TERMINAL_STATE_DIR?.trim()
+    || env.DHARMA_TERMINAL_TUI_STATE_DIR?.trim()
+    || DEFAULT_BRIDGE_STDERR_DIR;
+  return path.join(path.resolve(stateDir), "bridge.stderr.log");
+}
+
+function openBridgeStderrLog(logPath: string | undefined): WriteStream | undefined {
+  if (!logPath) {
+    return undefined;
+  }
+  try {
+    mkdirSync(path.dirname(logPath), {recursive: true, mode: 0o700});
+    if (existsSync(logPath)) {
+      const current = lstatSync(logPath);
+      if (current.isSymbolicLink() || !current.isFile()) {
+        return undefined;
+      }
+    }
+    const fd = openSync(
+      logPath,
+      fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_WRONLY | fsConstants.O_NOFOLLOW,
+      0o600,
+    );
+    fchmodSync(fd, 0o600);
+    let stream: WriteStream;
+    try {
+      stream = createWriteStream(logPath, {fd, autoClose: true});
+    } catch (error) {
+      closeSync(fd);
+      throw error;
+    }
+    stream.on("error", () => {
+      // An unavailable diagnostic path is not application truth and never
+      // becomes an alternate-screen event.
+    });
+    return stream;
+  } catch {
+    return undefined;
+  }
+}
+
+type StderrRoute = {release: () => void; tail: () => string};
+
+function routeBridgeStderr(child: ChildProcess, env: NodeJS.ProcessEnv = process.env): StderrRoute {
+  if (!child.stderr) {
+    return {release: () => {}, tail: () => ""};
+  }
+  const stderr = child.stderr;
+  const log = openBridgeStderrLog(bridgeStderrLogPath(env));
+  let released = false;
+  let tail = "";
+  const onData = (chunk: Buffer | string): void => {
+    if (log && !log.destroyed) {
+      log.write(chunk);
+    }
+    tail = (tail + chunk.toString()).slice(-STDERR_TAIL_LIMIT);
+  };
+  const onError = (): void => {
+    // The transport lifecycle reports stdout/stdin failures. Stderr is an
+    // append-only diagnostic lane and intentionally has no UI projection.
+  };
+  stderr.on("data", onData);
+  stderr.on("error", onError);
+  const release = (): void => {
+    if (released) {
+      return;
+    }
+    released = true;
+    stderr.off("data", onData);
+    stderr.off("error", onError);
+    if (log && !log.destroyed) {
+      log.end();
+    }
+  };
+  return {release, tail: () => tail.trim()};
+}
+
+function resolveGitCommonDir(repoRoot: string): string | undefined {
+  try {
+    const commonDir = execFileSync(
+      "git",
+      ["-C", repoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      // Bounded: a hung mount must degrade to the next candidate, never block
+      // the bridge spawn (and with it the whole UI) indefinitely.
+      {encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1_500},
+    ).trim();
+    return commonDir || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolvePython(
   env: NodeJS.ProcessEnv = process.env,
   repoRoot = REPO_ROOT,
   pathExists: (candidate: string) => boolean = existsSync,
+  gitCommonDir: GitCommonDirResolver = resolveGitCommonDir,
 ): string {
   const configured = env.DHARMA_PYTHON?.trim();
   if (configured) {
     return configured;
   }
 
+  const commonDir = gitCommonDir(repoRoot);
+  const canonicalCheckout = commonDir && path.basename(commonDir) === ".git"
+    ? path.dirname(commonDir)
+    : "";
   const candidates = [
     path.join(repoRoot, ".venv", "bin", "python"),
     env.VIRTUAL_ENV?.trim() ? path.join(env.VIRTUAL_ENV.trim(), "bin", "python") : "",
+    canonicalCheckout ? path.join(canonicalCheckout, ".venv", "bin", "python") : "",
     // Worktrees intentionally do not duplicate the large Python environment.
     // Fall back to the canonical checkout's venv when Helm runs from a sibling
-    // worktree such as dharma_helm_build.
+    // worktree such as dharma_helm_build. Git's common directory handles the
+    // repository's nested ~/worktrees/<repo>/<stem>_YYYYMMDD estate layout.
     path.join(path.dirname(repoRoot), "dharma_swarm", ".venv", "bin", "python"),
   ];
   for (const candidate of candidates) {
@@ -45,6 +161,7 @@ export class DharmaBridge {
   private nextId = 1;
   private alive = false;
   private closed = false;
+  private stderrCleanup?: () => void;
   private readonly onEvent: (event: BridgeEvent) => void;
   private readonly processFactory: BridgeProcessFactory;
   private readonly backgroundScheduler = new BridgeBackgroundScheduler();
@@ -54,7 +171,7 @@ export class DharmaBridge {
     this.processFactory = processFactory ?? (() => spawn(resolvePython(), ["-m", "dharma_swarm.terminal_bridge", "stdio"], {
       cwd: REPO_ROOT,
       env: process.env,
-      stdio: ["pipe", "pipe", "inherit"],
+      stdio: ["pipe", "pipe", "pipe"],
     }));
     this.child = this.spawnChild();
   }
@@ -62,8 +179,13 @@ export class DharmaBridge {
   private spawnChild(): ChildProcess {
     const child = this.processFactory();
     this.alive = true;
+    const stderrRoute = routeBridgeStderr(child);
+    const releaseStderr = stderrRoute.release;
+    this.stderrCleanup = releaseStderr;
 
     if (!child.stdout || !child.stdin) {
+      releaseStderr();
+      this.stderrCleanup = undefined;
       throw new Error("bridge child process streams are unavailable");
     }
 
@@ -91,15 +213,24 @@ export class DharmaBridge {
       }
     });
     child.on("exit", (code, signal) => {
+      releaseStderr();
+      if (this.stderrCleanup === releaseStderr) {
+        this.stderrCleanup = undefined;
+      }
       if (this.closed || child !== this.child || !this.alive) {
         return;
       }
       this.alive = false;
       this.backgroundScheduler.reset();
+      // A crashed bridge's last stderr lines are the only trace of an import
+      // or startup failure; surface them on the exit event instead of losing
+      // them when no log path is writable.
+      const stderrTail = code !== 0 ? stderrRoute.tail().split("\n").slice(-8).join("\n") : "";
       this.onEvent({
         type: "bridge.error",
         code: "bridge_exit",
-        message: `bridge exited (${code ?? "null"}${signal ? `, ${signal}` : ""})`,
+        message: `bridge exited (${code ?? "null"}${signal ? `, ${signal}` : ""})${stderrTail ? `\n${stderrTail}` : ""}`,
+        ...(stderrTail ? {stderr_tail: stderrTail} : {}),
       });
     });
     child.on("error", (error) => {
@@ -160,6 +291,8 @@ export class DharmaBridge {
     }
     this.alive = false;
     this.backgroundScheduler.reset();
+    this.stderrCleanup?.();
+    this.stderrCleanup = undefined;
     if (!child.killed) {
       child.kill("SIGTERM");
     }
@@ -193,6 +326,8 @@ export class DharmaBridge {
     this.closed = true;
     this.alive = false;
     this.backgroundScheduler.reset();
+    this.stderrCleanup?.();
+    this.stderrCleanup = undefined;
     if (!this.child.killed) {
       this.child.kill("SIGTERM");
     }

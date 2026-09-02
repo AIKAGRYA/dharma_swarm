@@ -17,12 +17,13 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
+import time
 import uuid
 from typing import Any
 from dharma_swarm.terminal_bridge_text import (
+    policy_target_for_key,
     render_working_memory,
     render_git_summary_lines,
     render_command_graph_text,
@@ -44,8 +45,6 @@ from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.operator_core import (
     build_permission_history_payload,
     build_permission_decision_payload,
-    build_permission_outcome_payload,
-    build_permission_resolution_payload,
     build_agent_routes_payload,
     build_routing_decision_payload,
     build_runtime_snapshot_payload,
@@ -53,7 +52,7 @@ from dharma_swarm.operator_core import (
 )
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
 from dharma_swarm import model_status
-from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
+from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, RuntimeStateStore
 from dharma_swarm.tui import model_routing
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module
@@ -66,6 +65,7 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_bridge_chat import TerminalBridgeChatMixin
+from dharma_swarm.terminal_bridge_chat_context import TerminalBridgeChatContextMixin
 from dharma_swarm.terminal_bridge_external_preview import (
     GPT_5_6_SOL_MODEL_ID,
     KIMI_K3_MODEL_ID,
@@ -91,6 +91,8 @@ from dharma_swarm.tui.engine.events import (
 )
 
 _HELM_LOCAL_PREVIEW_MODEL_ENV = "DHARMA_HELM_LOCAL_PREVIEW_MODEL"
+_MAX_PENDING_SESSION_BOOTSTRAPS = 32
+_SESSION_BOOTSTRAP_TTL_SECONDS = 5 * 60
 
 
 def _json_default(value: object) -> object:
@@ -105,6 +107,7 @@ class TerminalBridge(
     TerminalBridgeSessionRuntimeMixin,
     TerminalBridgeRouteTruthMixin,
     TerminalBridgeChatMixin,
+    TerminalBridgeChatContextMixin,
     TerminalBridgeHelmContextMixin,
 ):
     """Minimal stdio protocol server for a terminal frontend."""
@@ -140,6 +143,10 @@ class TerminalBridge(
         )
         self._session_recovery_complete = False
         self._session_store = session_store if session_store is not None else SessionStore()
+        self._server_owned_session_bootstraps: dict[
+            str,
+            tuple[float, dict[str, Any]],
+        ] = {}
         self._initialize_helm_context(helm_context_sources=helm_context_sources)
         self._chat_history: list[dict[str, str]] = []
         self._ensure_adapters()
@@ -343,45 +350,6 @@ class TerminalBridge(
             in {"claude", "codex_text", "grok_oauth", "kimi_code", "openrouter"}
             and self._adapters.get(provider_id) is adapter
         )
-
-    def _local_cli_attempt_authorized(self, provider_id: str) -> bool:
-        """Whether an unverified local CLI lane may be attempted.
-
-        This is deliberately weaker than model availability. It grants only
-        execution authority while the canonical key oracle is unknown; the
-        route remains ``unverified`` until a real provider event succeeds.
-        Keyed HTTP adapters never receive this exception.
-        """
-
-        adapter = self._adapters.get(provider_id)
-        if adapter is None or provider_id not in {"claude", "codex"}:
-            return False
-        cli_path = str(getattr(adapter, "_cli_path", provider_id) or provider_id)
-        binary = shutil.which(cli_path)
-        if binary is None:
-            return False
-
-        if provider_id == "claude":
-            # Claude auth presence is insufficient: a logged-in Max client can
-            # still fail every headless request. Reuse the smoke-proven oracle.
-            from dharma_swarm import key_oracle
-
-            return key_oracle.is_provider_live("claude_code") is True
-
-        try:
-            result = subprocess.run(
-                [binary, "login", "status"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                stdin=subprocess.DEVNULL,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return False
-        # A successful local OAuth-status command permits an attempt, not a
-        # liveness claim. The first actual completion is still the proof.
-        return result.returncode == 0
 
     async def close(self) -> None:
         if self._closing:
@@ -749,32 +717,6 @@ class TerminalBridge(
                     "message": f"✖ {result.get('summary', 'route change failed')}. {result.get('output', '')}".strip(),
                 }
             )
-        if action_type == "approval.resolve" and isinstance(result.get("payload"), dict):
-            runtime_enforcement = await self._record_runtime_approval_resolution(result["payload"])
-            result["payload"]["enforcement_state"] = runtime_enforcement["enforcement_state"]
-            metadata = result["payload"].get("metadata")
-            if isinstance(metadata, dict):
-                if runtime_enforcement.get("runtime_action_id"):
-                    metadata["runtime_action_id"] = runtime_enforcement["runtime_action_id"]
-                if runtime_enforcement.get("runtime_event_id"):
-                    metadata["runtime_event_id"] = runtime_enforcement["runtime_event_id"]
-            outcome_payload = build_permission_outcome_payload(
-                action_id=str(result["payload"].get("action_id", "") or ""),
-                outcome=str(runtime_enforcement.get("outcome") or runtime_enforcement["enforcement_state"]),
-                metadata=metadata if isinstance(metadata, dict) else {},
-            )
-            self._record_permission_payload(result["payload"])
-            self._record_permission_payload(outcome_payload)
-            self._emit_payload_result(
-                "permission.resolution",
-                request_id=request_id,
-                payload=result["payload"],
-            )
-            self._emit_payload_result(
-                "permission.outcome",
-                request_id=request_id,
-                payload=outcome_payload,
-            )
         result.update(
             {
                 "type": "action.result",
@@ -783,66 +725,6 @@ class TerminalBridge(
             }
         )
         self._emit(result)
-
-    async def _record_runtime_approval_resolution(self, payload: dict[str, Any]) -> dict[str, Any]:
-        metadata = payload.get("metadata")
-        metadata_record = metadata if isinstance(metadata, dict) else {}
-        action_id = str(payload.get("action_id", "") or "").strip()
-        resolution = str(payload.get("resolution", "") or "").strip().lower()
-        if not action_id:
-            return {"enforcement_state": "recorded_only"}
-        try:
-            runtime_state = RuntimeStateStore(db_path=DEFAULT_RUNTIME_DB)
-            action = await runtime_state.record_operator_action(
-                OperatorAction(
-                    action_id=f"approval_{action_id}",
-                    action_name="approval.resolve",
-                    actor=str(payload.get("actor", "") or "operator"),
-                    session_id=str(metadata_record.get("session_id", "") or ""),
-                    task_id=str(metadata_record.get("task_id", "") or ""),
-                    run_id=str(metadata_record.get("run_id", "") or ""),
-                    reason=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    payload=dict(payload),
-                )
-            )
-            runtime_outcome = self._classify_runtime_approval_outcome(resolution)
-            runtime_event = await runtime_state.record_session_event(
-                SessionEventRecord(
-                    event_id=f"evt_{uuid.uuid4().hex[:16]}",
-                    session_id=str(metadata_record.get("session_id", "") or ""),
-                    ledger_kind="operator_control",
-                    event_name=f"approval.resolve.{runtime_outcome}",
-                    task_id=str(metadata_record.get("task_id", "") or ""),
-                    run_id=str(metadata_record.get("run_id", "") or ""),
-                    agent_id=str(payload.get("actor", "") or "operator"),
-                    summary=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    event_text=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    payload={
-                        "action_id": action_id,
-                        "resolution": resolution,
-                        "enforcement_state": "runtime_recorded",
-                        "runtime_action_id": action.action_id,
-                        "outcome": runtime_outcome,
-                    },
-                )
-            )
-            return {
-                "enforcement_state": "runtime_recorded",
-                "outcome": runtime_outcome,
-                "runtime_action_id": action.action_id,
-                "runtime_event_id": runtime_event.event_id,
-            }
-        except Exception:
-            return {"enforcement_state": "recorded_only", "outcome": "runtime_record_failed"}
-
-    @staticmethod
-    def _classify_runtime_approval_outcome(resolution: str) -> str:
-        normalized = str(resolution or "").strip().lower()
-        if normalized in {"approved", "resolved"}:
-            return "runtime_applied"
-        if normalized in {"denied", "dismissed"}:
-            return "runtime_rejected"
-        return "runtime_recorded"
 
     async def _handle_intent_resolve(self, request_id: str, request: dict[str, Any]) -> None:
         prompt, error_code, error_message = self._validated_request_prompt(request)
@@ -949,13 +831,71 @@ class TerminalBridge(
             )
             return
         payload = await asyncio.to_thread(self._build_session_bootstrap, request)
-        payload.update(
+        self._cache_server_owned_session_bootstrap(request_id, payload)
+        wire_payload = dict(payload)
+        wire_payload.update(
             {
                 "type": "session.bootstrap.result",
                 "request_id": request_id,
             }
         )
-        self._emit(payload)
+        self._emit(wire_payload)
+
+    def _cache_server_owned_session_bootstrap(
+        self,
+        request_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Retain one bounded, process-local bootstrap for later admission.
+
+        The wire payload is only a projection. The cache is the provenance
+        boundary that lets ``session.start`` distinguish the payload built by
+        this bridge process from caller-authored lookalikes.
+        """
+
+        if not request_id:
+            return
+        self._server_owned_session_bootstraps.pop(request_id, None)
+        self._server_owned_session_bootstraps[request_id] = (
+            time.monotonic(),
+            dict(payload),
+        )
+        while len(self._server_owned_session_bootstraps) > _MAX_PENDING_SESSION_BOOTSTRAPS:
+            oldest_request_id = next(iter(self._server_owned_session_bootstraps))
+            self._server_owned_session_bootstraps.pop(oldest_request_id, None)
+
+    def _consume_server_owned_session_bootstrap(
+        self,
+        request_id: str,
+        *,
+        prompt: str,
+        provider_id: str,
+        model_id: str,
+    ) -> tuple[dict[str, Any] | None, str]:
+        """Consume once and return a bounded admission disposition."""
+
+        if not request_id:
+            return None, "missing_request_id"
+        cached = self._server_owned_session_bootstraps.pop(request_id, None)
+        if cached is None:
+            return None, "cache_miss"
+        cached_at, payload = cached
+        cache_age = time.monotonic() - cached_at
+        if cache_age < 0 or cache_age >= _SESSION_BOOTSTRAP_TTL_SECONDS:
+            return None, "expired"
+        cached_prompt = payload.get("prompt")
+        cached_provider = str(payload.get("selected_provider", "") or "").strip().lower()
+        cached_model = str(payload.get("selected_model", "") or "").strip()
+        cached_system_prompt = payload.get("system_prompt")
+        if not isinstance(cached_prompt, str) or cached_prompt != prompt:
+            return None, "prompt_mismatch"
+        if cached_provider != provider_id:
+            return None, "provider_mismatch"
+        if cached_model != model_id:
+            return None, "model_mismatch"
+        if not isinstance(cached_system_prompt, str) or not cached_system_prompt.strip():
+            return None, "invalid_server_bootstrap"
+        return payload, "matched"
 
     def _navigator_manifest(self) -> str:
         # The agent drives the Helm by emitting directives in its reply. The TS
@@ -1120,6 +1060,16 @@ class TerminalBridge(
             task.cancel()
         if task is not None and task is not asyncio.current_task():
             await asyncio.gather(task, return_exceptions=True)
+        # A task cancelled before its coroutine executes never enters
+        # _run_active_session's exception/finally blocks.  The lifecycle row
+        # already exists at that point, so finalize and clear it here as an
+        # idempotent backstop.  No ContextReceipt is minted: no provider lane
+        # reached construction or attempted a context boundary.
+        if not run.terminal_emitted:
+            self._emit_cancelled_terminal(run)
+        run.phase = "complete"
+        self._remember_completed_session_request(run.request_id)
+        self._clear_active_run(run)
         return provider_cancel_error
 
     def _set_active_run(self, run: _ActiveSessionRun) -> None:
@@ -1182,6 +1132,11 @@ class TerminalBridge(
             )
             terminal = run.lifecycle.terminal_event
         if terminal is not None and not run.terminal_emitted:
+            auto_context_receipt = (
+                run.lifecycle.take_auto_context_receipt_for_emission()
+            )
+            if auto_context_receipt is not None:
+                self._emit_recorded_session_event(run, auto_context_receipt)
             self._mark_terminal_emitted(run)
             self._emit(
                 {
@@ -1612,25 +1567,58 @@ class TerminalBridge(
             normalized = "\n".join([normalized.rstrip(), "", "--- Terminal Control ---", *terminal_lines])
         return normalized
 
+    def _resolve_session_route(
+        self,
+        request: dict[str, Any],
+        intent: dict[str, Any],
+    ) -> tuple[str, str, str, dict[str, Any]]:
+        """Resolve one canonical route for both bootstrap build and admission.
+
+        Bootstrap caching and session admission must derive identical
+        provider/model identities from the same request fields, or the
+        one-shot bootstrap handoff misses on route mismatch.
+        """
+
+        default_provider, default_model = self._terminal_default_route()
+        provider_id = str(
+            request.get("provider", "") or default_provider
+        ).strip().lower()
+        model_id = str(request.get("model", "") or "").strip()
+        strategy = model_routing.resolve_strategy(
+            str(request.get("strategy", "") or "")
+        )
+        explicit_model = bool(model_id)
+        if not model_id:
+            provider_id = provider_id or default_provider
+            model_id = default_model
+        elif not provider_id:
+            provider_id = default_provider
+        model_policy = self._build_model_policy_summary(
+            selected_provider=provider_id,
+            selected_model=model_id,
+            strategy=strategy or "responsive",
+        )
+        if not explicit_model:
+            provider_id = str(model_policy.get("selected_provider", provider_id))
+            model_id = str(model_policy.get("selected_model", model_id))
+        if str(intent.get("kind", "chat")) == "chat":
+            lanes = self._chat_lanes(provider_id, model_id)
+            if lanes:
+                provider_id, model_id, _, _ = lanes[0]
+        return provider_id, model_id, strategy, model_policy
+
     def _build_session_bootstrap(self, request: dict[str, Any]) -> dict[str, Any]:
         prompt, error_code, error_message = self._validated_request_prompt(request)
         if prompt is None:
             raise ValueError(f"{error_code}: {error_message}")
-        active_tab = str(request.get("active_tab", "") or "chat")
-        default_provider, default_model = self._terminal_default_route()
-        selected_provider = str(
-            request.get("provider", "") or default_provider
-        ).strip().lower()
-        selected_model = str(request.get("model", "") or "").strip()
+        active_tab = self._canonical_active_tab(request.get("active_tab"))
         intent = self._resolve_prompt_intent(prompt)
-        explicit_strategy = model_routing.resolve_strategy(
-            str(request.get("strategy", "") or "")
-        )
-        if not selected_model:
-            selected_provider = selected_provider or default_provider
-            selected_model = default_model
-        elif not selected_provider:
-            selected_provider = default_provider
+        (
+            selected_provider,
+            selected_model,
+            explicit_strategy,
+            model_policy,
+        ) = self._resolve_session_route(request, intent)
 
         workspace_snapshot = self._build_workspace_snapshot()
         ontology_snapshot = self._build_ontology_snapshot()
@@ -1641,13 +1629,6 @@ class TerminalBridge(
         workspace_preview = self._build_workspace_preview(workspace_snapshot)
         runtime_preview = self._build_runtime_preview(runtime_snapshot)
         command_graph = self._build_command_graph_summary()
-        model_policy = self._build_model_policy_summary(
-            selected_provider=selected_provider,
-            selected_model=selected_model,
-            strategy=explicit_strategy or "responsive",
-        )
-        selected_provider = str(model_policy.get("selected_provider", selected_provider))
-        selected_model = str(model_policy.get("selected_model", selected_model))
         orientation_packet = build_orientation_packet(
             role="operator",
             claims=[],
@@ -2214,20 +2195,33 @@ class TerminalBridge(
             )
         if mode == "set":
             target = model_routing.resolve_model_target(arg)
-            if target is None and arg.isdigit():
-                target = model_routing.target_by_index(int(arg))
-            if target is None:
-                return f"Unknown model target: {arg or 'missing'}"
-            if not model_routing.is_routable(target):
-                return (
-                    f"Model '{target.alias}' is unroutable "
-                    f"(no live key for {target.provider_id}). "
-                    "Run `dkeys test` or pick a live model with /model list."
+            if target is not None:
+                selected_provider, selected_model = target.provider_id, target.model_id
+                if not model_routing.is_routable(target):
+                    return (
+                        f"Model '{target.alias}' is unroutable "
+                        f"(no live key for {target.provider_id}). "
+                        "Run `dkeys test` or pick a live model with /model list."
+                    )
+            else:
+                # Keys are the positions `/model list` printed, so they must
+                # resolve against the same policy ordering, not the raw registry.
+                keyed = policy_target_for_key(
+                    self._build_model_policy_summary(
+                        selected_provider=current_provider,
+                        selected_model=current_model,
+                        strategy="responsive",
+                    ),
+                    arg,
                 )
+                if keyed is None:
+                    return f"Unknown model target: {arg or 'missing'}"
+                selected_provider = str(keyed.get("provider", ""))
+                selected_model = str(keyed.get("model", ""))
             return self._render_model_policy_text(
                 self._build_model_policy_summary(
-                    selected_provider=target.provider_id,
-                    selected_model=target.model_id,
+                    selected_provider=selected_provider,
+                    selected_model=selected_model,
                     strategy="responsive",
                 )
             )
@@ -2414,7 +2408,23 @@ class TerminalBridge(
                     "output": f"Route change to {requested_route} failed: {type(exc).__name__}: {exc}",
                     "requested_route": requested_route,
                 }
-            if str(policy.get("selected_route", "")) != requested_route:
+            requested_target = next(
+                (
+                    item
+                    for item in policy.get("targets", [])
+                    if isinstance(item, dict)
+                    and str(item.get("route_id", "")) == requested_route
+                ),
+                None,
+            )
+            requested_is_usable = bool(
+                requested_target is not None
+                and requested_target.get("usable_now") is True
+            )
+            if (
+                str(policy.get("selected_route", "")) != requested_route
+                or not requested_is_usable
+            ):
                 # The policy builder silently rewrites unavailable routes to a
                 # fallback; surfacing that as success is the silent
                 # route-switch failure the operator hit. Refuse honestly.
@@ -2552,48 +2562,17 @@ class TerminalBridge(
                     "summary": f"failed /{raw_command or '<empty>'}",
                 }
         if action_type == "approval.resolve":
-            action_id = str(request.get("action_id", "") or "").strip()
-            resolution = str(request.get("resolution", "") or "").strip().lower()
-            if not action_id:
-                return {
-                    "ok": False,
-                    "summary": "approval resolution missing action id",
-                    "target_pane": "approvals",
-                    "output": "Approval resolution requires an action_id.",
-                }
-            if resolution not in {"approved", "denied", "dismissed", "resolved"}:
-                return {
-                    "ok": False,
-                    "summary": f"approval resolution invalid for {action_id}",
-                    "target_pane": "approvals",
-                    "output": f"Unsupported approval resolution: {resolution or 'missing'}.",
-                }
-            metadata = request.get("metadata")
-            payload = build_permission_resolution_payload(
-                action_id=action_id,
-                resolution=resolution,
-                actor=str(request.get("actor", "") or "operator"),
-                note=str(request.get("note", "") or "").strip() or None,
-                metadata=metadata if isinstance(metadata, dict) else {},
-                enforcement_state="recorded_only",
-            )
-            self._remember_action(f"approval.resolve -> {resolution} {action_id}")
             return {
-                "ok": True,
-                "summary": f"{resolution} {action_id}",
+                "ok": False,
+                "outcome": "unsupported",
+                "completed": False,
+                "supported": False,
+                "summary": "approval resolution is unavailable in read-only Helm",
                 "target_pane": "approvals",
-                "output": "\n".join(
-                    [
-                        "# Approval Resolution",
-                        f"Action: {action_id}",
-                        f"Resolution: {resolution}",
-                        f"Actor: {payload['actor']}",
-                        f"Recorded at: {payload['resolved_at']}",
-                        f"Enforcement: {payload['enforcement_state']}",
-                        "Runtime enforcement remains owned by the legacy governance loop until that path is wired.",
-                    ]
+                "output": (
+                    "Unsupported in Helm Slice 1: approval.resolve requires an "
+                    "effectful authority that this read-only terminal does not own."
                 ),
-                "payload": payload,
             }
         return {
             "ok": False,

@@ -55,24 +55,53 @@ export function Composer({prompt, focused = true, compact = false, width = 80}: 
   const maxLines = compact ? 4 : 6;
   // Box border (2) + paddingX (2) = 4 cols of chrome; "> " / "  " prefix = 2.
   const textWidth = Math.max(8, width - 4 - 2);
+  const isMultiline = /[\r\n\u2028\u2029]/u.test(prompt);
+  const cueText = [
+    ...(isMultiline
+      ? ["multi-line draft · Enter sends all lines · multi-line → chat (intents are single-line)"]
+      : []),
+    ...(!focused && prompt ? ["Esc → compose"] : []),
+  ].join(" · ");
+  const wrappedCueLines = cueText ? wrapComposerText(cueText, textWidth) : [];
+  const cueBudget = Math.max(0, maxLines - 1);
+  const cueLines = wrappedCueLines.length <= cueBudget
+    ? wrappedCueLines
+    : focused
+      ? wrappedCueLines.slice(0, cueBudget)
+      : [...wrappedCueLines.slice(0, Math.max(0, cueBudget - 1)), "Esc → compose"];
   return (
     <Box borderStyle="round" borderColor={focused ? THEME.wave : THEME.ridge} paddingX={1} flexDirection="column">
       {prompt ? (
         (() => {
           const lines = wrapComposerText(prompt, textWidth);
-          const overflow = lines.length > maxLines;
-          const shown = overflow ? lines.slice(lines.length - maxLines) : lines;
-          return shown.map((line, index) => {
-            const isFirstReal = index === 0 && !overflow;
-            const isLast = index === shown.length - 1;
-            return (
-              <Text key={index} color={THEME.foam} wrap="truncate-end">
-                <Text color={THEME.stone}>{isFirstReal ? "> " : overflow && index === 0 ? "⋮ " : "  "}</Text>
-                {line}
-                {isLast && focused ? <Text color={THEME.foam} inverse> </Text> : null}
-              </Text>
-            );
-          });
+          const promptLineBudget = Math.max(1, maxLines - cueLines.length);
+          const overflow = lines.length > promptLineBudget;
+          const shown = overflow
+            ? focused
+              ? lines.slice(lines.length - promptLineBudget)
+              : lines.slice(0, promptLineBudget)
+            : lines;
+          return (
+            <>
+              {shown.map((line, index) => {
+                const isLast = index === shown.length - 1;
+                // Focused overflow hides the head (marker on line 0); unfocused
+                // overflow hides the tail (marker on the last shown line).
+                const elided = overflow && (focused ? index === 0 : isLast);
+                const prefix = elided ? "⋮ " : index === 0 ? "> " : "  ";
+                return (
+                  <Text key={index} color={THEME.foam} wrap="truncate-end">
+                    <Text color={THEME.stone}>{prefix}</Text>
+                    {line}
+                    {isLast && focused ? <Text color={THEME.foam} inverse> </Text> : null}
+                  </Text>
+                );
+              })}
+              {cueLines.map((line, index) => (
+                <Text key={`cue-${index}`} color={THEME.stone} dimColor wrap="truncate-end">{line}</Text>
+              ))}
+            </>
+          );
         })()
       ) : (
         <Box>

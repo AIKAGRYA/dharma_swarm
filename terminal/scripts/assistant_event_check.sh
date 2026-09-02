@@ -8,41 +8,57 @@
 #   turn 2: session.ack + session_end only (no response-bearing event)
 # Asserts:
 #   1. turn 1: the assistant message renders as the turn's response text in the
-#      transcript, ABOVE that turn's ✓ trace summary line — no no-response marker;
+#      transcript, ABOVE that turn's ■ trace summary line — no no-response marker;
 #   2. turn 2: an explicit "no response" marker renders, the turn's summary line
-#      carries the failed glyph ✖, and NO second ✓-complete summary appears
+#      carries the failed glyph ✖, and NO second ■-complete summary appears
 #      (a completed turn with zero response text is the graded violation).
 # Exit 0 = PASS, exit 1 = FAIL naming the violated assertion.
 set -u
 
-TERMINAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TERMINAL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=terminal/scripts/lib/codex_managed_tmux.sh
+source "${SCRIPT_DIR}/lib/codex_managed_tmux.sh"
+
 SESS="helm-f173-$RANDOM"
 STATEDIR="$(mktemp -d)"
 CAPDIR="${ASSISTANT_CHECK_OUT_DIR:-$(mktemp -d)}"
 ASSISTANT_TEXT="I am the Helm. Identity intents route straight through me."
 NO_RESPONSE_MARKER="no response — turn ended without output"
-SUMMARY_OK='✓ ([0-9]+s|done) · .+ · \^T details'
+SUMMARY_OK='■ ([0-9]+s|done) · .+ · \^T details'
 SUMMARY_FAILED='✖ failed · .+ · \^T details'
 
 cleanup() {
-  tmux kill-session -t "$SESS" 2>/dev/null || true
+  local status="$1"
+
+  trap - EXIT
+  if ! codex_managed_tmux_cleanup; then
+    echo "assistant_event_check: managed tmux cleanup failed — preserving state dir '$STATEDIR' and capture dir '$CAPDIR'" >&2
+    if [ "$status" -eq 0 ]; then
+      return 1
+    fi
+    return "$status"
+  fi
+
   find "$STATEDIR" -mindepth 1 -delete 2>/dev/null || true
   rmdir "$STATEDIR" 2>/dev/null || true
   if [ -z "${ASSISTANT_CHECK_OUT_DIR:-}" ]; then
     find "$CAPDIR" -mindepth 1 -delete 2>/dev/null || true
     rmdir "$CAPDIR" 2>/dev/null || true
   fi
+  return "$status"
 }
+trap 'cleanup "$?"; exit $?' EXIT
 
 fail() {
   echo "assistant_event_check: FAIL — $1" >&2
-  tmux capture-pane -t "$SESS" -p 2>/dev/null | sed 's/^/  | /' >&2 || true
-  cleanup
+  codex_managed_tmux capture-pane -t "$SESS" -p 2>/dev/null \
+    | sed 's/^/  | /' >&2 || true
   exit 1
 }
 
 capture() {
-  tmux capture-pane -t "$SESS" -p
+  codex_managed_tmux capture-pane -t "$SESS" -p
 }
 
 wait_for() {
@@ -50,7 +66,7 @@ wait_for() {
   local pattern="$1" label="$2" _attempt frame
   for _attempt in $(seq 1 40); do
     frame="$(capture 2>/dev/null || true)"
-    if echo "$frame" | grep -qE "$pattern"; then
+    if grep -qE "$pattern" <<<"$frame"; then
       return 0
     fi
     sleep 0.5
@@ -58,18 +74,28 @@ wait_for() {
   fail "$label never appeared (waited 20s)"
 }
 
-tmux new-session -d -s "$SESS" -x 100 -y 30 \
-  "cd $TERMINAL_DIR && COLORTERM=truecolor STUB_BRIDGE_SCENARIO=assistant_then_empty DHARMA_PYTHON=$TERMINAL_DIR/scripts/stub_bridge.py DHARMA_TERMINAL_STATE_DIR=$STATEDIR DHARMA_TERMINAL_SUPERVISOR_STATE_DIR=$STATEDIR bun run start" \
-  || fail "tmux session failed to start"
+codex_managed_tmux_init assistant_event \
+  || fail "could not initialize private tmux server"
+codex_managed_tmux new-session -d -s "$SESS" -x 100 -y 30 \
+  "sleep 1; cd '$TERMINAL_DIR' && COLORTERM=truecolor STUB_BRIDGE_SCENARIO=assistant_then_empty DHARMA_PYTHON='$TERMINAL_DIR/scripts/stub_bridge.py' DHARMA_TERMINAL_STATE_DIR='$STATEDIR' DHARMA_TERMINAL_SUPERVISOR_STATE_DIR='$STATEDIR' bun run start" \
+  || fail "private tmux session failed to start"
+codex_managed_tmux set-option -g status off \
+  || fail "could not disable private tmux status row"
+codex_managed_tmux resize-window -t "$SESS:0" -x 100 -y 30 \
+  || fail "could not resize private tmux window"
+dimensions="$(codex_managed_tmux display-message -p -t "$SESS:0.0" \
+  '#{pane_width}x#{pane_height}')"
+[ "$dimensions" = "100x30" ] \
+  || fail "expected 100x30 pane, got $dimensions"
 
-wait_for "Dharma Terminal" "app boot frame"
+wait_for "Dharma Helm" "app boot frame"
 # FACE-1: the zen status line names bridge connectivity without claiming provider liveness.
 wait_for "backend connected|bridge ready|resyncing|bridge connected|● bridge" "stub bridge handshake"
 
 # ---- turn 1: answered via the assistant event ----
-tmux send-keys -t "$SESS" -l "who are you and what can you do"
+codex_managed_tmux send-keys -t "$SESS" -l "who are you and what can you do"
 sleep 0.5
-tmux send-keys -t "$SESS" Enter
+codex_managed_tmux send-keys -t "$SESS" Enter
 
 wait_for "Identity intents route straight" "assistant message in transcript"
 sleep 0.5
@@ -84,9 +110,9 @@ summary_line="$(grep -nE "$SUMMARY_OK" "$CAPDIR/turn1.txt" | head -1 | cut -d: -
 grep -qF "$NO_RESPONSE_MARKER" "$CAPDIR/turn1.txt" && fail "no-response marker rendered on an answered turn"
 
 # ---- turn 2: session ends with no response-bearing event ----
-tmux send-keys -t "$SESS" -l "second question with no answer"
+codex_managed_tmux send-keys -t "$SESS" -l "second question with no answer"
 sleep 0.5
-tmux send-keys -t "$SESS" Enter
+codex_managed_tmux send-keys -t "$SESS" Enter
 
 wait_for "no response" "explicit no-response marker (turn 2)"
 sleep 0.5
@@ -95,7 +121,9 @@ capture > "$CAPDIR/turn2.txt"
 grep -qF "$NO_RESPONSE_MARKER" "$CAPDIR/turn2.txt" || fail "explicit no-response marker missing on the empty turn"
 grep -qE "$SUMMARY_FAILED" "$CAPDIR/turn2.txt" || fail "empty turn's summary line does not carry the failed glyph ✖"
 ok_count_after="$(grep -cE "$SUMMARY_OK" "$CAPDIR/turn2.txt")"
-[ "$ok_count_after" -eq 1 ] || fail "empty turn rendered as a completed turn (✓ summaries went from 1 to $ok_count_after)"
+[ "$ok_count_after" -eq 1 ] || fail "empty turn rendered as a completed turn (■ summaries went from 1 to $ok_count_after)"
 
-cleanup
+cleanup 0
+cleanup_status=$?
+[ "$cleanup_status" -eq 0 ] || exit "$cleanup_status"
 echo "assistant_event_check: OK (assistant message rendered as turn response; empty turn carries explicit no-response marker + ✖, never bare complete)"

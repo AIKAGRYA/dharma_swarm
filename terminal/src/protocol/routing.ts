@@ -1,3 +1,4 @@
+import {modelPickerShortcut} from "../components/ModelPicker";
 import {nonSelectableRouteTargets, routePolicyFromValue, selectableRouteTargets} from "../routePolicy";
 import type {
   AgentRoutesPayload,
@@ -48,6 +49,24 @@ function toLines(kind: TranscriptLine["kind"], text: string): TranscriptLine[] {
     .map((line) => line.trimEnd())
     .filter((line, index, lines) => line.length > 0 || (index > 0 && index < lines.length - 1))
     .map((line) => makeLine(kind, line));
+}
+
+function truthWord(value: boolean | undefined): string {
+  return value === true ? "yes" : value === false ? "no" : "unknown";
+}
+
+function appendModelTable(lines: string[], routePolicy: RoutePolicyState): void {
+  lines.push("", "## Models", "key | lane | usable now | identity verified");
+  if (routePolicy.targets.length === 0) {
+    lines.push("none");
+    return;
+  }
+  routePolicy.targets.forEach((entry, index) => {
+    const key = modelPickerShortcut(index) ?? "–";
+    lines.push(
+      `- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}] | key ${key} | usable now ${truthWord(entry.usableNow)} | identity verified ${truthWord(entry.identityVerified)}${entry.availabilityReason ? ` | ${entry.availabilityReason}` : ""}`,
+    );
+  });
 }
 
 function displayModelRouteLabel(value: string, provider?: string, model?: string): string {
@@ -164,6 +183,7 @@ export function modelPolicyToLines(payload: JsonRecord): TranscriptLine[] {
       `Route: ${decision.route_id}`,
       `Strategy: ${decision.strategy}`,
       `Default route: ${stringField(metadata, "default_route", "unknown")}`,
+      ...(routePolicy.fallbackNotice ? [`Notice: ${routePolicy.fallbackNotice}`] : []),
       "",
       "## Fallback chain",
     ];
@@ -176,23 +196,7 @@ export function modelPolicyToLines(payload: JsonRecord): TranscriptLine[] {
         );
       }
     }
-    lines.push("", "## Selectable targets");
-    const selectableTargets = selectableRouteTargets(routePolicy);
-    if (selectableTargets.length === 0) {
-      lines.push("none");
-    }
-    for (const entry of selectableTargets) {
-      lines.push(`- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]`);
-    }
-    const suppressedTargets = nonSelectableRouteTargets(routePolicy);
-    if (suppressedTargets.length > 0) {
-      lines.push("", "## Non-primary routes");
-      for (const entry of suppressedTargets) {
-        lines.push(
-          `- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]${entry.availabilityReason ? ` | ${entry.availabilityReason}` : ""}`,
-        );
-      }
-    }
+    appendModelTable(lines, routePolicy);
     return toLines("system", lines.join("\n"));
   }
   const policy =
@@ -208,6 +212,7 @@ export function modelPolicyToLines(payload: JsonRecord): TranscriptLine[] {
     `Route: ${String(policy.selected_route ?? "unknown")}`,
     `Strategy: ${String(policy.strategy ?? "responsive")}`,
     `Default route: ${String(policy.default_route ?? "unknown")}`,
+    ...(routePolicy.fallbackNotice ? [`Notice: ${routePolicy.fallbackNotice}`] : []),
     "",
     "## Fallback chain",
   ];
@@ -222,23 +227,7 @@ export function modelPolicyToLines(payload: JsonRecord): TranscriptLine[] {
       );
     }
   }
-  lines.push("", "## Selectable targets");
-  const selectableTargets = selectableRouteTargets(routePolicy);
-  if (selectableTargets.length === 0) {
-    lines.push("none");
-  }
-  for (const entry of selectableTargets) {
-    lines.push(`- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]`);
-  }
-  const suppressedTargets = nonSelectableRouteTargets(routePolicy);
-  if (suppressedTargets.length > 0) {
-    lines.push("", "## Non-primary routes");
-    for (const entry of suppressedTargets) {
-      lines.push(
-        `- ${entry.alias} -> ${entry.label} (${entry.provider}:${entry.model}) [${entry.routeState}]${entry.availabilityReason ? ` | ${entry.availabilityReason}` : ""}`,
-      );
-    }
-  }
+  appendModelTable(lines, routePolicy);
   return toLines("system", lines.join("\n"));
 }
 
