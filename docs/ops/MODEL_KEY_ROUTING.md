@@ -156,6 +156,13 @@ holding three different key environments at once.
   bot-blocked (Groq 403s a bare urllib call that `GroqProvider` completes
   in <1s) and light pings miss completion-path failures (NIM pinged "live"
   while real completions timed out).
+- Live-fallback never blocks: the interactive TUI event-loop path (policy
+  build, handshake, `/model list|status`, route resolve) reads only the cached
+  `dkeys` truth (`key_oracle.dispatchable_cached` / `live_providers(probe=False)`)
+  and never spawns the `claude -p` smoke. A fresh offline bridge renders from
+  cache instantly and fails closed to "usable-per-cache". Regression:
+  `tests/test_terminal_bridge_model_truth.py::test_policy_build_never_spawns_claude_smoke`.
+  A live smoke, if ever wanted, runs async off the event loop.
 - A provider chain must never lead with a lane in a known-exhausted state.
   `key_oracle` reads `dkeys test` status; consult it (or recent 429 receipts)
   before seeding the chain head. Ollama Cloud's weekly cap manifests as
