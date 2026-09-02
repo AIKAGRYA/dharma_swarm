@@ -773,7 +773,6 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
       event.sourceEventType === "session.ack"
       && (stampedRoute || event.summary)
       && activeTurn.routeSource !== "provider_session_start"
-      && activeTurn.routeSource !== "source_stamp"
     ) {
       activeTurn.route = stampedRoute || event.summary;
       activeTurn.routeSource = "request_ack";
@@ -781,6 +780,7 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
       stampedRoute
       && stampedRoute !== "local"
       && activeTurn.routeSource !== "provider_session_start"
+      && activeTurn.routeSource !== "request_ack"
     ) {
       activeTurn.route = stampedRoute;
       activeTurn.routeSource = "source_stamp";

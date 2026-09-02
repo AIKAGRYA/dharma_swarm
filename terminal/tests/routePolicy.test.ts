@@ -185,9 +185,9 @@ describe("routePolicyFromValue", () => {
 
     // The bootstrap identity is visible but cannot claim readiness before the
     // bridge supplies current policy.
-    expect(policy.routeId).toBe("claude:claude-opus-4.8");
+    expect(policy.routeId).toBe("claude:claude-opus-5.0");
     expect(policy.provider).toBe("claude");
-    expect(policy.model).toBe("claude-opus-4.8");
+    expect(policy.model).toBe("claude-opus-5.0");
     expect(policy.routeState).toBe("unverified");
     expect(policy.selectable).toBe(false);
     expect(policy.availabilityReason).toBe("awaiting_bridge_policy");

@@ -73,8 +73,8 @@ export type BridgeStatus = "booting" | "connected" | "degraded" | "offline";
 
 export type ActiveTurnState =
   | {phase: "idle"}
-  | {phase: "running"; requestId: string; sessionId?: string}
-  | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string};
+  | {phase: "running"; requestId: string; sessionId?: string; route?: string}
+  | {phase: "cancelling"; requestId: string; cancelRequestId: string; sessionId?: string; route?: string};
 
 export type RouteState = "ready" | "unverified" | "degraded" | "slow" | "unavailable" | "invalid";
 
@@ -578,7 +578,7 @@ export type AppAction =
   | {type: "state.replace"; state: AppState}
   | {type: "bridge.status"; status: BridgeStatus}
   | {type: "turn.start"; requestId: string}
-  | {type: "turn.ack"; requestId: string; sessionId?: string}
+  | {type: "turn.ack"; requestId: string; sessionId?: string; route?: string}
   | {type: "turn.cancel.request"; requestId: string; cancelRequestId: string}
   | {type: "turn.cancel.rejected"; requestId: string; cancelRequestId: string}
   | {type: "turn.finish"; requestId: string}

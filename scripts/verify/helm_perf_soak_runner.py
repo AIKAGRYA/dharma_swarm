@@ -189,8 +189,14 @@ def main() -> int:
         "soak": {"duration_ms": soak_ms, "journeys": journeys},
         "rollback": {"steps": rb},
     }
-    composer.parse_measurement_payload(measurement)
     output.write_text(json.dumps(measurement, indent=2) + "\n", encoding="utf-8")
+    try:
+        composer.parse_measurement_payload(measurement)
+    except Exception as exc:  # noqa: BLE001 - a rejected run is still evidence
+        invalid = output.with_suffix(".invalid.json")
+        output.replace(invalid)
+        print(json.dumps({"invalid_measurement": str(invalid), "reason": str(exc)}))
+        return 1
     print(json.dumps({"boot_ms": boot_ms, "intent_roundtrip_ms_from_enter": intent_ms,
                       "provider_stub_ms": provider_ms, "render_ms": render_ms,
                       "soak_ms": soak_ms, "journey_failures":

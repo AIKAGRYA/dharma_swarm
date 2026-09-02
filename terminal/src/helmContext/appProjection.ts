@@ -160,7 +160,7 @@ export function helmContextActionsForBridgeEvent(
   const requestId = event.request_id;
 
   if (eventType === "bridge.error") {
-    return helmContextResultCorrelates(requestId, pendingRequestId) ? [{type: "helm.context.reset"}] : [];
+    return String(requestId ?? "").trim() === pendingRequestId ? [{type: "helm.context.reset"}] : [];
   }
   if (eventType !== "helm.context.result" || !helmContextResultCorrelates(requestId, pendingRequestId)) {
     return [];

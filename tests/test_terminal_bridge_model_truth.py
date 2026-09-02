@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import time
 from types import SimpleNamespace
 
 from dharma_swarm import model_status
@@ -209,7 +211,22 @@ def test_policy_build_never_spawns_claude_smoke(monkeypatch, tmp_path) -> None:
         "dharma_swarm.key_oracle._claude_code_dispatchable_now", _forbidden
     )
     monkeypatch.setattr("dharma_swarm.key_oracle.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("dharma_swarm.key_oracle.shutil.which", lambda name: None)
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
+    status_dir = tmp_path / ".dharma"
+    status_dir.mkdir()
+    (status_dir / "keys_status.json").write_text(
+        json.dumps(
+            {
+                "last_test_ts": time.time(),
+                "rows": [
+                    {"name": "claude_code", "glyph": "✗", "status": "no session"},
+                    {"name": "openrouter", "glyph": "✗", "status": "dead"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     bridge = TerminalBridge()
     try:
         policy = bridge._build_model_policy_summary(

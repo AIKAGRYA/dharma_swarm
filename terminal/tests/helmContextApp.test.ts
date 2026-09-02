@@ -281,6 +281,26 @@ describe("HELM owner context app boundary", () => {
     expect(harness.state().helmContext).toEqual({});
   });
 
+  test("a later unrelated bridge.error neither wipes owner truth nor clears the pending anchor", () => {
+    const now = new Date();
+    const current = decodeHelmContextEnvelope(freshFixture(now)) as HelmContextEnvelope;
+    const helmContext = {pendingRequestId: "7", envelope: current};
+
+    const errorActions = helmContextActionsForBridgeEvent(
+      {type: "bridge.error", request_id: "8", code: "chat_refused", message: "turn refused"},
+      helmContext,
+      now,
+    );
+    expect(errorActions).toEqual([]);
+
+    const resultActions = helmContextActionsForBridgeEvent(
+      {type: "helm.context.result", request_id: "7", envelope: freshFixture(now)},
+      helmContext,
+      now,
+    );
+    expect(resultActions.map((action) => action.type)).toEqual(["helm.context.set"]);
+  });
+
   test("renders exactly twelve owner-stamped lines, including typed unavailable", () => {
     const now = new Date();
     const decoded = decodeHelmContextEnvelope(freshFixture(now, "mission_control"));

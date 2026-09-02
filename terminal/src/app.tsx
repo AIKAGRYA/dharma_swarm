@@ -1492,9 +1492,10 @@ export function createBridgeEventHandler({
       const projection = helmOnCallProjectionFromEvent(typed);
       apply([projection ? {type: "onCall.projection.set", projection} : {type: "onCall.truth.reset"}]);
     }
+    const ackedRoute = state.activeTurn.phase === "idle" ? undefined : state.activeTurn.route;
     const canonicalEvents = canonicalEventsFromBridgeEvent(
       typed,
-      `${state.routePolicy.provider}:${state.routePolicy.model}`,
+      ackedRoute || `${state.routePolicy.provider}:${state.routePolicy.model}`,
     );
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
@@ -1502,10 +1503,13 @@ export function createBridgeEventHandler({
     if (eventType === "session.ack") {
       const requestId = String(typed.request_id ?? "");
       if (requestId) {
+        const ackProvider = String(typed.provider ?? "").trim();
+        const ackModel = String(typed.model ?? "").trim();
         apply([{
           type: "turn.ack",
           requestId,
           sessionId: String(typed.session_id ?? "") || undefined,
+          route: ackProvider && ackModel ? `${ackProvider}:${ackModel}` : undefined,
         }]);
       }
     }

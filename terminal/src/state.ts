@@ -181,7 +181,11 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
       }
       return {
         ...state,
-        activeTurn: {...state.activeTurn, sessionId: action.sessionId ?? state.activeTurn.sessionId},
+        activeTurn: {
+          ...state.activeTurn,
+          sessionId: action.sessionId ?? state.activeTurn.sessionId,
+          route: action.route ?? state.activeTurn.route,
+        },
       };
     case "turn.cancel.request":
       if (state.activeTurn.phase !== "running" || state.activeTurn.requestId !== action.requestId) {
@@ -194,6 +198,7 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           requestId: state.activeTurn.requestId,
           cancelRequestId: action.cancelRequestId,
           sessionId: state.activeTurn.sessionId,
+          route: state.activeTurn.route,
         },
       };
     case "turn.cancel.rejected":

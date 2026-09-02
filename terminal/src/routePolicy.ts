@@ -111,15 +111,15 @@ export function defaultRoutePolicy(): RoutePolicyState {
   // Preserve the configured bootstrap identity only as an unverified
   // placeholder. The handshake replaces it with current route authority.
   return {
-    routeId: "claude:claude-opus-4.8",
+    routeId: "claude:claude-opus-5.0",
     provider: "claude",
-    model: "claude-opus-4.8",
+    model: "claude-opus-5.0",
     strategy: "responsive",
     routeState: "unverified",
     selectable: false,
     availabilityReason: "awaiting_bridge_policy",
     fallbackChain: [],
-    activeLabel: "Claude Opus 4.8",
+    activeLabel: "Claude Opus 5.0",
     targets: [],
   };
 }

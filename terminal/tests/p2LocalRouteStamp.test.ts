@@ -105,6 +105,31 @@ describe("P2 F4 immutable route attribution", () => {
     expect(afterSwitch.at(-1)?.text).not.toContain("claude-sonnet-5");
   });
 
+  test("the bridge-acked route outranks a policy-guess ingest stamp and survives a route switch", () => {
+    const events = [
+      userPromptExecutionEvent("fallback question", "2026-09-02T04:03:00Z"),
+      ...canonicalEventsFromBridgeEvent(
+        {type: "session.ack", request_id: "req-9", provider: "openrouter", model: "kimi-k2.6", created_at: "2026-09-02T04:03:01Z"},
+        "claude:claude-opus-5.0",
+      ),
+      ...canonicalEventsFromBridgeEvent(
+        {type: "text_complete", content: "served by the fallback lane", created_at: "2026-09-02T04:03:02Z"},
+        "claude:claude-opus-5.0",
+      ),
+      ...canonicalEventsFromBridgeEvent(
+        {type: "session_end", success: true, created_at: "2026-09-02T04:03:03Z"},
+        "claude:claude-opus-5.0",
+      ),
+    ];
+
+    const beforeSwitch = projectChatTraceLines(events, {routeLabel: "claude:claude-opus-5.0"});
+    const afterSwitch = projectChatTraceLines(events, {routeLabel: "codex_text:gpt-5.6-sol"});
+
+    expect(beforeSwitch.at(-1)?.text).toContain("openrouter:kimi-k2.6");
+    expect(beforeSwitch.at(-1)?.text).not.toContain("claude-opus-5.0");
+    expect(afterSwitch.at(-1)?.text).toBe(beforeSwitch.at(-1)?.text);
+  });
+
   test("an owned provider identity on the event outranks the ingest route", () => {
     const [stamped] = canonicalEventsFromBridgeEvent(
       {type: "text_complete", content: "owned", provider_id: "claude", model_id: "claude-sonnet-5"},
