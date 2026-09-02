@@ -116,6 +116,11 @@ class OperatorCoreAdapterTests(unittest.TestCase):
                 "strategy": "responsive",
                 "active_label": "GPT-5.4",
                 "default_route": "codex:gpt-5.4",
+                "configured_route": "openrouter:dead-model",
+                "fallback_notice": {
+                    "kind": "live_fallback",
+                    "message": "Live fallback: openrouter:dead-model -> codex:gpt-5.4",
+                },
                 "targets": [{
                     "alias": "primary",
                     "provider": "codex",
@@ -133,6 +138,10 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(decision.provider_id, "codex")
         self.assertEqual(decision.fallback_chain[0], "claude:sonnet-4.6")
         self.assertFalse(decision.degraded)
+        self.assertEqual(
+            decision.metadata["fallback_notice"]["message"],
+            "Live fallback: openrouter:dead-model -> codex:gpt-5.4",
+        )
 
     def test_routing_decision_preserves_unverified_modality(self) -> None:
         decision = routing_decision_from_policy(

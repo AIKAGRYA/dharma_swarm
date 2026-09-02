@@ -22,6 +22,24 @@ function asBoolean(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((entry) => asString(entry)).filter(Boolean)
+    : [];
+}
+
+function fallbackNotice(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return asString(value) || undefined;
+  }
+  const record = asRecord(value);
+  return asString(record.message) || undefined;
+}
+
 export function routeIdFor(provider: string, model: string, explicitRouteId?: string): string {
   const normalized = explicitRouteId?.trim();
   if (normalized) {
@@ -83,6 +101,9 @@ function normalizeRouteTarget(target: Record<string, unknown>): RouteTarget | nu
     routeState,
     availabilityReason: asString(target.availability_reason) || undefined,
     selectable,
+    usableNow: optionalBoolean(target.usable_now),
+    identityVerified: optionalBoolean(target.identity_verified),
+    oracleProviders: asStringList(target.oracle_providers),
   };
 }
 
@@ -222,6 +243,7 @@ export function routePolicyFromValue(value: unknown, current: RoutePolicyState =
     defaultRouteId: asString(metadata.default_route ?? policy.default_route) || undefined,
     fallbackChain,
     activeLabel: asString(metadata.active_label ?? policy.active_label) || matchingTarget?.label || undefined,
+    fallbackNotice: fallbackNotice(metadata.fallback_notice ?? policy.fallback_notice ?? payload.fallback_notice),
     targets,
   };
 }

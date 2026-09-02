@@ -2434,7 +2434,23 @@ class TerminalBridge(
                     "output": f"Route change to {requested_route} failed: {type(exc).__name__}: {exc}",
                     "requested_route": requested_route,
                 }
-            if str(policy.get("selected_route", "")) != requested_route:
+            requested_target = next(
+                (
+                    item
+                    for item in policy.get("targets", [])
+                    if isinstance(item, dict)
+                    and str(item.get("route_id", "")) == requested_route
+                ),
+                None,
+            )
+            requested_is_usable = bool(
+                requested_target is not None
+                and requested_target.get("usable_now") is True
+            )
+            if (
+                str(policy.get("selected_route", "")) != requested_route
+                or not requested_is_usable
+            ):
                 # The policy builder silently rewrites unavailable routes to a
                 # fallback; surfacing that as success is the silent
                 # route-switch failure the operator hit. Refuse honestly.

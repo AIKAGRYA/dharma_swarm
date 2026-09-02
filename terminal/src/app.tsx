@@ -19,6 +19,7 @@ import {Composer} from "./components/Composer.tsx";
 import {buildControlPaneSections, buildRuntimePaneSections} from "./components/ControlPane.tsx";
 import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
 import {OnCallTruthBand} from "./components/OnCallTruthBand.tsx";
+import {modelPickerShortcutIndex} from "./components/ModelPicker.tsx";
 import {buildRepoPaneSections} from "./components/RepoPane.tsx";
 import {NavigatorRail} from "./components/NavigatorRail.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
@@ -1577,6 +1578,16 @@ export function createBridgeEventHandler({
         strategy: state.routePolicy.strategy,
       }, ...(policy
         ? [{type: "route.policy.set", policy} as const]
+        : []), ...(policy?.fallbackNotice
+        ? [{
+            type: "tab.append",
+            tabId: "chat",
+            lines: [{
+              id: `route-fallback-${Date.now()}`,
+              kind: "system",
+              text: policy.fallbackNotice.split(/\r?\n/, 1)[0] ?? "route fallback applied",
+            }],
+          } as AppAction]
         : [])]);
       malformedBridgeEvents = 0;
       reconnectRequested = false;
@@ -1966,6 +1977,18 @@ export function createBridgeEventHandler({
       const selectedProvider = String(typed.selected_provider ?? pending?.provider ?? state.routePolicy.provider);
       const selectedModel = String(typed.selected_model ?? pending?.model ?? state.routePolicy.model);
       const selectedStrategy = String(typed.routing_strategy ?? state.routePolicy.strategy ?? "responsive");
+      const bootstrapPolicy = routePolicyFromValue(typed.model_policy, state.routePolicy);
+      if (bootstrapPolicy.fallbackNotice) {
+        dispatch({
+          type: "tab.append",
+          tabId: "chat",
+          lines: [{
+            id: `route-fallback-${Date.now()}`,
+            kind: "system",
+            text: bootstrapPolicy.fallbackNotice.split(/\r?\n/, 1)[0] ?? "route fallback applied",
+          }],
+        });
+      }
       dispatch({type: "bridge.config", provider: selectedProvider, model: selectedModel, strategy: selectedStrategy});
 
       // Ctrl-C can arrive before bootstrap returns. That is a real cancelled
@@ -2452,7 +2475,9 @@ export function App(): React.ReactElement {
   const railChatLines = displayedTranscriptLinesForTab(state.tabs.find((tab) => tab.id === "chat"), state);
   const railWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, paneWindowSize - 3);
   const outline = useMemo(() => outlineFromTabs(state.tabs), [state.tabs]);
-  const modelChoices = selectableRouteTargets(state.routePolicy);
+  const modelChoices = state.routePolicy.targets;
+  const usableNowCount = modelChoices.filter((choice) => choice.usableNow === true).length;
+  const usableLaneTotal = modelChoices.length;
   const displayedTranscriptLines = displayedTranscriptLinesForTab(activeTab, state);
   const transcriptMeta = transcriptMetaForTab(activeTab);
   // Display source of truth: name whichever model actually answered the latest
@@ -2983,12 +3008,16 @@ export function App(): React.ReactElement {
           events: [userPromptExecutionEvent(submitted), localCommandResultExecutionEvent(submitted, "route picker opened")],
         },
       ]);
-      bridge.send("model.policy", {
-        provider: stateRef.current.routePolicy.provider,
-        model: stateRef.current.routePolicy.model,
-        strategy: stateRef.current.routePolicy.strategy,
-      });
-      dispatch({type: "status.set", value: "route picker ready"});
+      if (stateRef.current.bridgeStatus === "connected") {
+        bridge.send("model.policy", {
+          provider: stateRef.current.routePolicy.provider,
+          model: stateRef.current.routePolicy.model,
+          strategy: stateRef.current.routePolicy.strategy,
+        });
+        dispatch({type: "status.set", value: "route picker ready"});
+      } else {
+        dispatch({type: "status.set", value: "route picker ready · offline policy cache"});
+      }
       return;
     }
     const plainLanguageIntent = exactLocalInput && !exactSlashCommand
@@ -3151,7 +3180,7 @@ export function App(): React.ReactElement {
 
   function applyModelChoice(index: number): void {
     const currentState = stateRef.current;
-    const choices = selectableRouteTargets(currentState.routePolicy);
+    const choices = currentState.routePolicy.targets;
     const returnTabId = currentState.uiMode.activeOverlay.kind === "modelPicker"
       ? currentState.uiMode.activeOverlay.returnTabId
       : currentState.uiMode.activeTabId;
@@ -3161,19 +3190,40 @@ export function App(): React.ReactElement {
       dispatch({type: "status.set", value: "no model targets available"});
       return;
     }
+    if (choice.usableNow !== true) {
+      dispatch({
+        type: "status.set",
+        value: `route unavailable now -> ${choice.provider}:${choice.model}${choice.availabilityReason ? ` | ${choice.availabilityReason}` : ""}`,
+      });
+      return;
+    }
     queueAppActions(dispatch, [
       {type: "modelPicker.set", index: clampedIndex},
     ]);
-    bridge.send("action.run", {
-      action_type: "model.set",
-      provider: choice.provider,
-      model: choice.model,
-      strategy: stateRef.current.routePolicy.strategy,
-    });
+    if (currentState.bridgeStatus === "connected") {
+      bridge.send("action.run", {
+        action_type: "model.set",
+        provider: choice.provider,
+        model: choice.model,
+        strategy: stateRef.current.routePolicy.strategy,
+      });
+    } else {
+      dispatch({
+        type: "bridge.config",
+        provider: choice.provider,
+        model: choice.model,
+        strategy: currentState.routePolicy.strategy,
+      });
+    }
     queueAppActions(dispatch, [
       {type: "modelPicker.close"},
       {type: "tab.activate", tabId: returnTabId},
-      {type: "status.set", value: `requesting route -> ${choice.provider}:${choice.model}`},
+      {
+        type: "status.set",
+        value: currentState.bridgeStatus === "connected"
+          ? `requesting route -> ${choice.provider}:${choice.model}`
+          : `offline route preference -> ${choice.provider}:${choice.model} · unverified`,
+      },
     ]);
   }
 
@@ -3316,10 +3366,10 @@ export function App(): React.ReactElement {
         applyModelChoice(state.uiMode.activeOverlay.selectedIndex);
         return;
       }
-      if (/^[1-9]$/.test(input)) {
-        const numericIndex = Number.parseInt(input, 10) - 1;
-        if (numericIndex <= maxIndex) {
-          applyModelChoice(numericIndex);
+      const directIndex = modelPickerShortcutIndex(input);
+      if (directIndex !== undefined) {
+        if (directIndex <= maxIndex) {
+          applyModelChoice(directIndex);
         }
         return;
       }
@@ -3531,12 +3581,16 @@ export function App(): React.ReactElement {
         type: "modelPicker.open",
         returnTabId: state.uiMode.activeTabId,
       });
-      bridge.send("model.policy", {
-        provider: stateRef.current.routePolicy.provider,
-        model: stateRef.current.routePolicy.model,
-        strategy: stateRef.current.routePolicy.strategy,
-      });
-      dispatch({type: "status.set", value: "route picker ready"});
+      if (stateRef.current.bridgeStatus === "connected") {
+        bridge.send("model.policy", {
+          provider: stateRef.current.routePolicy.provider,
+          model: stateRef.current.routePolicy.model,
+          strategy: stateRef.current.routePolicy.strategy,
+        });
+        dispatch({type: "status.set", value: "route picker ready"});
+      } else {
+        dispatch({type: "status.set", value: "route picker ready · offline policy cache"});
+      }
       return;
     }
     if (key.ctrl && input === "k") {
@@ -3646,7 +3700,7 @@ export function App(): React.ReactElement {
           />
         </Box>
         <Box flexShrink={0} flexDirection="column" width={zenWidth}>
-          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3694,7 +3748,7 @@ export function App(): React.ReactElement {
             emptyState={transcriptMeta.emptyState}
             accentColor={transcriptMeta.accentColor}
           />
-          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
+          <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
           <Composer
             prompt={state.prompt}
             focused={state.uiMode.keyboardFocus === "composer"}
@@ -3807,7 +3861,7 @@ export function App(): React.ReactElement {
           compact={compactShell}
         />
         <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
-        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} />
+        <OnCallTruthBand truth={state.onCallTruth} compact={terminalWidth < 120} usableNowCount={usableNowCount} usableLaneTotal={usableLaneTotal} />
         <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
         {/* F-021: the 8-row wave renders only when the height budget affords it
             (>= 40 rows) and the chat is still quiet — once real turns arrive the

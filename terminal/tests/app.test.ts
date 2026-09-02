@@ -9386,6 +9386,114 @@ describe("App prompt submission", () => {
     }
   });
 
+  test("keeps bare model commands and usable-row selection local while the bridge is offline", async () => {
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    let eventSink: ((event: Record<string, unknown>) => void) | undefined;
+    let bootstrapped = false;
+
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      if (type === "handshake" && !bootstrapped) {
+        bootstrapped = true;
+        eventSink = (this as unknown as {onEvent: (event: Record<string, unknown>) => void}).onEvent;
+        queueMicrotask(() => {
+          eventSink?.({
+            type: "handshake.result",
+            default_provider: "claude",
+            default_model: "claude-opus-4.8",
+            providers: [{provider_id: "claude", default_model: "claude-opus-4.8"}],
+            policy: {
+              selected_provider: "claude",
+              selected_model: "claude-opus-4.8",
+              selected_route: "claude:claude-opus-4.8",
+              targets: [
+                {
+                  alias: "opus",
+                  label: "Claude Opus 4.8",
+                  provider: "claude",
+                  model: "claude-opus-4.8",
+                  route_state: "unavailable",
+                  picker_visible: true,
+                  usable_now: false,
+                  identity_verified: false,
+                  availability_reason: "key_oracle_not_dispatchable",
+                },
+                {
+                  alias: "kimi",
+                  label: "Kimi K3",
+                  provider: "kimi_code",
+                  model: "k3",
+                  route_state: "unverified",
+                  picker_visible: true,
+                  usable_now: true,
+                  identity_verified: false,
+                },
+              ],
+            },
+          });
+          eventSink?.({type: "bridge.error", code: "bridge_send_failed", message: "offline test"});
+        });
+      }
+      return String(sentMessages.length);
+    };
+    DharmaBridge.prototype.sendBackground = function mockedSendBackground(): string {
+      return "background";
+    };
+    DharmaBridge.prototype.close = function mockedClose(): void {
+      originalClose.call(this);
+    };
+
+    const stdin = new TestStdin();
+    let rendered = "";
+    const stdout = new TestStdout();
+    stdout.on("data", (chunk) => { rendered += chunk.toString("utf8"); });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      await flushRender();
+      expect(normalizeTerminalText(rendered)).toContain("offline");
+
+      sentMessages.length = 0;
+      stdin.write("/models");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+      expect(sentMessages).toEqual([]);
+
+      rendered = "";
+      stdin.write("2");
+      await flushRender();
+      expect(sentMessages).toEqual([]);
+      expect(normalizeTerminalText(rendered)).toContain("kimi_code:k3");
+      expect(normalizeTerminalText(rendered)).toContain("unverified");
+
+      stdin.write("/model");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+      expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+      expect(sentMessages).toEqual([]);
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+      DharmaBridge.prototype.sendBackground = originalSendBackground;
+      DharmaBridge.prototype.close = originalClose;
+    }
+  });
+
   test("sends ambiguous, multiline, tour, and non-exact slash text byte-identically to Python with zero local effects", async () => {
     const originalSend = DharmaBridge.prototype.send;
     const originalSendBackground = DharmaBridge.prototype.sendBackground;

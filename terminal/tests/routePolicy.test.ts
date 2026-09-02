@@ -332,4 +332,71 @@ describe("routePolicyFromValue", () => {
     expect(selectableRouteTargets(dead)).toHaveLength(0);
   });
 
+  test("retains explicit usability and evaluator identity truth without inferring either", () => {
+    const policy = routePolicyFromValue({
+      selected_provider: "kimi_code",
+      selected_model: "k3",
+      selected_route: "kimi_code:k3",
+      targets: [
+        {
+          alias: "explicit",
+          label: "Explicit truth",
+          provider: "kimi_code",
+          model: "k3",
+          route_state: "ready",
+          picker_visible: true,
+          usable_now: false,
+          identity_verified: true,
+        },
+        {
+          alias: "unstated",
+          label: "No truth supplied",
+          provider: "claude",
+          model: "claude-opus-4.8",
+          route_state: "ready",
+          picker_visible: true,
+        },
+      ],
+    });
+
+    expect(policy.targets[0]?.usableNow).toBe(false);
+    expect(policy.targets[0]?.identityVerified).toBe(true);
+    expect(policy.targets[1]?.usableNow).toBeUndefined();
+    expect(policy.targets[1]?.identityVerified).toBeUndefined();
+  });
+
+  test("carries the backend's bounded fallback notice without treating it as route authority", () => {
+    const policy = routePolicyFromValue({
+      version: "v1",
+      domain: "routing_decision",
+      decision: {
+        route_id: "kimi_code:k3",
+        provider_id: "kimi_code",
+        model_id: "k3",
+        strategy: "responsive",
+        metadata: {
+          route_state: "unverified",
+          selectable: true,
+          fallback_notice: {
+            kind: "live_fallback",
+            message: "Live fallback: dead:route -> kimi_code:k3",
+          },
+        },
+      },
+      targets: [{
+        alias: "kimi",
+        label: "Kimi K3",
+        provider: "kimi_code",
+        model: "k3",
+        route_state: "unverified",
+        picker_visible: true,
+        usable_now: true,
+        identity_verified: false,
+      }],
+    });
+
+    expect(policy.fallbackNotice).toBe("Live fallback: dead:route -> kimi_code:k3");
+    expect(policy.routeState).toBe("unverified");
+  });
+
 });

@@ -157,7 +157,12 @@ export function NihongaCockpit(props: Props): React.ReactElement {
             height={props.height}
           />
           <PlaceCompass active={activePlace} compact={compact} />
-          <OnCallTruthBand truth={props.onCallTruth} compact={props.width < 120} />
+          <OnCallTruthBand
+            truth={props.onCallTruth}
+            compact={props.width < 120}
+            usableNowCount={props.routePolicy.targets.filter((target) => target.usableNow === true).length}
+            usableLaneTotal={props.routePolicy.targets.length}
+          />
         </>
       )}
       <Box flexGrow={1} flexShrink={1} overflow="hidden">{workspace}</Box>

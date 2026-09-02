@@ -9,10 +9,13 @@ import json
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 from dharma_swarm.model_status import LIVE_CALL_MATRIX_DIR_ENV
+from dharma_swarm import model_hierarchy
+from dharma_swarm.models import ProviderType
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.terminal_bridge import TerminalBridge, system_commands_module
@@ -52,6 +55,15 @@ LOCAL_PREVIEW_MODEL_ENV = "DHARMA_HELM_LOCAL_PREVIEW_MODEL"
 @pytest.fixture(autouse=True)
 def _isolate_local_preview_model(monkeypatch) -> None:
     monkeypatch.delenv(LOCAL_PREVIEW_MODEL_ENV, raising=False)
+
+
+def _set_dispatchable(monkeypatch, *providers: str) -> None:
+    """Pin the P2.5 key-oracle input instead of inheriting operator state."""
+
+    monkeypatch.setattr(
+        "dharma_swarm.terminal_bridge_chat_policy.key_oracle.dispatchable_now",
+        lambda: set(providers),
+    )
 
 
 class _FakeProfile:
@@ -302,9 +314,10 @@ def test_terminal_bridge_materializes_memory_common(monkeypatch) -> None:
 
 
 def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_path: Path) -> None:
+    _set_dispatchable(monkeypatch, "claude_code", "codex", "ollama")
     monkeypatch.setattr(
         "dharma_swarm.key_oracle.live_providers",
-        lambda: {"claude_code", "codex", "ollama"},
+        lambda *args, **kwargs: {"claude_code", "codex", "ollama"},
     )
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
@@ -343,11 +356,114 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
         asyncio.run(bridge.close())
 
 
-def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
+def test_dead_configured_route_falls_to_first_usable_canonical_lane_with_notice(
+    monkeypatch,
+) -> None:
+    """Usability chooses the fallback; evaluator identity truth does not."""
+
+    dead = model_routing.ModelTarget(
+        alias="dead",
+        provider_id="openrouter",
+        model_id="dead-model",
+        label="Dead configured route",
+        pool_providers=(ProviderType.OPENROUTER,),
+    )
+    later_claude = model_routing.ModelTarget(
+        alias="later-claude",
+        provider_id="claude",
+        model_id="claude-opus-4.8",
+        label="Later canonical lane",
+        pool_providers=(ProviderType.CLAUDE_CODE,),
+    )
+    first_kimi = model_routing.ModelTarget(
+        alias="first-kimi",
+        provider_id="kimi_code",
+        model_id=KIMI_K3_MODEL_ID,
+        label="First canonical lane",
+        pool_providers=(ProviderType.KIMI_CODE,),
+    )
+    assert model_hierarchy.CANONICAL_SEED_ORDER.index(
+        ProviderType.KIMI_CODE
+    ) < model_hierarchy.CANONICAL_SEED_ORDER.index(ProviderType.CLAUDE_CODE)
+
+    def projected(target, provider: ProviderType, *, live: bool):
+        return SimpleNamespace(
+            id=target.model_id,
+            route_statuses=[
+                SimpleNamespace(
+                    provider=provider.value,
+                    model_id=target.model_id,
+                    status="live_routable" if live else "unavailable",
+                    reason=None if live else "dead_key",
+                )
+            ],
+            verification=SimpleNamespace(status="unverified"),
+            unavailable_reason=None if live else "dead_key",
+            tier="floor",
+            lane="test",
+            status="available" if live else "unavailable",
+            available_routes=[provider.value] if live else [],
+        )
+
+    monkeypatch.setattr(
+        model_routing,
+        "all_targets",
+        lambda: [dead, later_claude, first_kimi],
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.key_oracle.dispatchable_now",
+        lambda: {ProviderType.KIMI_CODE.value, ProviderType.CLAUDE_CODE.value},
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.terminal_bridge_chat_policy.model_status.floor_model_status",
+        lambda: SimpleNamespace(
+            oracle_state="fresh",
+            live_providers=[ProviderType.KIMI_CODE.value, ProviderType.CLAUDE_CODE.value],
+            models=[
+                projected(dead, ProviderType.OPENROUTER, live=False),
+                projected(later_claude, ProviderType.CLAUDE_CODE, live=True),
+                projected(first_kimi, ProviderType.KIMI_CODE, live=True),
+            ],
+        ),
+    )
+
+    bridge = TerminalBridge()
+    monkeypatch.setattr(
+        bridge,
+        "_available_provider_ids",
+        lambda: {"openrouter", "claude", "kimi_code"},
+    )
+    try:
+        policy = bridge._build_model_policy_summary(
+            selected_provider="openrouter",
+            selected_model="dead-model",
+            strategy="responsive",
+        )
+    finally:
+        asyncio.run(bridge.close())
+
+    assert policy["selected_route"] == f"kimi_code:{KIMI_K3_MODEL_ID}"
+    assert policy["fallback_notice"] == {
+        "kind": "live_fallback",
+        "configured_route": "openrouter:dead-model",
+        "selected_route": f"kimi_code:{KIMI_K3_MODEL_ID}",
+        "message": (
+            "Live fallback: openrouter:dead-model -> "
+            f"kimi_code:{KIMI_K3_MODEL_ID} (configured route not usable now)"
+        ),
+    }
+    assert "\n" not in policy["fallback_notice"]["message"]
+
+
+def test_unknown_oracle_refuses_unproven_local_cli_attempts(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
+    _set_dispatchable(monkeypatch)
+    monkeypatch.setattr(
+        "dharma_swarm.key_oracle.live_providers",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
@@ -386,15 +502,11 @@ def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
         assert "codex" not in terminal_bridge_chat._SLICE1_CHAT_PROVIDER_IDS
         assert all(target["selectable"] is False for target in claude_targets)
         assert all(target["selectable"] is False for target in openrouter_targets)
-        assert policy["selected_provider"] == "codex_text"
-        assert policy["selected_model"] == GPT_5_6_SOL_MODEL_ID
+        assert policy["selected_provider"] == "claude"
+        assert policy["selected_model"] == "claude-opus-4.8"
+        assert policy["fallback_notice"]["kind"] == "no_usable_lane"
         assert policy["available_providers"] == []
-        assert {row["id"] for row in policy["attemptable_providers"]} == {
-            "claude",
-            "codex_text",
-            "grok_oauth",
-            "kimi_code",
-        }
+        assert policy["attemptable_providers"] == []
         # Codex advertises the shell tool and is therefore excluded from the
         # Slice-1 primary-chat membrane even when a local CLI attempt is
         # otherwise authorized.
@@ -403,7 +515,8 @@ def test_unknown_oracle_allows_only_authorized_local_cli_attempts(
         asyncio.run(bridge.close())
 
 
-def test_external_account_routes_are_loaded_as_attempts_not_proof() -> None:
+def test_external_account_routes_are_loaded_as_attempts_not_proof(monkeypatch) -> None:
+    _set_dispatchable(monkeypatch, "codex", "claude_code", "kimi_code", "xai")
     bridge = TerminalBridge()
     try:
         policy = bridge._build_model_policy_summary(
@@ -479,7 +592,7 @@ def test_local_preview_is_env_gated_selected_and_strictly_single_lane(
     capsys,
 ) -> None:
     monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
-    monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
+    _set_dispatchable(monkeypatch, "ollama", "local")
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
@@ -537,6 +650,7 @@ def test_local_preview_identity_matches_ack_invocation_and_durable_metadata(
     capsys,
 ) -> None:
     monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
+    _set_dispatchable(monkeypatch, "ollama", "local")
     bridge = TerminalBridge()
     adapter = _RouteCaptureAdapter("ollama")
     bridge._session_store = SessionStore(root=tmp_path)
@@ -580,6 +694,7 @@ def test_model_set_applies_exact_local_preview_and_refresh_preserves_selection(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv(LOCAL_PREVIEW_MODEL_ENV, "mistral:latest")
+    _set_dispatchable(monkeypatch, "ollama", "local")
     bridge = TerminalBridge()
     bridge._state_dir = tmp_path / "terminal-state"
 
@@ -618,7 +733,8 @@ def test_model_set_applies_exact_local_preview_and_refresh_preserves_selection(
         asyncio.run(bridge.close())
 
 
-def test_model_set_applies_only_exact_enabled_external_preview() -> None:
+def test_model_set_applies_only_exact_enabled_external_preview(monkeypatch) -> None:
+    _set_dispatchable(monkeypatch, "kimi_code", "xai")
     bridge = TerminalBridge()
     try:
         result = bridge._run_action(
@@ -660,10 +776,10 @@ def test_unknown_or_explicit_dead_oracle_never_admits_unproven_routes(
     monkeypatch.setattr(bridge, "_local_cli_attempt_authorized", lambda provider_id: False)
 
     try:
-        monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: None)
+        _set_dispatchable(monkeypatch)
         assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
 
-        monkeypatch.setattr("dharma_swarm.key_oracle.live_providers", lambda: set())
+        _set_dispatchable(monkeypatch)
         monkeypatch.setattr(bridge, "_local_cli_attempt_authorized", lambda provider_id: True)
         assert bridge._chat_lanes("claude", "claude-opus-4.8") == []
     finally:
@@ -671,10 +787,7 @@ def test_unknown_or_explicit_dead_oracle_never_admits_unproven_routes(
 
 
 def test_handshake_default_matches_canonical_selected_route(monkeypatch, tmp_path: Path, capsys) -> None:
-    monkeypatch.setattr(
-        "dharma_swarm.key_oracle.live_providers",
-        lambda: {"claude_code", "codex"},
-    )
+    _set_dispatchable(monkeypatch, "claude_code", "codex")
     monkeypatch.setattr("dharma_swarm.model_status._status_data", lambda: None)
     monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-live-matrix"))
     bridge = TerminalBridge()
@@ -874,9 +987,11 @@ def test_external_preview_success_cannot_promote_helm_on_call(
 
 
 def test_grok_served_alias_does_not_replace_requested_preview_selection(
+    monkeypatch,
     tmp_path: Path,
     capsys,
 ) -> None:
+    _set_dispatchable(monkeypatch, "xai")
     class GrokServedAliasAdapter(_ImmediateAdapter):
         async def stream(self, completion, *, session_id):
             self.stream_calls += 1
@@ -962,9 +1077,11 @@ def test_grok_served_alias_does_not_replace_requested_preview_selection(
 
 
 def test_claude_preview_rejects_response_owned_model_mismatch(
+    monkeypatch,
     tmp_path: Path,
     capsys,
 ) -> None:
+    _set_dispatchable(monkeypatch, "claude_code")
     class WrongClaudeModelAdapter(_ImmediateAdapter):
         async def stream(self, completion, *, session_id):
             yield SessionStart(
@@ -1108,9 +1225,11 @@ def test_external_preview_requires_content_and_sanitizes_provider_failure(
 
 
 def test_external_preview_error_cannot_be_overwritten_by_later_success(
+    monkeypatch,
     tmp_path: Path,
     capsys,
 ) -> None:
+    _set_dispatchable(monkeypatch, "claude_code")
     secret = "provider-error-secret-must-not-escape"
 
     class ContradictoryPreviewAdapter(_ImmediateAdapter):
@@ -1183,9 +1302,11 @@ def test_external_preview_error_cannot_be_overwritten_by_later_success(
 
 
 def test_external_preview_discards_provider_raw_after_membrane_scan(
+    monkeypatch,
     tmp_path: Path,
     capsys,
 ) -> None:
+    _set_dispatchable(monkeypatch, "claude_code")
     secret = "provider-raw-access-token-must-not-escape"
 
     class RawMetadataPreviewAdapter(_ImmediateAdapter):
@@ -1340,10 +1461,12 @@ def test_chat_membrane_rejects_nonzero_or_untyped_flat_claude_counters(
 
 @pytest.mark.parametrize("metadata_kind", ["usage", "rate_limit"])
 def test_external_preview_rejects_untyped_provider_metadata(
+    monkeypatch,
     tmp_path: Path,
     capsys,
     metadata_kind: str,
 ) -> None:
+    _set_dispatchable(monkeypatch, "claude_code")
     secret = "provider-metadata-secret-must-not-escape"
 
     class SuspiciousMetadataAdapter(_ImmediateAdapter):
@@ -1498,9 +1621,11 @@ def test_external_preview_rejects_nested_provider_tool_evidence(
 
 
 def test_external_preview_rejects_canonical_tool_capability_authority(
+    monkeypatch,
     tmp_path: Path,
     capsys,
 ) -> None:
+    _set_dispatchable(monkeypatch, "claude_code")
     class ToolCapablePreviewAdapter(_ImmediateAdapter):
         async def stream(self, completion, *, session_id):
             yield SessionStart(
@@ -1562,6 +1687,7 @@ def test_external_preview_response_buffer_is_bounded_and_sanitized(
     capsys,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _set_dispatchable(monkeypatch, "claude_code")
     secret = "oversized-provider-secret-must-not-escape"
 
     class OversizedPreviewAdapter(_ImmediateAdapter):

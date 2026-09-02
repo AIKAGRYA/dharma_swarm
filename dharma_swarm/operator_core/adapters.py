@@ -195,6 +195,9 @@ def routing_decision_from_policy(
         metadata={
             "active_label": policy.get("active_label"),
             "default_route": policy.get("default_route"),
+            "configured_route": policy.get("configured_route"),
+            "configured_default_route": policy.get("configured_default_route"),
+            "fallback_notice": policy.get("fallback_notice"),
             "route_state": route_state,
             "selectable": selectable,
             "availability_reason": (

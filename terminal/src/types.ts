@@ -456,6 +456,11 @@ export type RouteTarget = {
   routeState: RouteState;
   availabilityReason?: string;
   selectable: boolean;
+  /** Current transport/key-oracle usability; absent means the owner did not attest it. */
+  usableNow?: boolean;
+  /** Strict seven-seat evaluator identity verdict; absent means no typed verdict arrived. */
+  identityVerified?: boolean;
+  oracleProviders?: string[];
 };
 
 export type ModelTarget = RouteTarget;
@@ -501,6 +506,7 @@ export type RoutePolicyState = {
   defaultRouteId?: string;
   fallbackChain: string[];
   activeLabel?: string;
+  fallbackNotice?: string;
   targets: RouteTarget[];
 };
 

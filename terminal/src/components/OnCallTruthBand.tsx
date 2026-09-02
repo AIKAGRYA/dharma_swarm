@@ -7,6 +7,8 @@ import {THEME} from "../theme";
 type Props = {
   truth: OnCallTruthState;
   compact?: boolean;
+  usableNowCount?: number;
+  usableLaneTotal?: number;
 };
 
 const COMPACT_SEAT_LABELS = ["F5", "G56", "G46", "FU", "K3", "O50", "O48"] as const;
@@ -90,9 +92,10 @@ function verdictPresentation(
   };
 }
 
-export function OnCallTruthBand({truth, compact = false}: Props): React.ReactElement {
+export function OnCallTruthBand({truth, compact = false, usableNowCount, usableLaneTotal}: Props): React.ReactElement {
   const aggregate = aggregatePresentation(truth);
   const seats = truth.kind === "authoritative" ? truth.projection.seats : null;
+  const explicitUsability = usableNowCount !== undefined && usableLaneTotal !== undefined;
   return (
     <Box flexDirection="column" height={2} overflow="hidden">
       <Box paddingX={1} height={1} overflow="hidden">
@@ -100,8 +103,9 @@ export function OnCallTruthBand({truth, compact = false}: Props): React.ReactEle
         <Text color={aggregate.color} bold={aggregate.state !== "UNKNOWN"}>
           {aggregate.glyph} {aggregate.state} {aggregate.count}
         </Text>
-        <Text color={THEME.ink}>{"  ·  "}</Text>
-        <Text color={THEME.stone}>Python verdict</Text>
+        {explicitUsability
+          ? <><Text color={THEME.ink}>{" · "}</Text><Text color={THEME.stone}>Usable now {usableNowCount}/{usableLaneTotal} lanes · Identity verified {aggregate.count}</Text></>
+          : <><Text color={THEME.ink}>{"  ·  "}</Text><Text color={THEME.stone}>Python verdict</Text></>}
       </Box>
       <Box paddingX={1} height={1} overflow="hidden">
         <Text wrap="truncate-end">

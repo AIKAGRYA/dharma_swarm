@@ -59,7 +59,6 @@ def render_system_prompt(
 ) -> str:
     wsp = workspace_preview or {}
     rtp = runtime_preview or {}
-    cg = command_graph or {}
     intent_kind = (intent or {}).get("intent_kind", "chat")
 
     branch = str(wsp.get("Branch", "unknown"))
@@ -93,7 +92,7 @@ def render_system_prompt(
         "## Intent",
         f"- Kind: {intent_kind}",
         "",
-        f"## Prompt",
+        "## Prompt",
         prompt,
     ]
     return "\n".join(lines)
@@ -188,11 +187,13 @@ def render_model_policy_text(policy: dict[str, Any]) -> str:
         f"Strategy: {policy.get('strategy', 'unknown')}",
         f"Route: {policy.get('selected_route', 'unknown')}",
         f"Oracle: {policy.get('oracle_state', 'unknown')}",
-        "",
-        "## Targets",
     ]
+    notice = policy.get("fallback_notice")
+    if isinstance(notice, dict) and str(notice.get("message", "")).strip():
+        lines.append(f"Notice: {str(notice['message']).splitlines()[0]}")
+    lines.extend(["", "## Targets", "key | lane | usable now | identity verified"])
     if isinstance(targets, list):
-        for target in targets:
+        for index, target in enumerate(targets):
             if not isinstance(target, dict):
                 continue
             route = target.get("route_id") or f"{target.get('provider', '?')}:{target.get('model', '?')}"
@@ -201,9 +202,20 @@ def render_model_policy_text(policy: dict[str, Any]) -> str:
             suffix = f" [{state}]"
             if reason:
                 suffix += f" {reason}"
+            key = (
+                str(index + 1)
+                if index < 9
+                else "0"
+                if index == 9
+                else chr(87 + index)
+                if index < 36
+                else "-"
+            )
+            usable = str(target.get("usable_now", "unknown")).lower()
+            verified = str(target.get("identity_verified", "unknown")).lower()
             lines.append(
                 f"- {target.get('alias', '?')} -> {target.get('label', '?')} "
-                f"({route}){suffix}"
+                f"({route}){suffix} | {key} | {usable} | {verified}"
             )
     if isinstance(fallback_chain, list):
         lines.extend(["", "## Fallbacks"])
