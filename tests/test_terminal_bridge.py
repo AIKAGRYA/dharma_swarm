@@ -326,16 +326,16 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
     try:
         policy = bridge._build_model_policy_summary(
             selected_provider="claude",
-            selected_model="claude-opus-4.8",
+            selected_model="claude-opus-5.0",
             strategy="responsive",
         )
         targets = {target["alias"]: target for target in policy["targets"]}
 
         assert policy["schema_version"] == "dharma.model_status.v1"
-        assert targets["opus-4.8"]["selectable"] is True
-        assert targets["opus-4.8"]["exact_model_proven"] is False
-        assert targets["opus-4.8"]["route_state"] == "unverified"
-        assert targets["opus-4.8"]["availability_reason"] == (
+        assert targets["opus-5.0"]["selectable"] is True
+        assert targets["opus-5.0"]["exact_model_proven"] is False
+        assert targets["opus-5.0"]["route_state"] == "unverified"
+        assert targets["opus-5.0"]["availability_reason"] == (
             "exact_model_unproven"
         )
         assert targets["gpt-5.5"]["selectable"] is False
@@ -349,7 +349,7 @@ def test_model_policy_summary_uses_canonical_status_projection(monkeypatch, tmp_
 
         rendered = render_model_policy_text(policy)
         assert "## Targets" in rendered
-        assert "opus-4.8 -> Claude Opus 4.8" in rendered
+        assert "opus-5.0 -> Claude Opus 5.0" in rendered
         assert "kimi-k2.6" in rendered
         assert "terminal_adapter_missing" in rendered
     finally:

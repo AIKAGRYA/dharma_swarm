@@ -101,21 +101,21 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
     # Default chat brain: a FLOOR Claude on the Max-plan oauth lane.
     ModelSlot(
         ProviderType.CLAUDE_CODE,
-        "claude-opus-4.8",
-        "Claude Opus 4.8 (Claude Max)",
+        "claude-opus-5.0",
+        "Claude Opus 5.0 (Claude Max)",
         ModelTier.FRONTIER,
         ("reasoning", "code", "architecture"),
         200_000,
-        "Floor default chat brain — Opus via Claude-Max oauth (THE ONE WAY)",
+        "Floor default chat brain — Opus 5.0 via Claude-Max oauth (THE ONE WAY)",
     ),
     ModelSlot(
         ProviderType.CLAUDE_CODE,
-        "claude-sonnet-4.6",
-        "Claude Sonnet 4.6 (Claude Max)",
+        "claude-sonnet-5",
+        "Claude Sonnet 5 (Claude Max)",
         ModelTier.FRONTIER,
         ("code", "reasoning", "speed"),
         200_000,
-        "Floor fast-frontier Claude via Claude-Max oauth",
+        "Floor fast-frontier Claude 5 via Claude-Max oauth",
     ),
     # GPT-5.5 floor lane: codex oauth subscription (live) ahead of metered API.
     ModelSlot(

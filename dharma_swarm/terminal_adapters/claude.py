@@ -13,6 +13,9 @@ import time
 from typing import Any, AsyncIterator
 
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
+from dharma_swarm.model_catalog import HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID
+from dharma_swarm.model_defaults import default_for_provider
+from dharma_swarm.models import ProviderType
 from dharma_swarm.terminal_engine.events import (
     CanonicalEventType,
     ErrorEvent,
@@ -45,6 +48,7 @@ from dharma_swarm.terminal_engine.event_types import (
 from dharma_swarm.terminal_engine.stream_parser import parse_ndjson_line
 
 DHARMA_SWARM = Path(__file__).resolve().parents[2]
+CLAUDE_DEFAULT_MODEL = default_for_provider(ProviderType.CLAUDE_CODE)
 
 CLAUDE_CAPABILITIES = (
     Capability.STREAMING
@@ -81,7 +85,7 @@ class ClaudeAdapter(ProviderAdapter):
     ) -> None:
         self._config = config or ProviderConfig(
             provider_id=self.provider_id,
-            default_model="claude-sonnet-4-5",
+            default_model=CLAUDE_DEFAULT_MODEL,
         )
         self._cli_path = cli_path
         self._workdir = workdir or DHARMA_SWARM
@@ -96,10 +100,16 @@ class ClaudeAdapter(ProviderAdapter):
                 display_name="Claude Sonnet 4.5",
                 capabilities=CLAUDE_CAPABILITIES,
             ),
-            "claude-sonnet-4-6": ModelProfile(
+            HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID: ModelProfile(
                 provider_id=self.provider_id,
-                model_id="claude-sonnet-4-6",
-                display_name="Claude Sonnet 4.6",
+                model_id=HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID,
+                display_name="Claude Sonnet 5",
+                capabilities=CLAUDE_CAPABILITIES,
+            ),
+            CLAUDE_DEFAULT_MODEL: ModelProfile(
+                provider_id=self.provider_id,
+                model_id=CLAUDE_DEFAULT_MODEL,
+                display_name="Claude Opus 5.0",
                 capabilities=CLAUDE_CAPABILITIES,
             ),
             "claude-opus-4": ModelProfile(

@@ -77,8 +77,8 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
     # still a secondary aggregator route behind the first-party Kimi providers.
     ProviderType.OPENROUTER: "moonshotai/kimi-k3",
     ProviderType.OPENAI: "gpt-5",
-    ProviderType.ANTHROPIC: "claude-opus-4-6",
-    ProviderType.CLAUDE_CODE: "claude-opus-4-6",
+    ProviderType.ANTHROPIC: "claude-opus-5-0",
+    ProviderType.CLAUDE_CODE: "claude-opus-5.0",
     ProviderType.CODEX: "gpt-5.4",
 }
 

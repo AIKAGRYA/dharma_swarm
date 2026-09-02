@@ -165,18 +165,18 @@ def _projected(
 MODEL_TARGETS: tuple[ModelTarget, ...] = (
     # DEFAULT chat brain (index 1): a FLOOR Claude on the Max-plan oauth lane.
     _projected(
-        alias="opus-4.8",
+        alias="opus-5.0",
         provider_id="claude",
-        label="Claude Opus 4.8 [floor default]",
-        aliases=("opus", "opus 4.8", "claude opus 4.8", "default"),
-        pool_id="claude-opus-4.8",
+        label="Claude Opus 5.0 [floor default]",
+        aliases=("opus", "opus 5", "opus 5.0", "claude opus 5", "default"),
+        pool_id="claude-opus-5.0",
     ),
     _projected(
-        alias="sonnet-4.6",
+        alias="sonnet-5",
         provider_id="claude",
-        label="Claude Sonnet 4.6",
-        aliases=("sonnet", "sonnet 4.6", "claude sonnet 4.6"),
-        pool_id="claude-sonnet-4.6",
+        label="Claude Sonnet 5",
+        aliases=("sonnet", "sonnet 5", "claude sonnet 5"),
+        pool_id="claude-sonnet-5",
     ),
     # GPT-5.5 floor lane via the codex oauth subscription (THE ONE WAY).
     _projected(
@@ -293,18 +293,18 @@ _validate_targets()
 
 
 # _DEFAULT_TARGET is the default chat brain: MODEL_TARGETS[0] == a FLOOR Claude
-# (claude-opus-4.8 on the Max-plan oauth lane). NEVER a sub-floor model.
+# (claude-opus-5.0 on the Max-plan oauth lane). NEVER a sub-floor model.
 _DEFAULT_TARGET = MODEL_TARGETS[0]
 ROUTING_STRATEGIES: tuple[str, ...] = ("responsive", "cost", "genius")
 # Fallback orders reference FLOOR aliases only (the picker's main list). No
 # sub-floor alias can appear here — the grunt path is opt-in, never a fallback.
 _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
     "responsive": (
-        "sonnet-4.6",
+        "sonnet-5",
         "kimi-k2.6",
         "gpt-5.5",
         "gemini-3",
-        "opus-4.8",
+        "opus-5.0",
     ),
     "cost": (
         "kimi-k2.6",
@@ -314,8 +314,8 @@ _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
         "gemini-3",
     ),
     "genius": (
-        "opus-4.8",
-        "sonnet-4.6",
+        "opus-5.0",
+        "sonnet-5",
         "gpt-5.5",
         "kimi-k3",
         "gemini-3",

@@ -15,4 +15,11 @@ PYTHONPATH="$PWD" "$PY" -m pytest \
   tests/test_terminal_bridge.py \
   tests/test_terminal_tmux_isolation.py \
   tests/test_key_oracle_live_filter.py \
-  tests/test_terminal_bridge_external_preview.py -q
+  tests/test_terminal_bridge_external_preview.py \
+  tests/test_route_verification.py \
+  tests/test_helm_seat_matrix.py \
+  tests/test_model_pool.py \
+  tests/test_model_status_projection.py \
+  tests/test_model_key_routing_guard.py \
+  tests/tui/test_model_routing.py \
+  tests/tui/test_claude_adapter_v11.py -q
