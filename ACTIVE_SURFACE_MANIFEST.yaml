@@ -161,6 +161,9 @@ api_routers:
   - id: fleet
     prefix: /api/fleet
     module: api.routers.fleet
+  - id: mission_control
+    prefix: /api/mission-control
+    module: api.routers.mission_control
 
 dashboard_nav_sections:
   - label: COMMAND
