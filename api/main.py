@@ -601,11 +601,13 @@ def _register_routers(api_app: FastAPI) -> None:
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
     from api.routers.fleet import router as fleet_router
+    from api.routers.mission_control import router as mission_control_router
     from dharma_swarm.a2a.node_gateway import router as gateway_router
 
     api_app.include_router(chat_router)
     api_app.include_router(chat_ws_router)
     api_app.include_router(fleet_router)
+    api_app.include_router(mission_control_router)
     api_app.include_router(gateway_router)
 
 
