@@ -8,6 +8,7 @@ import pytest
 
 from dharma_swarm.model_hierarchy import LaneRole
 from dharma_swarm.models import LLMResponse, ProviderType
+from dharma_swarm.runtime_provider import DEFAULT_CLAUDE_MODEL
 from dharma_swarm.provider_matrix import (
     MatrixExecutionResult,
     MatrixPromptSpec,
@@ -32,7 +33,9 @@ def test_build_default_matrix_targets_keeps_sovereign_lanes_first() -> None:
     assert targets[0].model == "gpt-5.4"
     assert targets[1].provider == ProviderType.CLAUDE_CODE
     assert targets[1].lane_role == LaneRole.PRIMARY_DRIVER
-    assert targets[1].model == "claude-opus-4-6"
+    # The Claude-Max lane resolves through the runtime config, whose Claude
+    # default is DEFAULT_CLAUDE_MODEL — read it rather than pinning a literal.
+    assert targets[1].model == DEFAULT_CLAUDE_MODEL
 
     delegated = [target for target in targets if target.lane_role != LaneRole.PRIMARY_DRIVER]
     assert delegated

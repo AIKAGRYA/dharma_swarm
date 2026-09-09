@@ -3,4 +3,10 @@ rules:
     message: test fixture (mirror of real rule)
     severity: ERROR
     languages: [python]
+    # Fixture-scoped: this mirror exists to prove the pattern against its own
+    # fixture file. Left unscoped it adjudicated production code WITHOUT the real
+    # rule's owner allowlist, so an allowlisted file still blocked the scan.
+    paths:
+      include:
+        - ".semgrep/tests/test_no_unauthorized_dharma_write.py"
     pattern: Path.home() / ".dharma"

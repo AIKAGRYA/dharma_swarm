@@ -416,6 +416,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/algedonic_triage.py', 'save_state', 'path_write', '09c8535fac12', 'operational_state', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/allout_autopilot.py', 'execute_single_step', 'path_write', '9d58935c034b', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/allout_autopilot.py', 'execute_single_step', 'path_write', 'c77238abb207', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/build_helm_menu.py', 'build_menu', 'path_write', 'b6ea5dbb36a4', 'generated_artifact', occurrences=1, review_note='Helm menu app bundle builder writes the generated Info.plist into its own build output directory; no memory surface involved.'),
         ReviewedWriteBaselineEntry('scripts/experiments/test_full_loop.py', 'main', 'path_write', '0ade2c85a8ba', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/experiments/test_full_loop.py', 'main', 'path_write', '99c83aa2bd78', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/governance/run_nats_live_production_matrix.py', 'MatrixRunner.run', 'path_write', 'c5b7b9f59aa9', 'generated_artifact', occurrences=1, review_note='NATS live matrix success path updates repo evidence latest.json pointer only.'),

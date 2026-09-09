@@ -11,6 +11,7 @@ from dharma_swarm.model_hierarchy import (
     PRIMARY_DRIVER_LANES,
     PRIMARY_REASONING_PRIORITY,
     PRIMARY_TOOLING_PRIORITY,
+    default_model,
     provider_lane_role,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
@@ -151,7 +152,7 @@ def test_provider_policy_prefers_tooling_lanes_when_requested() -> None:
     )
 
     assert decision.selected_provider == ProviderType.CLAUDE_CODE
-    assert decision.selected_model_hint == "claude-opus-4-6"
+    assert decision.selected_model_hint == default_model(ProviderType.CLAUDE_CODE)
 
 
 def test_provider_policy_prefers_japanese_quality_lanes() -> None:

@@ -66,6 +66,12 @@ rules:
         - "scripts/research/palantir_source_card_playbooks.py"
         - "scripts/research/palantir_source_card_quality.py"
         - "dharma_swarm/verifier_ranker_v0/inventory.py"
+        # Helm verification composers: the only ~/.dharma reference in each is the
+        # boundary check that CONFINES an operator-supplied --output artifact to the
+        # canonical state root. They enforce state ownership rather than minting a
+        # slice, so they are pinned operational excludes, not research participants.
+        - "scripts/verify/helm_perf_soak.py"
+        - "scripts/verify/helm_seat_matrix.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================

@@ -309,6 +309,10 @@ _RULE1_PERMITTED_NON_RESEARCH_EXCLUDES = {
     "scripts/memory_retrieval_broad_sweep.py",
     "scripts/memory_retrieval_live_gate.py",
     "scripts/memory_retrieval_system_gate.py",
+    # Helm verification composers: their sole ~/.dharma reference confines an
+    # operator-supplied --output artifact to the canonical state root.
+    "scripts/verify/helm_perf_soak.py",
+    "scripts/verify/helm_seat_matrix.py",
 }
 
 # WP-0C1R decision B1: the ratified substrate classes and the one file each
