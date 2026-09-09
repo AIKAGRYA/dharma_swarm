@@ -9390,6 +9390,12 @@ describe("App prompt submission", () => {
     const originalSend = DharmaBridge.prototype.send;
     const originalSendBackground = DharmaBridge.prototype.sendBackground;
     const originalClose = DharmaBridge.prototype.close;
+    const previousPython = process.env.DHARMA_PYTHON;
+    const offlineRoot = mkdtempSync(path.join(os.tmpdir(), "dharma-offline-picker-"));
+    TEMP_DIRS.push(offlineRoot);
+    // Mocking send does not stop the constructor from launching Python. A real
+    // child's delayed bridge.ready would undo the synthetic offline transition.
+    process.env.DHARMA_PYTHON = path.join(offlineRoot, "unavailable-python");
     const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
     let eventSink: ((event: Record<string, unknown>) => void) | undefined;
     let bootstrapped = false;
@@ -9465,11 +9471,13 @@ describe("App prompt submission", () => {
       expect(normalizeTerminalText(rendered)).toContain("offline");
 
       sentMessages.length = 0;
+      rendered = "";
       stdin.write("/models");
       await flushRender();
       stdin.write("\r");
       await flushRender();
       expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+      expect(normalizeTerminalText(rendered)).toContain("offline");
       expect(sentMessages).toEqual([]);
 
       rendered = "";
@@ -9479,11 +9487,13 @@ describe("App prompt submission", () => {
       expect(normalizeTerminalText(rendered)).toContain("kimi_code:k3");
       expect(normalizeTerminalText(rendered)).toContain("unverified");
 
+      rendered = "";
       stdin.write("/model");
       await flushRender();
       stdin.write("\r");
       await flushRender();
       expect(normalizeTerminalText(rendered)).toContain("Model Picker");
+      expect(normalizeTerminalText(rendered)).toContain("offline");
       expect(sentMessages).toEqual([]);
     } finally {
       instance.unmount();
@@ -9491,6 +9501,8 @@ describe("App prompt submission", () => {
       DharmaBridge.prototype.send = originalSend;
       DharmaBridge.prototype.sendBackground = originalSendBackground;
       DharmaBridge.prototype.close = originalClose;
+      if (previousPython === undefined) delete process.env.DHARMA_PYTHON;
+      else process.env.DHARMA_PYTHON = previousPython;
     }
   });
 

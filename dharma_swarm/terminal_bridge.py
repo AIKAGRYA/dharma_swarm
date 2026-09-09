@@ -71,6 +71,7 @@ from dharma_swarm.terminal_bridge_external_preview import (
     KIMI_K3_MODEL_ID,
     default_external_preview_route,
 )
+from dharma_swarm.terminal_bridge_desktop_status import DesktopStatusWriter, start_desktop_status
 from dharma_swarm.terminal_bridge_helm_context import TerminalBridgeHelmContextMixin
 from dharma_swarm.terminal_bridge_route_truth import TerminalBridgeRouteTruthMixin
 from dharma_swarm.terminal_bridge_session_runtime import (
@@ -135,6 +136,7 @@ class TerminalBridge(
         self._state_dir = Path.home() / ".dharma" / "terminal"
         self._runtime_owner_id = f"terminal-bridge:{uuid.uuid4()}"
         self._runtime_owner_pid = os.getpid()
+        self._desktop_status: DesktopStatusWriter | None = None
         self._helm_route_evidence_by_seat: dict[str, model_status.RouteEvidence] = {}
         self._helm_route_sources_by_seat: dict[str, Any] = {}
         self._helm_on_call_projection = model_status.unknown_helm_on_call_projection(
@@ -358,13 +360,22 @@ class TerminalBridge(
                 await asyncio.gather(active.task, return_exceptions=True)
             return
         self._closing = True
-        active = self._active_run
-        if active is not None and active.task is not None:
-            await self._cancel_active_run(active, reason="bridge_closed")
-        for adapter in self._adapters.values():
-            await adapter.close()
+        try:
+            active = self._active_run
+            if active is not None and active.task is not None:
+                await self._cancel_active_run(active, reason="bridge_closed")
+            for adapter in self._adapters.values():
+                await adapter.close()
+        finally:
+            if self._desktop_status is not None:
+                await self._desktop_status.close()
 
     async def run_stdio(self) -> int:
+        self._desktop_status = await start_desktop_status(
+            owner_id=self._runtime_owner_id,
+            owner_pid=self._runtime_owner_pid,
+            repo_root=self._repo_root,
+        )
         if not self._session_recovery_complete:
             self._session_store.recover_orphaned_sessions(
                 cwd=str(self._repo_root),
@@ -1047,6 +1058,8 @@ class TerminalBridge(
         run.cancel_requested = True
         run.cancel_reason = reason
         run.phase = "cancelling"
+        if self._desktop_status is not None:
+            self._desktop_status.cancel_session()
         provider_cancel_error: str | None = None
         adapter = self._adapters.get(run.provider_id)
         if adapter is not None:
@@ -1079,6 +1092,11 @@ class TerminalBridge(
         self._active_model_id = run.model_id
         self._selected_provider_id = run.provider_id
         self._selected_model_id = run.model_id
+        if self._desktop_status is not None:
+            self._desktop_status.begin_session(
+                session_id=run.session_id, request_id=run.request_id,
+                requested_provider_id=run.provider_id, requested_model_id=run.model_id,
+            )
 
     def _set_active_provider(
         self,
@@ -1105,6 +1123,9 @@ class TerminalBridge(
         self._active_session_id = None
         self._active_provider_id = None
         self._active_model_id = None
+
+        if self._desktop_status is not None:
+            self._desktop_status.clear_session()
 
     def _mark_terminal_emitted(self, run: _ActiveSessionRun) -> None:
         run.phase = "finalizing"
@@ -1194,6 +1215,8 @@ class TerminalBridge(
         self._completed_session_request_ids = self._completed_session_request_ids[-64:]
 
     def _emit(self, payload: dict[str, Any]) -> None:
+        if self._desktop_status is not None:
+            self._desktop_status.observe(payload)
         sys.stdout.write(json.dumps(payload, default=_json_default) + "\n")
         sys.stdout.flush()
 

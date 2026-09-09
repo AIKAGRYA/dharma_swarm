@@ -13,6 +13,11 @@ PYTHONPATH="$PWD" "$PY" -m pytest \
   tests/test_operator_core_session_views.py \
   tests/test_claude_preview_protocol.py \
   tests/test_terminal_bridge.py \
+  tests/test_terminal_bridge_desktop_status.py \
+  tests/test_helm_desktop.py \
+  tests/test_helm_desktop_install.py \
+  tests/test_terminal_desktop_menu.py \
+  tests/test_terminal_desktop_menu_lifecycle.py \
   tests/test_terminal_tmux_isolation.py \
   tests/test_key_oracle_live_filter.py \
   tests/test_terminal_bridge_external_preview.py \

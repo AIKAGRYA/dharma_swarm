@@ -1,6 +1,7 @@
 import {buildInitialOutline, buildInitialTabs} from "./mockContent";
 import type {ActivityEntry, AppAction, AppState, ApprovalQueueState, TabSpec} from "./types";
-import {mergeExecutionEvents, projectActivityEntries, projectChatTraceLines, projectPaneLines} from "./executionLog";
+import {mergeExecutionEvents, projectChatTraceLines} from "./executionLog";
+import {projectExecutionViews} from "./executionProjectionMemo";
 import {defaultRoutePolicy, routeLabel, routePolicyWithConfig} from "./routePolicy";
 import {onCallTruthStateWithProjection, unknownOnCallTruthState} from "./onCallTruth";
 import {
@@ -267,29 +268,23 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "execution.events.ingest": {
       const executionEventLog = mergeExecutionEvents(state.executionEventLog, action.events);
       const chatTraceLines = projectedChatTraceLines(state, executionEventLog);
-      const thinkingLines = projectPaneLines("thinking", executionEventLog);
-      const toolLines = projectPaneLines("tools", executionEventLog);
-      const timelineLines = projectPaneLines("timeline", executionEventLog);
+      const views = projectExecutionViews(state.executionEventLog, executionEventLog);
+      let tabsChanged = false;
+      const tabs = state.tabs.map((tab) => {
+        const lines = tab.id === "thinking" ? views.thinking
+          : tab.id === "tools" ? views.tools
+          : tab.id === "timeline" ? views.timeline : undefined;
+        if (lines === undefined || lines === tab.lines) return tab;
+        tabsChanged = true;
+        return {...tab, lines};
+      });
       return {
         ...state,
         executionEventLog,
         chatTraceLines,
-        activityFeed: {
-          ...state.activityFeed,
-          entries: projectActivityEntries(executionEventLog),
-        },
-        tabs: state.tabs.map((tab) => {
-          if (tab.id === "thinking") {
-            return {...tab, lines: thinkingLines};
-          }
-          if (tab.id === "tools") {
-            return {...tab, lines: toolLines};
-          }
-          if (tab.id === "timeline") {
-            return {...tab, lines: timelineLines};
-          }
-          return tab;
-        }),
+        activityFeed: views.activity === state.activityFeed.entries
+          ? state.activityFeed : {...state.activityFeed, entries: views.activity},
+        tabs: tabsChanged ? tabs : state.tabs,
       };
     }
     case "ui.compact.set":

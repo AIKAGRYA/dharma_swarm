@@ -139,6 +139,20 @@ START_CMD+="DHARMA_TERMINAL_TUI_STATE_DIR=$(printf '%q' "${STATE_DIR}") "
 if [[ -n "${PYTHON_BIN}" ]]; then
   START_CMD+="DHARMA_PYTHON=$(printf '%q' "${PYTHON_BIN}") "
 fi
+# A persistent tmux server retains its original environment.  Pass the owner's
+# optional desktop mirror explicitly so a later launch cannot inherit another
+# seat's destination or silently omit the mirror.
+if [[ -n "${DHARMA_HELM_DESKTOP_STATUS_FILE:-}" ]]; then
+  _terminal_tui_tmux_validate_path \
+    "DHARMA_HELM_DESKTOP_STATUS_FILE" "${DHARMA_HELM_DESKTOP_STATUS_FILE}"
+  START_CMD+="DHARMA_HELM_DESKTOP_STATUS_FILE=$(printf '%q' "${DHARMA_HELM_DESKTOP_STATUS_FILE}") "
+  START_CMD+="DHARMA_TERMINAL_TMUX_SOCKET=$(printf '%q' "${TERMINAL_TUI_TMUX_SOCKET}") "
+  START_CMD+="DHARMA_TERMINAL_TMUX_SESSION=$(printf '%q' "${SESSION}") "
+  START_CMD+="DHARMA_HELM_DESKTOP_TMUX_SOCKET=$(printf '%q' "${TERMINAL_TUI_TMUX_SOCKET}") "
+  START_CMD+="DHARMA_HELM_DESKTOP_TMUX_SESSION=$(printf '%q' "${SESSION}") "
+else
+  START_CMD+="DHARMA_HELM_DESKTOP_STATUS_FILE='' "
+fi
 START_CMD+="bun run src/index.tsx"
 
 terminal_tui_tmux new-session -d -s "${SESSION}" "${START_CMD}"

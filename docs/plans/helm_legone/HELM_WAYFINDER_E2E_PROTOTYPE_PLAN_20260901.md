@@ -430,8 +430,9 @@ reversible or that an agent can rewrite its own permissions.
 
 ### 11.7 Ordered implementation slices
 
-These are future work descriptions, not newly admitted live effects or completed
-features. Each change serves the existing fleet/Helm track and retains its boundaries.
+These are the ordered acceptance targets. Section 11.9 records the first implemented
+slice and its limits; an item here is not itself evidence of completion or an admitted
+live effect. Each change serves the existing fleet/Helm track and retains its boundaries.
 
 | Order | Deliverable | Acceptance evidence |
 |---|---|---|
@@ -463,3 +464,119 @@ Maintain a short changed/verified/remaining note when a slice lands, with exact 
 and source references. Store benchmark traces and runtime receipts under
 `~/.dharma/`; keep links to them here rather than copying measurements into doctrine.
 Do not create a parallel desktop roadmap or a duplicate memory database.
+
+### 11.9 Desktop implementation and operator script — 2026-09-10
+
+Operator implementation request, preserved verbatim:
+
+> ok, code as much of you can end to end with a full plan and script.  anythign you need to ask me first ?
+
+The first implementation keeps macOS as the host and the existing Helm bridge as
+the session owner. It adds an optional status publication, a native AppKit menu,
+a typed Research profile, a shared desktop CLI, reversible generated configuration,
+and a measured reducer optimization. It does not claim the full acceptance table in
+11.7 is complete. The source entry point is
+[`scripts/helm_desktop.sh`](../../../scripts/helm_desktop.sh).
+
+| Implemented surface | Contract and source |
+|---|---|
+| Owner snapshot | [`terminal_bridge_desktop_status.py`](../../../dharma_swarm/terminal_bridge_desktop_status.py): opt-in `DHARMA_HELM_DESKTOP_STATUS_FILE`; existing bridge owner ID/PID plus restart epoch; coalesced atomic private writes; one-second heartbeat; three-second expiry; 64 KiB maximum. No prompt, tool body, credential, or served-model assertion. |
+| Desktop actions | [`helm_desktop/cli.py`](../../../dharma_swarm/helm_desktop/cli.py): status, doctor, explicit start, attach-only focus, workspace preview/open, install preview/apply, restore/uninstall, and machine-readable catalog. Every operation resolves the configured repository and exact private socket/session. |
+| Research profile | [`helm_desktop/profiles.py`](../../../dharma_swarm/helm_desktop/profiles.py): versioned JSON with typed Helm/editor/browser resources. No arbitrary shell string. Existing Helm attaches without opening another bridge. Browser launch receipts mean requested, not verified page liveness; editor reuse requires live pane evidence. |
+| Configuration lifecycle | [`helm_desktop/install.py`](../../../dharma_swarm/helm_desktop/install.py): isolated profile, executable wrapper, optional AeroSpace bindings snippet; manifest records hashes and prior bytes/modes. Restoration preserves subsequent user edits and reports partial results. |
+| Native menu | [`terminal/desktop/macos`](../../../terminal/desktop/macos): direct bounded snapshot reads, owner/repository/seat matching, fresh/stale/unavailable display, Show Helm and Open Research actions via the same CLI. Builds with the local Swift toolchain; no status subprocess per heartbeat. |
+| Projection performance | [`executionProjectionMemo.ts`](../../../terminal/src/executionProjectionMemo.ts): reuse pure pane/activity projections only when their relevant event-reference sequence is unchanged. Retention eviction and same-ID replacements invalidate; independent display writes never seed the cache. Chat behavior remains governed by the existing projector. |
+
+The catalog is a descriptive interface for automation; its
+`grants_execution_authority: false` is explicit. A model selecting an action has not
+acquired permission to execute it. `pending_approvals: null` means the owner has no
+complete count, and requested provider/model fields remain requests. The later
+effect-owner integration must preserve the `Proposal` → `OperatorAuthorization` +
+owner policy → `OwnedEffect` distinction from 11.5.
+
+Run these commands from the checkout containing this implementation, using Bash
+and Python 3.11+ (the wrapper locates the repository virtual environment or honors
+`DHARMA_PYTHON`). `doctor` reports missing prerequisites without installing them:
+
+```bash
+bash scripts/helm_desktop.sh doctor
+bash scripts/helm_desktop.sh install preview --json
+bash scripts/helm_desktop.sh workspace preview --json
+bash scripts/helm_desktop.sh verify
+```
+
+The verifier applies/restores generated files in a disposable directory beneath
+`~/.dharma/helm-desktop-build/verification`, starts the real TUI on a unique
+`CODEX_MANAGED_hdverify_*` socket, verifies one live owner across repeated start,
+checks compact rendering and native decoding, and stops that exact executor.
+It submits no model prompt and activates no desktop app. Use `--skip-native` or
+`--skip-live` for an explicitly partial check; the receipt records skipped checks.
+
+To use the desktop after reviewing the preview:
+
+```bash
+bash scripts/helm_desktop.sh install apply --apply
+bash scripts/helm_desktop.sh start
+bash scripts/helm_desktop.sh menu
+bash scripts/helm_desktop.sh workspace open
+bash scripts/helm_desktop.sh status --json
+```
+
+The default seat is socket `CODEX_MANAGED_helm_desktop`, session `helm_desktop`.
+`focus` never starts a bridge; `start` checks the launcher executor and a fresh
+matching snapshot before reporting ready. Use `--state-dir`, `--repo-root`,
+`--socket`, and `--session` consistently when selecting a different seat. Profile
+selection accepts an installed name or an absolute JSON path. Menu reuse is
+explicit; quit the menu before relaunching with a changed build/configuration.
+
+The installed `~/.dharma/helm_desktop/bin/helm-desktop` wrapper is bound to this
+source checkout and interpreter. Keep that source available while using a development
+installation. After the reviewed branch is integrated into a stable checkout, rerun
+the preview/install from that checkout with a fresh state directory or explicitly
+restore the old installation first. This release does not hide source relocation
+behind a second runtime copy.
+
+Restoration is also previewable:
+
+```bash
+bash scripts/helm_desktop.sh restore --json
+bash scripts/helm_desktop.sh restore --apply
+```
+
+This restores the generated profile/wrapper/snippet. Runtime sessions and receipts
+retain their independent lifecycle. The compiled native app remains a build
+artifact under the selected state directory; **Quit Menu** stops only its observer.
+The AeroSpace snippet is an optional, reviewable configuration fragment; installation
+does not merge or reload the operator's global configuration. Automatic login startup,
+global keymap/theme changes, and OS installation are separate later integration work.
+
+Verification commands and evidence boundaries:
+
+```bash
+bash scripts/helm_validation_test.sh
+bash scripts/terminal_guardian_preflight.sh
+bun run terminal/scripts/bench-desktop-projections.ts
+```
+
+The benchmark writes raw samples, environment/source hashes, and semantic parity
+results to `~/.dharma/helm-desktop-build/perf/reducer_projection_implemented.json`.
+It compares the shipped reducer with a reference that rebuilds every projection,
+using 200 warmups and 1,200 measured ingests per workload. It measures reducer
+work only. File-read timings in the verifier exclude process launch and AppKit
+painting. Neither measurement proves the physical key-to-glyph, startup, loaded
+frame, RSS, or 24-hour targets in 11.4. Native snapshot behavior is executable-tested;
+interactive menu placement, Accessibility, and actual window focus still require
+a desktop smoke check on the operator's session.
+
+Remaining implementation order:
+
+1. Instrument end-to-end key, render, bridge queue, first-provider-event and visible
+   output boundaries; run the named slow-owner/log-flood/resize/soak journeys.
+2. Optimize the dominant chat projection and stabilize rendered row identities from
+   measured evidence, preserving replay, eviction, fallback-attempt identity and drafts.
+3. Admit one bounded useful workflow through the existing effect owner with typed
+   scope/digest/cancellation/idempotence proofs; then expose that action in both faces.
+4. Add profile migrations, optional theme/keymap integration, stable source packaging,
+   and opt-in login startup with the same preview and restoration discipline.
+5. Evaluate a renderer replacement only against the existing interaction oracle and
+   measured targets; preserve the Python owner and adapter boundary either way.
