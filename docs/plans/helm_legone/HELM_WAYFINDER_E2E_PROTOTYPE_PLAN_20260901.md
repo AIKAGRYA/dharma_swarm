@@ -575,6 +575,31 @@ frame, RSS, or 24-hour targets in 11.4. Native snapshot behavior is executable-t
 interactive menu placement, Accessibility, and actual window focus still require
 a desktop smoke check on the operator's session.
 
+State ownership is declared in
+[`ACTIVE_SURFACE_MANIFEST.yaml`](../../../ACTIVE_SURFACE_MANIFEST.yaml), tracked by
+[governance issue #1520](https://github.com/AIKAGRYA/dharma_swarm/issues/1520).
+The two offline performance/seat report writers accept new outputs only beneath
+`~/.dharma/reports/helm/`; unrelated state files and redirected report roots are
+rejected. Historical report inputs and baselines remain readable at their original
+paths, including the existing P4 evidence cited in the Rust parity plan. With a
+Python 3.11+ environment active, a prospective offline report command is:
+
+```bash
+python scripts/verify/helm_seat_matrix.py \
+  --output ~/.dharma/reports/helm/desktop-trial/seat-matrix.json
+```
+
+Without supplied evidence, this records unproven seats; it does not probe a model
+or establish a served identity. Performance reports remain write-once. The
+measurement runner publishes both valid and invalid measurements through that
+same protected writer; seat reports may replace a report inside their owned subtree.
+The declaration separately records the Desktop default/explicit state-directory
+override and the verifier's disposable artifact directory. Its schema and authority
+are checked against actual emitted status, and both report validators are exercised
+against the declared boundary. The generated menu metadata is a reviewed artifact;
+that classification grants no launch or execution authority, and a changed target
+or extra write remains denied by the writer sentinel.
+
 Remaining implementation order:
 
 1. Instrument end-to-end key, render, bridge queue, first-provider-event and visible

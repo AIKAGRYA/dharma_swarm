@@ -14,6 +14,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from dharma_swarm import terminal_bridge_desktop_status as desktop
 
@@ -66,6 +67,57 @@ def test_missing_and_unset_status_have_no_side_effects(tmp_path):
     }
     assert desktop.DesktopStatusWriter.from_environment(owner_id="owner", owner_pid=os.getpid(), repo_root=tmp_path) is None
     assert not path.parent.exists()
+
+
+async def test_declared_desktop_contract_matches_optional_publisher_and_consumer(tmp_path, monkeypatch):
+    from dharma_swarm.helm_desktop.config import DesktopConfig
+    from dharma_swarm.helm_desktop.runtime import observe
+
+    repo_root = Path(__file__).resolve().parents[1]
+    manifest = yaml.safe_load((repo_root / "ACTIVE_SURFACE_MANIFEST.yaml").read_text(encoding="utf-8"))
+    declaration = manifest["helm_operational_surfaces"]["desktop"]
+    config = DesktopConfig(repo_root=repo_root, state_dir=tmp_path / "desktop-state")
+    environment = config.environment()
+    status_env = declaration["status_file_env"]
+    assert config.status_path == config.state_dir / declaration["status_file"]
+    assert environment[status_env] == str(config.status_path)
+
+    owner = {"owner_id": "terminal-bridge:manifest-contract", "owner_pid": os.getpid(), "repo_root": repo_root}
+    monkeypatch.delenv(status_env, raising=False)
+    disabled = await desktop.start_desktop_status(**owner)
+    assert declaration["optional"] is True
+    assert disabled is None
+    assert observe(config)["availability"] == "unavailable"
+    assert not config.state_dir.exists()
+
+    for name in (status_env, "DHARMA_TERMINAL_TMUX_SOCKET", "DHARMA_TERMINAL_TMUX_SESSION"):
+        monkeypatch.setenv(name, environment[name])
+    publisher = await desktop.start_desktop_status(**owner)
+    assert publisher is not None
+    try:
+        publisher.observe({"type": "bridge.ready"})
+        publisher.observe({"type": "assistant", "authority": "execution_allowed", "content": "untrusted grant"})
+        await wait_snapshot(config.status_path, lambda s: s["phase"] == "idle")
+        observed = observe(config)
+        snapshot = observed["snapshot"]
+        assert observed["availability"] == "fresh"
+        assert snapshot["schema_version"] == declaration["status_schema"]
+        assert snapshot["authority"] == observed["authority"] == declaration["status_authority"]
+        assert snapshot["owner"]["id"] == owner["owner_id"]
+        assert snapshot["owner"]["pid"] == owner["owner_pid"]
+        assert snapshot["seat"] == config.seat()
+        assert declaration["status_grants_effect_authority"] is False
+        assert "untrusted grant" not in config.status_path.read_text(encoding="utf-8")
+    finally:
+        await publisher.close()
+
+    assert observe(config)["reason"] == "owner_closed"
+    # A forged authority value cannot turn this declared observation into a
+    # consumable grant, even when the remaining owner metadata is valid.
+    write_private(config.status_path, {**snapshot, "authority": "execution_allowed"})
+    rejected = observe(config)
+    assert rejected["availability"] == "invalid"
+    assert rejected["snapshot"] is None
 
 
 @pytest.mark.parametrize("socket,session", [("default", "helm"), ("CODEX_MANAGED_ok", None), (None, "helm"), ("CODEX_MANAGED_a/../b", "helm"), ("CODEX_MANAGED_ok", "helm:1")])

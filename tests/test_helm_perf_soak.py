@@ -106,6 +106,29 @@ def _measurement() -> dict[str, object]:
     }
 
 
+@pytest.fixture
+def runner(harness, monkeypatch):
+    spec = importlib.util.spec_from_file_location("helm_perf_soak_runner", SCRIPT.with_name("helm_perf_soak_runner.py"))
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "_load_composer", lambda: harness)
+    monkeypatch.setattr(module, "_tmux", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module, "_stop", lambda: (0, 0.0))
+
+    def measure(target, boot, intent, render, provider, journeys, rollback, count):
+        raw = _measurement()
+        for values, name in ((boot, "boot_ms"), (intent, "intent_parse_ms"),
+                             (render, "render_ms"), (provider, "provider_turn_ms")):
+            values.extend(raw["samples"][name])
+        journeys.extend(raw["soak"]["journeys"])
+        rollback.extend(raw["rollback"]["steps"])
+        return raw["soak"]["duration_ms"]
+
+    monkeypatch.setattr(module, "_measure", measure)
+    return module
+
+
 def _baseline() -> dict[str, object]:
     return {
         "schema_version": "dharma.helm.perf_soak_baseline.v1",
@@ -266,17 +289,17 @@ def test_json_loader_rejects_duplicate_keys_and_nonstandard_constants(
         harness.load_json(nan_file)
 
 
-def test_cli_writes_once_beneath_dharma_with_mode_0600(
+def test_cli_writes_once_beneath_helm_reports_with_mode_0600(
     harness, tmp_path: Path, monkeypatch
 ) -> None:
     fake_home = tmp_path / "home"
-    inputs = tmp_path / "inputs"
-    inputs.mkdir()
+    inputs = fake_home / ".dharma" / "campaigns" / "historical" / "receipts"
+    inputs.mkdir(parents=True)
     measurement_path = inputs / "measurement.json"
     baseline_path = inputs / "baseline.json"
     measurement_path.write_text(json.dumps(_measurement()), encoding="utf-8")
     baseline_path.write_text(json.dumps(_baseline()), encoding="utf-8")
-    safe_output = fake_home / ".dharma" / "campaign" / "p4.json"
+    safe_output = fake_home / ".dharma" / "reports" / "helm" / "campaign" / "p4.json"
     unsafe_output = tmp_path / "repo" / "p4.json"
     monkeypatch.setattr(harness.Path, "home", classmethod(lambda cls: fake_home))
 
@@ -311,7 +334,7 @@ def test_output_symlink_is_refused(harness, tmp_path: Path, monkeypatch) -> None
     if not hasattr(os, "symlink"):
         pytest.skip("symlinks unavailable")
     fake_home = tmp_path / "home"
-    output_root = fake_home / ".dharma" / "campaign"
+    output_root = fake_home / ".dharma" / "reports" / "helm" / "campaign"
     output_root.mkdir(parents=True)
     target = output_root / "target.json"
     target.write_text("preserve", encoding="utf-8")
@@ -320,8 +343,58 @@ def test_output_symlink_is_refused(harness, tmp_path: Path, monkeypatch) -> None
     monkeypatch.setattr(harness.Path, "home", classmethod(lambda cls: fake_home))
 
     with pytest.raises(harness.HarnessInputError, match="symlink"):
-        harness.validate_output_path(link)
+        harness.write_report_once(link, {"replacement": True})
     assert target.read_text(encoding="utf-8") == "preserve"
+
+
+@pytest.mark.parametrize("relative", ["state/report.json", "reports/other/report.json"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_report_writer_refuses_other_state_slices(
+    harness, tmp_path: Path, monkeypatch, relative: str, existing: bool
+) -> None:
+    fake_home = tmp_path / "home"
+    output = fake_home / ".dharma" / relative
+    output.parent.mkdir(parents=True)
+    if existing:
+        output.write_text("preserve unrelated state", encoding="utf-8")
+    monkeypatch.setattr(harness.Path, "home", classmethod(lambda cls: fake_home))
+
+    with pytest.raises(harness.HarnessInputError, match="beneath ~/.dharma/reports/helm"):
+        harness.write_report_once(output, {"replacement": True})
+
+    if existing:
+        assert output.read_text(encoding="utf-8") == "preserve unrelated state"
+    else:
+        assert not output.exists()
+
+
+@pytest.mark.parametrize("redirect_at", [
+    ".dharma", ".dharma/reports", ".dharma/reports/helm", ".dharma/reports/helm/campaign",
+])
+@pytest.mark.parametrize("existing", [False, True])
+def test_report_writer_refuses_symlink_escape(
+    harness, tmp_path: Path, monkeypatch, redirect_at: str, existing: bool
+) -> None:
+    fake_home = tmp_path / "home"
+    redirect = fake_home / redirect_at
+    redirect.parent.mkdir(parents=True)
+    outside = tmp_path / "outside" if redirect_at == ".dharma" else fake_home / ".dharma" / "state"
+    outside.mkdir(parents=True)
+    redirect.symlink_to(outside, target_is_directory=True)
+    output = fake_home / ".dharma" / "reports" / "helm" / "campaign" / "report.json"
+    target = outside / output.relative_to(redirect)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if existing:
+        target.write_text("preserve unrelated state", encoding="utf-8")
+    monkeypatch.setattr(harness.Path, "home", classmethod(lambda cls: fake_home))
+
+    with pytest.raises(harness.HarnessInputError, match="symlink|beneath ~/.dharma/reports/helm"):
+        harness.write_report_once(output, {"replacement": True})
+
+    if existing:
+        assert target.read_text(encoding="utf-8") == "preserve unrelated state"
+    else:
+        assert not target.exists()
 
 
 def test_report_names_intent_metric_as_roundtrip_not_parser_latency(harness) -> None:
@@ -333,3 +406,60 @@ def test_report_names_intent_metric_as_roundtrip_not_parser_latency(harness) -> 
     assert set(semantics) == set(harness._SAMPLE_NAMES)
     assert "round trip" in semantics["intent_parse_ms"]
     assert "not pure parser time" in semantics["intent_parse_ms"]
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_runner_publishes_private_measurements_once(
+    runner, harness, tmp_path: Path, monkeypatch, invalid: bool
+) -> None:
+    fake_home = tmp_path / "home"
+    output = fake_home / ".dharma" / "reports" / "helm" / "campaign" / "measurement.json"
+    monkeypatch.setattr(harness.Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.setattr(sys, "argv", ["helm_perf_soak_runner.py", "--output", str(output)])
+    if invalid:
+        monkeypatch.setattr(runner, "_measure", lambda *args: 0.0)
+
+    assert runner.main() == (1 if invalid else 0)
+    published = output.with_suffix(".invalid.json") if invalid else output
+    original = published.read_bytes()
+    payload = json.loads(original)
+    assert payload["schema_version"] == harness.MEASUREMENT_SCHEMA_VERSION
+    assert stat.S_IMODE(published.stat().st_mode) == 0o600
+    if invalid:
+        assert not output.exists()
+        with pytest.raises(harness.HarnessInputError):
+            harness.parse_measurement_payload(payload)
+    else:
+        harness.parse_measurement_payload(payload)
+
+    with pytest.raises(harness.HarnessInputError, match="reports are write-once"):
+        runner.main()
+    assert published.read_bytes() == original
+
+
+def test_runner_rechecks_report_root_after_measurement(
+    runner, harness, tmp_path: Path, monkeypatch
+) -> None:
+    fake_home = tmp_path / "home"
+    root = fake_home / ".dharma" / "reports" / "helm"
+    root.mkdir(parents=True)
+    state = fake_home / ".dharma" / "state"
+    state.mkdir()
+    target = state / "measurement.json"
+    target.write_text("preserve unrelated state", encoding="utf-8")
+    output = root / target.name
+    monkeypatch.setattr(harness.Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.setattr(sys, "argv", ["helm_perf_soak_runner.py", "--output", str(output)])
+    measure = runner._measure
+
+    def redirect_during_measurement(*args):
+        duration = measure(*args)
+        root.rmdir()
+        root.symlink_to(state, target_is_directory=True)
+        return duration
+
+    monkeypatch.setattr(runner, "_measure", redirect_during_measurement)
+    with pytest.raises(harness.HarnessInputError, match="symlink"):
+        runner.main()
+
+    assert target.read_text(encoding="utf-8") == "preserve unrelated state"

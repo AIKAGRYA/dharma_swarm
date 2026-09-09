@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
 from pathlib import Path
+import stat
 import sys
 
 import pytest
@@ -161,9 +162,9 @@ def test_duplicate_receipt_fails_closed_without_aborting_honest_run(matrix) -> N
     ]
 
 
-def test_cli_requires_runtime_artifact_beneath_dharma(matrix, tmp_path: Path, monkeypatch) -> None:
+def test_cli_writes_and_replaces_private_report_beneath_helm_reports(matrix, tmp_path: Path, monkeypatch) -> None:
     fake_home = tmp_path / "home"
-    safe_output = fake_home / ".dharma" / "campaign" / "seat-matrix.json"
+    safe_output = fake_home / ".dharma" / "reports" / "helm" / "campaign" / "seat-matrix.json"
     unsafe_output = tmp_path / "inside-repo.json"
     monkeypatch.setattr(matrix.Path, "home", classmethod(lambda cls: fake_home))
 
@@ -172,10 +173,85 @@ def test_cli_requires_runtime_artifact_beneath_dharma(matrix, tmp_path: Path, mo
     assert matrix.main(["--output", str(safe_output), "--runtime-epoch", EPOCH]) == 0
     payload = json.loads(safe_output.read_text(encoding="utf-8"))
     assert len(payload["route_verifications"]) == 7
+    assert stat.S_IMODE(safe_output.stat().st_mode) == 0o600
+    safe_output.chmod(0o644)
+    assert matrix.main(["--output", str(safe_output), "--runtime-epoch", "replacement-epoch"]) == 0
+    assert json.loads(safe_output.read_text(encoding="utf-8"))["runtime_epoch"] == "replacement-epoch"
+    assert stat.S_IMODE(safe_output.stat().st_mode) == 0o600
 
 
-def test_strict_raw_evidence_loader_accepts_only_a_json_array(matrix, tmp_path: Path) -> None:
-    valid = tmp_path / "valid.json"
+@pytest.mark.parametrize("relative", ["state/report.json", "reports/other/report.json"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_report_writer_refuses_other_state_slices(
+    matrix, tmp_path: Path, monkeypatch, relative: str, existing: bool
+) -> None:
+    fake_home = tmp_path / "home"
+    output = fake_home / ".dharma" / relative
+    output.parent.mkdir(parents=True)
+    if existing:
+        output.write_text("preserve unrelated state", encoding="utf-8")
+    monkeypatch.setattr(matrix.Path, "home", classmethod(lambda cls: fake_home))
+
+    with pytest.raises(matrix.MatrixInputError, match="beneath ~/.dharma/reports/helm"):
+        matrix.write_report(output, {"replacement": True})
+
+    if existing:
+        assert output.read_text(encoding="utf-8") == "preserve unrelated state"
+    else:
+        assert not output.exists()
+
+
+@pytest.mark.parametrize("redirect_at", [
+    ".dharma", ".dharma/reports", ".dharma/reports/helm", ".dharma/reports/helm/campaign",
+])
+@pytest.mark.parametrize("existing", [False, True])
+def test_report_writer_refuses_symlink_escape(
+    matrix, tmp_path: Path, monkeypatch, redirect_at: str, existing: bool
+) -> None:
+    fake_home = tmp_path / "home"
+    redirect = fake_home / redirect_at
+    redirect.parent.mkdir(parents=True)
+    outside = tmp_path / "outside" if redirect_at == ".dharma" else fake_home / ".dharma" / "state"
+    outside.mkdir(parents=True)
+    redirect.symlink_to(outside, target_is_directory=True)
+    output = fake_home / ".dharma" / "reports" / "helm" / "campaign" / "report.json"
+    target = outside / output.relative_to(redirect)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if existing:
+        target.write_text("preserve unrelated state", encoding="utf-8")
+    monkeypatch.setattr(matrix.Path, "home", classmethod(lambda cls: fake_home))
+
+    with pytest.raises(matrix.MatrixInputError, match="symlink|beneath ~/.dharma/reports/helm"):
+        matrix.write_report(output, {"replacement": True})
+
+    if existing:
+        assert target.read_text(encoding="utf-8") == "preserve unrelated state"
+    else:
+        assert not target.exists()
+
+
+def test_report_writer_refuses_output_symlink(matrix, tmp_path: Path, monkeypatch) -> None:
+    fake_home = tmp_path / "home"
+    root = fake_home / ".dharma" / "reports" / "helm"
+    root.mkdir(parents=True)
+    target = root / "target.json"
+    target.write_text("preserve", encoding="utf-8")
+    output = root / "report.json"
+    output.symlink_to(target)
+    monkeypatch.setattr(matrix.Path, "home", classmethod(lambda cls: fake_home))
+
+    with pytest.raises(matrix.MatrixInputError, match="symlink"):
+        matrix.write_report(output, {"replacement": True})
+
+    assert target.read_text(encoding="utf-8") == "preserve"
+
+
+def test_strict_raw_evidence_loader_accepts_only_a_json_array(matrix, tmp_path: Path, monkeypatch) -> None:
+    fake_home = tmp_path / "home"
+    historical = fake_home / ".dharma" / "campaigns" / "historical" / "receipts"
+    historical.mkdir(parents=True)
+    monkeypatch.setattr(matrix.Path, "home", classmethod(lambda cls: fake_home))
+    valid = historical / "valid.json"
     valid.write_text(json.dumps([_raw_row(_evidence(0))]), encoding="utf-8")
     assert matrix.load_evidence(valid) == (_evidence(0),)
 

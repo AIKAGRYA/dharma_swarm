@@ -3,11 +3,12 @@
   "base_ref": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
   "branch": "codex/helm-prod-20260831",
   "worktree": ".",
-  "intent": "Record the operator's explicit 2026-08-31 production destination for the current-main Helm, expand the Fleet track to the exact bridge and verification surfaces needed to close that destination, and bind local cutover to truthful owner projections, evaluator-hard route evidence, an isolated terminal journey, rollback proof, No-Mistakes review, and green CI.",
+  "intent": "Carry the operator's existing Helm production destination forward with the 2026-09-10 macOS Desktop implementation: an optional native observer, typed workspace CLI, reversible configuration, and measured projection reuse around the existing bridge owner. Declare bounded Helm verification-report outputs and reviewed generated app metadata. Bind production cutover to owner truth, evaluator-backed route evidence, isolated runtime and rollback proof, No-Mistakes review, and green CI; implementation scope alone does not prove readiness.",
   "allowed_files": [
     ".no-mistakes.yaml",
     ".semgrep/dharma-anti-slop.yml",
     ".semgrep/tests/test_no_unauthorized_dharma_write.yml",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
     "CLAUDE.md",
     "dharma_swarm/evolution_roster.py",
     "dharma_swarm/helm_desktop/__init__.py",
@@ -135,6 +136,7 @@
     "tests/test_helm_perf_soak.py",
     "tests/test_helm_seat_matrix.py",
     "tests/test_key_oracle_live_filter.py",
+    "tests/test_memory_writer_sentinel.py",
     "tests/test_model_key_routing_guard.py",
     "tests/test_model_pool.py",
     "tests/test_model_router_routing_memory.py",
@@ -195,7 +197,7 @@
   "negative_controls": [
     {
       "name": "stale-active-track-include-is-rejected",
-      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('CLAUDE.md'); t=p.read_text(); old='Fleet advancement — Fleet Hub, Mission Control, and HELM operator surfaces'; t.count(old) >= 1 or sys.exit(3); p.write_text(t.replace(old,'BROKEN HELM TRACK',1)); sys.exit(subprocess.run([sys.executable,'scripts/governance/render_active_track_includes.py','--check']).returncode)\"",
+      "command": "python3 -c \"import pathlib,subprocess,sys; p=pathlib.Path('CLAUDE.md'); t=p.read_text(); old='Fleet advancement \u2014 Fleet Hub, Mission Control, and HELM operator surfaces'; t.count(old) >= 1 or sys.exit(3); p.write_text(t.replace(old,'BROKEN HELM TRACK',1)); sys.exit(subprocess.run([sys.executable,'scripts/governance/render_active_track_includes.py','--check']).returncode)\"",
       "expected_exit": 1,
       "timeout_seconds": 120
     }
@@ -231,23 +233,27 @@
       "details": []
     },
     "interface_mismatches": [
-      "The Fleet track describes Helm as a bounded prototype and owns terminal/**, while current-main product behavior also depends on unowned terminal_bridge, route-truth, HelmContext, launcher, and focused test surfaces.",
-      "The operator's new production destination changes the target closure kind but does not itself prove runtime liveness, model identity, owner authority, or deployment safety.",
-      "The existing local live terminal demonstrates a process and refresh loop, but raw bridge stderr corrupts its alternate screen and its owner projections remain unavailable."
+      "The Desktop adds an optional native observer and typed workspace/configuration actions around the existing Helm bridge; it does not replace the runtime owner.",
+      "A packet digest or surface declaration records source scope and intent, not runtime liveness, served-model identity, execution authority, or production readiness.",
+      "The development launcher depends on its source checkout; native menu placement/focus, full input-to-display performance targets, and stable packaging remain incomplete acceptance work."
     ],
     "closest_existing_implementation": [
       "docs/governance/ACTIVE_TRACK.yaml",
       "docs/plans/helm_legone/HELM_LEGONE_SPEC.md",
       "terminal/",
       "dharma_swarm/terminal_bridge.py",
-      "dharma_swarm/terminal_bridge_helm_context.py"
+      "dharma_swarm/terminal_bridge_helm_context.py",
+      "dharma_swarm/terminal_bridge_desktop_status.py",
+      "dharma_swarm/helm_desktop/cli.py",
+      "scripts/helm_desktop.sh",
+      "ACTIVE_SURFACE_MANIFEST.yaml"
     ],
     "honest_blockers": [
-      "Current fresh evidence is LIVE_DEGRADED at 0/7 evaluator-verified seats. Real Codex and Grok responses lacked exact-identity proof; Kimi is expired; Claude reported insufficient credit; Fugu Ultra and Opus 5 lack current product lanes.",
-      "This packet authorizes a governance amendment only. It does not change credentials, open keychain prompts, buy quota, deploy to the fleet, mutate a protected tmux seat, merge a pull request, or claim production readiness.",
-      "Local cutover remains blocked until the no-hand boundary, owner projections, route verification, runtime shell integrity, performance journey, rollback proof, No-Mistakes gate, and required CI all pass."
+      "Historical admission evidence recorded LIVE_DEGRADED at 0/7 evaluator-verified seats: Codex/Grok lacked exact-identity proof, Kimi was expired, Claude reported insufficient credit, and Fugu Ultra/Opus 5 lacked product lanes then. These are historical observations, not a fresh provider probe; Desktop validation makes no new live-provider or verified-seat claim.",
+      "This packet records task-authorized Helm/Desktop implementation and governance scope. It grants no new credential, cloud-quota, protected-seat, merge, production-deployment, or runtime-effect authority.",
+      "Native UI placement/focus smoke checks, full physical input latency/soak targets, stable source packaging, and complete production seat admission remain unproven by this Desktop slice. Production cutover still requires the named runtime, route, rollback, review, and CI evidence."
     ],
-    "rollback": "Revert the governance-admission commit to restore the bounded CLOSED_NOT_PROD target. That repository rollback does not alter any running terminal, tmux server, credential, runtime state, or provider account.",
-    "packet_digest": "e71fe15c9d6dd4eb869d9b6a434a8c1e628de82e97eaed2560296902d92bce2c"
+    "rollback": "Revert scoped source changes as needed; use the Desktop restore preview/apply contract for its generated profile, wrapper, and snippet, preserving pre-existing files and later edits. A source rollback does not itself stop a running terminal or menu, mutate a protected tmux seat, change credentials, or alter a provider account.",
+    "packet_digest": "0966e557f4ee940259507beabf394038802db8c11c8ccc3065ebc02f57aeee95"
   }
 }

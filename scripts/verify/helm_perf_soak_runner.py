@@ -8,6 +8,9 @@ the stop -> start -> replay-valid rollback shape, and takes provider-turn
 timings from the offline stub bridge only. It never dispatches a live provider
 turn and never touches the default tmux socket.
 
+New measurement outputs must be beneath ``~/.dharma/reports/helm`` and are
+write-once, using the composer's output validation and publication rules.
+
 Metric semantics: ``intent_parse_ms`` is a navigation-intent round trip, timed
 from the Enter keypress (the draft is already typed and echoed) to the first
 rendered frame change. It includes tmux input latency, so it is an upper bound
@@ -148,7 +151,10 @@ def _stop() -> tuple[int, float]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--journeys", type=int, default=24)
-    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--output", required=True, type=Path,
+        help="new write-once JSON measurement beneath ~/.dharma/reports/helm",
+    )
     args = parser.parse_args()
     composer = _load_composer()
     output = composer.validate_output_path(args.output)
@@ -189,14 +195,14 @@ def main() -> int:
         "soak": {"duration_ms": soak_ms, "journeys": journeys},
         "rollback": {"steps": rb},
     }
-    output.write_text(json.dumps(measurement, indent=2) + "\n", encoding="utf-8")
     try:
         composer.parse_measurement_payload(measurement)
     except Exception as exc:  # noqa: BLE001 - a rejected run is still evidence
         invalid = output.with_suffix(".invalid.json")
-        output.replace(invalid)
+        composer.write_report_once(invalid, measurement)
         print(json.dumps({"invalid_measurement": str(invalid), "reason": str(exc)}))
         return 1
+    composer.write_report_once(output, measurement)
     print(json.dumps({"boot_ms": boot_ms, "intent_roundtrip_ms_from_enter": intent_ms,
                       "provider_stub_ms": provider_ms, "render_ms": render_ms,
                       "soak_ms": soak_ms, "journey_failures":

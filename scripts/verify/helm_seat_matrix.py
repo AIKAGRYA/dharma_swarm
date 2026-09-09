@@ -8,6 +8,10 @@ operation is one call to ``project_helm_on_call`` for one runtime epoch.
 Evidence, when supplied, is a JSON array of strict raw ``RouteEvidence`` rows.
 Serialized verdicts are never accepted as evidence.  Operational blockers are
 separate observations and cannot promote an evaluator verdict.
+
+New reports are confined to ``~/.dharma/reports/helm``; an existing report there
+may be replaced. Historical evidence and blocker inputs may remain at their
+original paths.
 """
 
 from __future__ import annotations
@@ -212,33 +216,41 @@ def build_report(
 
 
 def validate_output_path(path: Path) -> Path:
-    """Resolve an explicit report path and confine it to ``~/.dharma``."""
+    """Resolve a report path and confine it to ``~/.dharma/reports/helm``."""
 
-    root = (Path.home() / ".dharma").resolve()
+    state_root = Path.home() / ".dharma"
+    report_root = state_root / "reports" / "helm"
+    # Resolving a redirected report root would silently transfer its ownership.
+    if any(directory.is_symlink() for directory in (state_root, report_root.parent, report_root)):
+        raise MatrixInputError("~/.dharma/reports/helm must not contain symlink directories")
+    root = report_root.resolve()
     expanded = path.expanduser()
     if expanded.is_symlink():
         raise MatrixInputError("--output must not be a symlink")
     candidate = expanded.resolve()
     if candidate == root or not candidate.is_relative_to(root):
-        raise MatrixInputError("--output must be a file beneath ~/.dharma")
+        raise MatrixInputError("--output must be a file beneath ~/.dharma/reports/helm")
     if candidate.exists() and (candidate.is_dir() or candidate.is_symlink()):
         raise MatrixInputError("--output must name a regular file, not a directory or symlink")
     return candidate
 
 
 def write_report(path: Path, report: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = validate_output_path(path)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Recheck confinement after creating the report directory, before opening.
+    path = validate_output_path(path)
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
         descriptor = os.open(path, flags, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            os.fchmod(stream.fileno(), 0o600)
             json.dump(report, stream, indent=2, sort_keys=True)
             stream.write("\n")
     except OSError as exc:
         raise MatrixInputError(f"cannot write {path}: {exc}") from exc
-    os.chmod(path, 0o600)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -247,7 +259,7 @@ def _parser() -> argparse.ArgumentParser:
         "--output",
         required=True,
         type=Path,
-        help="explicit JSON report path beneath ~/.dharma",
+        help="JSON report beneath ~/.dharma/reports/helm; replaces an existing report",
     )
     parser.add_argument(
         "--evidence",

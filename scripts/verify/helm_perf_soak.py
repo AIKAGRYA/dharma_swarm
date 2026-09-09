@@ -6,7 +6,8 @@ provider, or reaching the network.  A separate operator-controlled runner record
 raw observations, including its explicit private tmux socket and rollback states.
 This module validates those observations, calculates the fixed statistics, compares
 them with an explicit baseline, and writes one immutable runtime artifact beneath
-``~/.dharma``.
+``~/.dharma/reports/helm``. Historical measurement and baseline inputs may
+remain at their original paths.
 
 The provider timing in this package is an offline stub round trip.  It is useful as a
 local bridge/UI regression oracle and is never labelled as live-provider evidence.
@@ -441,19 +442,24 @@ def build_report(
 
 
 def validate_output_path(path: Path) -> Path:
-    """Confine a new non-symlink JSON artifact to the current home ``.dharma``."""
+    """Confine a new JSON artifact to ``~/.dharma/reports/helm``."""
 
     expanded = path.expanduser()
     if expanded.is_symlink():
         raise HarnessInputError("--output must not be a symlink")
-    root = (Path.home() / ".dharma").resolve()
+    state_root = Path.home() / ".dharma"
+    report_root = state_root / "reports" / "helm"
+    # Resolving a redirected report root would silently transfer its ownership.
+    if any(directory.is_symlink() for directory in (state_root, report_root.parent, report_root)):
+        raise HarnessInputError("~/.dharma/reports/helm must not contain symlink directories")
+    root = report_root.resolve()
     resolved = expanded.resolve(strict=False)
     try:
         relative = resolved.relative_to(root)
     except ValueError as exc:
-        raise HarnessInputError("--output must be beneath ~/.dharma") from exc
+        raise HarnessInputError("--output must be beneath ~/.dharma/reports/helm") from exc
     if not relative.parts or resolved.suffix != ".json":
-        raise HarnessInputError("--output must name a .json file beneath ~/.dharma")
+        raise HarnessInputError("--output must name a .json file beneath ~/.dharma/reports/helm")
     if resolved.exists():
         raise HarnessInputError("--output already exists; reports are write-once")
     return resolved
@@ -499,7 +505,10 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--measurement", required=True, type=Path)
     parser.add_argument("--baseline", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--output", required=True, type=Path,
+        help="new write-once JSON report beneath ~/.dharma/reports/helm",
+    )
     return parser
 
 

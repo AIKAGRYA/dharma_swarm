@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-08-14"
+last_updated: "2026-09-10"
 
 # WP-0C1R ratified research participants (operator decision A1, 2026-08-02,
 # Titanium campaign — reports/governance/titanium/wp0c1r_semgrep_adjudication_2026-08-02.md).
@@ -93,6 +93,76 @@ state_dir:
   # metabolism/gate receipts into memory_kernel_reports only.
   vectors_db: "~/.dharma/vectors.db"
   memory_kernel_reports: "~/.dharma/reports/memory_kernel"
+  helm_verification_reports: "~/.dharma/reports/helm"
+  helm_desktop: "~/.dharma/helm_desktop"
+  helm_desktop_verification: "~/.dharma/helm-desktop-build/verification"
+
+# Operational declarations, separate from the ratified research roster above.
+# A declaration describes scope; it does not grant execution authority or attest
+# a live process. The report validators enforce the declared output boundary.
+helm_operational_surfaces:
+  governance_issue: "https://github.com/AIKAGRYA/dharma_swarm/issues/1520"
+  verification_reports:
+    files:
+      - scripts/verify/helm_perf_soak.py
+      - scripts/verify/helm_seat_matrix.py
+    callers:
+      - scripts/verify/helm_perf_soak_runner.py
+    state_slices:
+      - "~/.dharma/reports/helm"
+    report_schemas:
+      - dharma.helm.perf_soak_measurement.v1
+      - dharma.helm.perf_soak_report.v1
+      - dharma.helm.seat_matrix_run.v1
+    authority: verification_evidence_only
+    grants_effect_authority: false
+    writes: explicit_command_only
+    historical_inputs: "Existing report inputs and baselines remain readable at their original paths."
+  desktop:
+    optional: true
+    default_state_dir: "~/.dharma/helm_desktop"
+    state_dir_override: "--state-dir; dedicated absolute directory outside the source checkout"
+    status_file: status.json
+    status_file_env: DHARMA_HELM_DESKTOP_STATUS_FILE
+    status_schema: dharma.helm.desktop_status.v1
+    status_authority: observation_only
+    status_grants_effect_authority: false
+    status_publisher: dharma_swarm/terminal_bridge.py
+    status_adapter: dharma_swarm/terminal_bridge_desktop_status.py
+    status_consumers:
+      - dharma_swarm/helm_desktop/runtime.py
+      - terminal/desktop/macos/DesktopStatus.swift
+    execution_owner: dharma_swarm/terminal_bridge.py
+    launcher: scripts/start_terminal_tui_tmux.sh
+    explicit_command_writers:
+      - dharma_swarm/helm_desktop/install.py
+      - dharma_swarm/helm_desktop/runtime.py
+      - dharma_swarm/helm_desktop/workspace.py
+      - scripts/build_helm_menu.py
+    explicit_command_artifacts:
+      - install/manifest.json
+      - bin/helm-desktop
+      - config/aerospace.toml
+      - profiles/
+      - workspaces/
+      - last_start.json
+      - focus_pending.json
+      - operation.lock
+      - terminal/
+      - apps/Helm.app/
+      - cache/swift/
+      - menu-instance.json
+      - menu-instance.lock
+      - menu-launch.lock
+    verification:
+      driver: scripts/verify/helm_desktop_verify.py
+      default_artifact_root: "~/.dharma/helm-desktop-build/verification"
+      artifact_root_override: "--state-dir; verification run directories are created beneath this explicit root"
+      receipt: "<run>/receipt.json"
+      receipt_schema: dharma.helm.desktop_verification.v1
+      artifacts: "Disposable configuration, native build, captures, and receipts beneath each run directory"
+      authority: verification_evidence_only
+      grants_effect_authority: false
 
 api_routers:
   - id: holon
