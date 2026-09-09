@@ -134,3 +134,44 @@ def test_installer_cli_roundtrip_from_other_directory(config: DesktopConfig, tmp
         assert result.returncode == 0, result.stdout + result.stderr
         assert json.loads(result.stdout)["ok"]
     assert not (config.state_dir / "bin/helm-desktop").exists()
+
+
+def test_deleted_managed_file_is_not_recreated_and_names_recovery(config: DesktopConfig, tmp_path: Path) -> None:
+    argv = [sys.executable, str(ROOT / "scripts/helm_desktop.py"), "--state-dir", str(config.state_dir), "--json"]
+    assert subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True,
+                          text=True, timeout=10).returncode == 0
+    launcher = config.state_dir / "bin/helm-desktop"
+    launcher.unlink()
+
+    preview = subprocess.run([*argv, "install", "preview"], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    payload = json.loads(preview.stdout)
+    assert payload["ready"] is False
+    deleted = [item for item in payload["files"] if item["relative_path"] == "bin/helm-desktop"][0]
+    assert deleted["action"] == "conflict"
+    assert "deleted after installation" in deleted["reason"] and "restore --apply" in deleted["reason"]
+
+    applied = subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True,
+                             text=True, timeout=10)
+    assert applied.returncode == 1
+    assert json.loads(applied.stdout)["ok"] is False
+    assert not launcher.exists()
+
+
+def test_restore_preview_succeeds_while_reporting_preserved_edits(config: DesktopConfig, tmp_path: Path) -> None:
+    argv = [sys.executable, str(ROOT / "scripts/helm_desktop.py"), "--state-dir", str(config.state_dir), "--json"]
+    subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    edited = config.state_dir / "config/aerospace.toml"
+    edited.write_text(edited.read_text() + "# operator note\n")
+
+    result = subprocess.run([*argv, "uninstall"], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0
+    assert payload["ok"] is True and payload["outcome"] == "preview" and payload["mutates"] is False
+    assert payload["restores_fully"] is False
+    assert payload["preserved_count"] == 1 and payload["preserved_paths"] == ["config/aerospace.toml"]
+
+    applied = subprocess.run([*argv, "uninstall", "--apply"], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    applied_payload = json.loads(applied.stdout)
+    assert applied.returncode == 1
+    assert applied_payload["ok"] is False and applied_payload["outcome"] == "partial"
+    assert edited.exists()

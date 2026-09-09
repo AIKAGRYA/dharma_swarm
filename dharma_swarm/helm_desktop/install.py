@@ -95,19 +95,21 @@ def _plan(config: DesktopConfig) -> tuple[dict[str, Any], dict[str, tuple[bytes,
         existing, entry = _existing(config.state_dir, relative), manifest["files"].get(relative)
         previous = digest(existing[0]) if existing else None
         expected = digest(data)
+        reason = None
         if entry and existing and (previous != entry["installed_sha256"] or existing[1] != entry["installed_mode"]):
-            action = "conflict"
+            action, reason = "conflict", "existing or later user changes are preserved"
         elif entry and not existing:
             action = "conflict"
+            reason = ("this managed file was deleted after installation and is not recreated automatically; "
+                      "drop it from the manifest with: restore --apply, then install apply --apply")
         elif existing and not entry and previous != expected:
-            action = "conflict"
+            action, reason = "conflict", "existing or later user changes are preserved"
         elif existing and previous == expected and existing[1] == mode:
             action = "unchanged"
         else:
             action = "update" if existing else "create"
         actions.append({"path": str(config.state_dir / relative), "relative_path": relative, "action": action,
-                        "sha256": expected, "mode": oct(mode), "content": data.decode(),
-                        "reason": "existing or later user changes are preserved" if action == "conflict" else None})
+                        "sha256": expected, "mode": oct(mode), "content": data.decode(), "reason": reason})
     return manifest, wanted, actions
 
 
@@ -120,8 +122,10 @@ def preview(config: DesktopConfig) -> dict[str, Any]:
 
 def apply(config: DesktopConfig) -> dict[str, Any]:
     manifest, wanted, actions = _plan(config)
-    if any(a["action"] == "conflict" for a in actions):
-        raise DesktopError("installation conflicts with existing or later user edits; preview lists preserved paths")
+    conflicts = [a for a in actions if a["action"] == "conflict"]
+    if conflicts:
+        raise DesktopError("installation conflicts with the current state; preview lists every preserved path. "
+                           + " ".join(f"{a['relative_path']}: {a['reason']}" for a in conflicts))
     for relative, (data, mode) in wanted.items():
         existing = _existing(config.state_dir, relative)
         old_entry = manifest["files"].get(relative)
@@ -175,6 +179,8 @@ def restore(config: DesktopConfig, *, apply_changes: bool = False) -> dict[str, 
                 state_path(config.state_dir, relative).unlink()
         if read_json(config.state_dir, MANIFEST) is not None:
             write_json(config.state_dir, MANIFEST, {**manifest, "files": remaining})
-    return {"action": "restore", "mutates": apply_changes, "outcome": "partial" if remaining else "restored" if apply_changes else "preview",
+    outcome = ("partial" if remaining else "restored") if apply_changes else "preview"
+    return {"action": "restore", "mutates": apply_changes, "outcome": outcome,
             "files": actions, "preserved_count": len(remaining),
+            "preserved_paths": sorted(remaining), "restores_fully": not remaining,
             "detail": "runtime sessions, status, receipts and unrelated files remain intact"}
