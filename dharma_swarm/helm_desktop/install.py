@@ -101,7 +101,12 @@ def _plan(config: DesktopConfig) -> tuple[dict[str, Any], dict[str, tuple[bytes,
         elif entry and not existing:
             action = "conflict"
             reason = ("this managed file was deleted after installation and is not recreated automatically; "
-                      "drop it from the manifest with: restore --apply, then install apply --apply")
+                      "drop it from the manifest with: restore --apply, then install apply --apply"
+                      if entry["original"] is None else
+                      "this managed file was deleted after installation and a backup of the file it replaced is "
+                      "preserved; restore keeps that entry, so reconciling this deletion is a deliberate operator "
+                      "decision. To install without touching it, use a separate installation with a fresh "
+                      "--state-dir and its own --socket and --session")
         elif existing and not entry and previous != expected:
             action, reason = "conflict", "existing or later user changes are preserved"
         elif existing and previous == expected and existing[1] == mode:

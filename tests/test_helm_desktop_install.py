@@ -156,6 +156,41 @@ def test_deleted_managed_file_is_not_recreated_and_names_recovery(config: Deskto
     assert json.loads(applied.stdout)["ok"] is False
     assert not launcher.exists()
 
+    assert subprocess.run([*argv, "uninstall", "--apply"], cwd=tmp_path, capture_output=True,
+                          text=True, timeout=10).returncode == 0
+    assert not launcher.exists()
+    recovered = subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True,
+                               text=True, timeout=10)
+    assert recovered.returncode == 0, recovered.stdout + recovered.stderr
+    assert launcher.exists()
+
+
+def test_deleted_managed_file_with_backup_advises_deliberate_reconciliation(config: DesktopConfig,
+                                                                           tmp_path: Path) -> None:
+    argv = [sys.executable, str(ROOT / "scripts/helm_desktop.py"), "--state-dir", str(config.state_dir), "--json"]
+    subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    (config.state_dir / install.MANIFEST).unlink()
+    subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    launcher = config.state_dir / "bin/helm-desktop"
+    launcher.unlink()
+
+    payload = json.loads(subprocess.run([*argv, "install", "preview"], cwd=tmp_path, capture_output=True,
+                                        text=True, timeout=10).stdout)
+    deleted = [item for item in payload["files"] if item["relative_path"] == "bin/helm-desktop"][0]
+    assert deleted["action"] == "conflict"
+    assert "backup" in deleted["reason"] and "--state-dir" in deleted["reason"]
+    assert "restore --apply, then install" not in deleted["reason"]
+
+    restored = json.loads(subprocess.run([*argv, "uninstall", "--apply"], cwd=tmp_path, capture_output=True,
+                                         text=True, timeout=10).stdout)
+    assert "bin/helm-desktop" in restored["preserved_paths"]
+    assert not launcher.exists()
+    entry = json.loads((config.state_dir / install.MANIFEST).read_text())["files"]["bin/helm-desktop"]
+    assert entry["original"] is not None
+    blocked = subprocess.run([*argv, "install", "apply", "--apply"], cwd=tmp_path, capture_output=True,
+                             text=True, timeout=10)
+    assert blocked.returncode == 1 and not launcher.exists()
+
 
 def test_restore_preview_succeeds_while_reporting_preserved_edits(config: DesktopConfig, tmp_path: Path) -> None:
     argv = [sys.executable, str(ROOT / "scripts/helm_desktop.py"), "--state-dir", str(config.state_dir), "--json"]
