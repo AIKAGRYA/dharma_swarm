@@ -4,6 +4,7 @@
 document_role: working_plan
 status: ACTIVE_OPERATOR_DIRECTED
 date: 2026-09-01
+updated_at: 2026-09-10
 scope: one experiential, locally wired HELM prototype
 authority: none of its own
 subordinate_to:
@@ -210,3 +211,255 @@ and architecture work; they must not be collapsed into a premature success label
 
 Every future update to this plan must distinguish operator ruling, repository canon,
 admitted code, observed runtime evidence, and proposed destination architecture.
+
+## 11. Desktop convergence — operator destination 2026-09-10
+
+This section records a proposed extension of the destination in §2. The operator's
+new words are preserved beneath the original quote in
+[the leg-one destination](HELM_LEGONE_SPEC.md#11-the-operators-own-words--canon).
+It refines this working plan, introduces no new product or authority owner, and
+leaves the current prototype exclusions and production acceptance conditions intact.
+[The glossary](CONTEXT.md) fixes the terms used below.
+
+### 11.1 The experience
+
+The proposed desktop extension makes the Mac an entrance to Helm: one shortcut
+returns to the persistent seat; a Research workspace brings the relevant project,
+editor, browser, and terminal into view; compact indicators open the exact work item
+or evidence already visible in Helm. A task continues when a window closes, where
+its existing runtime owner supports that lifecycle. Reopening a window restores the
+seat without claiming that interrupted work continued.
+
+Keep macOS as the host for this first design. Package the preferred tools, themes,
+keymaps, and workspace profiles as one reversible installation. Keep model inference
+on the host where the chosen provider supports it; an optional Linux environment is
+an execution target with its own identity and limits. Kernel development and a new
+distribution are outside this extension.
+
+The interface stays quiet: conversation and current work first; a short status band;
+details on demand; stable keyboard verbs at every depth. Desktop controls should
+return to the relevant Helm view rather than create another dashboard. These choices
+extend the leg-one experience and curator-seat requirements
+(`HELM_LEGONE_SPEC.md`, §§2.2, 2.6, 2.8).
+
+### 11.2 One set of semantics across every entrance
+
+Proposed arrangement; the additional desktop adapters and shared action catalogue
+are not implemented by this document:
+
+```text
+Helm TUI       Desktop shortcut / palette       Status indicator
+    |                     |                            |
+    +----- same entity identities and action descriptions -----+
+                          |
+              existing Python owner gateway
+                          |
+      existing work, session, context, and execution owners
+                          |
+          local tools / host model / remote worker
+```
+
+Retain Bun/Ink as the comparison implementation and the Python owner gateway in §3.
+Use the existing protocol and command catalogue to describe each permitted action:
+stable identity, argument schema, owning executor, effect class, scope,
+preconditions, timeout/cancellation behavior, result schema, and restoration or
+compensation limits. This is an extension of existing descriptors, not a second
+command bus. Shortcuts, typed commands, and AI suggestions must resolve to the same
+description. A natural-language suggestion remains a proposal until validated.
+
+Project and task state stays with its existing owner. The desktop owns only its
+layout/profile preference and view state. All entrances carry the same workspace,
+task, session, and request identities and retain source epoch/freshness. Unknown or
+stale state is visible; opening a window cannot renew an observation's freshness.
+
+The current stdio bridge is process-local (`terminal/src/bridge.ts:169`,
+`dharma_swarm/terminal_bridge.py:125`). A desktop adapter cannot gain a shared
+session merely by starting a second bridge. First prove identity and snapshot parity
+through existing owner interfaces. If multi-client attachment later requires a host
+endpoint, adapt the established gateway/transport after profiling; preserve owner
+identities, request correlation, reconnect semantics, and version compatibility.
+Do not introduce an independent daemon or state store as an incidental UI feature.
+
+Start with a passive status mirror issued by the existing Helm session owner:
+session identity, phase, source epoch, observation time, and expiry. The menu-bar
+adapter renders it and opens the existing seat. Opening that adapter must create
+zero new bridge or provider sessions; expiry or disconnect must become visibly stale.
+
+This follows the thin-client and canonical-owner boundary in
+`docs/architecture/FLEET_COMMAND_OPERATOR_SURFACE.md:42`, `:110`, and `:128`.
+
+### 11.3 Existing footholds and unresolved integration
+
+Source review baseline: commit `cf74acfc6de625ade0efb6820fa1ec0a23116975`, branch
+`codex/helm-legtwo-20260902`, host `Johns-MacBook-Pro.local`, observed 2026-09-10.
+These are source observations; no fresh end-to-end performance or live-provider
+claim is made here. Recheck the cited owners before implementation.
+
+| Foothold | Evidence at the baseline | Consequence for the next slice |
+|---|---|---|
+| Bun/React/Ink frontend | `terminal/package.json:1` | Keep behavior and input handling as the comparison oracle. |
+| Typed Helm owner projection | `dharma_swarm/operator_core/helm_context.py:14` | Preserve modality and bounded context on desktop projections. |
+| Some owner adapters are optional | `dharma_swarm/terminal_bridge_helm_context.py:199`; `dharma_swarm/operator_core/helm_context_projection.py:28` | Qualify missing owners individually; never substitute a guessed task or health state. |
+| Effect evaluator is not integrated | `dharma_swarm/operator_core/helm_context_projection.py:482` | Expose read-only parity first; effectful workflows remain a separately verified slice. |
+| Serial Python request dispatch | `dharma_swarm/terminal_bridge.py:383` | Measure head-of-line delay from status work before choosing concurrency changes. |
+| Periodic owner refresh | `terminal/src/app.tsx:2582` | Measure and bound refresh work; preserve periodic reconciliation when adding event-driven updates. |
+| Buffered provider output | `dharma_swarm/terminal_bridge_chat.py:191`; `:395` | Measure first-visible-token separately from final completion and UI latency. |
+| Event ingestion rebuilds projections | `terminal/src/state.ts:267`; `terminal/src/executionLog.ts:15` | Profile repeated work across retained events before changing already-windowed transcript rendering. |
+| MemoryKernel is a read-only facade | `dharma_swarm/memory_kernel/facade.py:60`; `:238` | Use its governed retrieval/context path; persistence and promotion stay with registered writers. |
+
+Source-level queueing and buffering are profiling leads, not proof of the cause of
+any observed stall. The historical 2026-09-02 measurements in
+[the Rust experiment](HELM_RUST_PARITY_EXPERIMENT_20260902.md) used an offline/stub
+journey. Their cockpit transition measurement cannot be read as renderer compute
+time or current production latency.
+
+### 11.4 Speed is an interaction contract
+
+Retain the locked boundaries from `HELM_LEGONE_SPEC.md`, §2.5. These are acceptance
+targets, not achieved measurements:
+
+| Boundary | Target retained from the existing plan |
+|---|---|
+| App state to computed/written frame | p95 ≤10 ms; max ≤16.7 ms |
+| Physical keypress to visible glyph | p95 ≤50 ms; outer loaded key-to-paint p99 <100 ms |
+| Local place switch | p95 <50 ms |
+| Stream event to visible output | p95 <100 ms |
+| Cold app start to first frame | ≤150 ms; separately retain outer first-paint p95 ≤250 ms |
+| Live region under 10 MB/min log flood | ≥30 fps, 60 fps burst, zero dropped input |
+| App steady-state memory | ≤120 MB RSS; distinguish the outer loaded <250 MiB budget |
+| Warm bridge readiness | p95 <2 seconds; never conflate with first paint |
+
+Add measurements for warm desktop activation, catalogue search, cancellation
+acknowledgment, provider first token, and event-loop lag. Proposed warm activation
+and local search target: p95 <50 ms. Cancellation acknowledgment target: p95 <100 ms;
+actual owner termination is separately reported and may take longer. Provider
+latency is reported by route, with no universal network/model latency promise.
+
+Implementation direction:
+
+1. Keep input, selection, draft editing, local search, and navigation off model,
+   network, disk-scan, and subprocess completion paths. Render a small local view
+   immediately, with an explicit unknown/stale state until owners answer.
+2. Bound rendering to the viewport. Keep scrollback append-only; use incremental
+   selectors and memoization; update only the parts affected by an event. Cap
+   retained in-memory history and expand older evidence on demand.
+3. Separate telemetry scheduling from operator interaction. Coalesce replaceable
+   status observations; bound in-flight work and queue sizes; propagate deadlines.
+   Never drop input, action lifecycle records, or cancellation to preserve frame rate.
+4. Move slow probes off the input path, preserving single-owner write ordering.
+   Prefer invalidation/subscription to frequent full scans, with bounded periodic
+   reconciliation to detect missed events. Reconnect via owner snapshots/cursors;
+   deduplicate repeated events and show sequence gaps instead of inventing continuity.
+5. Stream provider output asynchronously only with correct attempt identity. If an
+   attempt fails after partial output, retain it as failed/interrupted and start a
+   separately labelled attempt; never splice fallback output into a successful turn
+   or promote speculative tokens to verified evidence.
+6. Attribute layout, rendering, terminal write, bridge wait, and provider wait before
+   changing the renderer. Preserve the Rust experiment's parity and ≥3× measured
+   probe-improvement criteria; language choice alone is not a performance result.
+
+Measurement protocol: pin commit, host, runtime, emulator, viewport, scale, workload,
+and power mode; separate cold and warm runs; collect distributions and failures.
+Use monotonic timestamps at named boundaries and enough repetitions to report p95
+and p99 (at least 1,000 samples for the proposed input/event distributions).
+Terminal capture polling is useful for journey correctness but cannot establish
+sub-poll-interval frame latency; the existing harness uses tmux round trips and
+120 ms capture polling (`scripts/verify/helm_perf_soak.py:60`,
+`scripts/verify/helm_perf_soak_runner.py:103`). Report software input-to-write and physical
+keypress-to-visible separately. Include the existing 5k-node/50k-event workload,
+10 events/second, log flood, resize/reconnect, and the required 24-hour soak before a
+production performance claim; a short smoke is explicitly a smoke.
+
+### 11.5 Capable and AI-native
+
+An agent should receive the selected work item's identity, relevant project changes,
+recent task events, applicable action descriptions, budgets, and attributed evidence
+through the existing context compiler/MemoryKernel boundary. Load detail on demand,
+reuse stable prompt prefixes, and invalidate cached facts when their source epoch or
+permissions change. Prompt size, retrieval time, task success, cost, and time to a
+verified useful result are separate measurements. A larger prompt is not the goal.
+
+Route through existing provider owners. Permit task-specific models and isolated,
+bounded parallel workers where useful; preserve working context across model changes
+without upgrading a new model's authority. Routine deterministic actions use their
+existing commands. AI supplies planning, synthesis, diagnosis, and proposals.
+
+The future effect boundary should make this distinction executable:
+
+```text
+propose(Intent, OwnedContext) -> Proposal             # grants no authority
+admit(Proposal, OperatorAuthorization, CurrentOwnerPolicy) -> OwnedEffect | Held
+execute(OwnedEffect) -> OwnerReceipt                 # owner rechecks at execution
+verify(OwnerReceipt, Evidence, Rule) -> VerifiedOutcome | UnverifiedOutcome
+```
+
+This is human-readable proposed type notation, not an implemented language or a new
+permission service. Refine the existing
+[effect-lane decision packet](HELM_EFFECT_LANE_DECISION_PACKET_20260902.md) and
+canonical execution owners. The owner validates evidence of the operator's scoped
+authorization; policy compatibility alone cannot create that authorization.
+Bind a future grant to executor, target identity,
+argument digest, scope, expiry, request identity, and one-use redemption. Reject
+forgery, replay, expired grants, changed arguments/owners, and revoked policy at the
+executor even when a different UI presents the request. Success, verification, and
+authorization are independent facts; a model's text cannot cast between them.
+
+Already scoped operator authority should be respected by implementations; asking
+again is not a substitute for correct capability enforcement. The current effect
+packet's confirmation design remains a proposal and this vision does not activate
+an execution path, widen permissions, or authorize fleet/credential changes.
+
+### 11.6 Adaptability without losing continuity
+
+Workspace profiles declare resources, layout, keymap, theme, and integration IDs.
+Use stable IDs and explicit schema versions. Keep preferences separate from secrets
+and execution grants. A profile can be previewed and restored; merely loading one
+cannot run arbitrary shell snippets or start a model job.
+
+Adapters declare their events, actions, version compatibility, resource limits, and
+required capabilities. Isolate slow/crashing adapters; disabled or missing adapters
+show a useful unavailable state while the seat remains usable. Keep TUI behavior
+available without desktop integration, and keep familiar macOS shortcuts intact
+unless a profile explicitly overrides them.
+
+Adaptation is a tested change: propose a profile/tool/workflow revision, show its
+diff, evaluate it on recorded and held-out journeys in isolation, and promote it
+through the appropriate owner. Track task success alongside latency, cost, and
+restoration failures. Preserve the previous profile; never assume all effects are
+reversible or that an agent can rewrite its own permissions.
+
+### 11.7 Ordered implementation slices
+
+These are future work descriptions, not newly admitted live effects or completed
+features. Each change serves the existing fleet/Helm track and retains its boundaries.
+
+| Order | Deliverable | Acceptance evidence |
+|---|---|---|
+| 1 | Reproduce and instrument current Helm latency | Named render/queue/provider spans; raw distributions; honest missing metrics; baseline journey and input tests stay green. |
+| 2 | Passive status mirror and shared read-only description seam | TUI and a disposable desktop adapter resolve the same session/work item, owner, modality, freshness, and allowed actions; no additional bridge/provider session; stale/reconnect/cross-session fixtures pass; no secondary task store. |
+| 3 | One Research workspace profile | Preview then open existing resources while preserving Helm session, selection, and draft; repeated launch produces no duplicate work; missing apps/partial launch are visible; compare-before-restore preserves subsequent user edits. |
+| 4 | Fast projections and streaming | Slow owner, stalled provider, log flood, resize, and adapter failure preserve input; event gaps reconcile; partial/fallback output retains correct attempt identity; measured boundaries meet their targets. |
+| 5 | One bounded useful workflow through the admitted effect owner | Exact scope/target/digest enforcement, cancellation, idempotent request handling, restart reconciliation, and independent outcome evidence; unavailable until that effect owner is integrated and its lane admitted. |
+| 6 | Package and adapt | Reproducible install, versioned profile migrations, known previous version, uninstall/restoration proof, compatibility checks, and held-out journey evaluation. |
+
+Keep renderer replacement conditional on the existing Rust experiment. Prove the
+same journey and all interaction contracts before changing the comparison oracle.
+
+The first combined journey is deliberately concrete: select Research from a Mac
+shortcut, land in the same Helm session, inspect one real work item, open its evidence,
+observe a slow/unavailable owner without frozen input, and restore the workspace
+configuration. A later admitted effect slice adds execution of one useful task.
+
+### 11.8 Keep the vision recoverable
+
+The original operator destination and dated additions stay in `HELM_LEGONE_SPEC.md`.
+This file owns the working interpretation and next slices; `CONTEXT.md` owns only
+the scoped glossary. Future Helm/desktop tasks should start from this section and
+the relevant code owners, load deeper context through MemoryKernel, and cite the
+source version. Retrieval of this plan must retain `working_plan`/proposal status,
+not present design intent as implemented capability or current authority.
+
+Maintain a short changed/verified/remaining note when a slice lands, with exact tests
+and source references. Store benchmark traces and runtime receipts under
+`~/.dharma/`; keep links to them here rather than copying measurements into doctrine.
+Do not create a parallel desktop roadmap or a duplicate memory database.
