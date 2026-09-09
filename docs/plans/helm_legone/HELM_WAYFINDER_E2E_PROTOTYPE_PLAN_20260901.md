@@ -543,7 +543,14 @@ bash scripts/helm_desktop.sh restore --json
 bash scripts/helm_desktop.sh restore --apply
 ```
 
-This restores the generated profile/wrapper/snippet. Runtime sessions and receipts
+This restores the generated profile/wrapper/snippet. A preview run mutates nothing
+and succeeds (`outcome: preview`, exit 0) even when it lists files it would preserve;
+only an applied run that leaves preserved files reports `outcome: partial` and a
+non-zero exit. A managed file the operator later edited or deleted is preserved, never
+overwritten or recreated: `install preview` reports it as a conflict whose `reason`
+names the recovery, and for a deletion whose backup is still held the reconciliation is
+a deliberate operator decision (install elsewhere with a fresh `--state-dir`, `--socket`
+and `--session`). Runtime sessions and receipts
 retain their independent lifecycle. The compiled native app remains a build
 artifact under the selected state directory; **Quit Menu** stops only its observer.
 The AeroSpace snippet is an optional, reviewable configuration fragment; installation
