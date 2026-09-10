@@ -268,6 +268,10 @@ def main() -> int:
     if settings.get("identity") != _identity(config):
         raise DesktopError("workbench settings belong to another workspace")
     prepared = prepare_workbench(config, model=settings.get("model"), api_access=settings.get("api_access", False))
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
+    # reason=argv is a fixed internal tuple (resolved executable, repo root, validated model id)
+    # passed as a list without a shell; the environment is a filtered allowlist built in
+    # prepare_workbench, so no caller-controlled string reaches a command interpreter.
     return subprocess.call(prepared.argv, env=prepared.environment, cwd=config.repo_root)
 
 

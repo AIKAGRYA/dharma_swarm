@@ -18,6 +18,10 @@
     "dharma_swarm/helm_desktop/profiles.py",
     "dharma_swarm/helm_desktop/runtime.py",
     "dharma_swarm/helm_desktop/storage.py",
+    "dharma_swarm/helm_desktop/workbench_config.py",
+    "dharma_swarm/helm_desktop/workbench_context.py",
+    "dharma_swarm/helm_desktop/workbench_mcp.py",
+    "dharma_swarm/helm_desktop/workbench_runtime.py",
     "dharma_swarm/helm_desktop/workspace.py",
     "dharma_swarm/key_oracle.py",
     "dharma_swarm/memory_kernel/write_policy.py",
@@ -60,6 +64,7 @@
     "docs/plans/helm_legone/HELM_LEGONE_SPEC.md",
     "docs/plans/helm_legone/HELM_RUST_PARITY_EXPERIMENT_20260902.md",
     "docs/plans/helm_legone/HELM_WAYFINDER_E2E_PROTOTYPE_PLAN_20260901.md",
+    "docs/plans/helm_legone/HELM_WORKBENCH_OMARCHY_RESEARCH_20260910.md",
     "reports/agentops/work_packets/fleet-advancement-WP-HELM-PROD-ADMISSION-20260831.json",
     "scripts/build_helm_menu.py",
     "scripts/capture_terminal_tui_tmux.sh",
@@ -131,10 +136,14 @@
     "tests/test_claude_preview_protocol.py",
     "tests/test_conductors.py",
     "tests/test_helm_desktop.py",
+    "tests/test_helm_desktop_close.py",
     "tests/test_helm_desktop_install.py",
     "tests/test_helm_doctor.py",
     "tests/test_helm_perf_soak.py",
     "tests/test_helm_seat_matrix.py",
+    "tests/test_helm_workbench_config.py",
+    "tests/test_helm_workbench_context.py",
+    "tests/test_helm_workbench_runtime.py",
     "tests/test_key_oracle_live_filter.py",
     "tests/test_memory_writer_sentinel.py",
     "tests/test_model_key_routing_guard.py",
@@ -254,6 +263,6 @@
       "Native UI placement/focus smoke checks, full physical input latency/soak targets, stable source packaging, and complete production seat admission remain unproven by this Desktop slice. Production cutover still requires the named runtime, route, rollback, review, and CI evidence."
     ],
     "rollback": "Revert scoped source changes as needed; use the Desktop restore preview/apply contract for its generated profile, wrapper, and snippet, preserving pre-existing files and later edits. A source rollback does not itself stop a running terminal or menu, mutate a protected tmux seat, change credentials, or alter a provider account.",
-    "packet_digest": "0966e557f4ee940259507beabf394038802db8c11c8ccc3065ebc02f57aeee95"
+    "packet_digest": "a1db16df8a83a4dccb1606c503008965f7e43fa0f878bb13ca3b2d9e36f6e725"
   }
 }
