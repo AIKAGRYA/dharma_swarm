@@ -2956,6 +2956,11 @@ export function App(): React.ReactElement {
     }
   }
 
+  function quit(): void {
+    bridge.close();
+    exit();
+  }
+
   function submitPrompt(prompt: string): void {
     // Preserve the operator's bytes for every backend-bound conversational
     // turn. A trimmed view is used only to recognize exact local slash forms;
@@ -2967,6 +2972,10 @@ export function App(): React.ReactElement {
     }
     const exactLocalInput = rawPrompt === submitted && !/[\r\n\u2028\u2029]/u.test(rawPrompt);
     const exactSlashCommand = exactLocalInput && isSlashCommandPrompt(submitted);
+    if (exactSlashCommand && /^\/(quit|exit)$/i.test(submitted)) {
+      quit();
+      return;
+    }
     dispatch({type: "prompt.clear"});
     if (exactSlashCommand && submitted.toLowerCase() === "/cancel") {
       requestActiveTurnCancellation("command");
@@ -3330,8 +3339,24 @@ export function App(): React.ReactElement {
   }, [rawStdin]);
 
   useInput((input, key) => {
-    // The guided tour modal swallows the next keystroke to dismiss itself —
-    // any key closes it (operator word 2026-06-16).
+    // Lifecycle shortcuts belong to the App, including while an overlay owns
+    // ordinary navigation. Explicit quit never waits for cancellation replies.
+    if (key.ctrl && input === "q") {
+      quit();
+      return;
+    }
+    if (key.ctrl && input === "c") {
+      const cancellation = decideTurnCancellation(stateRef.current.activeTurn);
+      const bootstrapPending = Object.keys(pendingBootstraps.current).length > 0;
+      const bootstrapCancellationGuarded = Date.now() - bootstrapCancellationGuardRef.current < 2_000;
+      if (cancellation.kind !== "idle" || bootstrapPending || bootstrapCancellationGuarded) {
+        requestActiveTurnCancellation("shortcut");
+        return;
+      }
+      quit();
+      return;
+    }
+    // The guided tour dismisses on ordinary keys after global lifecycle input.
     if (state.uiMode.activeOverlay.kind === "tour") {
       dispatch({type: "tour.close"});
       dispatch({type: "status.set", value: "tour closed"});
@@ -3377,6 +3402,9 @@ export function App(): React.ReactElement {
         ]);
         return;
       }
+      if (key.ctrl || key.meta) {
+        return;
+      }
       if (input === "j" || key.downArrow) {
         dispatch({type: "modelPicker.set", index: Math.min(state.uiMode.activeOverlay.selectedIndex + 1, maxIndex)});
         return;
@@ -3396,18 +3424,6 @@ export function App(): React.ReactElement {
         }
         return;
       }
-      return;
-    }
-    if (key.ctrl && input === "c") {
-      const cancellation = decideTurnCancellation(stateRef.current.activeTurn);
-      const bootstrapPending = Object.keys(pendingBootstraps.current).length > 0;
-      const bootstrapCancellationGuarded = Date.now() - bootstrapCancellationGuardRef.current < 2_000;
-      if (cancellation.kind !== "idle" || bootstrapPending || bootstrapCancellationGuarded) {
-        requestActiveTurnCancellation("shortcut");
-        return;
-      }
-      bridge.close();
-      exit();
       return;
     }
     if (key.escape) {
@@ -3674,7 +3690,7 @@ export function App(): React.ReactElement {
 
   // The guided tour is an isolated, full-screen modal box (operator word
   // 2026-06-16) — it pre-empts every face so it is never tangled with the
-  // transcript. Any key dismisses it (handled in the input handler above).
+  // transcript. Ordinary keys dismiss it (handled in the input handler above).
   if (state.uiMode.activeOverlay.kind === "tour") {
     const tourPanes = state.tabs.map((tab) => ({id: tab.id, title: tab.title}));
     return (

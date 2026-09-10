@@ -90,6 +90,20 @@ incremental acceptance criteria are retained in
 [Wayfinder convergence plan §11](HELM_WAYFINDER_E2E_PROTOTYPE_PLAN_20260901.md#11-desktop-convergence--operator-destination-2026-09-10).
 Product terminology lives in the scoped [glossary](CONTEXT.md).
 
+**Usability additions — later operator conversation, 2026-09-10 (verbatim):**
+
+> maybe we should just wait for the hardening of the whole dharma swarm app?? before we contineu, not even sure.. the current helm is mostly unsabale and king of crappy for a variety of reasons andneeds a lot of improvment, first of all frntier models that re easily toggable and is at least as user friendly as claude code or open code with multp emodles and dep awareness.
+
+> ok do that now, asap.  i can:t even close the current dharma helm window for some resaon and the expereince is very very bad.  please reserach omarch deeply download it and use it if you must using screnshots and computer use. thta is the type of feel and experience i:m goign for
+
+These additions preserve the operator's immediate usability direction without
+overwriting the original destination or claiming the leg-one alive bar has passed.
+The bounded OpenCode workbench interpretation, with the original cockpit separately
+labeled Diagnostics, is in
+[the working plan, §11.10](HELM_WAYFINDER_E2E_PROTOTYPE_PLAN_20260901.md#1110-usability-correction--2026-09-10).
+Its supporting [research reference](HELM_WORKBENCH_OMARCHY_RESEARCH_20260910.md)
+does not establish full Helm parity or production completion.
+
 ### 1.2 Working decomposition — **Fable's read, not operator words**
 
 Marked as such on the map. Six movements:

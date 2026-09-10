@@ -97,19 +97,22 @@ final class HelmMenu: NSObject, NSApplicationDelegate {
                        observation.snapshot?.pending_approvals.map(String.init) ?? "unknown"].joined(separator: "\n")
         guard menuKey != lastMenuKey else { return }
         lastMenuKey = menuKey
-        item.button?.title = observation.title
+        item.button?.title = "Helm"
         let menu = NSMenu()
-        let status = NSMenuItem(title: "\(observation.availability): \(observation.reason)", action: nil, keyEquivalent: "")
+        addAction(menu, title: "Open Workbench", selector: #selector(workbench), key: "h")
+        addAction(menu, title: "Close Workbench Window", selector: #selector(closeWorkbench), key: "w")
+        menu.addItem(.separator())
+        addAction(menu, title: "Open Diagnostics Cockpit", selector: #selector(focus), key: "d")
+        addAction(menu, title: "Close Diagnostics Window", selector: #selector(closeDiagnostics), key: "")
+        let status = NSMenuItem(title: "Diagnostics: \(observation.availability)", action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
         if let snapshot = observation.snapshot {
             let requested = [snapshot.route.requested_provider_id, snapshot.route.requested_model_id]
                 .compactMap { $0 }.joined(separator: " / ")
-            if !requested.isEmpty { menu.addItem(withTitle: "Requested: \(requested)", action: nil, keyEquivalent: "") }
-            menu.addItem(withTitle: "Approvals: \(snapshot.pending_approvals.map(String.init) ?? "unknown")", action: nil, keyEquivalent: "")
+            if !requested.isEmpty { menu.addItem(withTitle: "Diagnostic chat: \(requested)", action: nil, keyEquivalent: "") }
         }
         menu.addItem(.separator())
-        addAction(menu, title: "Show Helm", selector: #selector(focus), key: "h")
         addAction(menu, title: "Open Workspace", selector: #selector(workspace), key: "r")
         menu.addItem(.separator())
         addAction(menu, title: "Quit Menu", selector: #selector(quit), key: "q")
@@ -124,6 +127,9 @@ final class HelmMenu: NSObject, NSApplicationDelegate {
     }
 
     @objc func focus() { runAction(["focus"]) }
+    @objc func workbench() { runAction(["workbench", "open"]) }
+    @objc func closeWorkbench() { runAction(["workbench", "close"]) }
+    @objc func closeDiagnostics() { runAction(["close"]) }
     @objc func workspace() { runAction(["workspace", "open"]) }
     @objc func quit() { NSApp.terminate(nil) }
 
@@ -160,7 +166,18 @@ final class HelmMenu: NSObject, NSApplicationDelegate {
             }
             process.waitUntilExit()
             let notice = DesktopActionNotice.parse(retained, exitStatus: process.terminationStatus)
-            DispatchQueue.main.async { self.finishAction(notice) }
+            let result = (try? JSONSerialization.jsonObject(with: retained)) as? [String: Any]
+            DispatchQueue.main.async {
+                // Bring the dedicated GUI forward, including from another Space.
+                // A generic "open WezTerm" can focus the operator's other window.
+                if arguments == ["workbench", "open"], result?["ok"] as? Bool == true,
+                   let pid = result?["gui_pid"] as? Int32,
+                   let app = NSRunningApplication(processIdentifier: pid),
+                   app.bundleIdentifier == "com.github.wez.wezterm" {
+                    app.activate(options: [.activateAllWindows])
+                }
+                self.finishAction(notice)
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 45) { if process.isRunning { process.terminate() } }
     }

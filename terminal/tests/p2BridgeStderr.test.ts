@@ -14,6 +14,10 @@ class FakeBridgeProcess extends EventEmitter {
   readonly stderr = new PassThrough();
   killed = false;
 
+  unref(): this {
+    return this;
+  }
+
   kill(signal: NodeJS.Signals | number = "SIGTERM"): boolean {
     if (this.killed) return false;
     this.killed = true;

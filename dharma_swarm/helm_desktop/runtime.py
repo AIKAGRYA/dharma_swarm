@@ -173,3 +173,30 @@ def focus(config: DesktopConfig, *, runner: Runner = run) -> dict[str, Any]:
         runner(["open", "-a", "WezTerm"], env=config.environment())
     write_json(config.state_dir, "focus_pending.json", {"at": time.time(), "seat": config.seat(), **outcome})
     return {"action": "focus", "seat": config.seat(), **outcome}
+
+
+def close(config: DesktopConfig, *, runner: Runner = run) -> dict[str, Any]:
+    """Detach only WezTerm clients verified against this exact private seat."""
+    if tmux(config, "has-session", "-t", f"={config.session}", runner=runner).returncode:
+        return {"action": "close", "outcome": "already_closed", "seat": config.seat()}
+    clients = tmux(config, "list-clients", "-t", f"={config.session}", "-F", "#{client_tty}", runner=runner)
+    if clients.returncode:
+        raise DesktopError("could not inspect the exact private Helm attachments")
+    ttys = set(clients.stdout.splitlines())
+    if not ttys:
+        return {"action": "close", "outcome": "already_closed", "seat": config.seat()}
+    panes = wezterm_panes(config, runner=runner)
+    if panes is None:
+        raise DesktopError("could not verify the Helm window because WezTerm is unavailable")
+    owned = {pane.get("tty_name") for pane in panes if pane.get("tty_name") in ttys}
+    for tty in sorted(owned):
+        result = tmux(config, "detach-client", "-t", tty, runner=runner)
+        if result.returncode:
+            raise DesktopError("a verified Helm attachment could not be closed")
+    remaining = tmux(config, "list-clients", "-t", f"={config.session}", "-F", "#{client_tty}", runner=runner)
+    if remaining.returncode:
+        raise DesktopError("Helm close was requested but its completion could not be verified")
+    if owned.intersection(remaining.stdout.splitlines()):
+        raise DesktopError("Helm close was requested but a client remains attached")
+    return {"action": "close", "outcome": "closed" if owned else "already_closed",
+            "attachments_closed": len(owned), "session_preserved": True, "seat": config.seat()}

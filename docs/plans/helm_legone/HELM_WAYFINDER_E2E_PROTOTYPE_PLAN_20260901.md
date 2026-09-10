@@ -32,17 +32,25 @@ repository canon. Canon and owner records win on conflict. It also does not rede
 and verify the whole swarm from one persistent seat, while every displayed claim and
 available action retains its real owner, freshness, evidence, and authority.**
 
-There is one visible product. tmux, Git worktrees, provider CLIs, Python services,
-Treehouse, and future renderer processes are plumbing or bounded tools, never rival
-operator seats.
+Under the operator-directed usability correction in §11.10, the desktop entrance
+prioritizes the OpenCode coding workbench. The existing Helm cockpit is separately
+labeled Diagnostics. Their session owners and capabilities remain explicit; a shared
+launcher does not make their histories, protocols, or effect authority interchangeable.
 
 ## 3. Binding interpretation for this prototype
 
-The current experiential oracle is the admitted Bun/React/Ink application with the
-Python `terminal_bridge` owner gateway. It remains the prototype chassis until a
-replacement proves behavioral parity and a measured improvement.
+The admitted Bun/React/Ink application with the Python `terminal_bridge` gateway
+remains the regression oracle for the Helm diagnostic cockpit. The operator's
+2026-09-10 usability request changes the immediate coding entrance: §11.10 adopts
+the installed OpenCode client as the primary workbench and retains that cockpit as
+a separately labeled diagnostic surface. Using the mature coding client does not
+wait for a replacement Helm renderer to prove parity.
 
-The destination architecture is:
+This is a bounded integration decision, not evidence that OpenCode implements the
+full Helm contract or that leg one is production complete. OpenCode owns its coding
+sessions; the existing Python gateway retains its own diagnostic/session boundary.
+
+The proposed destination architecture for a future Helm cockpit renderer remains:
 
 ```text
 operator input / terminal cells
@@ -56,9 +64,12 @@ future Rust terminal kernel  <->  Bun semantic state + reducer
                     canonical state owners / providers / evidence
 ```
 
-Rust is a destination, not a present-tense claim. No second visible TUI or dual
-renderer is admitted. The Rust kernel may replace Ink only after parity, latency,
-resize, recovery, and accessibility evidence clears the Ink oracle.
+Rust remains a destination. A Rust kernel replacing the cockpit's Ink renderer
+still requires parity, latency, resize, recovery, and accessibility evidence against
+the Ink oracle. That experiment must not create competing owners of one cockpit
+session. This renderer restriction does not prohibit the separately owned OpenCode
+workbench directed in §11.10; its integration must prove the coding journey there
+without claiming transparent Helm protocol or history migration.
 
 ## 4. Authority and modality contract
 
@@ -202,6 +213,10 @@ and architecture work; they must not be collapsed into a premature success label
   `~/handoffs/2026-08-19_helm_legone_build_handoff.md`
 - Active leg-one contract:
   `docs/plans/helm_legone/HELM_LEGONE_SPEC.md`
+- Dated Omarchy/OpenCode source and screenshot research:
+  [Workbench research reference](HELM_WORKBENCH_OMARCHY_RESEARCH_20260910.md).
+  Its raw downloads and provenance receipts remain under
+  `~/.dharma/helm-usability/research/`.
 - Nihonga design source (selective reference only):
   `docs/plans/nihonga_helm_frontier/NIHONGA_HELM_FRONTIER_MASTER_SPEC.md`
 - Reverse-spec design source (selective reference only):
@@ -217,8 +232,10 @@ admitted code, observed runtime evidence, and proposed destination architecture.
 This section records a proposed extension of the destination in §2. The operator's
 new words are preserved beneath the original quote in
 [the leg-one destination](HELM_LEGONE_SPEC.md#11-the-operators-own-words--canon).
-It refines this working plan, introduces no new product or authority owner, and
-leaves the current prototype exclusions and production acceptance conditions intact.
+It refines this working plan and preserves the production acceptance conditions.
+Sections 11.1–11.8 describe the original shared-owner desktop destination; §11.10
+records the later operator-directed OpenCode workbench integration and its separate
+coding-session owner. That integration does not establish shared effect authority.
 [The glossary](CONTEXT.md) fixes the terms used below.
 
 ### 11.1 The experience
@@ -612,3 +629,66 @@ Remaining implementation order:
    and opt-in login startup with the same preview and restoration discipline.
 5. Evaluate a renderer replacement only against the existing interaction oracle and
    measured targets; preserve the Python owner and adapter boundary either way.
+
+### 11.10 Usability correction — 2026-09-10
+
+This working-plan update subordinates further desktop/cockpit expansion to a
+usable coding experience. The operator reported an effectively unusable Helm,
+inability to close its window, difficult frontier-model switching, and a desired
+Omarchy-like experience. The requested acceptance journey is: open a project,
+converse, change models without losing the thread, inspect/edit/check work,
+interrupt, close the window, reopen, and continue. This section records the
+implementation plan, not a claim that every journey has passed.
+
+Research basis: Omarchy composes established agent CLIs, launch-or-focus behavior,
+shared themes, and consistent keys. See the official [AI manual](https://omarchy.org/manual/ai/),
+[themes](https://omarchy.org/manual/themes/), and the pinned
+[agent launcher](https://github.com/omacom/omarchy/blob/8ea51516390320f8e768808b230098e67bdaa82c/bin/omarchy-agent).
+OpenCode owns durable coding sessions and accepts model selection within a session;
+its [server contract](https://opencode.ai/docs/server/) and
+[keybindings](https://opencode.ai/docs/keybinds/) are the integration references.
+The research snapshot and installed-client schema were checked against OpenCode
+v1.18.30, commit `3104c1428ec91f809e5ab86631300de41eb6952e`.
+The dated [Omarchy/OpenCode research reference](HELM_WORKBENCH_OMARCHY_RESEARCH_20260910.md)
+preserves the source citations, screenshot observations, configuration precedence,
+and integration limits. It supplies research evidence, not live acceptance results.
+
+Bounded implementation slices:
+
+1. Input/state: global exit controls precede overlays; exact `/quit` and `/exit`
+   are local commands; modified model-picker letters cannot select a row.
+   Transport cleanup: close bridge stdin, then terminate its exact child within
+   a bounded interval if graceful shutdown does not complete.
+2. Session/configuration: use the installed OpenCode client as the coding-session
+   owner. Give the workbench private XDG directories, persistent session history,
+   a searchable model picker, and explicit optional access to configured metered
+   providers. Credentials remain in the child environment. Native Codex/Claude
+   subscription authentication is not automatically transferred into OpenCode.
+3. Desktop lifecycle/rendering: open an opaque Tokyo Night WezTerm window with
+   native title/close controls, on its own `CODEX_MANAGED_helm_workbench_*` socket.
+   Closing the window detaches its verified client; OpenCode can remain running.
+   The menu exposes workbench and diagnostics as separately named operations.
+4. Context: reuse Mission Control's read-only snapshot interface and MemoryKernel's
+   bounded knowledge-wiki reader. Missing owners remain missing. This companion
+   does not grant swarm dispatch, memory writes, or backend lifecycle authority.
+
+The original Helm cockpit remains a diagnostic surface. The workbench is explicitly
+OpenCode-backed; this is not a claim of a new agent engine or an installed Linux OS.
+Its implementation owners are `dharma_swarm/helm_desktop/workbench_config.py`,
+`workbench_runtime.py`, `workbench_context.py`, and `workbench_mcp.py`.
+
+Entry points and repeatable checks:
+
+```bash
+bash scripts/helm_desktop.sh workbench open
+bash scripts/helm_desktop.sh workbench status --json
+bash scripts/helm_desktop.sh workbench close
+bash scripts/helm_desktop.sh close
+bash scripts/helm_validation_test.sh
+```
+
+F4 opens models; F2 cycles recent models; Ctrl+P opens commands; Ctrl+X then L
+opens sessions; Escape interrupts; Ctrl+Q quits OpenCode. Cmd+W closes the dedicated
+window while retaining its terminal session. Metered providers require explicit
+`workbench open --api-access` on a stopped workbench. No provider identity or
+availability is established merely by a configured model name.

@@ -9283,6 +9283,158 @@ describe("slashCommandStartActions", () => {
   });
 });
 
+describe("App global shutdown", () => {
+  async function fixture() {
+    const previousPython = process.env.DHARMA_PYTHON;
+    const stateDir = makeSupervisorStateDir();
+    process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
+    // A mocked send alone still launches a real Python bridge. Keep this
+    // renderer fixture hermetic so late bridge.ready cannot change its state.
+    process.env.DHARMA_PYTHON = path.join(stateDir, "unavailable-python");
+    const originalSend = DharmaBridge.prototype.send;
+    const originalSendBackground = DharmaBridge.prototype.sendBackground;
+    const originalClose = DharmaBridge.prototype.close;
+    const messages: Array<{id: string; type: string; payload: Record<string, unknown>}> = [];
+    let subject: DharmaBridge | undefined;
+    let emit: (event: Record<string, unknown>) => void = () => {};
+    let closeCalls = 0;
+    let exited = false;
+    DharmaBridge.prototype.send = function (type, payload = {}) {
+      if (!subject) {
+        subject = this;
+        emit = (this as unknown as {onEvent: typeof emit}).onEvent;
+      }
+      const id = String(messages.length + 1);
+      messages.push({id, type, payload});
+      return id;
+    };
+    DharmaBridge.prototype.sendBackground = () => "background";
+    DharmaBridge.prototype.close = function () {
+      if (this === subject) closeCalls += 1;
+      originalClose.call(this);
+    };
+    const stdin = new TestStdin();
+    const stdout = new TestStdout(80, 24);
+    let rendered = "";
+    stdout.on("data", (chunk) => { rendered += chunk.toString("utf8"); });
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout(80, 24) as unknown as NodeJS.WriteStream,
+      debug: true, patchConsole: false, exitOnCtrlC: false,
+    });
+    void instance.waitUntilExit().then(() => { exited = true; });
+    await flushRender();
+    emit({type: "bridge.ready"});
+    emit({
+      type: "handshake.result", default_provider: "kimi_code", default_model: "test-0",
+      policy: {
+        selected_provider: "kimi_code", selected_model: "test-0",
+        targets: Array.from({length: 14}, (_, index) => ({
+          alias: `test-${index}`, label: `Test lane ${index}`, provider: "kimi_code", model: `test-${index}`,
+          picker_visible: true, usable_now: true, route_state: "unverified",
+        })),
+      },
+    });
+    await flushRender();
+    const key = async (value: string) => { stdin.write(value); await flushRender(); };
+    const enter = async (value: string) => { await key(value); await key("\r"); };
+    return {
+      messages, key, enter, emit,
+      get exited() { return exited; },
+      get closeCalls() { return closeCalls; },
+      get rawMode() { return stdin.isRaw; },
+      get text() { return normalizeTerminalText(rendered); },
+      async busy(phase: "bootstrap" | "cancelling") {
+        await enter("A test turn with a deliberately withheld reply");
+        const bootstrap = messages.find((message) => message.type === "session.bootstrap");
+        expect(bootstrap).toBeDefined();
+        if (phase === "cancelling") {
+          emit({type: "session.bootstrap.result", request_id: bootstrap!.id});
+          await flushRender();
+          expect(messages.some((message) => message.type === "session.start")).toBe(true);
+          await key("\u0003");
+          await key("\u0003");
+          expect(messages.filter((message) => message.type === "session.cancel")).toHaveLength(1);
+          expect(closeCalls).toBe(0);
+        }
+      },
+      cleanup() {
+        instance.unmount();
+        instance.cleanup();
+        DharmaBridge.prototype.send = originalSend;
+        DharmaBridge.prototype.sendBackground = originalSendBackground;
+        DharmaBridge.prototype.close = originalClose;
+        if (previousPython === undefined) delete process.env.DHARMA_PYTHON;
+        else process.env.DHARMA_PYTHON = previousPython;
+      },
+    };
+  }
+
+  for (const phase of ["idle", "bootstrap", "cancelling"] as const) {
+    for (const command of ["Ctrl-Q", "/quit", "/exit"]) {
+      test(`${command} exits from ${phase} without waiting for backend replies`, async () => {
+        const app = await fixture();
+        try {
+          if (phase !== "idle") await app.busy(phase);
+          const sentBeforeQuit = app.messages.length;
+          if (command === "Ctrl-Q") await app.key("\u0011");
+          else await app.enter(command);
+          expect(app.exited).toBe(true);
+          expect(app.rawMode).toBe(false);
+          expect(app.closeCalls).toBeGreaterThan(0);
+          expect(app.messages).toHaveLength(sentBeforeQuit);
+        } finally {
+          app.cleanup();
+        }
+      });
+    }
+  }
+
+  for (const overlay of ["/tour", "/navigator", "/model"]) {
+    for (const shortcut of ["Ctrl-C", "Ctrl-Q"]) {
+      test(`${shortcut} reaches global shutdown through ${overlay}`, async () => {
+        const app = await fixture();
+        try {
+          if (shortcut === "Ctrl-Q") await app.busy("cancelling");
+          await app.enter(overlay);
+          if (overlay === "/model") expect(app.text).toContain("shown key selects usable row | 14 lanes");
+          const sentBeforeQuit = app.messages.length;
+          await app.key(shortcut === "Ctrl-C" ? "\u0003" : "\u0011");
+          expect(app.exited).toBe(true);
+          expect(app.rawMode).toBe(false);
+          expect(app.messages).toHaveLength(sentBeforeQuit);
+        } finally {
+          app.cleanup();
+        }
+      });
+    }
+  }
+
+  test("picker ignores modified row letters while Ctrl-C still cancels a pending turn", async () => {
+    const app = await fixture();
+    try {
+      await app.busy("bootstrap");
+      await app.enter("/model");
+      expect(app.text).toContain("shown key selects usable row | 14 lanes");
+      const sentBeforeKeys = app.messages.length;
+      await app.key("\u0004"); // Ctrl-D is row d without the modifier guard.
+      await app.key("\u001bc"); // Alt-C must not select row c either.
+      await app.key("\u0003");
+      expect(app.exited).toBe(false);
+      expect(app.closeCalls).toBe(0);
+      expect(app.messages).toHaveLength(sentBeforeKeys);
+      await app.key("\u001b");
+      await app.key("\u0003");
+      expect(app.exited).toBe(false);
+      await app.key("\u0011");
+      expect(app.exited).toBe(true);
+    } finally {
+      app.cleanup();
+    }
+  });
+});
+
 describe("App prompt submission", () => {
   test("executes exact one-line plain-language UI intents locally without starting a backend turn", async () => {
     const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -9523,6 +9675,8 @@ describe("App prompt submission", () => {
         "give me a tour",
         "open sessions\nand explain what they contain",
         "  /thread attacker-chosen  ",
+        "  /quit  ",
+        "/exit\nthen explain the current task",
       ]) {
         const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
         DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {

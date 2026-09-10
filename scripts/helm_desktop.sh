@@ -18,6 +18,9 @@ case "${1:-}" in
   ""|-h|--help|help)
     cat <<'USAGE'
 Helm Desktop entry point
+  workbench open                 Open the coding workspace (F4 models, Ctrl+Q quit)
+  workbench close                Close its window, preserving the coding session
+  close                          Close the diagnostic cockpit window
   build-menu [--state-dir PATH]   Compile the native macOS status menu
   menu [--state-dir PATH]         Build and request the native menu
   verify [--skip-native] [--skip-live]

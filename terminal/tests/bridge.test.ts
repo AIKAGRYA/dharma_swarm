@@ -1,7 +1,7 @@
 import {describe, expect, test} from "bun:test";
 import {EventEmitter} from "node:events";
 import {PassThrough} from "node:stream";
-import type {ChildProcess} from "node:child_process";
+import {spawn, type ChildProcess} from "node:child_process";
 
 import {DharmaBridge, resolvePython} from "../src/bridge";
 
@@ -9,6 +9,10 @@ class FakeBridgeProcess extends EventEmitter {
   readonly stdin = new PassThrough();
   readonly stdout = new PassThrough();
   killed = false;
+
+  unref(): this {
+    return this;
+  }
 
   kill(signal: NodeJS.Signals | number = "SIGTERM"): boolean {
     if (this.killed) {
@@ -244,5 +248,60 @@ describe("DharmaBridge transport scheduling", () => {
     expect(events).toEqual([]);
     expect(() => bridge.send("handshake")).toThrow("bridge is closed");
     expect(children).toHaveLength(1);
+  });
+
+  test("intentional close ends stdin before signals and ignores cleanup output", async () => {
+    const child = new FakeBridgeProcess();
+    const events: Record<string, unknown>[] = [];
+    const bridge = new DharmaBridge((event) => events.push(event), () => child.asChildProcess());
+    child.stdin.once("finish", () => {
+      child.stdout.write(`${JSON.stringify({type: "session_end", cancelled: true})}\n`);
+      child.emit("exit", 0, null);
+    });
+
+    bridge.close();
+    await flushBridgeEvents();
+
+    expect(child.stdin.writableEnded).toBe(true);
+    expect(child.killed).toBe(false);
+    expect(child.stdout.destroyed).toBe(true);
+    expect(events).toEqual([]);
+    expect(() => bridge.sendBackground("status")).toThrow("bridge is closed");
+  });
+
+  test("intentional close bounds an owned child that ignores EOF and SIGTERM", async () => {
+    const output: string[] = [];
+    let child!: ChildProcess;
+    let ready!: () => void;
+    const started = new Promise<void>((resolve) => { ready = resolve; });
+    const bridge = new DharmaBridge((event) => {
+      if (event.type === "ready") ready();
+    }, () => {
+      child = spawn(process.execPath, ["-e", `
+        process.stdin.resume();
+        process.stdin.on("end", () => console.log("EOF received"));
+        process.on("SIGTERM", () => console.log("SIGTERM received"));
+        setInterval(() => {}, 1000);
+        console.log(JSON.stringify({type: "ready"}));
+      `], {stdio: ["pipe", "pipe", "pipe"]});
+      child.stdout?.on("data", (chunk) => output.push(String(chunk)));
+      return child;
+    });
+    const exited = new Promise<NodeJS.Signals | null>((resolve) => {
+      child.once("exit", (_code, signal) => resolve(signal));
+    });
+
+    try {
+      expect(await Promise.race([started.then(() => true), Bun.sleep(1_000).then(() => false)])).toBe(true);
+      bridge.close();
+      bridge.close();
+      expect(await Promise.race([exited, Bun.sleep(3_000).then(() => "timed_out")])).toBe("SIGKILL");
+      expect(output.join("")).toContain("EOF received");
+      expect(output.join("")).toContain("SIGTERM received");
+      expect(() => bridge.send("handshake")).toThrow("bridge is closed");
+    } finally {
+      bridge.close();
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    }
   });
 });

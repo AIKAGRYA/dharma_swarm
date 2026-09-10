@@ -30,8 +30,19 @@ def parser() -> argparse.ArgumentParser:
                             ("doctor", "read-only dependency and profile checks"),
                             ("start", "explicitly start or verify the private Helm seat"),
                             ("focus", "focus/attach an existing seat; never start the bridge"),
+                            ("close", "close the verified diagnostic window; preserve its session"),
                             ("catalog", "print supported typed actions for automation")):
         _common(commands.add_parser(name, help=help_text))
+    workbench = commands.add_parser("workbench", help="OpenCode coding workspace with Dharma context")
+    _common(workbench)
+    workbench_commands = workbench.add_subparsers(dest="operation", required=True)
+    workbench_open = workbench_commands.add_parser("open", help="open or focus the dedicated coding window")
+    _common(workbench_open)
+    workbench_open.add_argument("--model", help="initial provider/model; use F4 for later switches")
+    workbench_open.add_argument("--api-access", action=argparse.BooleanOptionalAction, default=None,
+                                help="make existing metered API accounts available in this workspace")
+    _common(workbench_commands.add_parser("close", help="close the window and retain the coding session"))
+    _common(workbench_commands.add_parser("status", help="inspect the exact coding session and window"))
     workspace = commands.add_parser("workspace", help="preview/open typed project resources")
     _common(workspace)
     workspace_commands = workspace.add_subparsers(dest="operation", required=True)
@@ -58,6 +69,10 @@ def catalog() -> dict[str, Any]:
         ("status", ["status"], "observation_only", False, "read one status snapshot"),
         ("doctor", ["doctor"], "observation_only", False, "inspect local prerequisites"),
         ("focus", ["focus"], "desktop_navigation", True, "focus or attach the existing exact private seat"),
+        ("close", ["close"], "desktop_navigation", True, "detach only the verified diagnostic window"),
+        ("workbench.open", ["workbench", "open"], "explicit_session_start", True, "open the isolated OpenCode coding workspace"),
+        ("workbench.close", ["workbench", "close"], "desktop_navigation", True, "close its window and preserve its coding session"),
+        ("workbench.status", ["workbench", "status"], "observation_only", False, "inspect the private coding seat"),
         ("start", ["start"], "explicit_session_start", True, "invoke the existing owner launcher and verify its executor"),
         ("workspace.preview", ["workspace", "preview"], "observation_only", False, "show validated resource intents"),
         ("workspace.open", ["workspace", "open"], "desktop_navigation", True, "apply typed app/resource intents"),
@@ -82,6 +97,9 @@ def execute(args: argparse.Namespace, config: DesktopConfig) -> dict[str, Any]:
         return runtime.doctor(config)
     if args.command == "catalog":
         return catalog()
+    if args.command == "workbench" and args.operation == "status":
+        from .workbench_runtime import status
+        return status(config)
     if args.command == "workspace" and args.operation == "preview":
         return workspace.preview(config)
     if args.command == "install" and args.operation == "preview":
@@ -93,6 +111,13 @@ def execute(args: argparse.Namespace, config: DesktopConfig) -> dict[str, Any]:
             return runtime.start(config)
         if args.command == "focus":
             return runtime.focus(config)
+        if args.command == "close":
+            return runtime.close(config)
+        if args.command == "workbench":
+            from .workbench_runtime import close_workbench, open_workbench
+            if args.operation == "close":
+                return close_workbench(config)
+            return open_workbench(config, model=args.model, api_access=args.api_access)
         if args.command == "workspace":
             return workspace.open_workspace(config, reopen=args.reopen)
         if args.command == "install":

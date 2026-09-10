@@ -27,6 +27,8 @@ const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 
 const DEFAULT_BRIDGE_STDERR_DIR = path.join(os.homedir(), ".dharma", "terminal_supervisor");
 const STDERR_TAIL_LIMIT = 4_096;
+export const BRIDGE_EOF_GRACE_MS = 1_000;
+export const BRIDGE_TERM_GRACE_MS = 500;
 
 export function bridgeStderrLogPath(env: NodeJS.ProcessEnv = process.env): string {
   const stateDir = env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR?.trim()
@@ -326,10 +328,51 @@ export class DharmaBridge {
     this.closed = true;
     this.alive = false;
     this.backgroundScheduler.reset();
-    this.stderrCleanup?.();
-    this.stderrCleanup = undefined;
-    if (!this.child.killed) {
-      this.child.kill("SIGTERM");
+    const child = this.child;
+    let finished = false;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const finish = (): void => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(deadline);
+      child.off("exit", finish);
+      child.off("close", finish);
+      this.stderrCleanup?.();
+      this.stderrCleanup = undefined;
+      child.stdin?.destroy();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      child.unref();
+    };
+    if (typeof child.exitCode === "number" || child.signalCode) {
+      finish();
+      return;
+    }
+    child.once("exit", finish);
+    child.once("close", finish);
+    const terminate = (): void => {
+      if (finished) return;
+      clearTimeout(deadline);
+      child.kill("SIGTERM");
+      // `killed` means a signal was sent, not that the child exited. A hung
+      // adapter must not retain the terminal forever after an explicit quit.
+      if (!finished) {
+        deadline = setTimeout(() => {
+          child.kill("SIGKILL");
+          finish();
+        }, BRIDGE_TERM_GRACE_MS);
+        deadline.unref();
+      }
+    };
+    deadline = setTimeout(terminate, BRIDGE_EOF_GRACE_MS);
+    deadline.unref();
+    try {
+      // EOF enters Python's normal finally/close path, preserving the session
+      // terminal event and adapter cleanup before bounded signal escalation.
+      if (!child.stdin || child.stdin.destroyed) terminate();
+      else child.stdin.end();
+    } catch {
+      terminate();
     }
   }
 }

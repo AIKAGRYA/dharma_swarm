@@ -16,6 +16,10 @@ PYTHONPATH="$PWD" "$PY" -m pytest \
   tests/test_terminal_bridge_desktop_status.py \
   tests/test_helm_desktop.py \
   tests/test_helm_desktop_install.py \
+  tests/test_helm_desktop_close.py \
+  tests/test_helm_workbench_context.py \
+  tests/test_helm_workbench_config.py \
+  tests/test_helm_workbench_runtime.py \
   tests/test_terminal_desktop_menu.py \
   tests/test_terminal_desktop_menu_lifecycle.py \
   tests/test_terminal_tmux_isolation.py \
