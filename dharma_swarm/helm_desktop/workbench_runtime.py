@@ -243,6 +243,16 @@ def status(config: DesktopConfig) -> dict[str, Any]:
             "seat": seat(config), "authority": "observation_only"}
 
 
+def _run(config: DesktopConfig) -> int:
+    from .workbench_config import prepare_workbench
+
+    settings = read_json(config.state_dir, "workbench/settings.json") or {}
+    if settings.get("identity") != _identity(config):
+        raise DesktopError("workbench settings belong to another workspace")
+    prepared = prepare_workbench(config, model=settings.get("model"), api_access=settings.get("api_access", False))
+    return subprocess.call(prepared.argv, env=prepared.environment, cwd=config.repo_root)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("operation", choices=("run", "attach"))
@@ -262,16 +272,7 @@ def main() -> int:
             "pane_id": int(pane), "tty": os.ttyname(0), "gui_pid": os.getppid()})
         argv = ["tmux", "-L", seat(config)["tmux_socket"], "-f", "/dev/null", "attach-session", "-t", "=helm_workbench"]
         os.execvpe("tmux", argv, _env(config))
-    from .workbench_config import prepare_workbench
-
-    settings = read_json(config.state_dir, "workbench/settings.json") or {}
-    if settings.get("identity") != _identity(config):
-        raise DesktopError("workbench settings belong to another workspace")
-    prepared = prepare_workbench(config, model=settings.get("model"), api_access=settings.get("api_access", False))
-    # reason=argv is a fixed internal tuple (resolved executable, repo root, validated model id)
-    # passed as a list without a shell; the environment is a filtered allowlist built in
-    # prepare_workbench, so no caller-controlled string reaches a command interpreter.
-    return subprocess.call(prepared.argv, env=prepared.environment, cwd=config.repo_root)  # nosemgrep
+    return _run(config)
 
 
 if __name__ == "__main__":
