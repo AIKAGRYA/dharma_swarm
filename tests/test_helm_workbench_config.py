@@ -192,6 +192,67 @@ def test_routine_reopen_honors_saved_theme_model_and_does_not_force_cli_model(se
     assert generated(explicit)[1]["theme"] == "everforest"
 
 
+def _roll_provider_models(home: Path, models: dict) -> None:
+    path = home / ".config/opencode/opencode.jsonc"
+    source = workbench._jsonc(path.read_text())
+    source["provider"]["glm-coding"]["models"] = models
+    source["model"] = "glm-coding/" + next(iter(models))
+    path.write_text(json.dumps(source))
+
+
+@pytest.mark.parametrize("recent", [
+    '{"recent":[{"providerID":"glm-coding","modelID":"glm-9.9-removed"}]}',
+    '{"recent":[{"providerID":"not-enabled","modelID":"x"}]}',
+    '{"recent":[{"providerID":"glm-coding","modelID":{"nested":"shape"}}]}',
+    '{"recent":[{"providerID":"glm-coding","modelID":"has spaces/and*chars"}]}',
+    '{"recent":"a string, not a list"}',
+])
+def test_unusable_recent_model_hint_falls_back_instead_of_blocking_launch(setup, recent: str) -> None:
+    config, _ = setup
+    first = workbench.prepare_workbench(config)
+    state = Path(first.environment["XDG_STATE_HOME"]) / "opencode"
+    state.mkdir()
+    (state / "model.json").write_text(recent)
+
+    reopened = workbench.prepare_workbench(config)
+
+    assert reopened.model == "glm-coding/glm-5.3"
+    assert generated(reopened)[0]["model"] == "glm-coding/glm-5.3"
+
+
+def test_provider_model_roll_retires_both_stale_generated_and_recent_preferences(setup) -> None:
+    config, home = setup
+    first = workbench.prepare_workbench(config, model="glm-coding/glm-5.3-flash")
+    state = Path(first.environment["XDG_STATE_HOME"]) / "opencode"
+    state.mkdir()
+    (state / "model.json").write_text('{"recent":[{"providerID":"glm-coding","modelID":"glm-5.3"}]}')
+    assert generated(first)[0]["model"] == "glm-coding/glm-5.3-flash"
+
+    _roll_provider_models(home, {"glm-6.0": {"name": "GLM 6.0"}})
+    reopened = workbench.prepare_workbench(config)
+
+    assert reopened.model == "glm-coding/glm-6.0"
+    assert generated(reopened)[0]["model"] == "glm-coding/glm-6.0"
+
+
+def test_valid_recent_hint_still_outranks_the_generated_preference(setup) -> None:
+    config, _ = setup
+    first = workbench.prepare_workbench(config)
+    state = Path(first.environment["XDG_STATE_HOME"]) / "opencode"
+    state.mkdir()
+    (state / "model.json").write_text('{"recent":[{"providerID":"glm-coding","modelID":"glm-5.3-flash"}]}')
+
+    assert workbench.prepare_workbench(config).model == "glm-coding/glm-5.3-flash"
+
+
+def test_explicitly_requested_unavailable_model_is_still_refused(setup) -> None:
+    config, _ = setup
+    with pytest.raises(DesktopError, match="not declared in the existing coding provider"):
+        workbench.prepare_workbench(config, model="glm-coding/glm-9.9-removed")
+    with pytest.raises(DesktopError, match="provider is unavailable"):
+        workbench.prepare_workbench(config, model="anthropic/claude-opus-5")
+
+
 @pytest.mark.parametrize("corrupt", ['{"theme": "everforest"', 'null', '[]', 'not json at all'])
 def test_unreadable_foreign_state_is_ignored_without_blocking_launch(setup, corrupt: str) -> None:
     config, _ = setup

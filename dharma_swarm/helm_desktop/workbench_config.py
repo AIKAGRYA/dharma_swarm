@@ -20,6 +20,7 @@ from .workbench_context import prepare_workbench_context
 
 API_PROVIDERS = ("openai", "anthropic", "openrouter")
 MANIFEST = "workbench/config-manifest.json"
+_MODEL_ID = re.compile(r"[a-z0-9][a-z0-9_-]*/[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}")
 _STRING = r'"(?:\\.|[^"\\])*"'
 _SECRET = re.compile(r"^(?:api.?key|(?:access.?|refresh.?|auth.?|bearer.?)?token|password|(?:client.?)?secret|authorization)$", re.I)
 _BASE_ENV = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "COLORTERM",
@@ -166,6 +167,14 @@ def _write_configs(config: DesktopConfig, files: dict[str, dict[str, Any]]) -> N
                 "files": {name: hashlib.sha256(data).hexdigest() for name, data in encoded.items()}})
 
 
+def _admissible(candidate: Any, enabled: list[str], provider: dict[str, Any]) -> bool:
+    """A remembered preference is a hint; only the operator's --model may fail the launch."""
+    if not isinstance(candidate, str) or not re.fullmatch(_MODEL_ID, candidate):
+        return False
+    provider_id, model_id = candidate.split("/", 1)
+    return provider_id in enabled and (provider_id != "glm-coding" or model_id in provider["models"])
+
+
 def _advisory_state(config: DesktopConfig, relative: str) -> dict[str, Any]:
     """OpenCode owns these files; an unreadable hint is ignored, never a launch failure."""
     state_path(config.state_dir, relative)
@@ -198,7 +207,7 @@ def prepare_workbench(config: DesktopConfig, *, model: str | None = None,
     saved_model = _advisory_state(config, f"workbench/{project}/state/opencode/model.json")
     saved_ui = _advisory_state(config, f"workbench/{project}/state/opencode/kv.json")
     previous_tui = read_json(config.state_dir, tui_relative) or {}
-    selected = model if model is not None else previous.get("model", default)
+    selected: Any = model
     environment = {key: value for key, value in os.environ.items()
                    if key in _BASE_ENV or key.startswith("LC_")}
     providers = {"glm-coding": _lift_credentials(provider, environment)}
@@ -214,14 +223,14 @@ def prepare_workbench(config: DesktopConfig, *, model: str | None = None,
                 providers[name] = {"options": {"apiKey": "{env:" + key + "}"}}
                 if name not in enabled:
                     enabled.append(name)
-    if model is None and isinstance(saved_model.get("recent"), list):
-        for recent in saved_model["recent"]:
-            if (isinstance(recent, dict) and recent.get("providerID") in enabled
-                    and isinstance(recent.get("modelID"), str)):
-                selected = f"{recent['providerID']}/{recent['modelID']}"
-                break
-    if not isinstance(selected, str) or not re.fullmatch(
-            r"[a-z0-9][a-z0-9_-]*/[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}", selected):
+    if model is None:
+        hints = [f"{item['providerID']}/{item['modelID']}"
+                 for item in (saved_model.get("recent") if isinstance(saved_model.get("recent"), list) else [])
+                 if isinstance(item, dict) and isinstance(item.get("providerID"), str)
+                 and isinstance(item.get("modelID"), str)]
+        selected = next((candidate for candidate in (*hints, previous.get("model"), default)
+                         if _admissible(candidate, enabled, provider)), default)
+    if not isinstance(selected, str) or not re.fullmatch(_MODEL_ID, selected):
         raise DesktopError("model must be a provider/model identifier")
     provider_id, model_id = selected.split("/", 1)
     if provider_id not in enabled:

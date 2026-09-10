@@ -192,3 +192,22 @@ def test_close_cli_reports_failed_verification_instead_of_success(
     assert report["action"] == "close"
     assert "verif" in report["error"]
     assert processes.clients == {"/dev/ttysManual"}
+
+
+def test_cli_close_signals_failure_when_only_another_terminal_holds_the_seat(
+    config: DesktopConfig, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    processes = Attachments(config)
+    processes.panes = [{"pane_id": 91, "tty_name": "/dev/ttysOtherProject"}]
+    close = runtime.close
+    monkeypatch.setattr(runtime, "close", lambda selected: close(selected, runner=processes))
+
+    code = cli.main(["--repo-root", str(config.repo_root), "--state-dir", str(config.state_dir),
+                     "--socket", config.socket, "--session", config.session, "--json", "close"])
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert report["ok"] is False
+    assert report["outcome"] == "attached_elsewhere"
+    assert report["detail"]
+    assert processes.detached == []

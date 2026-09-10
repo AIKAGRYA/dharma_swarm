@@ -146,7 +146,10 @@ def main(argv: list[str] | None = None) -> int:
             profile=options.get("profile", "research"), socket=options.get("socket", SOCKET),
             session=options.get("session", SESSION))
         result = execute(args, config)
-        failed = result.get("outcome") == "partial" or result.get("ready") is False or result.get("ready_to_start") is False
+        unclosed = (result.get("action") in {"close", "workbench.close"}
+                    and result.get("outcome") == "attached_elsewhere")
+        failed = (result.get("outcome") == "partial" or unclosed
+                  or result.get("ready") is False or result.get("ready_to_start") is False)
         result = {"ok": not failed, **result}
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")) if options.get("as_json") else _human(result))
         return 1 if failed else 0
