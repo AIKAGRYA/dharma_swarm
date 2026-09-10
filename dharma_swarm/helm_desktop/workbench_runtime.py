@@ -271,9 +271,7 @@ def main() -> int:
     # reason=argv is a fixed internal tuple (resolved executable, repo root, validated model id)
     # passed as a list without a shell; the environment is a filtered allowlist built in
     # prepare_workbench, so no caller-controlled string reaches a command interpreter.
-    return subprocess.call(  # nosemgrep reason=fixed internal argv, no shell, allowlisted env
-        prepared.argv, env=prepared.environment, cwd=config.repo_root
-    )
+    return subprocess.call(prepared.argv, env=prepared.environment, cwd=config.repo_root)  # nosemgrep
 
 
 if __name__ == "__main__":
