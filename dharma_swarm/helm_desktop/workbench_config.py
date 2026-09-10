@@ -166,6 +166,15 @@ def _write_configs(config: DesktopConfig, files: dict[str, dict[str, Any]]) -> N
                 "files": {name: hashlib.sha256(data).hexdigest() for name, data in encoded.items()}})
 
 
+def _advisory_state(config: DesktopConfig, relative: str) -> dict[str, Any]:
+    """OpenCode owns these files; an unreadable hint is ignored, never a launch failure."""
+    state_path(config.state_dir, relative)
+    try:
+        return read_json(config.state_dir, relative) or {}
+    except DesktopError:
+        return {}
+
+
 def prepare_workbench(config: DesktopConfig, *, model: str | None = None,
                       api_access: bool = False) -> PreparedWorkbench:
     """Prepare an isolated store without running OpenCode, providers, or installers.
@@ -186,8 +195,8 @@ def prepare_workbench(config: DesktopConfig, *, model: str | None = None,
     config_relative = f"workbench/{project}/config/opencode/opencode.json"
     tui_relative = f"workbench/{project}/config/opencode/tui.json"
     previous = read_json(config.state_dir, config_relative) or {}
-    saved_model = read_json(config.state_dir, f"workbench/{project}/state/opencode/model.json") or {}
-    saved_ui = read_json(config.state_dir, f"workbench/{project}/state/opencode/kv.json") or {}
+    saved_model = _advisory_state(config, f"workbench/{project}/state/opencode/model.json")
+    saved_ui = _advisory_state(config, f"workbench/{project}/state/opencode/kv.json")
     previous_tui = read_json(config.state_dir, tui_relative) or {}
     selected = model if model is not None else previous.get("model", default)
     environment = {key: value for key, value in os.environ.items()

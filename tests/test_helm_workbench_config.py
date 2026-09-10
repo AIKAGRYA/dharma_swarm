@@ -192,6 +192,37 @@ def test_routine_reopen_honors_saved_theme_model_and_does_not_force_cli_model(se
     assert generated(explicit)[1]["theme"] == "everforest"
 
 
+@pytest.mark.parametrize("corrupt", ['{"theme": "everforest"', 'null', '[]', 'not json at all'])
+def test_unreadable_foreign_state_is_ignored_without_blocking_launch(setup, corrupt: str) -> None:
+    config, _ = setup
+    first = workbench.prepare_workbench(config)
+    state = Path(first.environment["XDG_STATE_HOME"]) / "opencode"
+    state.mkdir()
+    (state / "kv.json").write_text(corrupt)
+    (state / "model.json").write_text(corrupt)
+
+    reopened = workbench.prepare_workbench(config)
+
+    runtime, tui = generated(reopened)
+    assert tui["theme"] == "tokyonight"
+    assert reopened.model == runtime["model"] == first.model
+    assert (state / "kv.json").read_text() == corrupt
+    assert (state / "model.json").read_text() == corrupt
+
+
+def test_symlinked_foreign_state_directory_is_still_rejected(setup, tmp_path: Path) -> None:
+    config, _ = setup
+    first = workbench.prepare_workbench(config)
+    state = Path(first.environment["XDG_STATE_HOME"])
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (outside / "kv.json").write_text('{"theme":"everforest"}')
+    (state / "opencode").symlink_to(outside)
+
+    with pytest.raises(DesktopError, match="symlink"):
+        workbench.prepare_workbench(config)
+
+
 @pytest.mark.parametrize("saved", ['{"theme":null}', '{"theme":{"name":"everforest"}}', '{"theme":"bad name!"}'])
 def test_unusable_foreign_theme_state_falls_back_instead_of_blocking_launch(setup, saved: str) -> None:
     config, _ = setup
