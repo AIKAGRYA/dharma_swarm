@@ -138,6 +138,8 @@ helm_operational_surfaces:
       - dharma_swarm/helm_desktop/install.py
       - dharma_swarm/helm_desktop/runtime.py
       - dharma_swarm/helm_desktop/workspace.py
+      - dharma_swarm/helm_desktop/workbench_config.py
+      - dharma_swarm/helm_desktop/workbench_runtime.py
       - scripts/build_helm_menu.py
     explicit_command_artifacts:
       - install/manifest.json
@@ -154,6 +156,10 @@ helm_operational_surfaces:
       - menu-instance.json
       - menu-instance.lock
       - menu-launch.lock
+      # OpenCode workbench slice: generated client configuration, its ownership
+      # manifest, launch/settings records, and the dedicated window state. The
+      # workbench's own coding session is owned by OpenCode, not by this tree.
+      - workbench/
     verification:
       driver: scripts/verify/helm_desktop_verify.py
       default_artifact_root: "~/.dharma/helm-desktop-build/verification"
