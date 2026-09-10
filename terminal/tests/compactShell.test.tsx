@@ -12,6 +12,7 @@ import {Box, Text, render} from "ink";
 
 import {App} from "../src/app";
 import {DharmaBridge} from "../src/bridge";
+import {HELM_CONTEXT_PROJECTION_NAMES} from "../src/helmContext/types";
 import {CausalFlowPlane, causalEventRowBudget} from "../src/nihonga/CausalFlowPlane";
 
 class TestStdout extends PassThrough {
@@ -229,6 +230,10 @@ test("100x28 selects the two-plane standard composition", async () => {
   expect(frame).toContain("CONVERSATION / INTENT");
   expect(frame).toContain("CONTEXT / ORGANISM");
   expect(frame).toContain("WHOLE ORGANISM");
+  for (const region of HELM_CONTEXT_PROJECTION_NAMES) {
+    expect(frame).toContain(region);
+  }
+  expect(frame).toContain("12 actions · status=unavailable");
   expect(frame).not.toContain("CAUSAL / PROOF");
 });
 
@@ -242,7 +247,7 @@ test("120x30 and larger use the 45/35/20 panorama", async () => {
   expect(frame).toContain("CONVERSATION / INTENT");
   expect(frame).toContain("ECOSYSTEM / ORGANISM");
   expect(frame).toContain("CAUSAL / PROOF");
-  expect(frame).toContain("six stable fields");
+  expect(frame).toContain("twelve owner-stamped fields");
   expect(frame).toContain("○ offline");
   expect(frame).not.toContain("OFFLINE");
   expect(frame).not.toContain("DHARMA TERMINAL");

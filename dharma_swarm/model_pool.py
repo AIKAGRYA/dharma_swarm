@@ -312,15 +312,14 @@ FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = _required_provider_route(
 
 
 # Providers whose default is a deliberate operator pin that supersedes the
-# legacy roster (the roster predates gpt-5 / opus-4.6 / codex gpt-5.4). These are
+# legacy roster (the roster predates some provider-pinned defaults). These are
 # still owned by _PROVIDER_DEFAULTS; the coherence guard below only exempts them
 # from the "must match a roster route" check — it does NOT exempt them from being
 # present here.
 _OPERATOR_PINNED_DEFAULTS: frozenset[ProviderType] = frozenset(
     {
         ProviderType.OPENAI,        # gpt-5  (roster: gpt-4o / gpt-5.5)
-        ProviderType.ANTHROPIC,     # claude-opus-4-6  (roster: claude-opus-4-20250514)
-        ProviderType.CLAUDE_CODE,   # claude-opus-4-6 via Claude-Max (roster: claude-opus-4.8)
+        ProviderType.ANTHROPIC,     # direct API id remains separate from Claude-Max roster
         ProviderType.CODEX,         # gpt-5.4 via codex oauth (roster: gpt-5.5)
         # Secondary floor routes (DeepSeek-V4-Pro / MiniMax-M3 fan-out) gave
         # these providers a roster entry, but their per-provider *default* is a

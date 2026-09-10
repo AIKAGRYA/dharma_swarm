@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SESSION="${SESSION_NAME:-dharma_terminal_tui}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=terminal_tui_tmux_common.sh
+source "${SCRIPT_DIR}/terminal_tui_tmux_common.sh"
+terminal_tui_tmux_init
+
+SESSION="${TERMINAL_TUI_TMUX_SESSION}"
 
 if [[ "$#" -lt 1 ]]; then
   echo "Usage: $0 [--literal <text> | <keys...>]"
@@ -10,8 +15,8 @@ if [[ "$#" -lt 1 ]]; then
   exit 1
 fi
 
-if ! tmux has-session -t "${SESSION}" 2>/dev/null; then
-  echo "Session '${SESSION}' not running."
+if ! terminal_tui_tmux has-session -t "=${SESSION}" 2>/dev/null; then
+  echo "Session '${SESSION}' not running on socket '${TERMINAL_TUI_TMUX_SOCKET}'."
   exit 1
 fi
 
@@ -20,10 +25,10 @@ if [[ "${1:-}" == "--literal" || "${1:-}" == "--text" ]]; then
     echo "Usage: $0 --literal <text>"
     exit 1
   fi
-  tmux send-keys -l -t "${SESSION}" "$2"
-  echo "Sent literal text to '${SESSION}': $2"
+  terminal_tui_tmux send-keys -l -t "=${SESSION}:" "$2"
+  echo "Sent literal text to '${SESSION}' on socket '${TERMINAL_TUI_TMUX_SOCKET}': $2"
   exit 0
 fi
 
-tmux send-keys -t "${SESSION}" "$@"
-echo "Sent keys to '${SESSION}': $*"
+terminal_tui_tmux send-keys -t "=${SESSION}:" "$@"
+echo "Sent keys to '${SESSION}' on socket '${TERMINAL_TUI_TMUX_SOCKET}': $*"

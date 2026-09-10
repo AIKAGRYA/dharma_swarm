@@ -32,6 +32,7 @@ _FACETS_BY_PLACE = {"home": {"mission", "control"}, "conversation": {"chat", "se
 JsonValue: TypeAlias = str | int | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 _SECRET_KEYS = frozenset({"access_key", "access_token", "api_key", "apikey", "authorization", "client_secret", "cookie", "credential", "openai_api_key", "password", "private_key", "provider_raw_metadata", "raw", "raw_metadata", "refresh_token", "response_headers", "secret", "secret_key", "session_cookie", "system_info", "token"})
 _SECRET_KEY_SUFFIXES = ("_access_key", "_api_key", "_cookie", "_credential", "_password", "_private_key", "_secret", "_token")
+_SECRET_KEY_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 _SECRET_VALUE_PREFIXES = ("bearer ", "gho_", "ghp_", "github_pat_", "xai-", "xapp-", "xoxa-", "xoxc-", "xoxe-", "xoxr-", "xoxs-", "xoxb-", "xoxp-")
 _RESERVED_PROJECTION_KEYS = frozenset({"authority", "authority_modality", "authority_stamp", "modality", "narration_verified", "provider_state_promotion", "state_promotion_allowed"})
 _RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$")
@@ -103,7 +104,7 @@ def _bounded_text(value: Any, *, field_name: str, allow_empty: bool = False) -> 
         raise HelmContextError(f"{field_name} contains a control character")
     return value
 def is_secret_key(key: str) -> bool:
-    normalized = key.casefold().replace("-", "_")
+    normalized = _SECRET_KEY_CAMEL_BOUNDARY.sub("_", key).casefold().replace("-", "_")
     return (
         normalized in _SECRET_KEYS
         or normalized.endswith(_SECRET_KEY_SUFFIXES)

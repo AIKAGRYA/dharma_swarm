@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from dharma_swarm import model_pool as _model_pool
+from dharma_swarm.model_catalog import HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID
 from dharma_swarm.models import ProviderType
 
 from .base import (
@@ -39,13 +40,14 @@ CLAUDE_CAPABILITIES = (
 
 
 def _canonical_claude_model() -> str:
-    entry = _model_pool.get_entry("claude-opus-4.8")
+    configured = _model_pool.default_for_provider(ProviderType.CLAUDE_CODE)
+    entry = _model_pool.get_entry(configured)
     if entry is not None:
         for provider in (ProviderType.CLAUDE_CODE, ProviderType.ANTHROPIC):
             for route in entry.routes:
                 if route.provider is provider:
                     return route.model_id
-    raise AssertionError("model_pool has no Claude route for claude-opus-4.8")
+    raise AssertionError(f"model_pool has no Claude route for {configured}")
 
 
 CLAUDE_DEFAULT_MODEL = _canonical_claude_model()
@@ -79,7 +81,7 @@ class ClaudeAdapter(ProviderAdapter):
             CLAUDE_DEFAULT_MODEL: ModelProfile(
                 provider_id=self.provider_id,
                 model_id=CLAUDE_DEFAULT_MODEL,
-                display_name="Claude Opus 4.8",
+                display_name="Claude Opus 5.0",
                 capabilities=CLAUDE_CAPABILITIES,
             ),
             "claude-sonnet-4-5": ModelProfile(
@@ -88,10 +90,10 @@ class ClaudeAdapter(ProviderAdapter):
                 display_name="Claude Sonnet 4.5",
                 capabilities=CLAUDE_CAPABILITIES,
             ),
-            "claude-sonnet-4-6": ModelProfile(
+            HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID: ModelProfile(
                 provider_id=self.provider_id,
-                model_id="claude-sonnet-4-6",
-                display_name="Claude Sonnet 4.6",
+                model_id=HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID,
+                display_name="Claude Sonnet 5",
                 capabilities=CLAUDE_CAPABILITIES,
             ),
             "claude-opus-4": ModelProfile(

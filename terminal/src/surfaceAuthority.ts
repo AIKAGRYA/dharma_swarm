@@ -38,6 +38,13 @@ export function requestPermissionHistory(bridge: DharmaBridge): void {
   sendBackgroundRequest(bridge, "permission.history", {limit: 50});
 }
 
+export function requestHelmContext(
+  bridge: DharmaBridge,
+  payload: RequestPayload,
+): string {
+  return sendBackgroundRequest(bridge, "helm.context.request", payload);
+}
+
 export function missingAuthoritativeSurfaces(
   authoritative: SurfaceAuthorityState,
 ): Array<keyof SurfaceAuthorityState> {
@@ -73,7 +80,8 @@ export function requestAuthoritativeResync(
   provider: string,
   model: string,
   strategy: string,
-): void {
+  helmContextPayload?: RequestPayload,
+): string | undefined {
   sendBackgroundRequest(bridge, "status");
   sendBackgroundRequest(bridge, "command.graph");
   sendBackgroundRequest(bridge, "command.registry");
@@ -81,6 +89,9 @@ export function requestAuthoritativeResync(
   requestSessionCatalog(bridge);
   requestPermissionHistory(bridge);
   requestLiveSnapshots(bridge, provider, model, strategy);
+  return helmContextPayload === undefined
+    ? undefined
+    : requestHelmContext(bridge, helmContextPayload);
 }
 
 export function requestMissingAuthoritativeSurfaces(

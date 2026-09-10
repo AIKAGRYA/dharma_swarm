@@ -1,36 +1,20 @@
 import {describe, expect, test} from "bun:test";
 
-import {footerHintFor, paneActionsFor} from "../src/shellControls";
+import {
+  focusModeFor,
+  footerHintFor,
+  paneActionChordDecision,
+  paneActionsFor,
+  plainListDirection,
+} from "../src/shellControls";
 import {initialState} from "../src/state";
 import type {AppState} from "../src/types";
 
-function actionsFor(tabId: string, state: AppState) {
-  return paneActionsFor(tabId, state, {
-    sessionCatalogLimit: 50,
-    approvalResolveAction(entry, resolution, label) {
-      return {
-        label,
-        summary: `${label} ${entry.decision.action_id}`,
-        payload: {
-          action_type: "approval.resolve",
-          action_id: entry.decision.action_id,
-          resolution,
-        },
-      };
-    },
-  });
-}
+const options = {sessionCatalogLimit: 50};
 
-const options = {
-  sessionCatalogLimit: 50,
-  approvalResolveAction(entry: AppState["approvalPane"]["entriesByActionId"][string], resolution: "approved" | "denied" | "dismissed" | "resolved", label: string) {
-    return {
-      label,
-      summary: `${label} ${entry.decision.action_id}`,
-      payload: {action_type: "approval.resolve", action_id: entry.decision.action_id, resolution},
-    };
-  },
-};
+function actionsFor(tabId: string, state: AppState) {
+  return paneActionsFor(tabId, state, options);
+}
 
 function ownerBackedState(authoritative: boolean): AppState {
   return {
@@ -77,25 +61,92 @@ function ownerBackedState(authoritative: boolean): AppState {
 }
 
 describe("owner-backed shell controls", () => {
-  test("holds session detail and every approval resolution until current owner authority exists", () => {
-    const retained = ownerBackedState(false);
+  test("keeps stale and fresh approval history refresh-only", () => {
+    for (const authoritative of [false, true]) {
+      const actions = actionsFor("approvals", ownerBackedState(authoritative));
 
-    expect(actionsFor("sessions", retained).primary).toBeUndefined();
-    expect(actionsFor("approvals", retained)).toMatchObject({
-      primary: undefined,
-      secondary: undefined,
-      tertiary: undefined,
-    });
-    expect(footerHintFor("sessions", retained, options)).toContain("detail/resume held");
-    expect(footerHintFor("approvals", retained, options)).toContain("resolution held");
+      expect(actions).toEqual({
+        refresh: {
+          label: "refresh approvals",
+          summary: "refresh approval history",
+          requestType: "permission.history",
+          payload: {limit: 50},
+        },
+      });
+      expect(actions.primary).toBeUndefined();
+      expect(actions.secondary).toBeUndefined();
+      expect(actions.tertiary).toBeUndefined();
+    }
   });
 
-  test("exposes owner actions after the corresponding fresh projection is authoritative", () => {
+  test("labels the approval pane as read-only without effect chords", () => {
+    for (const authoritative of [false, true]) {
+      const state = ownerBackedState(authoritative);
+      for (const compact of [false, true]) {
+        const hint = footerHintFor("approvals", state, options, compact);
+
+        expect(hint).toContain("read-only history");
+        expect(hint).not.toMatch(/\b(?:approve|deny|dismiss|mark resolved)\b/);
+        expect(hint).not.toMatch(/\^(?:X|F|V)\b/);
+      }
+    }
+  });
+
+  test("routes approval chords through the production decision seam without effect requests", () => {
+    for (const authoritative of [false, true]) {
+      const state = ownerBackedState(authoritative);
+      const sent: Array<{requestType?: string; payload: Record<string, unknown>}> = [];
+
+      for (const chord of ["x", "f", "v"]) {
+        const decision = paneActionChordDecision(chord, {ctrl: true}, "approvals", state, options);
+        expect(decision.handled).toBe(true);
+        if (decision.handled && decision.action) {
+          sent.push({requestType: decision.action.requestType, payload: decision.action.payload});
+        }
+      }
+      expect(sent).toEqual([]);
+
+      const refresh = paneActionChordDecision("l", {ctrl: true}, "approvals", state, options);
+      expect(refresh).toEqual({
+        handled: true,
+        action: {
+          label: "refresh approvals",
+          summary: "refresh approval history",
+          requestType: "permission.history",
+          payload: {limit: 50},
+        },
+      });
+      if (refresh.handled && refresh.action) {
+        sent.push({requestType: refresh.action.requestType, payload: refresh.action.payload});
+      }
+      expect(sent).toEqual([{requestType: "permission.history", payload: {limit: 50}}]);
+    }
+  });
+
+  test("keeps approval list movement plain-key-only so Ctrl-J and Ctrl-K recover globally", () => {
+    expect(plainListDirection("j", {})).toBe(1);
+    expect(plainListDirection("k", {})).toBe(-1);
+    expect(plainListDirection("j", {ctrl: true})).toBeUndefined();
+    expect(plainListDirection("k", {ctrl: true})).toBeUndefined();
+    expect(plainListDirection("j", {meta: true})).toBeUndefined();
+    expect(plainListDirection("k", {meta: true})).toBeUndefined();
+  });
+
+  test("uses the production status mode to expose the read-only approval boundary", () => {
+    const state = ownerBackedState(true);
+    const approvalsTab = state.tabs.find((tab) => tab.kind === "approvals");
+
+    expect(focusModeFor(approvalsTab, state)).toBe("approval history · read-only");
+  });
+
+  test("preserves fresh owner-backed session detail", () => {
+    const retained = ownerBackedState(false);
     const observed = ownerBackedState(true);
 
-    expect(actionsFor("sessions", observed).primary?.requestType).toBe("session.detail");
-    expect(actionsFor("approvals", observed).primary?.payload.action_type).toBe("approval.resolve");
-    expect(actionsFor("approvals", observed).secondary?.payload.resolution).toBe("denied");
-    expect(actionsFor("approvals", observed).tertiary?.payload.resolution).toBe("dismissed");
+    expect(actionsFor("sessions", retained).primary).toBeUndefined();
+    expect(actionsFor("sessions", observed).primary).toMatchObject({
+      requestType: "session.detail",
+      payload: {session_id: "session-a", transcript_limit: 40},
+    });
   });
 });

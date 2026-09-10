@@ -546,7 +546,7 @@ def project_model_status(
     entries: Iterable[ModelEntry] | None = None,
     profiles_path: Path | None = None,
 ) -> ModelStatusProjection:
-    live = key_oracle.live_providers()
+    live = key_oracle.live_providers(probe=False)
     status_data = _status_data()
     live_results = _live_call_results()
     profiles = load_profiles(profiles_path)

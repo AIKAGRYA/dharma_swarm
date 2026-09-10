@@ -357,8 +357,9 @@ def _anti_slop_rule_excludes(rule_id: str) -> list[str]:
     return list(_anti_slop_rule(rule_id).get("paths", {}).get("exclude", []))
 
 
-def test_rule1_lockstep_is_bidirectional():
+def test_rule1_lockstep_is_bidirectional(tmp_path, monkeypatch):
     import yaml
+    from scripts.verify import helm_perf_soak, helm_seat_matrix
 
     manifest = yaml.safe_load(_SURFACE_MANIFEST.read_text(encoding="utf-8"))
     participants = manifest.get("research_state_participants", {})
@@ -382,12 +383,36 @@ def test_rule1_lockstep_is_bidirectional():
         f"manifest now declares {len(declared)} — update the adjudication "
         "record and this contract together, never one alone"
     )
+    report_modules = (helm_perf_soak, helm_seat_matrix)
+    report_files = {
+        str(Path(module.__file__).resolve().relative_to(REPO_ROOT))
+        for module in report_modules
+    }
+    report_scope = manifest["helm_operational_surfaces"]["verification_reports"]
+    assert set(report_scope["files"]) == report_files
+    assert set(report_scope["report_schemas"]) == {
+        module.REPORT_SCHEMA_VERSION for module in report_modules
+    } | {helm_perf_soak.MEASUREMENT_SCHEMA_VERSION}
+    declared_root = manifest["state_dir"]["helm_verification_reports"]
+    assert report_scope["state_slices"] == [declared_root]
+    assert declared_root.startswith("~/")
+    # Exercise the real validators against the manifest's declared boundary.
+    # A declaration change cannot make an unrelated state path a report target.
+    operator_root = tmp_path.resolve() / "operator"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: operator_root))
+    report_root = operator_root / declared_root.removeprefix("~/")
+    candidate = report_root / "contract" / "output.json"
+    for module in report_modules:
+        assert module.validate_output_path(candidate) == candidate
+        with pytest.raises(ValueError):
+            module.validate_output_path(operator_root / ".dharma/state/unrelated.json")
+
     excludes = set(_anti_slop_rule_excludes("dharma.no-unauthorized-dharma-write"))
-    missing = declared - excludes
+    missing = (declared | report_files) - excludes
     assert not missing, (
-        f"declared research participants missing from Rule 1 allowlist: {sorted(missing)}"
+        f"declared participants or report owners missing from Rule 1 allowlist: {sorted(missing)}"
     )
-    undeclared = excludes - declared - _RULE1_PERMITTED_NON_RESEARCH_EXCLUDES
+    undeclared = excludes - declared - report_files - _RULE1_PERMITTED_NON_RESEARCH_EXCLUDES
     assert not undeclared, (
         "Rule 1 exclude entries with neither a manifest declaration nor a "
         f"pinned canonical/operational justification: {sorted(undeclared)} — "

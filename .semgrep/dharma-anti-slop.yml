@@ -66,6 +66,12 @@ rules:
         - "scripts/research/palantir_source_card_playbooks.py"
         - "scripts/research/palantir_source_card_quality.py"
         - "dharma_swarm/verifier_ranker_v0/inventory.py"
+        # Exact operational report owners declared by ACTIVE_SURFACE_MANIFEST.yaml
+        # helm_operational_surfaces.verification_reports (governance issue #1520).
+        # Both validators confine new output to ~/.dharma/reports/helm; historical
+        # report inputs remain readable. They are not research participants.
+        - "scripts/verify/helm_perf_soak.py"
+        - "scripts/verify/helm_seat_matrix.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================

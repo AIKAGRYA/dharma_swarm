@@ -9,6 +9,7 @@ from dharma_swarm.operator_core.session_views import build_session_catalog, buil
 from dharma_swarm.operator_core.permission_payloads import build_permission_decision_payload, build_permission_resolution_payload
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.tui.engine.events import (
+    ContextReceipt,
     PermissionDecisionEvent,
     PermissionResolutionEvent,
     SessionEnd,
@@ -157,6 +158,73 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
             self.assertTrue(catalog["has_more"])
             self.assertEqual(len(catalog["sessions"]), 2)
 
+    def test_session_detail_reserves_context_receipt_outside_recent_tail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = SessionStore(root=Path(temp_dir))
+            session_id = store.create_session(
+                session_id="sess-long-context",
+                provider_id="claude",
+                model_id="claude-sonnet-5",
+                cwd="/repo",
+            )
+            store.append_event(
+                session_id,
+                UserPrompt(session_id=session_id, content="bounded context"),
+            )
+            store.append_event(
+                session_id,
+                ContextReceipt(
+                    session_id=session_id,
+                    provider_id="claude",
+                    model_id="claude-sonnet-5",
+                    source_epoch="sha256:epoch",
+                    context_digest="sha256:digest",
+                    disposition="attached_redacted",
+                    lane_outcome="completed",
+                ),
+            )
+            store.append_event(
+                session_id,
+                SessionStart(
+                    session_id=session_id,
+                    provider_id="claude",
+                    model="claude-sonnet-5",
+                ),
+            )
+            for index in range(100):
+                store.append_event(
+                    session_id,
+                    TextDelta(
+                        session_id=session_id,
+                        provider_id="claude",
+                        content=f"chunk-{index}",
+                    ),
+                )
+            store.append_event(
+                session_id,
+                SessionEnd(
+                    session_id=session_id,
+                    provider_id="claude",
+                    success=True,
+                ),
+            )
+
+            detail = build_session_detail(store, session_id, transcript_limit=80)
+
+            self.assertEqual(detail["compaction_preview"]["event_count"], 104)
+            self.assertIn(
+                "context_receipt",
+                detail["compaction_preview"]["protected_event_types"],
+            )
+            self.assertEqual(len(detail["recent_events"]), 80)
+            visible_types = [event["event_type"] for event in detail["recent_events"]]
+            self.assertEqual(visible_types[:3], [
+                "user_prompt",
+                "context_receipt",
+                "session_start",
+            ])
+            self.assertEqual(visible_types[-1], "session_end")
+
     def test_build_session_catalog_matches_normalized_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store = SessionStore(root=Path(temp_dir))
@@ -250,7 +318,10 @@ class OperatorCoreSessionViewTests(unittest.TestCase):
             )
 
             store.finalize_session(session_id, status="completed", total_turns=1)
-            self.assertEqual(store.verify_session_replay(session_id), (True, []))
+            self.assertEqual(
+                store.verify_session_replay(session_id),
+                (True, ["replay_unproven_pre_receipt_era"]),
+            )
             meta = store.load_meta(session_id)
             self.assertEqual(
                 (meta["provider_id"], meta["model_id"]),

@@ -32,8 +32,8 @@ class TestConductorConfigs:
         assert cfg["role"] == AgentRole.CONDUCTOR
         assert cfg["provider_type"] == _resolve_conductor_provider()
         # Both conductors derive model from canonical_default_model(); codex
-        # (CLAUDE_CODE) resolves to the same opus default as the claude config.
-        assert cfg["model"] == "claude-opus-4-6"
+        # reads the CLAUDE_CODE default from the one per-provider owner.
+        assert cfg["model"] == canonical_default_model(ProviderType.CLAUDE_CODE)
         assert cfg["wake_interval_seconds"] == 1800.0
         assert cfg["max_turns"] == 10
 

@@ -3,10 +3,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TERMINAL_ROOT="$ROOT/terminal"
+# shellcheck source=terminal/scripts/lib/codex_managed_tmux.sh
+source "$TERMINAL_ROOT/scripts/lib/codex_managed_tmux.sh"
 EXPECTED_BUN_VERSION="1.3.11"
 
 SMOKE_LOG=""
-TMUX_SOCKET=""
 TMUX_SESSION="guardian-smoke"
 # Bash 3.2 (the macOS system Bash) considers an empty array unset under
 # `set -u`. Keep one inert sentinel until the live process tree is captured.
@@ -31,15 +32,7 @@ collect_descendants() {
 }
 
 stop_smoke_server() {
-  local socket_path
-
-  if [[ -n "$TMUX_SOCKET" ]] && command -v tmux >/dev/null 2>&1; then
-    tmux -L "$TMUX_SOCKET" kill-server >/dev/null 2>&1 || true
-    # tmux 3.6b on macOS can leave a dead named socket after kill-server.
-    # This path is derived from our private, PID-qualified socket label only.
-    socket_path="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$TMUX_SOCKET"
-    rm -f "$socket_path"
-  fi
+  codex_managed_tmux_cleanup || true
 }
 
 cleanup() {
@@ -80,10 +73,10 @@ wait_for_smoke_screen() {
   local attempt
 
   for ((attempt = 1; attempt <= 80; attempt += 1)); do
-    if ! tmux -L "$TMUX_SOCKET" has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    if ! codex_managed_tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
       return 1
     fi
-    tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION:0.0" -S - >"$SMOKE_LOG"
+    codex_managed_tmux capture-pane -p -t "$TMUX_SESSION:0.0" -S - >"$SMOKE_LOG"
     if grep -qiE "DHARMA|Dharma Terminal" "$SMOKE_LOG"; then
       return 0
     fi
@@ -120,8 +113,8 @@ run_compact_smoke() {
   local process_command
   local bridge_pid=""
 
-  if ! command -v tmux >/dev/null 2>&1; then
-    fail_smoke "tmux is required for the bounded 80x24 PTY check"
+  if ! codex_managed_tmux_init terminal_guardian; then
+    fail_smoke "tmux is required for the bounded private 80x24 PTY check"
     return 1
   fi
   if ! command -v pgrep >/dev/null 2>&1; then
@@ -130,29 +123,28 @@ run_compact_smoke() {
   fi
 
   SMOKE_LOG="$(mktemp "${TMPDIR:-/tmp}/dharma-terminal-guardian-smoke.XXXXXX")"
-  TMUX_SOCKET="dharma-guardian-$$-${RANDOM}"
 
   # Delay the application for one second so tmux can disable its status row
   # and establish the exact PTY dimensions before Ink reads stdout.columns.
-  tmux -L "$TMUX_SOCKET" -f /dev/null new-session \
+  codex_managed_tmux new-session \
     -d -x 80 -y 24 -s "$TMUX_SESSION" -c "$TERMINAL_ROOT" \
     "sleep 1; exec env COLUMNS=80 LINES=24 bun run start"
-  tmux -L "$TMUX_SOCKET" set-option -g status off
-  tmux -L "$TMUX_SOCKET" resize-window -t "$TMUX_SESSION:0" -x 80 -y 24
+  codex_managed_tmux set-option -g status off
+  codex_managed_tmux resize-window -t "$TMUX_SESSION:0" -x 80 -y 24
 
-  pane_dimensions="$(tmux -L "$TMUX_SOCKET" display-message -p -t "$TMUX_SESSION:0.0" '#{pane_width}x#{pane_height}')"
+  pane_dimensions="$(codex_managed_tmux display-message -p -t "$TMUX_SESSION:0.0" '#{pane_width}x#{pane_height}')"
   if [[ "$pane_dimensions" != "80x24" ]]; then
     fail_smoke "expected an 80x24 pane, got $pane_dimensions"
     return 1
   fi
 
   if ! wait_for_smoke_screen; then
-    tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION:0.0" -S - >"$SMOKE_LOG" 2>/dev/null || true
+    codex_managed_tmux capture-pane -p -t "$TMUX_SESSION:0.0" -S - >"$SMOKE_LOG" 2>/dev/null || true
     fail_smoke "Helm did not render its compact Dharma shell within 8 seconds"
     return 1
   fi
 
-  pane_pid="$(tmux -L "$TMUX_SOCKET" display-message -p -t "$TMUX_SESSION:0.0" '#{pane_pid}')"
+  pane_pid="$(codex_managed_tmux display-message -p -t "$TMUX_SESSION:0.0" '#{pane_pid}')"
   SMOKE_PIDS=("$pane_pid")
   collect_descendants "$pane_pid"
   for pid in "${SMOKE_PIDS[@]}"; do
@@ -172,7 +164,7 @@ run_compact_smoke() {
     return 1
   fi
 
-  tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION:0.0" C-c
+  codex_managed_tmux send-keys -t "$TMUX_SESSION:0.0" C-c
   if ! wait_for_smoke_exit; then
     stop_smoke_server
     if ! wait_for_smoke_exit; then

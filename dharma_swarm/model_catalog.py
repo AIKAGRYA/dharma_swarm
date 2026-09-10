@@ -28,6 +28,7 @@ from dharma_swarm.models import ProviderType
 # tier, default, or proof.
 HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID = "gpt-5.6-sol"
 HELM_PREVIEW_CLAUDE_FABLE_5_MODEL_ID = "claude-fable-5"
+HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID = "claude-sonnet-5"
 HELM_PREVIEW_GROK_4_6_MODEL_ID = "grok-4.6"
 
 _SELECTOR_KEYS = (
@@ -342,6 +343,7 @@ def model_catalog_summary(
 
 __all__ = [
     "HELM_PREVIEW_CLAUDE_FABLE_5_MODEL_ID",
+    "HELM_PREVIEW_CLAUDE_SONNET_5_MODEL_ID",
     "HELM_PREVIEW_GPT_5_6_SOL_MODEL_ID",
     "HELM_PREVIEW_GROK_4_6_MODEL_ID",
     "ModelCatalogEntry",

@@ -102,3 +102,31 @@ test("renders Python-provided ages and aggregate clock skew without evaluating t
   expect(formatReceiptAge(3_600)).toBe("1h");
   expect(formatReceiptAge(null)).toBe("?");
 });
+
+test("names usable-now lanes separately from evaluator-verified seats", async () => {
+  const truth = authoritativeTruth(buildOnCallProjection({
+    state: "LIVE_DEGRADED",
+    verdicts: ["ON_CALL", "REJECTED", "REJECTED", "REJECTED", "REJECTED", "REJECTED", "REJECTED"],
+  }));
+  const stdout = new TestStdout(120);
+  let frame = "";
+  stdout.on("data", (chunk) => { frame += chunk.toString("utf8"); });
+  const instance = render(
+    <OnCallTruthBand truth={truth} compact={false} usableNowCount={2} usableLaneTotal={5} />,
+    {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: new TestStdout(120) as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    },
+  );
+  await Bun.sleep(10);
+  instance.unmount();
+  instance.cleanup();
+
+  const rendered = stripAnsi(frame);
+  expect(rendered).toContain("Usable now 2/5 lanes");
+  expect(rendered).toContain("Identity verified 1/7");
+  expect(rendered).not.toContain("available 1/7");
+});

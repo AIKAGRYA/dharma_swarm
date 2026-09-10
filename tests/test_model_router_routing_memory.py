@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dharma_swarm.decision_router import RoutePath
+from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.provider_policy import ProviderRouteDecision, ProviderRouteRequest
 from dharma_swarm.providers import ModelRouter
@@ -52,8 +53,6 @@ async def test_model_router_uses_persistent_routing_memory_to_reorder(tmp_path) 
     )
 
     # Record outcomes using the DEFAULT_MODELS hints that will be looked up
-    from dharma_swarm.model_hierarchy import DEFAULT_MODELS
-
     anthropic_model = DEFAULT_MODELS.get(ProviderType.ANTHROPIC, "claude-opus-4-6")
     orfree_model = DEFAULT_MODELS.get(ProviderType.OPENROUTER_FREE, "meta-llama/llama-3.3-70b-instruct:free")
 
@@ -136,7 +135,7 @@ async def test_model_router_posthoc_feedback_reorders_future_routes(tmp_path) ->
             selected_provider=ProviderType.OPENROUTER_FREE,
             selected_model_hint="meta-llama/llama-3.3-70b-instruct:free",
             fallback_providers=[ProviderType.ANTHROPIC],
-            fallback_model_hints=["claude-opus-4-6"],
+            fallback_model_hints=[DEFAULT_MODELS[ProviderType.ANTHROPIC]],
             confidence=0.8,
             requires_human=False,
             reasons=["seed_feedback"],
@@ -152,7 +151,7 @@ async def test_model_router_posthoc_feedback_reorders_future_routes(tmp_path) ->
         decision=ProviderRouteDecision(
             path=RoutePath.DELIBERATIVE,
             selected_provider=ProviderType.ANTHROPIC,
-            selected_model_hint="claude-opus-4-6",
+            selected_model_hint=DEFAULT_MODELS[ProviderType.ANTHROPIC],
             fallback_providers=[ProviderType.OPENROUTER_FREE],
             fallback_model_hints=["meta-llama/llama-3.3-70b-instruct:free"],
             confidence=0.8,

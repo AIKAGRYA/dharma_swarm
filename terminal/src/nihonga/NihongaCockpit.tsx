@@ -17,7 +17,6 @@ import type {
 } from "../types";
 import {BoundaryLine, NihongaRoomBand, PlaceCompass} from "./NihongaChrome";
 import {CausalFlowPlane, causalEventRowBudget} from "./CausalFlowPlane";
-import type {OrganismRegionView} from "./organismView";
 import {WholeOrganismPlane} from "./WholeOrganismPlane";
 import {placeForPane, planeForPane, viewportProfile, workspaceLabel} from "./shellModel";
 
@@ -33,7 +32,7 @@ type Props = {
   transcriptSubtitle?: string;
   transcriptEmptyState?: string;
   transcriptAccentColor?: string;
-  regions: OrganismRegionView[];
+  ownerProjectionLines: string[];
   events: CanonicalExecutionEvent[];
   prompt: string;
   composerFocused: boolean;
@@ -91,6 +90,7 @@ export function NihongaCockpit(props: Props): React.ReactElement {
   const conversation = (
     <TranscriptPane
       frameless
+      bottomAnchor
       title="Conversation"
       lines={props.transcriptLines}
       scrollOffset={props.transcriptScrollOffset}
@@ -101,7 +101,7 @@ export function NihongaCockpit(props: Props): React.ReactElement {
     />
   );
   const contextual = props.activeTab?.kind === "chat"
-    ? <WholeOrganismPlane regions={props.regions} activeFacet={props.activeTab.title} compact={profile !== "panorama"} />
+    ? <WholeOrganismPlane projectionLines={props.ownerProjectionLines} activeFacet={props.activeTab.title} compact={profile !== "panorama"} />
     : props.activeFacet;
   const facetOwnsFrame = props.activeTab?.kind !== "chat";
 
@@ -157,7 +157,13 @@ export function NihongaCockpit(props: Props): React.ReactElement {
             height={props.height}
           />
           <PlaceCompass active={activePlace} compact={compact} />
-          <OnCallTruthBand truth={props.onCallTruth} compact={props.width < 120} />
+          <OnCallTruthBand
+            truth={props.onCallTruth}
+            compact={props.width < 120}
+            width={props.width}
+            usableNowCount={props.routePolicy.targets.filter((target) => target.usableNow === true).length}
+            usableLaneTotal={props.routePolicy.targets.length}
+          />
         </>
       )}
       <Box flexGrow={1} flexShrink={1} overflow="hidden">{workspace}</Box>

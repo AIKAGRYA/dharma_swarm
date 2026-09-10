@@ -53,6 +53,19 @@ describe("F-066 natural-language UI intents", () => {
     }
   });
 
+  test("a tied provider-only model request opens an ambiguity result", () => {
+    const targets = [
+      ...TARGETS,
+      {alias: "sonnet", label: "Claude Sonnet", provider: "claude_code", model: "sonnet", routeId: "r4", routeState: "ready", selectable: true} as const,
+    ];
+    const intent = matchUiIntent("switch the route to claude", PANES, targets);
+
+    expect(intent?.kind).toBe("model_ambiguous");
+    if (intent?.kind === "model_ambiguous") {
+      expect(intent.targets.map((target) => target.model)).toEqual(["opus", "sonnet"]);
+    }
+  });
+
   test("operator literal: 'change models to glm 4.' and 'glm 5.' resolve or answer locally — never a backend turn", () => {
     const targets = [
       ...TARGETS,
@@ -98,6 +111,10 @@ describe("F-066 natural-language UI intents", () => {
     expect(matchUiIntent("tell me about zen buddhism and its history", PANES, TARGETS)).toBeNull();
     expect(matchUiIntent("what is the control plane architecture of this swarm?", PANES, TARGETS)).toBeNull();
     expect(matchUiIntent("switch to plan b for the deployment", PANES, TARGETS)).toBeNull();
+    expect(matchUiIntent("explain status, run swarm, then switch the route to claude opus", PANES, TARGETS)).toBeNull();
+    expect(matchUiIntent("switch to cockpit mode and summarize the current state", PANES, TARGETS)).toBeNull();
+    expect(matchUiIntent("open sessions while explaining the newest one", PANES, TARGETS)).toBeNull();
+    expect(matchUiIntent("open sessions. explain the newest one", PANES, TARGETS)).toBeNull();
     expect(matchUiIntent("hello, can you hear me?", PANES, TARGETS)).toBeNull();
   });
 

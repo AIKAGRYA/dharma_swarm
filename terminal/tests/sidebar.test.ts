@@ -7,6 +7,7 @@ import path from "node:path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 const REPO_ROOT_COMPACT = REPO_ROOT.length <= 24 ? REPO_ROOT : `${REPO_ROOT.slice(0, 23).trimEnd()}…`;
+const REPO_ROOT_LINE = REPO_ROOT.length <= 56 ? REPO_ROOT : `${REPO_ROOT.slice(0, 55).trimEnd()}…`;
 
 describe("buildContextSidebarLines", () => {
   test("surfaces repo dependency hotspots and durable control previews", () => {
@@ -157,7 +158,7 @@ describe("buildContextSidebarLines", () => {
     expect(lines.some((line) => line.startsWith("Topo pressure dharma_swarm Δ552 (510 modified, 42"))).toBe(true);
     expect(lines).toContain("Pressure preview 1 warning | dharma_swarm Δ552 (510 modified, 42 untracked)");
     expect(lines).toContain("Hotspot pressure change terminal (274) | dep dharma_swarm.models | inbound 159");
-    expect(lines).toContain(`Root ${REPO_ROOT}`);
+    expect(lines).toContain(`Root ${REPO_ROOT_LINE}`);
     expect(lines).toContain("Branch main@95210b1");
     expect(lines.some((line) => line.startsWith("Branch preview tracking origin/main in sync | +0/-0 | topol"))).toBe(
       true,
@@ -854,7 +855,7 @@ describe("buildContextSidebarLines", () => {
       new Date("2026-04-02T12:00:00Z"),
     );
 
-    expect(lines).toContain(`Root ${REPO_ROOT}`);
+    expect(lines).toContain(`Root ${REPO_ROOT_LINE}`);
     expect(lines).toContain("Branch main@95210b1");
     expect(lines.some((line) => line.startsWith("Health topology sab_canonical_repo_missing; high"))).toBe(true);
     expect(lines.some((line) => line.startsWith("Repo risk preview tracking origin/main in sync | sab_canonical_repo_missing"))).toBe(true);

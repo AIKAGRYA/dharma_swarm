@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from dharma_swarm.tui.engine.events import CanonicalEvent as LegacyCanonicalEvent
-from dharma_swarm.tui.engine.events import ToolCallComplete, UserPrompt
+from dharma_swarm.tui.engine.events import ContextReceipt, ToolCallComplete, UserPrompt
 
 from .contracts import (
     CanonicalEventEnvelope,
@@ -98,10 +98,17 @@ def event_envelope_from_legacy_event(
     payload = asdict(event)
     event_type = str(payload.pop("type", event.type))
     session_id = str(payload.get("session_id", "") or "").strip() or None
+    source = (
+        EventSource.OPERATOR
+        if isinstance(event, UserPrompt)
+        else EventSource.RUNTIME
+        if isinstance(event, ContextReceipt)
+        else EventSource.PROVIDER
+    )
     return CanonicalEventEnvelope(
         event_id=f"evt-{uuid4()}",
         event_type=event_type,
-        source=EventSource.OPERATOR if isinstance(event, UserPrompt) else EventSource.PROVIDER,
+        source=source,
         audience=audience,
         transport=transport,
         session_id=session_id,
@@ -188,6 +195,9 @@ def routing_decision_from_policy(
         metadata={
             "active_label": policy.get("active_label"),
             "default_route": policy.get("default_route"),
+            "configured_route": policy.get("configured_route"),
+            "configured_default_route": policy.get("configured_default_route"),
+            "fallback_notice": policy.get("fallback_notice"),
             "route_state": route_state,
             "selectable": selectable,
             "availability_reason": (

@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-import hashlib
-import json
-import os
-import stat
-from typing import Any
+import math
 
 from dharma_swarm import model_status
+from dharma_swarm.terminal_bridge_route_evidence import (
+    read_durable_transcript,
+    strict_transcript_from_bytes,
+)
 from dharma_swarm.terminal_bridge_session_types import _ActiveSessionRun
 from dharma_swarm.tui.engine.events import (
     CanonicalEventType,
-    EVENT_TYPES,
-    SCHEMA_VERSION,
+    ContextReceipt,
     SessionEnd,
     SessionStart,
     TextComplete,
@@ -50,19 +49,6 @@ class _DurableRouteEvidenceSource:
     adapter: object
     receipt_ref: str | None = None
     receipt_sha256: str | None = None
-
-
-def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    decoded: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in decoded:
-            raise ValueError(f"duplicate JSON key: {key}")
-        decoded[key] = value
-    return decoded
-
-
-def _reject_non_finite_json_constant(value: str) -> None:
-    raise ValueError(f"non-finite JSON constant: {value}")
 
 
 class TerminalBridgeRouteTruthMixin:
@@ -153,81 +139,7 @@ class TerminalBridgeRouteTruthMixin:
         self,
         session_id: str,
     ) -> tuple[bytes | None, str | None, str | None]:
-        """Read and hash one root-confined regular transcript from one file handle."""
-
-        if (
-            not session_id
-            or session_id in {".", ".."}
-            or "/" in session_id
-            or "\\" in session_id
-        ):
-            return None, None, None
-        try:
-            store_root = self._session_store.root.resolve()
-            session_path = store_root / session_id
-            if session_path.is_symlink():
-                return None, None, None
-            session_dir = session_path.resolve(strict=True)
-            transcript_path = session_dir / "transcript.jsonl"
-            if transcript_path.is_symlink():
-                return None, None, None
-            resolved_transcript = transcript_path.resolve(strict=True)
-        except OSError:
-            return None, None, None
-        if (
-            session_dir.parent != store_root
-            or session_dir.name != session_id
-            or resolved_transcript.parent != session_dir
-        ):
-            return None, None, None
-
-        descriptor = -1
-        try:
-            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-            descriptor = os.open(transcript_path, flags)
-            before = os.fstat(descriptor)
-            if not stat.S_ISREG(before.st_mode):
-                return None, None, None
-            chunks: list[bytes] = []
-            while True:
-                chunk = os.read(descriptor, 1024 * 1024)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-            after = os.fstat(descriptor)
-        except OSError:
-            return None, None, None
-        finally:
-            if descriptor >= 0:
-                os.close(descriptor)
-        identity_before = (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-            before.st_mtime_ns,
-        )
-        identity_after = (
-            after.st_dev,
-            after.st_ino,
-            after.st_size,
-            after.st_mtime_ns,
-        )
-        transcript_bytes = b"".join(chunks)
-        if identity_before != identity_after or len(transcript_bytes) != after.st_size:
-            return None, None, None
-        try:
-            if (
-                transcript_path.is_symlink()
-                or transcript_path.resolve(strict=True) != resolved_transcript
-            ):
-                return None, None, None
-        except OSError:
-            return None, None, None
-        return (
-            transcript_bytes,
-            str(resolved_transcript),
-            hashlib.sha256(transcript_bytes).hexdigest(),
-        )
+        return read_durable_transcript(self._session_store.root, session_id)
 
     @staticmethod
     def _strict_transcript_from_bytes(
@@ -235,48 +147,7 @@ class TerminalBridgeRouteTruthMixin:
         *,
         session_id: str,
     ) -> list[CanonicalEventType] | None:
-        """Decode every persisted byte; malformed or skipped rows reject the receipt."""
-
-        if not transcript_bytes or not transcript_bytes.endswith(b"\n"):
-            return None
-        try:
-            decoded = transcript_bytes.decode("utf-8", errors="strict")
-        except UnicodeDecodeError:
-            return None
-
-        transcript: list[CanonicalEventType] = []
-        for raw_line in decoded.splitlines():
-            if not raw_line.strip():
-                return None
-            try:
-                payload = json.loads(
-                    raw_line,
-                    object_pairs_hook=_reject_duplicate_json_keys,
-                    parse_constant=_reject_non_finite_json_constant,
-                )
-            except (TypeError, ValueError, json.JSONDecodeError):
-                return None
-            if not isinstance(payload, dict):
-                return None
-            event_type = payload.get("type")
-            if not isinstance(event_type, str):
-                return None
-            event_cls = EVENT_TYPES.get(event_type)
-            if event_cls is None:
-                return None
-            try:
-                event = event_cls(**payload)
-            except (TypeError, ValueError):
-                return None
-            if (
-                event.schema_version != SCHEMA_VERSION
-                or event.session_id != session_id
-                or event.raw is not None
-                or asdict(event) != payload
-            ):
-                return None
-            transcript.append(event)
-        return transcript
+        return strict_transcript_from_bytes(transcript_bytes, session_id=session_id)
 
     def _route_evidence_from_durable_session(
         self,
@@ -316,6 +187,9 @@ class TerminalBridgeRouteTruthMixin:
         decoded_transcript = transcript or []
 
         starts = [event for event in decoded_transcript if isinstance(event, SessionStart)]
+        context_receipts = [
+            event for event in decoded_transcript if isinstance(event, ContextReceipt)
+        ]
         prompts = [event for event in decoded_transcript if isinstance(event, UserPrompt)]
         replies = [
             event
@@ -337,11 +211,58 @@ class TerminalBridgeRouteTruthMixin:
             for index, event in enumerate(decoded_transcript)
             if isinstance(event, SessionEnd)
         ]
+        context_receipt_positions = [
+            index
+            for index, event in enumerate(decoded_transcript)
+            if isinstance(event, ContextReceipt)
+        ]
+        context_receipt = (
+            context_receipts[0] if len(context_receipts) == 1 else None
+        )
+        receipt_timestamps_valid = False
+        if context_receipt is not None and start is not None and durable_terminal is not None:
+            timestamp_values = (
+                context_receipt.timestamp,
+                context_receipt.boundary_timestamp,
+                start.timestamp,
+                durable_terminal.timestamp,
+                context_receipt.outcome_timestamp,
+            )
+            if all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+                for value in timestamp_values
+            ):
+                (
+                    receipt_timestamp,
+                    boundary_timestamp,
+                    start_timestamp,
+                    terminal_timestamp,
+                    outcome_timestamp,
+                ) = (float(value) for value in timestamp_values)
+                receipt_timestamps_valid = (
+                    receipt_timestamp > 0
+                    and receipt_timestamp == boundary_timestamp
+                    and boundary_timestamp <= start_timestamp
+                    and start_timestamp <= terminal_timestamp
+                    and terminal_timestamp <= outcome_timestamp
+                )
+        context_receipt_valid = (
+            context_receipt is not None
+            and context_receipt.provider_id == source.requested_provider_id
+            and context_receipt.model_id == source.requested_model_id
+            and context_receipt.source == "server_bootstrap_cache"
+            and context_receipt.authority == "NONE"
+            and context_receipt.lane_outcome == "completed"
+            and receipt_timestamps_valid
+        )
         canonical_event_order = (
             len(prompts) == 1
             and bool(decoded_transcript)
             and isinstance(decoded_transcript[0], UserPrompt)
-            and start_positions == [1]
+            and context_receipt_positions == [1]
+            and start_positions == [2]
             and terminal_positions == [len(decoded_transcript) - 1]
         )
         served_provider = (
@@ -393,6 +314,7 @@ class TerminalBridgeRouteTruthMixin:
                 replay_ok,
                 not replay_issues,
                 canonical_event_order,
+                context_receipt_valid,
                 len(prompts) == 1,
                 (
                     prompts[0].content == source.expected_prompt

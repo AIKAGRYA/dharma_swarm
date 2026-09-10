@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,12 @@ from dharma_swarm.memory_kernel import (
     WriterClassification,
     WriterStatus,
     default_writer_specs,
+)
+from dharma_swarm.memory_kernel.write_policy import (
+    MemoryWritePolicy,
+    WriteDecisionOutcome,
+    WriteRequest,
+    default_reviewed_write_baseline,
 )
 from scripts.memory_writer_sentinel import main as writer_sentinel_cli_main
 
@@ -237,6 +244,48 @@ def test_loop4_10_state_sentinel_write_has_reviewed_baseline() -> None:
         "path_write:fff3e82d4cdf"
     )
     assert sentinel_write.write_decision["decision"] == "warn"
+
+
+@pytest.fixture
+def helm_menu_plist_write():
+    """Inspect the shipped call without building the app or writing its metadata."""
+    source = "scripts/build_helm_menu.py"
+    discoveries = MemoryWriterSentinel(repo_root=Path(__file__).resolve().parents[1]).discover_write_paths(
+        scan_roots=(source,),
+    )
+    writes = [row for row in discoveries if row.symbol == "build_menu" and row.operation == "path_write"]
+    assert len(writes) == 1
+    write = writes[0]
+    identity = MemoryWritePolicy().identity_for_writer_specs((), source_path=source, symbol=write.symbol)
+    request = WriteRequest(source, write.symbol, write.operation, write.target, write.mode, identity)
+    return write, request
+
+
+def test_helm_menu_generated_metadata_has_reviewed_warning_only(helm_menu_plist_write) -> None:
+    write, request = helm_menu_plist_write
+    expected_key = ("scripts/build_helm_menu.py", "build_menu", "path_write", "b6ea5dbb36a4")
+    assert request.baseline_key() == expected_key
+    entry = next(entry for entry in default_reviewed_write_baseline() if entry.key() == expected_key)
+    assert entry.triage_category == "generated_artifact"
+    assert entry.occurrences == 1
+    assert write.status is DiscoveredWriteStatus.UNREGISTERED
+    assert write.matched_writer_ids == ()
+    assert write.write_decision is not None
+    assert write.write_decision["reviewed_baseline"] is True
+    assert write.write_decision["reviewed_baseline_id"] == ":".join(expected_key)
+    assert write.write_decision["decision"] == "warn"
+    assert MemoryWritePolicy().decide(request).decision is WriteDecisionOutcome.WARN
+
+
+@pytest.mark.parametrize("change", ["second_occurrence", "changed_target"])
+def test_helm_menu_metadata_review_does_not_admit_other_writes(helm_menu_plist_write, change) -> None:
+    _, request = helm_menu_plist_write
+    changed = replace(request, occurrence_index=2) if change == "second_occurrence" else replace(
+        request, target="plist.write_bytes(other_metadata)",
+    )
+    decision = MemoryWritePolicy().decide(changed)
+    assert decision.decision is WriteDecisionOutcome.DENY
+    assert decision.reviewed_baseline_id is None
 
 
 def test_tfidf_embedder_move_keeps_registered_writer_spec() -> None:

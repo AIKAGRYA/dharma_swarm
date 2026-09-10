@@ -54,6 +54,22 @@ class SessionEnd(CanonicalEvent):
 
 
 @dataclass(slots=True)
+class ContextReceipt(CanonicalEvent):
+    """Server-owned evidence for the context boundary of the final chat lane."""
+
+    type: str = "context_receipt"
+    boundary_timestamp: float = 0.0
+    outcome_timestamp: float = 0.0
+    model_id: str = ""
+    source: str = "server_bootstrap_cache"
+    source_epoch: str = ""
+    context_digest: str = ""
+    disposition: str = "missing"
+    authority: str = "NONE"
+    lane_outcome: str = "pending"
+
+
+@dataclass(slots=True)
 class TextDelta(CanonicalEvent):
     type: str = "text_delta"
     content: str = ""
@@ -219,6 +235,7 @@ EVENT_TYPES: dict[str, type[CanonicalEvent]] = {
     "session_start": SessionStart,
     "user_prompt": UserPrompt,
     "session_end": SessionEnd,
+    "context_receipt": ContextReceipt,
     "text_delta": TextDelta,
     "text_complete": TextComplete,
     "thinking_delta": ThinkingDelta,
@@ -244,6 +261,7 @@ CanonicalEventType = (
     SessionStart
     | UserPrompt
     | SessionEnd
+    | ContextReceipt
     | TextDelta
     | TextComplete
     | ThinkingDelta

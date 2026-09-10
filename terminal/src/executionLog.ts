@@ -82,6 +82,12 @@ function timestampFromEvent(event: Record<string, unknown>): string | undefined 
   return timestamp || undefined;
 }
 
+function routeFromBridgeEvent(event: Record<string, unknown>): string | undefined {
+  const provider = String(event.provider_id ?? event.provider ?? "").trim();
+  const model = String(event.model_id ?? event.model ?? "").trim();
+  return provider && model ? `${provider}:${model}` : undefined;
+}
+
 function canonicalEvent(
   event: Record<string, unknown>,
   partial: Omit<CanonicalExecutionEvent, "id" | "raw">,
@@ -90,6 +96,7 @@ function canonicalEvent(
   return {
     id: `${partial.kind}:${sourceId}:${String(event.created_at ?? event.timestamp ?? "")}:${String(event.content ?? event.summary ?? partial.title).slice(0, 24)}`,
     raw: event,
+    route: partial.route ?? routeFromBridgeEvent(event),
     ...partial,
   };
 }
@@ -108,6 +115,23 @@ export function userPromptExecutionEvent(prompt: string, timestamp = new Date().
   };
 }
 
+export function localAssistantExecutionEvent(
+  content: string,
+  timestamp = new Date().toISOString(),
+): CanonicalExecutionEvent {
+  return {
+    id: `assistant_text:local:${timestamp}:${content.slice(0, 24)}`,
+    sourceEventType: "local_assistant",
+    kind: "assistant_text",
+    phase: "complete",
+    title: compactText(content),
+    content,
+    timestamp,
+    route: "local",
+    raw: {message: content, created_at: timestamp, source: "local"},
+  };
+}
+
 export function localStatusExecutionEvent(
   title: string,
   summary?: string,
@@ -122,6 +146,7 @@ export function localStatusExecutionEvent(
     title,
     summary,
     timestamp,
+    route: "local",
     raw: {title, summary, created_at: timestamp, source: "local"},
   };
 }
@@ -180,6 +205,7 @@ export function localCommandResultExecutionEvent(
     content: summary,
     detail: [`Command: ${command}`],
     timestamp,
+    route: "local",
     raw: {
       command,
       summary,
@@ -193,7 +219,22 @@ export function localCommandResultExecutionEvent(
   };
 }
 
-export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): CanonicalExecutionEvent[] {
+// F4: a provider event that carries no owned provider/model identity is stamped
+// with the route in force when it was ingested, so a later route switch can
+// never re-label a settled turn at render time.
+export function canonicalEventsFromBridgeEvent(
+  event: Record<string, unknown>,
+  ingestRoute?: string,
+): CanonicalExecutionEvent[] {
+  const events = unstampedCanonicalEventsFromBridgeEvent(event);
+  const fallback = ingestRoute?.trim();
+  if (!fallback) {
+    return events;
+  }
+  return events.map((entry) => (entry.route ? entry : {...entry, route: fallback}));
+}
+
+function unstampedCanonicalEventsFromBridgeEvent(event: Record<string, unknown>): CanonicalExecutionEvent[] {
   const type = String(event.type ?? "");
 
   if (type === "text_delta" || type === "text_complete") {
@@ -231,6 +272,7 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
         title: compactText(content),
         content,
         timestamp: timestampFromEvent(event),
+        route: routeFromBridgeEvent(event),
       },
     ];
   }
@@ -457,6 +499,31 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     })];
   }
 
+  if (type === "context_receipt") {
+    const provider = String(event.provider_id ?? "").trim();
+    const model = String(event.model_id ?? "").trim();
+    const disposition = String(event.disposition ?? "").trim() || "missing";
+    const contextDigest = String(event.context_digest ?? "").trim();
+    const sourceEpoch = String(event.source_epoch ?? "").trim();
+    return [canonicalEvent(event, {
+      sourceEventType: type,
+      kind: "status",
+      phase: "complete",
+      title: "context boundary sealed",
+      summary: `${provider}:${model}`.replace(/^:|:$/g, "") || undefined,
+      detail: [
+        `Final lane context ${disposition}${contextDigest ? ` · ${contextDigest.slice(0, 23)}` : ""}`,
+        `Lane ${String(event.lane_outcome ?? "").trim() || "unknown"}`,
+        `Authority ${String(event.authority ?? "").trim() || "NONE"}`,
+        ...(sourceEpoch ? [`Source epoch ${sourceEpoch.slice(0, 23)}`] : []),
+      ],
+      timestamp: timestampFromEvent({
+        ...event,
+        timestamp: event.outcome_timestamp ?? event.timestamp,
+      }),
+    })];
+  }
+
   if (type === "session.bootstrap.result" || type === "session.ack") {
     return [
       canonicalEvent(event, {
@@ -474,6 +541,15 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
             : [
                 `Session ${String(event.session_id ?? "").trim() || "pending"}`,
                 `${String(event.provider ?? "").trim()}:${String(event.model ?? "").trim()}`.replace(/^:/, "") || "route pending",
+                ...(event.context_disposition === undefined
+                  ? []
+                  : [
+                      `Initial lane context ${String(event.context_disposition ?? "").trim() || "missing"}${
+                        String(event.context_digest ?? "").trim()
+                          ? ` · ${String(event.context_digest).trim().slice(0, 23)}`
+                          : ""
+                      }`,
+                    ]),
               ],
         timestamp: timestampFromEvent(event),
       }),
@@ -586,7 +662,7 @@ type ChatTurn = {
   assistant?: string;
   assistantTimestamp?: string;
   route?: string;
-  routeSource?: "request_ack" | "provider_session_start";
+  routeSource?: "request_ack" | "provider_session_start" | "source_stamp";
   endedWithoutResponse?: boolean;
   acceptedCommandPending?: boolean;
   promptMs?: number;
@@ -689,6 +765,36 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
     if (eventMs !== undefined) {
       activeTurn.lastEventMs = Math.max(activeTurn.lastEventMs ?? 0, eventMs);
     }
+    const stampedRoute = event.route?.trim();
+    if (event.sourceEventType === "session_start" && (stampedRoute || event.summary)) {
+      activeTurn.route = stampedRoute || event.summary;
+      activeTurn.routeSource = "provider_session_start";
+    } else if (
+      event.sourceEventType === "session.ack"
+      && (stampedRoute || event.summary)
+      && activeTurn.routeSource !== "provider_session_start"
+    ) {
+      activeTurn.route = stampedRoute || event.summary;
+      activeTurn.routeSource = "request_ack";
+    } else if (
+      stampedRoute
+      && stampedRoute !== "local"
+      && activeTurn.routeSource !== "provider_session_start"
+      && activeTurn.routeSource !== "request_ack"
+    ) {
+      activeTurn.route = stampedRoute;
+      activeTurn.routeSource = "source_stamp";
+    } else if (
+      stampedRoute === "local"
+      && (event.sourceEventType === "local_assistant" || event.sourceEventType === "local_command_result")
+      && (!activeTurn.routeSource || (activeTurn.routeSource === "source_stamp" && activeTurn.route === "local"))
+    ) {
+      // Local lifecycle/status events also carry source evidence, but provider-
+      // bound turns use those statuses while bootstrapping and cancelling. Only
+      // an explicit local response or result attributes the conversational turn.
+      activeTurn.route = stampedRoute;
+      activeTurn.routeSource = "source_stamp";
+    }
     if (event.kind === "assistant_text") {
       const content = (event.content ?? "").trim();
       if (content && activeTurn.assistant !== content) {
@@ -699,13 +805,6 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
         activeTurn.phase = "complete";
       }
       continue;
-    }
-    if (event.sourceEventType === "session_start" && event.summary) {
-      activeTurn.route = event.summary;
-      activeTurn.routeSource = "provider_session_start";
-    } else if (event.sourceEventType === "session.ack" && event.summary && activeTurn.routeSource !== "provider_session_start") {
-      activeTurn.route = event.summary;
-      activeTurn.routeSource = "request_ack";
     }
     // F-157: queued-offline lifecycle — pending holds the turn in the explicit queued
     // state; dispatched releases it back to running (real bridge events take over);

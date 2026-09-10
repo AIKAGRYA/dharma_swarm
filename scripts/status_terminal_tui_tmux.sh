@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SESSION="${SESSION_NAME:-dharma_terminal_tui}"
-STATE_DIR="${DHARMA_TERMINAL_TUI_STATE_DIR:-${HOME}/.dharma/terminal_tui}"
-LOG_FILE="${STATE_DIR}/session.log"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=terminal_tui_tmux_common.sh
+source "${SCRIPT_DIR}/terminal_tui_tmux_common.sh"
+terminal_tui_tmux_init
 
-if tmux has-session -t "${SESSION}" 2>/dev/null; then
-  echo "Session '${SESSION}': RUNNING"
+SESSION="${TERMINAL_TUI_TMUX_SESSION}"
+STATE_DIR="${TERMINAL_TUI_TMUX_STATE_DIR}"
+LOG_FILE="${STATE_DIR}/session.log"
+RUNNING=0
+
+terminal_tui_print_receipt 80
+echo
+
+if terminal_tui_tmux has-session -t "=${SESSION}" 2>/dev/null; then
+  RUNNING=1
+  echo "Session '${SESSION}' on socket '${TERMINAL_TUI_TMUX_SOCKET}': RUNNING"
 else
-  echo "Session '${SESSION}': NOT RUNNING"
+  echo "Session '${SESSION}' on socket '${TERMINAL_TUI_TMUX_SOCKET}': NOT RUNNING"
 fi
 
 if [[ -f "${LOG_FILE}" ]]; then
@@ -17,8 +27,8 @@ if [[ -f "${LOG_FILE}" ]]; then
   tail -n 40 "${LOG_FILE}"
 fi
 
-if tmux has-session -t "${SESSION}" 2>/dev/null; then
+if [[ "${RUNNING}" -eq 1 ]]; then
   echo
   echo "Pane snapshot:"
-  tmux capture-pane -pt "${SESSION}" -S -80
+  terminal_tui_tmux capture-pane -pt "=${SESSION}:" -S -80
 fi
