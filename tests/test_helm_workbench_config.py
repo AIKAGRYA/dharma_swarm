@@ -83,8 +83,10 @@ def test_default_preparation_is_private_and_secret_free(setup, monkeypatch: pyte
     assert tui["theme"] == "tokyonight" and tui["mouse"] is True
     assert tui["keybinds"]["model_list"] == "f4,<leader>m"
     assert tui["keybinds"]["model_cycle_recent"] == "f2"
-    assert tui["keybinds"]["session_interrupt"] == "escape"
-    assert "ctrl+q" in tui["keybinds"]["app_exit"]
+    interrupt = tui["keybinds"]["session_interrupt"].split(",")
+    exits = tui["keybinds"]["app_exit"].split(",")
+    assert "escape" in interrupt and "ctrl+c" in interrupt
+    assert "ctrl+q" in exits and "ctrl+d" in exits and "ctrl+c" not in exits
     assert "environment" not in prepared.public_report()
     assert "environment" not in repr(prepared)
     for path in (config.state_dir / "workbench").rglob("*"):
@@ -188,6 +190,21 @@ def test_routine_reopen_honors_saved_theme_model_and_does_not_force_cli_model(se
     explicit = workbench.prepare_workbench(config, model="glm-coding/glm-5.3")
     assert explicit.argv[-2:] == ("--model", "glm-coding/glm-5.3")
     assert generated(explicit)[1]["theme"] == "everforest"
+
+
+@pytest.mark.parametrize("saved", ['{"theme":null}', '{"theme":{"name":"everforest"}}', '{"theme":"bad name!"}'])
+def test_unusable_foreign_theme_state_falls_back_instead_of_blocking_launch(setup, saved: str) -> None:
+    config, _ = setup
+    first = workbench.prepare_workbench(config)
+    state = Path(first.environment["XDG_STATE_HOME"]) / "opencode"
+    state.mkdir()
+    (state / "kv.json").write_text(saved)
+    original = (state / "kv.json").read_text()
+
+    reopened = workbench.prepare_workbench(config)
+
+    assert generated(reopened)[1]["theme"] == "tokyonight"
+    assert (state / "kv.json").read_text() == original
 
 
 def test_glm_env_reference_is_resolved_only_into_private_child_env(setup, monkeypatch: pytest.MonkeyPatch) -> None:

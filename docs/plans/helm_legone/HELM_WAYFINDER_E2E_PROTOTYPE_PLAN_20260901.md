@@ -688,7 +688,8 @@ bash scripts/helm_validation_test.sh
 ```
 
 F4 opens models; F2 cycles recent models; Ctrl+P opens commands; Ctrl+X then L
-opens sessions; Escape interrupts; Ctrl+Q quits OpenCode. Cmd+W closes the dedicated
+opens sessions; Escape or Ctrl+C interrupts the running turn; Ctrl+Q or Ctrl+D
+quits OpenCode. Cmd+W closes the dedicated
 window while retaining its terminal session. Metered providers require explicit
 `workbench open --api-access` on a stopped workbench. No provider identity or
 availability is established merely by a configured model name.

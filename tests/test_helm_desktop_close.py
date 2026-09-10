@@ -91,8 +91,9 @@ def test_close_detaches_only_exact_private_seat_wezterm_clients(config: DesktopC
     assert processes.session_exists
     assert not config.state_dir.exists()
     again = runtime.close(config, runner=processes)
-    assert again["outcome"] == "already_closed"
+    assert again["outcome"] == "attached_elsewhere"
     assert again["attachments_closed"] == 0
+    assert again["attached_ttys"] == ["/dev/ttysManual"]
     assert processes.detached == ["/dev/ttysHelm", "/dev/ttysHelmTwo"]
 
 
@@ -103,9 +104,11 @@ def test_close_preserves_manual_clients_and_unrelated_wezterm_panes(config: Desk
 
     result = runtime.close(config, runner=processes)
 
-    assert result["outcome"] == "already_closed"
+    assert result["outcome"] == "attached_elsewhere"
     assert result["attachments_closed"] == 0
     assert result["session_preserved"] is True
+    assert result["attached_ttys"] == sorted(before)
+    assert result["attach_argv"] == runtime.attach_argv(config)
     assert processes.clients == before
     assert processes.detached == []
 

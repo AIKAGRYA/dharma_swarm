@@ -213,7 +213,17 @@ def close_workbench(config: DesktopConfig) -> dict[str, Any]:
         return {"action": "workbench.close", "outcome": "already_closed", "seat": seat(config)}
     current = _window(config)
     if current is None:
-        return {"action": "workbench.close", "outcome": "already_closed", "seat": seat(config)}
+        attached = _tmux(config, "list-clients", "-t", "=helm_workbench", "-F", "#{client_tty}")
+        if attached.returncode:
+            raise DesktopError("could not inspect the private workbench attachments")
+        ttys = sorted(tty for tty in attached.stdout.splitlines() if tty)
+        if not ttys:
+            return {"action": "workbench.close", "outcome": "already_closed", "seat": seat(config)}
+        # The window this invocation owns is unverified, but a client is still
+        # attached elsewhere. Report it rather than claiming the window is gone.
+        return {"action": "workbench.close", "outcome": "attached_elsewhere", "seat": seat(config),
+                "session_preserved": True, "attached_ttys": ttys,
+                "detail": "the coding session is attached in another window; close it there"}
     record, _ = current
     result = _tmux(config, "detach-client", "-t", record["tty"])
     if result.returncode:

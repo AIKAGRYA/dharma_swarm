@@ -189,6 +189,13 @@ def close(config: DesktopConfig, *, runner: Runner = run) -> dict[str, Any]:
     if panes is None:
         raise DesktopError("could not verify the Helm window because WezTerm is unavailable")
     owned = {pane.get("tty_name") for pane in panes if pane.get("tty_name") in ttys}
+    if not owned:
+        # A client is attached from a terminal WezTerm does not enumerate. It is
+        # real, unverified work: report it honestly instead of claiming closure.
+        return {"action": "close", "outcome": "attached_elsewhere", "attachments_closed": 0,
+                "session_preserved": True, "seat": config.seat(), "attached_ttys": sorted(ttys),
+                "detail": "the seat is attached in another terminal; close it there or detach from that window",
+                "attach_argv": attach_argv(config)}
     for tty in sorted(owned):
         result = tmux(config, "detach-client", "-t", tty, runner=runner)
         if result.returncode:
@@ -198,5 +205,5 @@ def close(config: DesktopConfig, *, runner: Runner = run) -> dict[str, Any]:
         raise DesktopError("Helm close was requested but its completion could not be verified")
     if owned.intersection(remaining.stdout.splitlines()):
         raise DesktopError("Helm close was requested but a client remains attached")
-    return {"action": "close", "outcome": "closed" if owned else "already_closed",
-            "attachments_closed": len(owned), "session_preserved": True, "seat": config.seat()}
+    return {"action": "close", "outcome": "closed", "attachments_closed": len(owned),
+            "session_preserved": True, "seat": config.seat()}

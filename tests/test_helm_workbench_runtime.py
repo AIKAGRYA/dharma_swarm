@@ -226,8 +226,18 @@ def test_close_does_not_touch_mismatched_or_operator_pane(boundary: Boundary, mi
     boundary.record_window(**overrides)
     before = list(boundary.clients)
     result = runtime.close_workbench(boundary.config)
-    assert result["outcome"] == "already_closed"
+    assert result["outcome"] == "attached_elsewhere"
+    assert result["attached_ttys"] == sorted(before)
+    assert result["session_preserved"] is True
     assert boundary.clients == before
+    assert_no_destructive_calls(boundary)
+
+
+def test_close_reports_already_closed_only_when_no_client_is_attached(boundary: Boundary) -> None:
+    boundary.clients = []
+    boundary.record_window()
+    result = runtime.close_workbench(boundary.config)
+    assert result["outcome"] == "already_closed"
     assert_no_destructive_calls(boundary)
 
 

@@ -232,14 +232,13 @@ def prepare_workbench(config: DesktopConfig, *, model: str | None = None,
     runtime = {"$schema": "https://opencode.ai/config.json", "model": selected,
                "enabled_providers": enabled, "provider": providers,
                "autoupdate": False, "share": "disabled", **fragment}
-    theme = saved_ui.get("theme", previous_tui.get("theme", "tokyonight"))
-    if not isinstance(theme, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", theme):
-        raise DesktopError("The saved workbench theme name is invalid")
+    theme = next((candidate for candidate in (saved_ui.get("theme"), previous_tui.get("theme"), "tokyonight")
+                  if isinstance(candidate, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,80}", candidate)), "tokyonight")
     tui = {"$schema": "https://opencode.ai/tui.json", "theme": theme, "mouse": True,
            "diff_style": "auto", "keybinds": {"leader": "ctrl+x", "command_list": "ctrl+p",
            "model_list": "f4,<leader>m", "model_cycle_recent": "f2",
            "model_cycle_recent_reverse": "shift+f2", "session_list": "<leader>l",
-           "session_interrupt": "escape", "app_exit": "ctrl+q,ctrl+c,ctrl+d,<leader>q"}}
+           "session_interrupt": "escape,ctrl+c", "app_exit": "ctrl+q,ctrl+d,<leader>q"}}
     _write_configs(config, {config_relative: runtime, tui_relative: tui})
     argv = (executable, str(config.repo_root), "--continue")
     if model is not None or not previous:
