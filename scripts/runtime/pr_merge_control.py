@@ -191,22 +191,91 @@ def run(
     return result
 
 
-def gh_json(args: list[str], *, timeout: int = 120) -> Any:
-    result = run(["gh", *args], timeout=timeout)
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise PRControlError(
-            f"gh returned non-JSON output for {' '.join(args)}"
-        ) from exc
+# GitHub answers a query that costs more than it will spend with a 5xx rather
+# than a partial result. That is not a hypothetical: the hourly backlog lane
+# died on exactly this 115 consecutive times between 2026-08-26 and 2026-09-14,
+# because one 502 on the bulk PR query aborted the whole run.
+TRANSIENT_GH_MARKERS = (
+    "http 500",
+    "http 502",
+    "http 503",
+    "http 504",
+    "bad gateway",
+    "gateway timeout",
+    "service unavailable",
+    "internal server error",
+    "secondary rate limit",
+    "was submitted too quickly",
+    # GitHub answers an over-expensive GraphQL query with HTTP 200 and an
+    # errors array at least as often as with a 502. gh surfaces that as this
+    # message and exits non-zero, so without it the commonest form of the
+    # very failure this retry exists for would not be retried.
+    "something went wrong while executing your query",
+    # Transport-layer failures between the runner and GitHub.
+    "tls handshake timeout",
+    "connection reset by peer",
+    "i/o timeout",
+    "unexpected eof",
+    "no such host",
+)
+GH_RETRY_ATTEMPTS = 4
+GH_RETRY_BASE_S = 2.0
+# Per-PR hydration retries less than a one-off call: the breaker below is the
+# real defence against a systemic outage, and a long ladder per PR is what
+# pushes the job past its timeout.
+GH_HYDRATE_ATTEMPTS = 2
+GH_HYDRATE_BREAKER = 3
+
+
+def is_transient_gh_error(detail: str) -> bool:
+    """True only for server-side 'ask again later' failures.
+
+    Deliberately narrow. A 404, a rejected flag or an auth failure is
+    deterministic, and retrying it only spends four times as long reaching
+    the same answer -- while hiding the real error behind the last attempt.
+    """
+    lowered = str(detail).lower()
+    return any(marker in lowered for marker in TRANSIENT_GH_MARKERS)
+
+
+def gh_json(
+    args: list[str], *, timeout: int = 120, attempts: int = GH_RETRY_ATTEMPTS
+) -> Any:
+    attempts = max(1, attempts)
+    for attempt in range(1, attempts + 1):
+        try:
+            result = run(["gh", *args], timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # A timeout on an expensive query is the same condition as a 504.
+            if attempt == attempts:
+                raise
+        except PRControlError as exc:
+            if attempt == attempts or not is_transient_gh_error(str(exc)):
+                raise
+        else:
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as exc:
+                # Malformed output is deterministic; do not retry it.
+                raise PRControlError(
+                    f"gh returned non-JSON output for {' '.join(args)}"
+                ) from exc
+        time.sleep(GH_RETRY_BASE_S * (2 ** (attempt - 1)))
+    raise PRControlError(  # pragma: no cover - loop always returns or raises
+        f"gh exhausted {attempts} attempts for {' '.join(args)}"
+    )
 
 
 def repo_name() -> str:
-    result = run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
-        timeout=30,
-    )
-    name = result.stdout.strip()
+    # cmd_fanout calls this before fetch_open_prs, so an unretried 5xx here
+    # aborts the run exactly as the bulk query used to.
+    name = str(
+        gh_json(
+            ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+            timeout=30,
+        )
+        or ""
+    ).strip()
     if not name or "/" not in name:
         raise PRControlError("could not determine GitHub repository name")
     return name
@@ -461,6 +530,7 @@ def backup_reviewer_agents(args: argparse.Namespace) -> list[str]:
 
 
 def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
+    unavailable = str(pr.get("rollupUnavailable") or "")
     rollup = pr.get("statusCheckRollup") or []
     latest_by_name: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
     for index, item in enumerate(rollup):
@@ -510,6 +580,7 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
         "failing": failing,
         "pending": pending,
         "unknown": unknown,
+        "unavailable": unavailable,
     }
 
 
@@ -525,6 +596,10 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     elif mergeable == "CONFLICTING":
         reasons.append("merge conflict")
         status = "BLOCKED_CONFLICT"
+    elif checks.get("unavailable"):
+        # Not knowing is not the same as nothing being wrong.
+        reasons.append(f"check status unavailable: {checks['unavailable']}")
+        status = "BLOCKED_CHECKS_UNAVAILABLE"
     elif checks["failing"]:
         reasons.append(f"{len(checks['failing'])} failing checks")
         status = "BLOCKED_CHECKS"
@@ -569,8 +644,55 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# statusCheckRollup is deliberately absent from the bulk field list. It expands
+# to commits(last:1){statusCheckRollup{contexts(last:100)}}, so a 100-PR page
+# resolves on the order of 10,000 nodes in one query -- the shape GitHub
+# refuses. What remains is roughly a dozen scalar fields per PR. Note this is
+# still a single page of --limit PRs; no paging was added, so a backlog above
+# --limit is invisible to this lane either way.
+PR_LIST_FIELDS = (
+    "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,"
+    "isDraft,mergeable,reviewDecision,updatedAt,url"
+)
+
+
+def fetch_pr_rollup(pr_number: int, *, attempts: int = GH_HYDRATE_ATTEMPTS) -> list[dict[str, Any]]:
+    """Read one PR's check rollup, or raise. Never returns a silent empty.
+
+    gh emits the statusCheckRollup key only when the PR's last-commit node
+    resolves. A force-push race, a GC'd ref or a deleted fork head yields a
+    successful call with `{}` -- and `{}.get(...) or []` would hand back an
+    empty rollup that classify_pr reads as "no checks are failing", which is
+    the fail-open this whole change exists to close. Absence of the key is
+    missing data, not evidence of green, so it raises.
+    """
+    payload = gh_json(
+        ["pr", "view", str(pr_number), "--json", "statusCheckRollup"], attempts=attempts
+    )
+    if not isinstance(payload, dict):
+        raise PRControlError(
+            f"gh pr view returned a non-object rollup payload for PR #{pr_number}"
+        )
+    if "statusCheckRollup" not in payload:
+        raise PRControlError(
+            f"gh pr view returned no statusCheckRollup key for PR #{pr_number}; "
+            "the head commit did not resolve, so check state is unknown"
+        )
+    rollup = payload["statusCheckRollup"]
+    if rollup is None:
+        raise PRControlError(
+            f"gh pr view returned a null statusCheckRollup for PR #{pr_number}"
+        )
+    if not isinstance(rollup, list):
+        raise PRControlError(
+            f"gh pr view returned a non-list statusCheckRollup for PR #{pr_number}: "
+            f"{type(rollup).__name__}"
+        )
+    return rollup
+
+
 def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
-    return gh_json(
+    prs = gh_json(
         [
             "pr",
             "list",
@@ -579,9 +701,70 @@ def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
             "--limit",
             str(limit),
             "--json",
-            "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
+            PR_LIST_FIELDS,
         ]
     )
+    if not isinstance(prs, list):
+        raise PRControlError(
+            f"gh pr list returned {type(prs).__name__}, expected a list of pull requests"
+        )
+
+    # Worst case matters more than best case here. The backlog job allows
+    # ten minutes for everything including checkout and pip install; N PRs
+    # each burning four attempts plus 14s of backoff blows through that and
+    # turns a loud one-line failure into a silent cancelled job -- strictly
+    # harder to diagnose than the outage being fixed. Two bounds:
+    #   - skip PRs whose classification never consults the rollup at all;
+    #   - trip a breaker once failures are clearly systemic rather than
+    #     per-PR, and mark the remainder without paying for them.
+    consecutive_failures = 0
+    tripped = False
+    for pr in prs:
+        if not isinstance(pr, dict):
+            raise PRControlError(
+                f"gh pr list returned a non-object entry: {type(pr).__name__}"
+            )
+        # classify_pr short-circuits on these before it looks at checks, so
+        # hydrating them buys nothing and can cost a full retry ladder each.
+        if pr.get("isDraft") or str(pr.get("mergeable") or "").upper() == "CONFLICTING":
+            pr.setdefault("statusCheckRollup", [])
+            continue
+        if tripped:
+            pr["statusCheckRollup"] = []
+            pr["rollupUnavailable"] = (
+                f"skipped after {GH_HYDRATE_BREAKER} consecutive rollup failures; "
+                "GitHub looks unavailable rather than this PR being unusual"
+            )
+            continue
+        try:
+            pr["statusCheckRollup"] = fetch_pr_rollup(int(pr.get("number")))
+        except (
+            PRControlError,
+            subprocess.TimeoutExpired,
+            TypeError,
+            ValueError,
+        ) as exc:
+            # An empty rollup is NOT a safe default here: classify_pr reads a
+            # clean PR with no checks as GITHUB_GREEN_NEEDS_PACKET, which is a
+            # lane the backlog acts on. Record the failure so the PR is judged
+            # unknown rather than green.
+            pr["statusCheckRollup"] = []
+            pr["rollupUnavailable"] = str(exc) or exc.__class__.__name__
+            consecutive_failures += 1
+            if consecutive_failures >= GH_HYDRATE_BREAKER:
+                tripped = True
+        else:
+            consecutive_failures = 0
+    return prs
+
+
+def unavailable_rollup_numbers(summary: dict[str, Any]) -> list[int]:
+    """PR numbers whose check state could not be read, from a queue summary."""
+    return [
+        int(item["number"])
+        for item in summary.get("items", [])
+        if item.get("status") == "BLOCKED_CHECKS_UNAVAILABLE"
+    ]
 
 
 def render_queue_markdown(summary: dict[str, Any]) -> str:
@@ -3463,6 +3646,9 @@ def cmd_fanout(args: argparse.Namespace) -> int:
     root = expand(args.state_root)
     repo = repo_name()
     queue_summary = build_queue_summary(fetch_open_prs(args.limit), repo)
+    unreadable = unavailable_rollup_numbers(queue_summary)
+    for number in unreadable:
+        print(f"CHECKS_UNAVAILABLE #{number} check state could not be read")
     queue_dir = root / "queue"
     write_json(queue_dir / "latest.json", queue_summary)
     write_text(queue_dir / "latest.md", render_queue_markdown(queue_summary))
@@ -3753,6 +3939,18 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         and receipt.get("a2a_nats", {}).get("status") != "OK"
     ):
         return 3
+    if len(unreadable) >= GH_HYDRATE_BREAKER:
+        # The 115-run outage was visible precisely because the lane went red.
+        # Classifying unreadable PRs as blocked keeps them out of the fanout,
+        # but on its own it would convert that outage into a green workflow
+        # publishing an empty queue -- a silent stall, which is worse. A
+        # handful of unreadable PRs is a bad day at GitHub; this many is the
+        # lane not working, and the lane must say so.
+        print(
+            f"FANOUT_DEGRADED could not read check state for {len(unreadable)} PRs: "
+            f"{', '.join(f'#{n}' for n in unreadable)}"
+        )
+        return 4
     return 0
 
 

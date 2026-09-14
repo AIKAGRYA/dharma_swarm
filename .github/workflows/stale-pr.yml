@@ -69,6 +69,7 @@ jobs:
           summary="## Stale PR Lifecycle Report\n\n"
           closed_count=0
           warned_count=0
+          labelled_count=0
 
           while IFS= read -r pr_json; do
             number="$(echo "$pr_json" | jq -r '.number')"
@@ -134,7 +135,27 @@ jobs:
                 summary+="- **WOULD CLOSE (dry-run)** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
               fi
 
-            # Warn if at warning threshold but not yet closeable
+            # Drafts are exempt from auto-close (see the close branch above),
+            # so the auto-close warning is simply false for them. A draft past
+            # its close threshold fell through to here and was told it would be
+            # "auto-closed in -2 days" and advised to "convert to a draft" --
+            # a countdown that had already gone negative, and advice it had
+            # already taken. Seventeen PRs got that comment on 2026-09-14.
+            # Drafts get the label and nothing else, which is what the header
+            # of this file has always said they get.
+            elif [ "$is_draft" = "true" ]; then
+              if [ -z "$has_stale" ]; then
+                summary+="- **LABELLED (draft — exempt from auto-close)** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
+                if [ "$DRY_RUN" = "false" ]; then
+                  gh pr edit "$number" --repo "$GH_REPO" --add-label "stale" || true
+                fi
+                labelled_count=$((labelled_count + 1))
+              fi
+
+            # Warn if at warning threshold but not yet closeable. Only
+            # non-drafts reach here, and a non-draft at or past close_days took
+            # the close branch -- so days_stale < close_days and the countdown
+            # below is always positive.
             elif [ -z "$has_stale" ]; then
               summary+="- **WARNED** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
               if [ "$DRY_RUN" = "false" ]; then
@@ -159,6 +180,6 @@ jobs:
 
           done < <(jq -c '.[]' /tmp/open_prs.json)
 
-          summary+="\n**Summary:** ${closed_count} closed, ${warned_count} warned\n"
+          summary+="\n**Summary:** ${closed_count} closed, ${warned_count} warned, ${labelled_count} labelled (drafts)\n"
           echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "Closed: $closed_count, Warned: $warned_count"
+          echo "Closed: $closed_count, Warned: $warned_count, Labelled: $labelled_count"
