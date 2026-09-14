@@ -191,14 +191,61 @@ def run(
     return result
 
 
-def gh_json(args: list[str], *, timeout: int = 120) -> Any:
-    result = run(["gh", *args], timeout=timeout)
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise PRControlError(
-            f"gh returned non-JSON output for {' '.join(args)}"
-        ) from exc
+# GitHub answers a query that costs more than it will spend with a 5xx rather
+# than a partial result. That is not a hypothetical: the hourly backlog lane
+# died on exactly this 115 consecutive times between 2026-08-26 and 2026-09-14,
+# because one 502 on the bulk PR query aborted the whole run.
+TRANSIENT_GH_MARKERS = (
+    "http 502",
+    "http 503",
+    "http 504",
+    "bad gateway",
+    "gateway timeout",
+    "service unavailable",
+    "secondary rate limit",
+    "was submitted too quickly",
+)
+GH_RETRY_ATTEMPTS = 4
+GH_RETRY_BASE_S = 2.0
+
+
+def is_transient_gh_error(detail: str) -> bool:
+    """True only for server-side 'ask again later' failures.
+
+    Deliberately narrow. A 404, a rejected flag or an auth failure is
+    deterministic, and retrying it only spends four times as long reaching
+    the same answer -- while hiding the real error behind the last attempt.
+    """
+    lowered = str(detail).lower()
+    return any(marker in lowered for marker in TRANSIENT_GH_MARKERS)
+
+
+def gh_json(
+    args: list[str], *, timeout: int = 120, attempts: int = GH_RETRY_ATTEMPTS
+) -> Any:
+    attempts = max(1, attempts)
+    for attempt in range(1, attempts + 1):
+        try:
+            result = run(["gh", *args], timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # A timeout on an expensive query is the same condition as a 504.
+            if attempt == attempts:
+                raise
+        except PRControlError as exc:
+            if attempt == attempts or not is_transient_gh_error(str(exc)):
+                raise
+        else:
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as exc:
+                # Malformed output is deterministic; do not retry it.
+                raise PRControlError(
+                    f"gh returned non-JSON output for {' '.join(args)}"
+                ) from exc
+        time.sleep(GH_RETRY_BASE_S * (2 ** (attempt - 1)))
+    raise PRControlError(  # pragma: no cover - loop always returns or raises
+        f"gh exhausted {attempts} attempts for {' '.join(args)}"
+    )
 
 
 def repo_name() -> str:
@@ -461,6 +508,7 @@ def backup_reviewer_agents(args: argparse.Namespace) -> list[str]:
 
 
 def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
+    unavailable = str(pr.get("rollupUnavailable") or "")
     rollup = pr.get("statusCheckRollup") or []
     latest_by_name: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
     for index, item in enumerate(rollup):
@@ -510,6 +558,7 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
         "failing": failing,
         "pending": pending,
         "unknown": unknown,
+        "unavailable": unavailable,
     }
 
 
@@ -525,6 +574,10 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     elif mergeable == "CONFLICTING":
         reasons.append("merge conflict")
         status = "BLOCKED_CONFLICT"
+    elif checks.get("unavailable"):
+        # Not knowing is not the same as nothing being wrong.
+        reasons.append(f"check status unavailable: {checks['unavailable']}")
+        status = "BLOCKED_CHECKS_UNAVAILABLE"
     elif checks["failing"]:
         reasons.append(f"{len(checks['failing'])} failing checks")
         status = "BLOCKED_CHECKS"
@@ -569,8 +622,27 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# statusCheckRollup is deliberately absent from the bulk field list. It expands
+# to every check run on every PR, and asking for it across a 100-PR page is the
+# query GitHub refuses. The cheap fields page fine; the rollup is hydrated one
+# PR at a time below, where each request is small and individually retryable.
+PR_LIST_FIELDS = (
+    "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,"
+    "isDraft,mergeable,reviewDecision,updatedAt,url"
+)
+
+
+def fetch_pr_rollup(pr_number: int) -> list[dict[str, Any]]:
+    payload = gh_json(["pr", "view", str(pr_number), "--json", "statusCheckRollup"])
+    if not isinstance(payload, dict):
+        raise PRControlError(
+            f"gh pr view returned a non-object rollup payload for PR #{pr_number}"
+        )
+    return payload.get("statusCheckRollup") or []
+
+
 def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
-    return gh_json(
+    prs = gh_json(
         [
             "pr",
             "list",
@@ -579,9 +651,25 @@ def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
             "--limit",
             str(limit),
             "--json",
-            "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
+            PR_LIST_FIELDS,
         ]
     )
+    for pr in prs:
+        try:
+            pr["statusCheckRollup"] = fetch_pr_rollup(int(pr.get("number")))
+        except (
+            PRControlError,
+            subprocess.TimeoutExpired,
+            TypeError,
+            ValueError,
+        ) as exc:
+            # An empty rollup is NOT a safe default here: classify_pr reads a
+            # clean PR with no checks as GITHUB_GREEN_NEEDS_PACKET, which is a
+            # lane the backlog acts on. Record the failure so the PR is judged
+            # unknown rather than green.
+            pr["statusCheckRollup"] = []
+            pr["rollupUnavailable"] = str(exc) or exc.__class__.__name__
+    return prs
 
 
 def render_queue_markdown(summary: dict[str, Any]) -> str:
