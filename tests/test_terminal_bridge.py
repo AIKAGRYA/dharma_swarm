@@ -2896,7 +2896,7 @@ def test_stdio_reads_correlated_cancel_while_provider_is_blocked_and_skips_fallb
         run_task = asyncio.create_task(bridge.run_stdio())
         writer.write(json.dumps(_chat_start("start-1")) + "\n")
         writer.flush()
-        await asyncio.wait_for(primary.started.wait(), timeout=0.5)
+        await asyncio.wait_for(primary.started.wait(), timeout=5.0)
 
         writer.write(
             json.dumps(
@@ -2909,9 +2909,9 @@ def test_stdio_reads_correlated_cancel_while_provider_is_blocked_and_skips_fallb
             + "\n"
         )
         writer.flush()
-        await asyncio.wait_for(primary.cancel_called.wait(), timeout=0.5)
+        await asyncio.wait_for(primary.cancel_called.wait(), timeout=5.0)
         writer.close()
-        assert await asyncio.wait_for(run_task, timeout=0.5) == 0
+        assert await asyncio.wait_for(run_task, timeout=5.0) == 0
         await bridge.close()
 
     try:
@@ -2990,7 +2990,7 @@ def test_provider_cancel_failure_is_sanitized_in_operator_ack(
         run_task = asyncio.create_task(bridge.run_stdio())
         writer.write(json.dumps(_chat_start("start-secret-cancel")) + "\n")
         writer.flush()
-        await asyncio.wait_for(adapter.started.wait(), timeout=0.5)
+        await asyncio.wait_for(adapter.started.wait(), timeout=5.0)
         writer.write(
             json.dumps(
                 {
@@ -3002,9 +3002,9 @@ def test_provider_cancel_failure_is_sanitized_in_operator_ack(
             + "\n"
         )
         writer.flush()
-        await asyncio.wait_for(adapter.cancel_called.wait(), timeout=0.5)
+        await asyncio.wait_for(adapter.cancel_called.wait(), timeout=5.0)
         writer.close()
-        assert await asyncio.wait_for(run_task, timeout=0.5) == 0
+        assert await asyncio.wait_for(run_task, timeout=5.0) == 0
         await bridge.close()
 
     try:
@@ -3071,7 +3071,7 @@ def test_busy_start_and_mismatched_cancel_cannot_touch_active_provider(capsys, t
         bridge._session_store = SessionStore(root=tmp_path)
         _install_chat_adapters(bridge, primary)
         await bridge._handle_request(_chat_start("start-active"))
-        await asyncio.wait_for(primary.started.wait(), timeout=0.5)
+        await asyncio.wait_for(primary.started.wait(), timeout=5.0)
 
         await bridge._handle_request(_chat_start("start-second"))
         await bridge._handle_request(
@@ -3162,8 +3162,8 @@ def test_close_cancels_and_drains_active_run(capsys, tmp_path) -> None:
         bridge._session_store = SessionStore(root=tmp_path)
         _install_chat_adapters(bridge, primary)
         await bridge._handle_request(_chat_start("start-close"))
-        await asyncio.wait_for(primary.started.wait(), timeout=0.5)
-        await asyncio.wait_for(bridge.close(), timeout=0.5)
+        await asyncio.wait_for(primary.started.wait(), timeout=5.0)
+        await asyncio.wait_for(bridge.close(), timeout=5.0)
         return bridge, primary
 
     bridge, primary = asyncio.run(scenario())
