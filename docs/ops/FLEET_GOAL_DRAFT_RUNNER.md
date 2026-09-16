@@ -31,7 +31,9 @@ effectful execution requires a different executor with actual fencing.
 TaskBoard and RuntimeStateStore retain tasks, attempts, claims, receipts,
 source checkpoints, and previous results. A local file lock permits one
 controller per state directory. A failed attempt rotates to the next worker
-after backoff; exhaustion blocks that goal for operator review. Unexpired
+after backoff. When a task exhausts `max_attempts`, it stays FAILED and the
+goal cools down for one `interval_seconds` after the last attempt, then admits
+one fresh task; missed intervals are not replayed. Unexpired
 leases block replay. Canonical Mission Control recovers expired claims.
 Source collection failure creates no unfounded task. Status and artifacts
 are projections under the explicitly supplied state directory.
@@ -41,8 +43,8 @@ quotations from supplied sources. They do **not** certify the model's
 interpretation, actual goal achievement, or authorization for its proposed
 next action. Every accepted artifact retains `review_required: true`.
 An operator can pause a goal with `enabled: false` and restart the service.
-Cancelled tasks stay blocked. Failed tasks reach a bounded attempt limit;
-inspect the owner records before explicitly admitting replacement work.
+Cancelled tasks stay blocked and are never resumed automatically. Failed
+tasks recover only through the bounded per-cycle limit above.
 
 Use systemd with `Restart=on-failure`, explicit memory/CPU limits, and a
 private state directory. Back up both SQLite owners together while the

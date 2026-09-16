@@ -44,7 +44,7 @@ def tcp_probe(host: str, port: int, *, read_banner: bool = False) -> tuple[bool,
             sock.settimeout(2)
             return True, sock.recv(4096).decode("utf-8", "replace")
     except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+        return False, type(exc).__name__
 
 
 def service_active(name: str) -> bool:
@@ -62,9 +62,13 @@ def gateway_health() -> tuple[bool, str]:
     try:
         with urllib.request.urlopen("http://127.0.0.1:8422/health", timeout=5) as response:
             body = json.loads(response.read().decode("utf-8"))
-        return bool(response.status == 200 and body.get("ok") is True), json.dumps(body)
+        if response.status != 200:
+            return False, f"http_{response.status}"
+        if not isinstance(body, dict) or body.get("ok") is not True:
+            return False, "ok_not_true"
+        return True, ""
     except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+        return False, type(exc).__name__
 
 
 def recent_gateway_errors() -> list[str]:

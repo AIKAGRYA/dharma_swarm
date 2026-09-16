@@ -69,6 +69,24 @@ class WatchdogTests(unittest.TestCase):
         self.assertEqual(calls,[])
         self.assertNotIn('do-not-emit',out+json.dumps(state))
 
+    def test_probe_and_health_failures_emit_no_raw_detail(self):
+        secret = 'do-not-emit-token'
+        with patch.object(watchdog.socket, 'create_connection', side_effect=OSError(secret)):
+            ok, detail = watchdog.tcp_probe('127.0.0.1', 4223)
+        self.assertEqual((ok, detail), (False, 'OSError'))
+        body = io.BytesIO(json.dumps({'ok': False, 'token': secret}).encode())
+        body.status = 200
+        with patch.object(watchdog.urllib.request, 'urlopen', return_value=body):
+            self.assertEqual(watchdog.gateway_health(), (False, 'ok_not_true'))
+        with patch.object(watchdog.urllib.request, 'urlopen', side_effect=OSError(secret)):
+            self.assertEqual(watchdog.gateway_health(), (False, 'OSError'))
+        output = io.StringIO()
+        with patch.object(watchdog,'BRIDGE_ENV',self.env), patch.object(watchdog,'HEARTBEAT',self.hb), patch.object(watchdog,'STATE',self.state), patch.object(watchdog.socket,'create_connection',side_effect=OSError(secret)), patch.object(watchdog,'service_active',return_value=True), patch.object(watchdog.urllib.request,'urlopen',return_value=io.BytesIO(json.dumps({'ok': False, 'token': secret}).encode())), patch.object(watchdog,'recent_gateway_errors',return_value=[]), contextlib.redirect_stdout(output):
+            self.assertEqual(watchdog.main(), 1)
+        emitted = output.getvalue() + self.state.read_text()
+        self.assertNotIn(secret, emitted)
+        self.assertIn('gateway_unhealthy:', emitted)
+
 
 if __name__ == '__main__':
     unittest.main()

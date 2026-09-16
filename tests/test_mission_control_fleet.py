@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
 import sys
@@ -85,16 +86,71 @@ async def test_failure_rotates_worker_after_backoff_without_new_task(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_attempt_limit_stops_failing_goal_across_restart(tmp_path):
+async def test_exhausted_cycle_cools_down_then_opens_one_fresh_task(tmp_path):
+    executor = Executor(fail=2)
+    runner = FleetDraftRunner(tmp_path, config(), executor)
+    await runner.initialize()
+    base = datetime.now(timezone.utc)
+    await runner.tick(now=base)
+    await runner.tick(now=base + timedelta(seconds=65))
+    runner = FleetDraftRunner(tmp_path, config(), executor)
+    await runner.initialize()
+    assert (await runner.tick(now=base + timedelta(seconds=600)))["outcomes"]["continuity"] == "waiting:cycle_cooldown"
+    assert len(executor.workers) == 2
+    later = base + timedelta(days=3)
+    assert (await runner.tick(now=later))["outcomes"]["continuity"] == "accepted:draft_requires_review"
+    assert (await runner.tick())["outcomes"]["continuity"] == "waiting:interval"
+    tasks = await runner.control.list_tasks("continuity")
+    assert sorted(t.status for t in tasks) == sorted([TaskStatus.FAILED, TaskStatus.COMPLETED])
+    assert len(executor.workers) == 3
+
+
+@pytest.mark.asyncio
+async def test_operator_cancelled_goal_is_never_resumed(tmp_path):
     executor = Executor(fail=10)
     runner = FleetDraftRunner(tmp_path, config(), executor)
     await runner.initialize()
-    await runner.tick()
-    await runner.tick(now=datetime.now(timezone.utc) + timedelta(seconds=65))
+    task = await runner.control.create_task("continuity", title="Operator-stopped task")
+    await runner.board.cancel(task.task_id)
+    for days in (0, 3, 30):
+        outcome = await runner.tick(now=datetime.now(timezone.utc) + timedelta(days=days))
+        assert outcome["outcomes"]["continuity"] == "blocked:cancelled_by_operator"
+    assert len(await runner.control.list_tasks("continuity")) == 1
+    assert not executor.workers
+
+
+@pytest.mark.asyncio
+async def test_crashed_attempt_is_fenced_after_lease_expiry_and_replaced(tmp_path):
+    executor = Executor()
     runner = FleetDraftRunner(tmp_path, config(), executor)
     await runner.initialize()
-    assert (await runner.tick(now=datetime.now(timezone.utc) + timedelta(days=3)))["outcomes"]["continuity"] == "blocked:attempt_limit"
-    assert len(executor.workers) == 2
+    task = await runner.control.create_task(
+        "continuity", title="Crashed task",
+        metadata={"sources": {"observed": "Queue age is 90 seconds."},
+                  "previous_result": "", "evidence_at": "then"})
+    crashed = await runner.control.start_attempt("continuity", task.task_id, "worker-a",
+                                                 attempt_key="crashed", lease_seconds=60)
+    await runner.control.heartbeat_lease("continuity", task.task_id, "worker-a",
+                                         attempt_id=crashed.attempt_id, lease_seconds=60)
+    restarted = FleetDraftRunner(tmp_path, config(), executor)
+    await restarted.initialize()
+    assert (await restarted.tick())["outcomes"]["continuity"] == "waiting:active_lease"
+    claim = (await restarted.runtime.list_task_claims(task_id=task.task_id))[0]
+    await restarted.runtime.record_task_claim(
+        replace(claim, stale_after=datetime.now(timezone.utc) - timedelta(seconds=1)))
+    future = datetime.now(timezone.utc) + timedelta(seconds=120)
+    assert (await restarted.tick(now=future))["outcomes"]["continuity"] == "accepted:draft_requires_review"
+    assert executor.workers == ["worker-b"]
+    stale = await restarted.runtime.get_delegation_run(crashed.attempt_id)
+    assert stale.status == "stale_recovered"
+    with pytest.raises(Exception):
+        await restarted.control.finish_attempt(
+            "continuity", task.task_id, "worker-a", attempt_id=crashed.attempt_id,
+            status="succeeded", result="late")
+    snapshot = await restarted.control.get_snapshot("continuity")
+    assert len(snapshot.tasks) == 1 and snapshot.tasks[0].status == TaskStatus.COMPLETED
+    terminal = [r for r in snapshot.receipts if r.receipt_type == "mission_attempt_terminal"]
+    assert len(terminal) == 1
 
 
 @pytest.mark.asyncio

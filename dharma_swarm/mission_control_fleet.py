@@ -175,8 +175,16 @@ class FleetDraftRunner:
         if len(tasks) >= 10000:
             return "blocked:task_scan_limit"
         latest = max(tasks, key=lambda t: t.created_at, default=None)
-        if latest is None or latest.status == TaskStatus.COMPLETED:
-            if latest and (now - latest.created_at).total_seconds() < goal["interval_seconds"]:
+        attempts = [] if latest is None else await self.runtime.list_delegation_runs(
+            task_id=latest.task_id, limit=10)
+        exhausted = (latest is not None and latest.status == TaskStatus.FAILED
+                     and len(attempts) >= goal.get("max_attempts", 3))
+        if latest is None or latest.status == TaskStatus.COMPLETED or exhausted:
+            if exhausted:
+                anchor = attempts[0].completed_at or attempts[0].started_at or latest.created_at
+                if (now - anchor).total_seconds() < goal["interval_seconds"]:
+                    return "waiting:cycle_cooldown"
+            elif latest and (now - latest.created_at).total_seconds() < goal["interval_seconds"]:
                 return "waiting:interval"
             sources = {}
             for source in goal["sources"]:
@@ -184,7 +192,8 @@ class FleetDraftRunner:
                 if not text.strip():
                     raise ValueError("empty evidence source")
                 sources[source["id"]] = text[:16384]
-            previous = latest.result if latest else "No previous draft."
+            previous = (latest.result if latest and latest.status == TaskStatus.COMPLETED
+                        else "No previous accepted draft.")
             latest = await self.control.create_task(
                 goal["id"], title=f"Sourced progress draft: {goal['title']}",
                 description=goal["objective"],
@@ -192,9 +201,9 @@ class FleetDraftRunner:
                 metadata={"sources": sources, "previous_result": previous,
                           "evidence_at": now.isoformat(), "work_kind": "citation_checked_draft"},
             )
+            attempts = await self.runtime.list_delegation_runs(task_id=latest.task_id, limit=10)
         if latest.status == TaskStatus.CANCELLED:
             return "blocked:cancelled_by_operator"
-        attempts = await self.runtime.list_delegation_runs(task_id=latest.task_id, limit=10)
         snapshot = await self.control.get_snapshot(goal["id"])
         if snapshot is None:
             raise RuntimeError("missing mission")
