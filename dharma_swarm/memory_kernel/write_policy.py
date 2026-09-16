@@ -434,6 +434,7 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/merge_snapshot.py', 'write_canonical_outputs', 'path_write', 'b75b71c07cd1', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/mirror_test.py', 'build_sqlite_graph', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/onboard_cybernetics_stewards.py', 'main', 'path_write', '46fbb16ffdbd', 'operational_state', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/ops/agni_nats_watchdog.py', 'main', 'path_write', '7dd58d68965b', 'operational_state', occurrences=1, review_note='Rushabdev NATS watchdog tick state (/root/.hermes/state/agni_nats_watchdog_state.json): last check timestamp, health verdict and problem list; operational monitoring state, not agent memory, and never carries transport credentials.'),
         ReviewedWriteBaselineEntry('scripts/organism_council.py', 'main', 'path_write', 'efc4fba934f2', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/overnight_autopilot.py', 'main', 'path_write', 'bb376ba4fa8b', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/rebind_cybernetics_directive.py', '_amain', 'path_write', '9cf7924d9d6d', 'operational_state', occurrences=1),
