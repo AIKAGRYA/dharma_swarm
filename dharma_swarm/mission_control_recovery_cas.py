@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 
 from dharma_swarm.mission_control_contract import (
+    MAX_LEASE_SECONDS,
     RECOVERY_RECEIPT_TYPE,
     SCHEMA_VERSION,
     TERMINAL_RECEIPT_TYPE,
@@ -128,6 +129,9 @@ def _canonical_preimage(
         and claim.stale_after is not None
         and claim.heartbeat_at is not None
         and claim.heartbeat_at <= claim.stale_after
+        and 0
+        <= (claim.stale_after - claim.heartbeat_at).total_seconds()
+        <= MAX_LEASE_SECONDS
         and claim.claimed_at == run.started_at
         and claim.claimed_at < claim.stale_after <= recovered_at
         and run.task_id == task.id == claim.task_id == identity.task_id

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import dharma_swarm.mission_control as mission_control_module
+import dharma_swarm.mission_control_recovery as recovery_module
 import dharma_swarm.runtime_state as runtime_state_module
 from dharma_swarm.mission_control import (
     SCHEMA_VERSION,
@@ -1028,6 +1029,77 @@ async def test_expired_normal_active_heartbeat_allows_successor(
     assert successor.status == "queued"
     assert recovered_run is not None and recovered_run.status == "stale_recovered"
     assert recovered_claim is not None and recovered_claim.status == "stale_recovered"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ("normal", "interrupted"))
+@pytest.mark.parametrize(
+    ("lease_seconds", "malformed", "recovered"),
+    (
+        (MAX_LEASE_SECONDS, False, True),
+        (MAX_LEASE_SECONDS + 1, False, False),
+        (-1, False, False),
+        (0, True, False),
+    ),
+)
+async def test_recovery_preimage_requires_bounded_heartbeat_lease_for_both_states(
+    mission_control: MissionControl,
+    monkeypatch: pytest.MonkeyPatch,
+    state: str,
+    lease_seconds: int,
+    malformed: bool,
+    recovered: bool,
+) -> None:
+    task = await _mission_task(mission_control)
+    if state == "normal":
+        attempt = await _active_attempt(mission_control, task.task_id)
+    else:
+        attempt = await _interrupted_heartbeat_attempt(
+            mission_control, task.task_id
+        )
+    claim = await mission_control._runtime.get_task_claim(attempt.claim_id)
+    assert claim is not None and claim.heartbeat_at is not None
+    stale_after = claim.heartbeat_at + timedelta(seconds=lease_seconds)
+    await mission_control._runtime.record_task_claim(
+        replace(claim, stale_after=stale_after)
+    )
+    if malformed:
+        with sqlite3.connect(mission_control._runtime.db_path) as database:
+            database.execute(
+                "UPDATE task_claims SET stale_after=? WHERE claim_id=?",
+                ("not-a-timestamp", attempt.claim_id),
+            )
+            database.commit()
+    recovered_at = stale_after + timedelta(seconds=1)
+    monkeypatch.setattr(recovery_module, "utc_now", lambda: recovered_at)
+
+    if recovered:
+        assert await mission_control._recover_expired_claim(
+            "m-alpha", claim, recovered_at=recovered_at
+        ) is False
+        recovered_claim = await mission_control._runtime.get_task_claim(
+            attempt.claim_id
+        )
+        recovered_run = await mission_control._runtime.get_delegation_run(
+            attempt.attempt_id
+        )
+        assert recovered_claim is not None
+        assert recovered_run is not None
+        assert (recovered_claim.status, recovered_run.status) == (
+            "stale_recovered",
+            "stale_recovered",
+        )
+    else:
+        with pytest.raises(MissionControlError):
+            await mission_control._recover_expired_claim(
+                "m-alpha", claim, recovered_at=recovered_at
+            )
+        receipts = await mission_control._runtime.list_runtime_receipts(
+            run_id=attempt.attempt_id,
+            receipt_type="mission_attempt_recovery",
+            limit=2,
+        )
+        assert receipts == []
 
 
 @pytest.mark.asyncio

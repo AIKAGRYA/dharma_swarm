@@ -24,6 +24,7 @@ from dharma_swarm.mission_control_contract import (
     TERMINAL_RECEIPT_TYPE,
     MissionControlError,
     stable_id,
+    terminal_operation_metadata,
 )
 from dharma_swarm.mission_control_effect_records import (
     EffectRefusal,
@@ -34,12 +35,20 @@ from dharma_swarm.mission_control_effect_owner_recovery import (
     observe_expired_proposal_for_effect_recovery_from_connection,
 )
 from dharma_swarm.models import TaskStatus
-from dharma_swarm.mission_control_mcp import _ImmutableSnapshotMissionControl
+from dharma_swarm.mission_control_immutable_snapshot import (
+    _ImmutableSnapshotCapability,
+)
+from dharma_swarm.mission_control_mcp import (
+    _ImmutableSnapshotMissionControl,
+    _copy_immutable_owner_pair,
+)
+from dharma_swarm.runtime_state import RuntimeReceipt
 from dharma_swarm.runtime_state_effect_fence import (
     EFFECT_FENCE_TABLE,
     EFFECT_RECEIPT_ID_PREFIX,
 )
 from dharma_swarm.task_board import TaskBoard, TaskBoardError
+from dharma_swarm.spine.identity import ExecutionIdentity
 from tests.test_mission_control_effect_fence import (
     EffectHarness,
     _fresh_recovery_authority,
@@ -132,6 +141,271 @@ def _expected_proof_metadata(
         "base_sha": terminal.base_sha,
         "postimage_sha256": terminal.postimage_sha256,
     }
+
+
+async def _insert_prior_lineage(
+    harness: EffectHarness,
+    *,
+    state: str,
+    newer: bool = False,
+    owner_drift: bool = False,
+) -> None:
+    """Insert bounded predecessor evidence without changing the current task owner."""
+
+    current_claim = await harness.runtime.get_task_claim(
+        harness.binding.mission_claim_id
+    )
+    current_run = await harness.runtime.get_delegation_run(
+        harness.binding.mission_attempt_id
+    )
+    assert current_claim is not None and current_run is not None
+    offset = timedelta(seconds=10 if newer else -10)
+    started_at = current_claim.claimed_at + offset
+    heartbeat_at = started_at + timedelta(seconds=1)
+    stale_after = heartbeat_at + timedelta(seconds=1)
+    completed_at = stale_after + timedelta(seconds=1)
+    attempt_id = f"attempt_prior_{state}_{'newer' if newer else 'older'}"
+    claim_id = f"lease_prior_{state}_{'newer' if newer else 'older'}"
+    attempt_key = f"prior-{state}-key"
+    agent_id = "prior-agent"
+    metadata = {
+        "schema_version": SCHEMA_VERSION,
+        "mission_id": harness.binding.mission_id,
+        "attempt_id": attempt_id,
+        "attempt_key": attempt_key,
+    }
+    identity = ExecutionIdentity(
+        trace_id=stable_id("trace", attempt_id),
+        correlation_id=f"mission:{harness.binding.mission_id}:attempt:{attempt_id}",
+        task_id=harness.binding.task_id,
+        run_id=attempt_id,
+        claim_id=claim_id,
+        idempotency_key=attempt_key,
+        agent_id=agent_id,
+        session_id=f"mission:{harness.binding.mission_id}",
+        metadata={
+            "schema_version": SCHEMA_VERSION,
+            "mission_id": harness.binding.mission_id,
+        },
+    )
+    owner_status = {
+        "completed": "completed",
+        "failed": "failed",
+        "stale_recovered": "stale_recovered",
+        "open": "active",
+        "partial": "completed",
+    }[state]
+    run_status = {
+        "completed": "completed",
+        "failed": "failed",
+        "stale_recovered": "stale_recovered",
+        "open": "running",
+    }.get(state, "completed")
+    claim_metadata = dict(metadata)
+    run_metadata = dict(metadata)
+    recovered_at = None
+    failure_code = ""
+    if state == "stale_recovered":
+        recovery_id = stable_id("receipt", attempt_id, "stale_recovered")
+        recovered_at = completed_at + timedelta(microseconds=1)
+        claim_metadata["recovery_receipt_id"] = recovery_id
+        run_metadata.update(
+            {
+                "recovered_claim_id": claim_id,
+                "recovery_receipt_id": recovery_id,
+            }
+        )
+        failure_code = "stale_lease_recovered"
+    elif state in {"completed", "failed"}:
+        stale_after = heartbeat_at
+        completed_at = heartbeat_at + timedelta(seconds=1)
+        if state == "failed":
+            failure_code = "prior failure"
+
+    with sqlite3.connect(harness.runtime_path) as database:
+        database.execute(
+            "INSERT INTO execution_identities"
+            " (run_id,trace_id,correlation_id,task_id,claim_id,idempotency_key,"
+            " causation_id,parent_run_id,agent_id,session_id,external_a2a_task_id,"
+            " message_id,event_id,artifact_id,proposal_id,source,metadata_json,"
+            " created_at,updated_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                identity.run_id,
+                identity.trace_id,
+                identity.correlation_id,
+                identity.task_id,
+                identity.claim_id,
+                identity.idempotency_key,
+                "",
+                "",
+                identity.agent_id,
+                identity.session_id,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "mission_control.start_attempt",
+                json.dumps(identity.metadata, sort_keys=True),
+                started_at.isoformat(),
+                started_at.isoformat(),
+            ),
+        )
+        database.execute(
+            "INSERT INTO task_claims"
+            " (claim_id,task_id,session_id,agent_id,status,claimed_at,acked_at,"
+            " heartbeat_at,stale_after,recovered_at,retry_count,metadata_json,"
+            " trace_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                claim_id,
+                harness.binding.task_id,
+                identity.session_id,
+                agent_id,
+                owner_status,
+                started_at.isoformat(),
+                heartbeat_at.isoformat(),
+                heartbeat_at.isoformat(),
+                stale_after.isoformat(),
+                recovered_at.isoformat() if recovered_at else None,
+                0,
+                json.dumps(claim_metadata, sort_keys=True),
+                identity.trace_id,
+            ),
+        )
+        if state != "partial":
+            database.execute(
+                "INSERT INTO delegation_runs"
+                " (run_id,session_id,task_id,claim_id,parent_run_id,assigned_by,"
+                " assigned_to,requested_output_json,current_artifact_id,status,"
+                " started_at,completed_at,failure_code,metadata_json,trace_id,"
+                " receipt_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    attempt_id,
+                    identity.session_id,
+                    harness.binding.task_id,
+                    claim_id,
+                    "",
+                    "mission_control",
+                    "foreign-agent" if owner_drift else agent_id,
+                    "[]",
+                    "",
+                    run_status,
+                    started_at.isoformat(),
+                    (
+                        recovered_at if state == "stale_recovered" else completed_at
+                    ).isoformat()
+                    if state not in {"open", "partial"}
+                    else None,
+                    failure_code,
+                    json.dumps(run_metadata, sort_keys=True),
+                    identity.trace_id,
+                    None,
+                ),
+            )
+        if state in {"completed", "failed"}:
+            receipt_status = "succeeded" if state == "completed" else "failed"
+            receipt = RuntimeReceipt(
+                receipt_id=stable_id("receipt", attempt_id, receipt_status),
+                receipt_type=TERMINAL_RECEIPT_TYPE,
+                status=receipt_status,
+                run_id=attempt_id,
+                task_id=harness.binding.task_id,
+                trace_id=identity.trace_id,
+                correlation_id=identity.correlation_id,
+                agent_id=agent_id,
+                idempotency_key=attempt_key,
+                side_effect_key=f"mission_control:{attempt_id}:terminal",
+                payload={
+                    "schema_version": SCHEMA_VERSION,
+                    "mission_id": harness.binding.mission_id,
+                    "attempt_id": attempt_id,
+                    "result": "prior result",
+                    "failure_code": "" if state == "completed" else "prior failure",
+                    "metadata": metadata,
+                },
+                created_at=completed_at,
+            )
+            database.execute(
+                "INSERT INTO runtime_receipts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    receipt.receipt_id,
+                    receipt.receipt_type,
+                    receipt.run_id,
+                    receipt.task_id,
+                    receipt.trace_id,
+                    receipt.correlation_id,
+                    receipt.causation_id,
+                    receipt.parent_run_id,
+                    receipt.agent_id,
+                    receipt.idempotency_key,
+                    receipt.side_effect_key,
+                    receipt.status,
+                    json.dumps(receipt.payload, sort_keys=True),
+                    receipt.created_at.isoformat(),
+                ),
+            )
+            _, idempotency_metadata = terminal_operation_metadata(
+                receipt, identity, harness.binding.mission_id
+            )
+            database.execute(
+                "INSERT INTO idempotency_records VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    attempt_key,
+                    receipt.side_effect_key,
+                    attempt_id,
+                    harness.binding.task_id,
+                    identity.trace_id,
+                    identity.correlation_id,
+                    "completed",
+                    receipt.receipt_id,
+                    json.dumps(idempotency_metadata, sort_keys=True),
+                    completed_at.isoformat(),
+                    completed_at.isoformat(),
+                ),
+            )
+        elif state == "stale_recovered":
+            recovery = RuntimeReceipt(
+                receipt_id=stable_id("receipt", attempt_id, "stale_recovered"),
+                receipt_type="mission_attempt_recovery",
+                status="stale_recovered",
+                run_id=attempt_id,
+                task_id=harness.binding.task_id,
+                trace_id=identity.trace_id,
+                correlation_id=identity.correlation_id,
+                agent_id=agent_id,
+                idempotency_key=attempt_key,
+                side_effect_key=f"mission_control:{attempt_id}:stale_recovery",
+                payload={
+                    "schema_version": SCHEMA_VERSION,
+                    "mission_id": harness.binding.mission_id,
+                    "attempt_id": attempt_id,
+                    "recovered_claim_id": claim_id,
+                    "reason": "expired_lease",
+                    "expired_stale_after": stale_after.isoformat(),
+                },
+                created_at=completed_at,
+            )
+            database.execute(
+                "INSERT INTO runtime_receipts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    recovery.receipt_id,
+                    recovery.receipt_type,
+                    recovery.run_id,
+                    recovery.task_id,
+                    recovery.trace_id,
+                    recovery.correlation_id,
+                    recovery.causation_id,
+                    recovery.parent_run_id,
+                    recovery.agent_id,
+                    recovery.idempotency_key,
+                    recovery.side_effect_key,
+                    recovery.status,
+                    json.dumps(recovery.payload, sort_keys=True),
+                    recovery.created_at.isoformat(),
+                ),
+            )
+        database.commit()
 
 
 @pytest.mark.asyncio
@@ -552,49 +826,152 @@ async def test_immutable_snapshot_retains_exact_source_owner_identity(
 
 
 @pytest.mark.asyncio
-async def test_copied_or_forged_snapshot_owner_is_never_a_source_substitute(
+async def test_immutable_snapshot_copy_capability_is_single_use_and_bound(
     effect_harness: EffectHarness,
     tmp_path,
 ) -> None:
     harness = effect_harness
-    _consume(harness)
-    source_owners = inspect_owner_stores(harness.runtime_path, harness.task_path)
+    terminal = _consume(harness)
+    for path in (harness.runtime_path, harness.task_path):
+        with sqlite3.connect(path) as database:
+            database.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
     copied_runtime = tmp_path / "copied-runtime.db"
     copied_task = tmp_path / "copied-task.db"
+    capability = _copy_immutable_owner_pair(
+        harness.runtime_path,
+        harness.task_path,
+        copied_runtime,
+        copied_task,
+        require_task_db=True,
+    )
+    assert capability is not None
+    copied_control = MissionControl._from_immutable_snapshot_copy(
+        TaskBoard(copied_task),
+        type(harness.runtime)(copied_runtime, include_memory_plane=False),
+        capability,
+    )
+    snapshot = await copied_control.get_snapshot(harness.binding.mission_id)
+    assert snapshot is not None
+    assert [receipt.receipt_id for receipt in snapshot.receipts] == [
+        terminal.terminal_receipt_id
+    ]
+    with pytest.raises(ValueError, match="freshly minted"):
+        MissionControl._from_immutable_snapshot_copy(
+            TaskBoard(copied_task),
+            type(harness.runtime)(copied_runtime, include_memory_plane=False),
+            capability,
+        )
+    with pytest.raises(TypeError, match="minted only"):
+        _ImmutableSnapshotCapability()
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        MissionControl(
+            TaskBoard(copied_task),
+            type(harness.runtime)(copied_runtime, include_memory_plane=False),
+            immutable_snapshot_source_owners=inspect_owner_stores(
+                harness.runtime_path, harness.task_path
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_immutable_snapshot_capability_refuses_destination_and_source_drift(
+    effect_harness: EffectHarness,
+    tmp_path,
+) -> None:
+    harness = effect_harness
+    for path in (harness.runtime_path, harness.task_path):
+        with sqlite3.connect(path) as database:
+            database.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+    destination_runtime = tmp_path / "destination-runtime.db"
+    destination_task = tmp_path / "destination-task.db"
+    capability = _copy_immutable_owner_pair(
+        harness.runtime_path,
+        harness.task_path,
+        destination_runtime,
+        destination_task,
+        require_task_db=True,
+    )
+    assert capability is not None
+    substitute_runtime = tmp_path / "substitute-runtime.db"
+    substitute_task = tmp_path / "substitute-task.db"
     for source, destination in (
-        (harness.runtime_path, copied_runtime),
-        (harness.task_path, copied_task),
+        (destination_runtime, substitute_runtime),
+        (destination_task, substitute_task),
     ):
         with sqlite3.connect(source) as source_db, sqlite3.connect(
             destination
         ) as destination_db:
             source_db.backup(destination_db)
-    copied_owners = inspect_owner_stores(copied_runtime, copied_task)
+    with pytest.raises(ValueError, match="destination identity"):
+        MissionControl._from_immutable_snapshot_copy(
+            TaskBoard(substitute_task),
+            type(harness.runtime)(substitute_runtime, include_memory_plane=False),
+            capability,
+        )
 
-    copied_control = MissionControl(
-        TaskBoard(copied_task),
-        runtime_state=type(harness.runtime)(
-            copied_runtime, include_memory_plane=False
-        ),
-        immutable_snapshot_source_owners=copied_owners,
+    mutated_runtime = tmp_path / "mutated-runtime.db"
+    mutated_task = tmp_path / "mutated-task.db"
+    mutation_capability = _copy_immutable_owner_pair(
+        harness.runtime_path,
+        harness.task_path,
+        mutated_runtime,
+        mutated_task,
+        require_task_db=True,
     )
-    copied = await copied_control.get_snapshot(harness.binding.mission_id)
-    forged_control = MissionControl(
-        TaskBoard(copied_task),
-        runtime_state=type(harness.runtime)(
-            copied_runtime, include_memory_plane=False
-        ),
-        immutable_snapshot_source_owners=replace(
-            source_owners,
-            runtime_database_inode=source_owners.runtime_database_inode + 1,
-        ),
-    )
-    forged = await forged_control.get_snapshot(harness.binding.mission_id)
+    assert mutation_capability is not None
+    with sqlite3.connect(mutated_runtime) as database:
+        database.execute("PRAGMA user_version=1")
+        database.commit()
+    with pytest.raises(ValueError, match="destination mutated"):
+        MissionControl._from_immutable_snapshot_copy(
+            TaskBoard(mutated_task),
+            type(harness.runtime)(mutated_runtime, include_memory_plane=False),
+            mutation_capability,
+        )
 
-    assert copied is not None
-    assert copied.reconciliation.value == "conflicting_terminal_evidence"
-    assert forged is not None
-    assert forged.reconciliation.value == "conflicting_terminal_evidence"
+    live_runtime = tmp_path / "live-runtime.db"
+    live_task = tmp_path / "live-task.db"
+    live_capability = _copy_immutable_owner_pair(
+        harness.runtime_path,
+        harness.task_path,
+        live_runtime,
+        live_task,
+        require_task_db=True,
+    )
+    assert live_capability is not None
+    live_control = MissionControl._from_immutable_snapshot_copy(
+        TaskBoard(live_task),
+        type(harness.runtime)(live_runtime, include_memory_plane=False),
+        live_capability,
+    )
+    with sqlite3.connect(live_runtime) as database:
+        database.execute("PRAGMA user_version=2")
+        database.commit()
+    with pytest.raises(ValueError, match="destination mutated"):
+        await live_control.get_mission(harness.binding.mission_id)
+
+    drift_runtime = tmp_path / "drift-runtime.db"
+    drift_task = tmp_path / "drift-task.db"
+    source_capability = _copy_immutable_owner_pair(
+        harness.runtime_path,
+        harness.task_path,
+        drift_runtime,
+        drift_task,
+        require_task_db=True,
+    )
+    assert source_capability is not None
+    replacement = tmp_path / "runtime-replacement.db"
+    with sqlite3.connect(harness.runtime_path) as source_db, sqlite3.connect(
+        replacement
+    ) as replacement_db:
+        source_db.backup(replacement_db)
+    replacement.replace(harness.runtime_path)
+    with pytest.raises(ValueError, match="source identity"):
+        MissionControl._from_immutable_snapshot_copy(
+            TaskBoard(drift_task),
+            type(harness.runtime)(drift_runtime, include_memory_plane=False),
+            source_capability,
+        )
 
 
 @pytest.mark.asyncio
@@ -949,6 +1326,90 @@ async def test_completion_refuses_second_run_scoped_effect_receipt(
         database.commit()
 
     with pytest.raises(MissionControlError, match="run-scoped effect receipt"):
+        await _finish(harness)
+    await _assert_no_parent_terminal(harness)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ("completed", "failed", "stale_recovered"))
+async def test_completion_allows_exact_current_owner_after_canonical_terminal_predecessor(
+    effect_harness: EffectHarness,
+    state: str,
+) -> None:
+    harness = effect_harness
+    _consume(harness)
+    await _insert_prior_lineage(harness, state=state)
+
+    receipt = await _finish(harness)
+
+    assert receipt.status == "succeeded"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("state", "newer", "owner_drift", "error"),
+    (
+        ("open", False, False, "not unique"),
+        ("partial", False, False, "partial"),
+        ("completed", True, False, "superseded"),
+        ("completed", False, True, "identity drifted"),
+    ),
+)
+async def test_completion_refuses_competing_or_drifted_predecessor_lineages(
+    effect_harness: EffectHarness,
+    state: str,
+    newer: bool,
+    owner_drift: bool,
+    error: str,
+) -> None:
+    harness = effect_harness
+    _consume(harness)
+    await _insert_prior_lineage(
+        harness, state=state, newer=newer, owner_drift=owner_drift
+    )
+
+    with pytest.raises(MissionControlError, match=error):
+        await _finish(harness)
+    await _assert_no_parent_terminal(harness)
+
+
+@pytest.mark.asyncio
+async def test_completion_refuses_duplicate_current_owner_lineage(
+    effect_harness: EffectHarness,
+) -> None:
+    harness = effect_harness
+    _consume(harness)
+    run = await harness.runtime.get_delegation_run(harness.binding.mission_attempt_id)
+    assert run is not None
+    with sqlite3.connect(harness.runtime_path) as database:
+        database.execute(
+            "INSERT INTO delegation_runs"
+            " (run_id,session_id,task_id,claim_id,parent_run_id,assigned_by,"
+            " assigned_to,requested_output_json,current_artifact_id,status,"
+            " started_at,completed_at,failure_code,metadata_json,trace_id,"
+            " receipt_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                "attempt_duplicate_current_claim",
+                run.session_id,
+                run.task_id,
+                run.claim_id,
+                run.parent_run_id,
+                run.assigned_by,
+                run.assigned_to,
+                "[]",
+                "",
+                "queued",
+                run.started_at.isoformat(),
+                None,
+                "",
+                json.dumps(run.metadata, sort_keys=True),
+                stable_id("trace", run.run_id),
+                None,
+            ),
+        )
+        database.commit()
+
+    with pytest.raises(MissionControlError, match="duplicate current"):
         await _finish(harness)
     await _assert_no_parent_terminal(harness)
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from dharma_swarm.mission_control_a2a_owner_snapshot import one_owner_row, owner_object, owner_text, owner_time
-from dharma_swarm.mission_control_contract import GOVERNED_PATCH_COMPLETION_CONTRACT, GOVERNED_PATCH_COMPLETION_METADATA_FIELDS, GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA, GOVERNED_PATCH_COMPLETION_RESULT, OPEN_CLAIM_STATUSES, RECOVERY_RECEIPT_TYPE, SCHEMA_VERSION, TERMINAL_RECEIPT_TYPE, MissionControlError, ReceiptView, completion_contract_from_metadata, session_id, stable_id, terminal_operation_metadata
+from dharma_swarm.mission_control_contract import GOVERNED_PATCH_COMPLETION_CONTRACT, GOVERNED_PATCH_COMPLETION_METADATA_FIELDS, GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA, GOVERNED_PATCH_COMPLETION_RESULT, OPEN_CLAIM_STATUSES, RECOVERY_RECEIPT_TYPE, SCHEMA_VERSION, TERMINAL_RECEIPT_TYPE, MissionControlError, ReceiptView, completion_contract_from_metadata, recovery_receipt_matches_contract, require_same_completion_contract, session_id, stable_id, terminal_operation_metadata, terminal_receipt_contract
 from dharma_swarm.mission_control_effect_codec import canonical_json, terminal_from_json
 from dharma_swarm.mission_control_effect_fence_store import row_binding
 from dharma_swarm.mission_control_effect_owner import (
@@ -20,9 +20,17 @@ from dharma_swarm.mission_control_effect_owner_graph import (
 )
 from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
 from dharma_swarm.mission_control_effect_terminal_store import existing_terminal
+from dharma_swarm.mission_control_reconciliation import (
+    terminal_claim_projection_matches,
+    terminal_run_projection_matches,
+)
 from dharma_swarm.mission_control_lifecycle import _serialized_task
 from dharma_swarm.mission_control_projection import receipt_view
-from dharma_swarm.runtime_state import RuntimeReceipt
+from dharma_swarm.runtime_state import (
+    RuntimeReceipt,
+    _row_to_claim,
+    _row_to_run,
+)
 from dharma_swarm.runtime_state_effect_fence import EFFECT_FENCE_TABLE, EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
 
@@ -140,6 +148,231 @@ def _json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=True)
 
 
+def _require_terminal_predecessor(
+    db: sqlite3.Connection,
+    *,
+    current_run: sqlite3.Row,
+    current_claim: sqlite3.Row,
+    predecessor_run: sqlite3.Row,
+    predecessor_claim: sqlite3.Row,
+    task_id: str,
+) -> None:
+    """Require one older, fully closed lineage before ignoring it as a fence."""
+
+    current_metadata = owner_object(current_run["metadata_json"], "current run")
+    mission_id = current_metadata.get("mission_id")
+    if type(mission_id) is not str or not mission_id:
+        raise MissionControlError("governed completion lineage binding disagrees")
+    current_claimed_at = owner_time(current_claim, "claimed_at")
+    current_started_at = owner_time(current_run, "started_at")
+    predecessor_metadata = owner_object(
+        predecessor_run["metadata_json"], "predecessor run"
+    )
+    predecessor_claim_metadata = owner_object(
+        predecessor_claim["metadata_json"], "predecessor claim"
+    )
+    predecessor_run_id = owner_text(predecessor_run, "run_id")
+    predecessor_claim_id = owner_text(predecessor_claim, "claim_id")
+    if (
+        owner_text(predecessor_run, "claim_id") != predecessor_claim_id
+        or predecessor_claim_metadata.get("attempt_id") != predecessor_run_id
+        or predecessor_metadata.get("attempt_id") != predecessor_run_id
+        or predecessor_metadata.get("mission_id") != mission_id
+        or predecessor_claim_metadata.get("mission_id") != mission_id
+        or owner_text(predecessor_run, "task_id") != task_id
+        or owner_text(predecessor_claim, "task_id") != task_id
+        or owner_text(predecessor_run, "session_id") != session_id(mission_id)
+        or owner_text(predecessor_claim, "session_id") != session_id(mission_id)
+        or owner_text(predecessor_run, "assigned_to")
+        != owner_text(predecessor_claim, "agent_id")
+        or owner_time(predecessor_claim, "claimed_at")
+        != owner_time(predecessor_run, "started_at")
+    ):
+        raise MissionControlError("terminal predecessor owner identity drifted")
+    if (
+        owner_time(predecessor_claim, "claimed_at") >= current_claimed_at
+        or owner_time(predecessor_run, "started_at") >= current_started_at
+    ):
+        raise MissionControlError("governed completion run was superseded")
+    identity_row = one_owner_row(
+        db,
+        "SELECT * FROM execution_identities WHERE run_id=? LIMIT 2",
+        (predecessor_run_id,),
+        "predecessor identity",
+    )
+    identity = _identity(identity_row)
+    try:
+        completion_contract = require_same_completion_contract(
+            predecessor_metadata,
+            predecessor_claim_metadata,
+            identity.metadata,
+        )
+    except MissionControlError as exc:
+        raise MissionControlError(
+            "terminal predecessor completion contract drifted"
+        ) from exc
+    expected_identity_metadata: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "mission_id": mission_id,
+    }
+    if completion_contract:
+        expected_identity_metadata["completion_contract"] = completion_contract
+    if (
+        identity.run_id != predecessor_run_id
+        or identity.claim_id != predecessor_claim_id
+        or identity.task_id != task_id
+        or identity.agent_id != owner_text(predecessor_run, "assigned_to")
+        or identity.session_id != session_id(mission_id)
+        or identity.metadata != expected_identity_metadata
+        or identity.trace_id != stable_id("trace", predecessor_run_id)
+        or identity.correlation_id
+        != f"mission:{mission_id}:attempt:{predecessor_run_id}"
+        or any(
+            (
+                identity.causation_id,
+                identity.parent_run_id,
+                identity.external_a2a_task_id,
+                identity.message_id,
+                identity.event_id,
+                identity.artifact_id,
+                identity.proposal_id,
+            )
+        )
+        or owner_text(identity_row, "source") != "mission_control.start_attempt"
+        or predecessor_metadata.get("schema_version") != SCHEMA_VERSION
+        or predecessor_claim_metadata.get("schema_version") != SCHEMA_VERSION
+        or predecessor_metadata.get("attempt_key") != identity.idempotency_key
+        or predecessor_claim_metadata.get("attempt_key") != identity.idempotency_key
+    ):
+        raise MissionControlError("terminal predecessor owner identity drifted")
+
+    run_status = owner_text(predecessor_run, "status")
+    claim_status = owner_text(predecessor_claim, "status").lower()
+    transitions = db.execute(
+        "SELECT * FROM runtime_receipts WHERE run_id=?"
+        " AND receipt_type IN (?,?,?) LIMIT 4",
+        (
+            predecessor_run_id,
+            TERMINAL_RECEIPT_TYPE,
+            RECOVERY_RECEIPT_TYPE,
+            EFFECT_RECEIPT_TYPE,
+        ),
+    ).fetchall()
+    if run_status in {"completed", "failed"}:
+        terminal_rows = [
+            row for row in transitions
+            if owner_text(row, "receipt_type") == TERMINAL_RECEIPT_TYPE
+        ]
+        recovery_rows = [
+            row for row in transitions
+            if owner_text(row, "receipt_type") == RECOVERY_RECEIPT_TYPE
+        ]
+        supporting = [
+            _runtime_receipt(row) for row in transitions
+            if owner_text(row, "receipt_type") == EFFECT_RECEIPT_TYPE
+        ]
+        if len(terminal_rows) != 1 or recovery_rows:
+            raise MissionControlError("terminal predecessor evidence is incomplete")
+        terminal = _runtime_receipt(terminal_rows[0])
+        try:
+            _, owner_status, _, _, _ = terminal_receipt_contract(
+                terminal,
+                identity,
+                mission_id,
+                supporting_receipts=supporting,
+            )
+        except MissionControlError as exc:
+            raise MissionControlError(
+                "terminal predecessor evidence is not canonical"
+            ) from exc
+        receipt_rows, idempotency_rows = _terminal_rows(
+            db,
+            identity,
+            terminal.receipt_id,
+            terminal.side_effect_key,
+        )
+        _, idempotency_metadata = terminal_operation_metadata(
+            terminal, identity, mission_id
+        )
+        _exact_replay(
+            receipt_rows, idempotency_rows, terminal, idempotency_metadata
+        )
+        if (
+            owner_status != run_status
+            or claim_status != run_status
+            or predecessor_claim["recovered_at"] is not None
+            or not terminal_run_projection_matches(
+                _row_to_run(predecessor_run), terminal
+            )
+            or not terminal_claim_projection_matches(
+                _row_to_claim(predecessor_claim), terminal
+            )
+            or terminal.created_at >= current_claimed_at
+        ):
+            raise MissionControlError("terminal predecessor owner state drifted")
+        return
+
+    if run_status != "stale_recovered" or claim_status != "stale_recovered":
+        raise MissionControlError("governed completion claim is not unique")
+    terminal_rows = [
+        row for row in transitions
+        if owner_text(row, "receipt_type") == TERMINAL_RECEIPT_TYPE
+    ]
+    recovery_rows = [
+        row for row in transitions
+        if owner_text(row, "receipt_type") == RECOVERY_RECEIPT_TYPE
+    ]
+    effect_rows = [
+        row for row in transitions
+        if owner_text(row, "receipt_type") == EFFECT_RECEIPT_TYPE
+    ]
+    if terminal_rows or effect_rows or len(recovery_rows) != 1:
+        raise MissionControlError("terminal predecessor evidence is incomplete")
+    recovery = _runtime_receipt(recovery_rows[0])
+    recovered_at = owner_time(predecessor_claim, "recovered_at")
+    stale_after = owner_time(predecessor_claim, "stale_after")
+    heartbeat_at = owner_time(predecessor_claim, "heartbeat_at")
+    acked_at = owner_time(predecessor_claim, "acked_at")
+    idempotency_rows = db.execute(
+        "SELECT * FROM idempotency_records WHERE side_effect_key IN (?,?)"
+        " OR result_receipt_id=? LIMIT 2",
+        (
+            f"mission_control:{predecessor_run_id}:terminal",
+            recovery.side_effect_key,
+            recovery.receipt_id,
+        ),
+    ).fetchall()
+    expected_recovery_id = stable_id(
+        "receipt", predecessor_run_id, "stale_recovered"
+    )
+    if (
+        idempotency_rows
+        or not recovery_receipt_matches_contract(
+            recovery,
+            identity,
+            mission_id,
+            expired_stale_after=stale_after,
+        )
+        or recovery.receipt_id != expected_recovery_id
+        or predecessor_metadata.get("recovered_claim_id") != predecessor_claim_id
+        or predecessor_metadata.get("recovery_receipt_id") != expected_recovery_id
+        or predecessor_claim_metadata.get("recovery_receipt_id")
+        != expected_recovery_id
+        or owner_text(predecessor_run, "failure_code") != "stale_lease_recovered"
+        or owner_time(predecessor_run, "completed_at") != recovered_at
+        or not (
+            owner_time(predecessor_claim, "claimed_at")
+            <= acked_at
+            <= heartbeat_at
+            < stale_after
+            <= recovery.created_at
+            <= recovered_at
+            < current_claimed_at
+        )
+    ):
+        raise MissionControlError("terminal predecessor owner state drifted")
+
+
 def _require_promotion_claim(
     db: sqlite3.Connection, run: sqlite3.Row, claim: sqlite3.Row, task_id: str,
     now: datetime,
@@ -161,22 +394,56 @@ def _require_promotion_claim(
     ):
         state = "expired active" if _recovery_only else "fresh active"
         raise MissionControlError(f"governed completion requires an exact {state} claim")
-    others = db.execute(
+    other_claims = db.execute(
         "SELECT * FROM task_claims WHERE task_id=? AND claim_id<>? LIMIT 10001",
         (task_id, owner_text(claim, "claim_id")),
     ).fetchall()
-    if len(others) > 10_000:
+    if len(other_claims) > 10_000:
         raise MissionControlError("claim fence scan saturated")
-    if others:
-        raise MissionControlError("governed completion claim is not unique")
-    runs = db.execute(
+    other_runs = db.execute(
         "SELECT * FROM delegation_runs WHERE task_id=? AND run_id<>? LIMIT 10001",
         (task_id, owner_text(run, "run_id")),
     ).fetchall()
-    if len(runs) > 10_000:
+    if len(other_runs) > 10_000:
         raise MissionControlError("delegation run fence scan saturated")
-    if runs:
+    current_claim_id = owner_text(claim, "claim_id")
+    current_run_id = owner_text(run, "run_id")
+    claims_by_id = {owner_text(item, "claim_id"): item for item in other_claims}
+    runs_by_claim: dict[str, list[sqlite3.Row]] = {}
+    for item in other_runs:
+        runs_by_claim.setdefault(owner_text(item, "claim_id"), []).append(item)
+    if (
+        any(owner_text(item, "claim_id") == current_claim_id for item in other_runs)
+        or any(
+            owner_object(item["metadata_json"], "competing claim").get("attempt_id")
+            == current_run_id
+            for item in other_claims
+        )
+    ):
+        raise MissionControlError("governed completion lineage has a duplicate current owner")
+    if any(
+        owner_time(item, "claimed_at") >= claimed_at for item in other_claims
+    ) or any(
+        owner_time(item, "started_at") >= owner_time(run, "started_at")
+        for item in other_runs
+    ):
         raise MissionControlError("governed completion run was superseded")
+    if set(claims_by_id) != set(runs_by_claim) or any(
+        len(items) != 1 for items in runs_by_claim.values()
+    ):
+        raise MissionControlError(
+            "governed completion run was superseded: "
+            "terminal predecessor lineage is partial"
+        )
+    for claim_id, predecessor_claim in claims_by_id.items():
+        _require_terminal_predecessor(
+            db,
+            current_run=run,
+            current_claim=claim,
+            predecessor_run=runs_by_claim[claim_id][0],
+            predecessor_claim=predecessor_claim,
+            task_id=task_id,
+        )
     return stale_after
 
 
@@ -233,22 +500,15 @@ class MissionControlEffectCompletionMixin:
     def _effect_readback_owner_stores(
         self, snapshot_owners: OwnerStoreBinding
     ) -> OwnerStoreBinding:
-        source_owners = getattr(self, "_immutable_snapshot_source_owners", None)
-        if source_owners is None:
+        provenance = getattr(self, "_immutable_snapshot_provenance", None)
+        if provenance is None:
             return snapshot_owners
-        if type(source_owners) is not OwnerStoreBinding:
-            raise MissionControlError("immutable snapshot source identity is malformed")
         try:
-            current = inspect_owner_stores(
-                Path(source_owners.runtime_database_path),
-                Path(source_owners.task_database_path),
-            )
+            source_owners = provenance.require_source_intact()
         except (OSError, ValueError) as exc:
             raise MissionControlError(
                 "immutable snapshot source identity is unavailable"
             ) from exc
-        if current != source_owners:
-            raise MissionControlError("immutable snapshot source identity drifted")
         return source_owners
 
     def _validate_observed_patch_effect_receipts_sync(

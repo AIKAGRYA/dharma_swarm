@@ -21,6 +21,7 @@ import asyncio
 import hashlib
 import json
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
@@ -55,7 +56,11 @@ from dharma_swarm.mission_control_projection import (
     task_view,
 )
 from dharma_swarm.mission_control_recovery import MissionControlRecoveryMixin
-from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
+from dharma_swarm.mission_control_immutable_snapshot import (
+    _ImmutableSnapshotCapability,
+    _ImmutableSnapshotProvenance,
+    _consume_immutable_snapshot_capability,
+)
 from dharma_swarm.models import Task, TaskPriority, TaskStatus
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -97,8 +102,6 @@ class MissionControl(
         self,
         board: TaskBoard,
         runtime_state: RuntimeStateStore,
-        *,
-        immutable_snapshot_source_owners: OwnerStoreBinding | None = None,
     ) -> None:
         """Build an adapter over the two canonical owners.
 
@@ -114,7 +117,31 @@ class MissionControl(
         self._task_locks: dict[str, asyncio.Lock] = {}
         self._mission_locks: dict[str, asyncio.Lock] = {}
         self._task_creation_locks: dict[str, asyncio.Lock] = {}
-        self._immutable_snapshot_source_owners = immutable_snapshot_source_owners
+        self._immutable_snapshot_provenance: _ImmutableSnapshotProvenance | None = None
+
+    @classmethod
+    def _from_immutable_snapshot_copy(
+        cls,
+        board: TaskBoard,
+        runtime_state: RuntimeStateStore,
+        capability: _ImmutableSnapshotCapability,
+    ) -> "MissionControl":
+        """Build a read projection only from one freshly verified copy token."""
+
+        control = cls(board, runtime_state)
+        control._immutable_snapshot_provenance = (
+            _consume_immutable_snapshot_capability(
+                capability, Path(runtime_state.db_path), Path(board._db_path)
+            )
+        )
+        return control
+
+    def _require_immutable_snapshot_intact(self) -> None:
+        provenance = self._immutable_snapshot_provenance
+        if provenance is not None:
+            provenance.require_intact(
+                Path(self._runtime.db_path), Path(self._board._db_path)
+            )
 
     async def create_mission(
         self,
@@ -171,6 +198,7 @@ class MissionControl(
             return mission_view(await self._runtime.upsert_session(session))
 
     async def get_mission(self, mission_id: str) -> MissionView | None:
+        self._require_immutable_snapshot_intact()
         session = await self._runtime.get_session(mission_session_id(mission_id))
         if session is None:
             return None

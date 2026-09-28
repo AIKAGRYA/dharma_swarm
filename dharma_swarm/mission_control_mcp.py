@@ -20,7 +20,10 @@ from typing import Any, TypeAlias
 
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.mission_control_effect_owner import inspect_owner_stores
-from dharma_swarm.mission_control_effect_records import OwnerStoreBinding
+from dharma_swarm.mission_control_immutable_snapshot import (
+    _ImmutableSnapshotCapability,
+    _mint_immutable_snapshot_capability,
+)
 from dharma_swarm.mission_control_mcp_mutations import (
     AUTHORIZED_PRINCIPAL_METADATA_KEY as AUTHORIZED_PRINCIPAL_METADATA_KEY,
 )
@@ -149,7 +152,7 @@ def _copy_immutable_owner_pair(
     task_destination: Path,
     *,
     require_task_db: bool,
-) -> OwnerStoreBinding | None:
+) -> _ImmutableSnapshotCapability | None:
     if not require_task_db:
         _copy_immutable_sqlite(runtime_source, runtime_destination)
         return None
@@ -174,7 +177,9 @@ def _copy_immutable_owner_pair(
     )
     if inspect_owner_stores(runtime_source, task_source) != owners:
         raise ValueError("immutable snapshot owner identity drifted during copy")
-    return owners
+    return _mint_immutable_snapshot_capability(
+        owners, runtime_destination, task_destination
+    )
 
 
 class _ImmutableSnapshotMissionControl:
@@ -199,7 +204,7 @@ class _ImmutableSnapshotMissionControl:
             root = Path(raw)
             runtime_copy = root / "runtime.db"
             task_copy = root / "tasks.db"
-            source_owners = await asyncio.to_thread(
+            capability = await asyncio.to_thread(
                 _copy_immutable_owner_pair,
                 self.runtime_db,
                 self.task_db,
@@ -207,11 +212,16 @@ class _ImmutableSnapshotMissionControl:
                 task_copy,
                 require_task_db=require_task_db,
             )
-            control = MissionControl(
-                TaskBoard(task_copy),
-                RuntimeStateStore(runtime_copy),
-                immutable_snapshot_source_owners=source_owners,
-            )
+            if capability is None:
+                control = MissionControl(
+                    TaskBoard(task_copy), RuntimeStateStore(runtime_copy)
+                )
+            else:
+                control = MissionControl._from_immutable_snapshot_copy(
+                    TaskBoard(task_copy),
+                    RuntimeStateStore(runtime_copy),
+                    capability,
+                )
             return await getattr(control, method_name)(*args, **kwargs)
 
     async def get_mission(self, mission_id: str) -> Any:
