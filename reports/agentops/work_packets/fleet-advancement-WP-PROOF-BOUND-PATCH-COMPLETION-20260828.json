@@ -1,0 +1,132 @@
+{
+  "allowed_files": [
+    "dharma_swarm/mission_control.py",
+    "dharma_swarm/mission_control_a2a_owner_readback.py",
+    "dharma_swarm/mission_control_contract.py",
+    "dharma_swarm/mission_control_effect_completion.py",
+    "dharma_swarm/mission_control_effect_owner_graph.py",
+    "dharma_swarm/mission_control_effect_owner_recovery.py",
+    "dharma_swarm/mission_control_lifecycle.py",
+    "dharma_swarm/mission_control_mcp.py",
+    "dharma_swarm/mission_control_mcp_mutations.py",
+    "dharma_swarm/mission_control_projection.py",
+    "dharma_swarm/mission_control_reconciliation.py",
+    "dharma_swarm/mission_control_recovery.py",
+    "dharma_swarm/mission_control_recovery_cas.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-PROOF-BOUND-PATCH-COMPLETION-20260828.json",
+    "tests/test_mission_control.py",
+    "tests/test_mission_control_a2a.py",
+    "tests/test_mission_control_effect_completion.py",
+    "tests/test_mission_control_effect_fence.py",
+    "tests/test_mission_control_mcp.py"
+  ],
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "base_ref": "c4a7752e9c19a827380e55a70764aa0b2d475b2d",
+  "branch": "codex/governed-patch-reflex-proof-bound-finish-20260828",
+  "commit": {
+    "allowed": true,
+    "message": "feat(control): bind patch effect to parent completion"
+  },
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "deploy/**",
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/task_board.py",
+    "scripts/runtime/**",
+    "terminal/**"
+  ],
+  "gates": [
+    {
+      "command": "python3 -m pytest -q tests/test_mission_control_effect_completion.py tests/test_mission_control_effect_fence.py tests/test_mission_control.py tests/test_mission_control_a2a.py tests/test_mission_control_mcp.py",
+      "expected_exit": 0,
+      "name": "proof-bound-completion-focused-tests",
+      "timeout_seconds": 300
+    },
+    {
+      "command": "python3 -m ruff check dharma_swarm/mission_control.py dharma_swarm/mission_control_a2a_owner_readback.py dharma_swarm/mission_control_contract.py dharma_swarm/mission_control_effect_completion.py dharma_swarm/mission_control_effect_owner_graph.py dharma_swarm/mission_control_effect_owner_recovery.py dharma_swarm/mission_control_lifecycle.py dharma_swarm/mission_control_mcp.py dharma_swarm/mission_control_mcp_mutations.py dharma_swarm/mission_control_projection.py dharma_swarm/mission_control_reconciliation.py dharma_swarm/mission_control_recovery.py dharma_swarm/mission_control_recovery_cas.py tests/test_mission_control.py tests/test_mission_control_a2a.py tests/test_mission_control_effect_completion.py tests/test_mission_control_effect_fence.py tests/test_mission_control_mcp.py",
+      "expected_exit": 0,
+      "name": "proof-bound-completion-ruff",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "make module-budget",
+      "expected_exit": 0,
+      "name": "proof-bound-completion-module-budget",
+      "timeout_seconds": 240
+    },
+    {
+      "command": "git diff --check c4a7752e9c19a827380e55a70764aa0b2d475b2d",
+      "expected_exit": 0,
+      "name": "proof-bound-completion-range-diff-check",
+      "timeout_seconds": 120
+    }
+  ],
+  "id": "fleet-advancement-WP-PROOF-BOUND-PATCH-COMPLETION-20260828",
+  "intent": "Close the parent-authority and stale-owner gaps for one governed patch attempt without broadening Mission Control's generic public terminal surface. A task must carry the exact closed completion contract before attempt creation; start and heartbeat copy it into the parent execution identity, run, and claim without caller override. Generic finish refuses any governed or inconsistent lineage. The public proof-bound success surface accepts exact lineage routing identifiers plus only one proof locator, effect_key; no caller-supplied proof fields. Inside one canonical owner BEGIN IMMEDIATE transaction it re-reads the unique canonical effect receipt/idempotency/fence triple and binds the same mission, task, attempt, claim, agent, proposal, candidate, diff, base, and completion contract. Its typed promotion rule is GovernedLineage x ExactEffectTerminalTriple x (FreshActiveLease | ExpiredActiveRecoveryCAS) -> MissionTerminalReceipt. Public completion is fresh-only; private recovery accepts only an expired, active, unrecovered, unsuperseded lineage. Promotion atomically creates, or exact-replays and validates, the terminal receipt plus completed parent-run state; natural same-key restart repairs TaskBoard and claim projection before returning. Snapshot and recovery readback rejoin the live exact effect triple and exact completed owner metadata rather than trusting the promoted receipt alone. Generic stale recovery separately joins its receipt, run, and claim transition under an exact owner CAS. Caller-supplied observations, terminal records, statuses, and receipt fields are never promotion authority.",
+  "negative_controls": [
+    {
+      "command": "python3 -c 'from dharma_swarm.mission_control_contract import GOVERNED_PATCH_COMPLETION_CONTRACT, MissionControlError, completion_contract_from_metadata\nassert completion_contract_from_metadata({}) == \"\"\nassert completion_contract_from_metadata({\"completion_contract\": GOVERNED_PATCH_COMPLETION_CONTRACT}) == GOVERNED_PATCH_COMPLETION_CONTRACT\nfor bad in (\"governed_patch_effect\", \"GOVERNED_PATCH_EFFECT_V1\", True, 1):\n    try:\n        completion_contract_from_metadata({\"completion_contract\": bad})\n    except MissionControlError:\n        pass\n    else:\n        raise AssertionError(f\"completion-contract alias accepted: {bad!r}\")'",
+      "expected_exit": 0,
+      "name": "completion-contract-aliases-fail-closed",
+      "timeout_seconds": 120
+    }
+  ],
+  "session_entry": {
+    "active_track": "fleet-advancement-2026-08",
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/mission_control_recovery.py",
+      "dharma_swarm/mission_control_projection.py",
+      "dharma_swarm/mission_control_effect_terminal_store.py",
+      "dharma_swarm/mission_control_effect_owner.py",
+      "dharma_swarm/mission_control_effect_owner_recovery.py",
+      "dharma_swarm/mission_control_a2a_owner_readback.py",
+      "dharma_swarm/mission_control_reconciliation.py"
+    ],
+    "collision": {
+      "checked_at_sha": "c4a7752e9c19a827380e55a70764aa0b2d475b2d",
+      "details": [],
+      "status": "clear"
+    },
+    "honest_blockers": [
+      "This packet closes parent completion authority but does not create the missing production governed-patch responder or real-provider composition.",
+      "TaskBoard and final claim state remain a repairable projection after the atomic RuntimeState proof transition; a process crash may temporarily report needs_task_projection but cannot create a second terminal proof.",
+      "Generic finish_attempt and generic stale recovery still do not share one cross-process owner transaction; this packet closes governed-effect completion, not that pre-existing generic finish/recovery race.",
+      "Replacement-attempt creation is serialized only per MissionControl instance; two processes can still mint competing successors after a generic stale recovery. Governed effect promotion now fails closed on any competing claim or run, but a cross-process successor owner CAS remains required for liveness.",
+      "Recovery tests exercise exact SQLite transaction, chronology, replay, and race fixtures; they are not a kill-9, power-loss, or filesystem-durability demonstration.",
+      "Python and same-UID direct database custody remain admitted principals until the supervisor and owner writes move behind an external non-fork boundary.",
+      "Governed patch completion is success-only; provider, verifier, or refusal exhaustion still needs a separate closed governed-failure contract before it can terminalize the task as failed.",
+      "Production-positive Foundry and Vibe processes, two clean-restart real-provider runs, and canonical Fleet projection remain later segments.",
+      "Every stacked PR requires external human approval before merge."
+    ],
+    "interface_mismatches": [
+      "An effect terminal proves one exact filesystem transition but is historical evidence until the proof-bound evaluator consumes it in a fresh canonical owner transaction.",
+      "Generic Mission Control success and governed patch success are distinct completion contracts and cannot share an implicit fallback.",
+      "The effect key is a lookup capability, not a proof object; exact owner readback supplies the proof.",
+      "Runtime terminal proof precedes TaskBoard projection, so needs_task_projection is recoverable drift rather than completion failure or duplicate authority.",
+      "A2A packet/delivery IDs remain distinct from Mission Control attempt/claim IDs through completion."
+    ],
+    "owner": "@dhyana",
+    "packet_digest": "dde6113c16f00d327632efe513ab6dda007896c7b528e6a5eab431e15c9fd03e",
+    "rollback": "Revert the proof-bound completion and joined stale-recovery CAS commit with this packet. Existing effect terminals remain historical repository-effect evidence and cannot be reinterpreted as generic Mission Control completion; generic expired lineages return to the prior non-joined recovery projection behavior.",
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "git": "2.50.1",
+      "make": "3.81",
+      "python": "3.13.12"
+    },
+    "work_packet": "WP-PROOF-BOUND-PATCH-COMPLETION-20260828"
+  },
+  "worktree": "."
+}

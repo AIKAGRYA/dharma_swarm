@@ -29,12 +29,14 @@ from dharma_swarm.mission_control_a2a_owner_snapshot import (
     require_owner_schema,
 )
 from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
     MAX_LEASE_SECONDS,
     OPEN_CLAIM_STATUSES,
     RECOVERY_RECEIPT_TYPE,
     SCHEMA_VERSION as MISSION_CONTROL_SCHEMA,
     TERMINAL_RECEIPT_TYPE,
     MissionControlError,
+    completion_contract_from_metadata,
     stable_id,
 )
 from dharma_swarm.mission_control_effect_owner_recovery import (
@@ -288,6 +290,8 @@ def _observe_exact_proposal_store(
             or task_metadata.get("mission_id") != ref.mission_id
             or task_metadata.get("mission_attempt_id") != attempt_id
             or task_metadata.get("mission_claim_id") != claim_id
+            or completion_contract_from_metadata(task_metadata)
+            != GOVERNED_PATCH_COMPLETION_CONTRACT
         ):
             raise MissionControlError("RUNNING task projection binding disagrees")
 
@@ -303,6 +307,7 @@ def _observe_exact_proposal_store(
             "mission_id": ref.mission_id,
             "attempt_id": attempt_id,
             "attempt_key": expected.attempt_key,
+            "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
         }
         run_values = (
             owner_text(run, "status"),
@@ -364,6 +369,7 @@ def _observe_exact_proposal_store(
         ) or parent_metadata != {
             "schema_version": MISSION_CONTROL_SCHEMA,
             "mission_id": ref.mission_id,
+            "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
         }:
             raise MissionControlError("Mission Control parent identity disagrees")
         _require_no_terminal_transition(connection, attempt_id)

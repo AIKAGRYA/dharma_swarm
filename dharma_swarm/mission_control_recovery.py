@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
-from dataclasses import replace
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
@@ -20,15 +22,51 @@ from dharma_swarm.mission_control_contract import (
     ReceiptView,
     claim_is_expired,
     clean_identifier,
+    completion_contract_from_metadata,
+    require_same_completion_contract,
     stable_id,
     terminal_operation_metadata,
     terminal_receipt_contract,
     utc_now,
 )
 from dharma_swarm.mission_control_lifecycle import _serialized_task
+from dharma_swarm.mission_control_effect_owner import inspect_owner_stores, owner_transaction
 from dharma_swarm.mission_control_projection import receipt_view
-from dharma_swarm.runtime_state import RuntimeReceipt, TaskClaim
+from dharma_swarm.mission_control_recovery_cas import recover_stale_lineage_cas
+from dharma_swarm.models import Task
+from dharma_swarm.runtime_state import DelegationRun, RuntimeReceipt, TaskClaim
+from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
+
+
+def _recover_stale_lineage_in_owner_transaction(
+    runtime_database: Path,
+    task_database: Path,
+    *,
+    mission_id: str,
+    task: Task,
+    run: DelegationRun,
+    claim: TaskClaim,
+    identity: ExecutionIdentity,
+    receipt: RuntimeReceipt,
+    recovered_at: datetime,
+) -> RuntimeReceipt:
+    """Commit one exact stale recovery without occupying the event loop."""
+
+    owners = inspect_owner_stores(runtime_database, task_database)
+    with owner_transaction(owners) as database:
+        result = recover_stale_lineage_cas(
+            database,
+            mission_id=mission_id,
+            task=task,
+            run=run,
+            claim=claim,
+            identity=identity,
+            receipt=receipt,
+            recovered_at=recovered_at,
+        )
+        database.commit()
+        return result
 
 
 class MissionControlRecoveryMixin:
@@ -68,6 +106,21 @@ class MissionControlRecoveryMixin:
         if identity.claim_id != run.claim_id:
             raise MissionControlError(
                 f"execution identity for {run.run_id!r} has foreign fields"
+            )
+        claim = await self._runtime.get_task_claim(run.claim_id)
+        if claim is None:
+            raise MissionControlError(f"claim {run.claim_id!r} was not found")
+        self._require_claim_identity(claim, mission_id, task_id, agent_id, run.run_id)
+        completion_contract = require_same_completion_contract(
+            task.metadata,
+            run.metadata,
+            claim.metadata,
+            identity.metadata,
+        )
+        requested_contract = completion_contract_from_metadata(dict(metadata or {}))
+        if completion_contract or requested_contract:
+            raise MissionControlError(
+                "governed completion requires finish_attempt_from_patch_effect"
             )
         attempt_key = str(run.metadata.get("attempt_key") or identity.idempotency_key)
         owner_terminal_status = (
@@ -129,10 +182,6 @@ class MissionControlRecoveryMixin:
             status=terminal_status,
             payload=payload,
         )
-        claim = await self._runtime.get_task_claim(run.claim_id)
-        if claim is None:
-            raise MissionControlError(f"claim {run.claim_id!r} was not found")
-        self._require_claim_identity(claim, mission_id, task_id, agent_id, run.run_id)
         claims = await self._claims_for_fencing(task_id)
         self._require_current_claim(
             claim,
@@ -229,7 +278,7 @@ class MissionControlRecoveryMixin:
         *,
         recovered_at: datetime,
     ) -> bool:
-        """Close an expired lineage; no cross-process lease CAS is claimed."""
+        """Close an expired lineage through the canonical owner-store CAS."""
         current_claim = await self._runtime.get_task_claim(claim.claim_id)
         if current_claim is None:
             raise MissionControlError(f"claim {claim.claim_id!r} was not found")
@@ -268,6 +317,10 @@ class MissionControlRecoveryMixin:
         self._require_attempt_identity(run, mission_id, claim.task_id, claim.agent_id)
         if run.claim_id != claim.claim_id:
             raise MissionControlError(f"attempt {attempt_id!r} has foreign identity")
+        task = await self._require_task(mission_id, claim.task_id)
+        require_same_completion_contract(
+            task.metadata, run.metadata, claim.metadata, identity.metadata
+        )
 
         terminal_receipts = await self._runtime.list_runtime_receipts(
             run_id=attempt_id,
@@ -279,13 +332,24 @@ class MissionControlRecoveryMixin:
             receipt_type=RECOVERY_RECEIPT_TYPE,
             limit=2,
         )
+        effect_receipts = await self._runtime.list_runtime_receipts(
+            run_id=attempt_id,
+            receipt_type=EFFECT_RECEIPT_TYPE,
+            limit=2,
+        )
+        await self._validate_observed_patch_effect_receipts(effect_receipts)
         if terminal_receipts:
             if len(terminal_receipts) != 1 or recovery_receipts:
                 raise MissionControlError(
                     f"attempt {attempt_id!r} has conflicting terminal evidence"
                 )
             terminal = terminal_receipts[0]
-            terminal_receipt_contract(terminal, identity, mission_id)
+            terminal_receipt_contract(
+                terminal,
+                identity,
+                mission_id,
+                supporting_receipts=effect_receipts,
+            )
             operation_hash, idempotency_metadata = terminal_operation_metadata(
                 terminal, identity, mission_id
             )
@@ -322,7 +386,6 @@ class MissionControlRecoveryMixin:
                 raise MissionControlError(
                     f"attempt {attempt_id!r} has conflicting terminal evidence"
                 ) from exc
-            task = await self._require_task(mission_id, claim.task_id)
             await self._project_terminal_lineage(
                 mission_id,
                 task=task,
@@ -330,6 +393,19 @@ class MissionControlRecoveryMixin:
                 claim=claim,
                 identity=identity,
                 receipt=terminal,
+            )
+            return True
+        if effect_receipts:
+            if len(effect_receipts) != 1 or recovery_receipts:
+                raise MissionControlError(
+                    f"attempt {attempt_id!r} has conflicting effect evidence"
+                )
+            await self._recover_attempt_from_patch_effect(
+                mission_id,
+                claim.task_id,
+                claim.agent_id,
+                attempt_id=attempt_id,
+                effect_key=effect_receipts[0].side_effect_key,
             )
             return True
         if run.status in {"completed", "failed"}:
@@ -356,52 +432,44 @@ class MissionControlRecoveryMixin:
             status="stale_recovered",
             payload=payload,
         )
-        if recovery is None:
-            await self._runtime.record_receipt_for_identity(
-                identity,
-                receipt_type=RECOVERY_RECEIPT_TYPE,
-                status="stale_recovered",
-                side_effect_key=side_effect_key,
-                payload=payload,
-                receipt_id=receipt_id,
+        receipt_at = recovery.created_at if recovery is not None else utc_now()
+        transitioned_at = max(recovered_at, trusted_now, receipt_at)
+        recovery = recovery or RuntimeReceipt(
+            receipt_id=receipt_id,
+            receipt_type=RECOVERY_RECEIPT_TYPE,
+            status="stale_recovered",
+            run_id=identity.run_id,
+            task_id=identity.task_id,
+            trace_id=identity.trace_id,
+            correlation_id=identity.correlation_id,
+            causation_id=identity.causation_id,
+            parent_run_id=identity.parent_run_id,
+            agent_id=identity.agent_id,
+            idempotency_key=identity.idempotency_key,
+            side_effect_key=side_effect_key,
+            payload=payload,
+            created_at=receipt_at,
+        )
+        try:
+            await asyncio.to_thread(
+                _recover_stale_lineage_in_owner_transaction,
+                Path(self._runtime.db_path),
+                Path(self._board._db_path),
+                mission_id=mission_id,
+                task=task,
+                run=run,
+                claim=claim,
+                identity=identity,
+                receipt=recovery,
+                recovered_at=transitioned_at,
             )
-        transitioned_at = max(recovered_at, trusted_now, utc_now())
-        if run is not None and run.status != "stale_recovered":
-            await self._runtime.record_delegation_run(
-                replace(
-                    run,
-                    status="stale_recovered",
-                    completed_at=transitioned_at,
-                    failure_code="stale_lease_recovered",
-                    metadata={
-                        **run.metadata,
-                        "recovered_claim_id": claim.claim_id,
-                        "recovery_receipt_id": receipt_id,
-                    },
-                )
-            )
-        if claim.status != "stale_recovered":
-            await self._runtime.record_task_claim(
-                replace(
-                    claim,
-                    status="stale_recovered",
-                    recovered_at=transitioned_at,
-                    metadata={
-                        **claim.metadata,
-                        "recovery_receipt_id": receipt_id,
-                    },
-                )
-            )
+        except (OSError, RuntimeError, sqlite3.Error, ValueError) as exc:
+            raise MissionControlError("expired claim recovery CAS was lost") from exc
         return False
 
     async def _recover_terminal_ownership(
-        self,
-        identity: ExecutionIdentity,
-        *,
-        side_effect_key: str,
-        operation_hash: str,
-        receipt: RuntimeReceipt | None,
-        receipt_id: str,
+        self, identity: ExecutionIdentity, *, side_effect_key: str,
+        operation_hash: str, receipt: RuntimeReceipt | None, receipt_id: str,
         ownership_token: datetime | None,
     ) -> tuple[datetime | None, bool]:
         if ownership_token is not None:

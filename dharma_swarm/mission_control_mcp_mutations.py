@@ -17,6 +17,9 @@ MISSION_CREATE_TASK = "mission_create_task"
 MISSION_START_ATTEMPT = "mission_start_attempt"
 MISSION_HEARTBEAT_LEASE = "mission_heartbeat_lease"
 MISSION_FINISH_ATTEMPT = "mission_finish_attempt"
+MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT = (
+    "mission_finish_attempt_from_patch_effect"
+)
 
 MUTATION_TOOL_NAMES = (
     MISSION_CREATE,
@@ -24,6 +27,7 @@ MUTATION_TOOL_NAMES = (
     MISSION_START_ATTEMPT,
     MISSION_HEARTBEAT_LEASE,
     MISSION_FINISH_ATTEMPT,
+    MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT,
 )
 
 
@@ -53,6 +57,7 @@ class MutationRequest:
     lease_seconds: int | None = None
     terminal_status: str = ""
     failure_code_present: bool = False
+    effect_key: str = ""
 
 
 MutationDecision: TypeAlias = bool | Awaitable[bool]
@@ -288,6 +293,36 @@ class _MissionControlMCPMutations:
                 result=result,
                 failure_code=error,
                 metadata=_authorized_metadata(metadata, request.principal),
+            ),
+        )
+
+    async def finish_attempt_from_patch_effect(
+        self,
+        mission_id: str,
+        task_id: str,
+        attempt_id: str,
+        agent_id: str,
+        effect_key: str,
+    ) -> dict[str, Any]:
+        tool_name = MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT
+        return await self._mutate(
+            tool_name,
+            lambda principal: MutationRequest(
+                tool_name=tool_name,
+                principal=principal,
+                mission_id=_normalize_identifier(mission_id, "mission_id"),
+                task_id=_normalize_identifier(task_id, "task_id"),
+                attempt_id=_normalize_identifier(attempt_id, "attempt_id"),
+                agent_id=_normalize_identifier(agent_id, "agent_id"),
+                effect_key=_normalize_identifier(effect_key, "effect_key"),
+                terminal_status="succeeded",
+            ),
+            lambda request: self._control.finish_attempt_from_patch_effect(
+                request.mission_id,
+                request.task_id,
+                request.agent_id,
+                attempt_id=request.attempt_id,
+                effect_key=request.effect_key,
             ),
         )
 

@@ -1,5 +1,3 @@
-"""Task projections and read-model reconciliation for Mission Control."""
-
 from __future__ import annotations
 
 from dataclasses import replace
@@ -7,7 +5,9 @@ from datetime import datetime
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
-    OWNER_TERMINAL_ATTEMPT_STATUSES,
+    COMPLETION_CONTRACT_METADATA_KEY,
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
+    OPEN_CLAIM_STATUSES,
     SCHEMA_VERSION,
     TERMINAL_RECEIPT_TYPE,
     AttemptView,
@@ -16,15 +16,22 @@ from dharma_swarm.mission_control_contract import (
     claim_is_active,
     claim_is_expired,
     claim_is_open,
+    completion_contract_from_metadata,
     lease_view,
     mission_view,
     receipt_view,
+    require_same_completion_contract,
     session_id,
     terminal_receipt_contract,
     task_view,
     utc_now,
 )
-from dharma_swarm.mission_control_reconciliation import reconciliation
+from dharma_swarm.mission_control_reconciliation import (
+    reconciliation,
+    terminal_claim_projection_matches,
+    terminal_run_projection_matches,
+    terminal_task_projection_matches,
+)
 from dharma_swarm.models import Task, TaskStatus
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -32,25 +39,19 @@ from dharma_swarm.runtime_state import (
     SessionState,
     TaskClaim,
 )
+from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
 from dharma_swarm.task_board import TaskBoard, TaskBoardError
 
 
-# Preserve the exported pre-split function path for introspection and pickles.
 reconciliation.__module__ = __name__
 reconciliation.__qualname__ = "reconciliation"
 
 
 async def project_assigned_task(
-    board: TaskBoard,
-    task: Task,
-    *,
-    mission_id: str,
-    agent_id: str,
-    attempt_id: str,
-    claim_id: str,
+    board: TaskBoard, task: Task, *, mission_id: str, agent_id: str,
+    attempt_id: str, claim_id: str,
 ) -> None:
-    """Project a queued attempt without claiming executor acknowledgement."""
     current = await board.get(task.id)
     if current is None:
         raise MissionControlError(f"task {task.id!r} was not found")
@@ -89,15 +90,9 @@ async def project_assigned_task(
 
 
 async def project_running_task(
-    board: TaskBoard,
-    task: Task,
-    *,
-    mission_id: str,
-    agent_id: str,
-    attempt_id: str,
-    claim_id: str,
+    board: TaskBoard, task: Task, *, mission_id: str, agent_id: str,
+    attempt_id: str, claim_id: str,
 ) -> None:
-    """Repair the nonterminal TaskBoard projection for an existing run."""
     current = await board.get(task.id)
     if current is None:
         raise MissionControlError(f"task {task.id!r} was not found")
@@ -141,10 +136,7 @@ async def project_running_task(
 
 
 async def project_terminal_task(
-    board: TaskBoard,
-    task: Task,
-    terminal_status: str,
-    result: str,
+    board: TaskBoard, task: Task, terminal_status: str, result: str,
     failure_code: str,
 ) -> None:
     current = await board.get(task.id)
@@ -154,6 +146,15 @@ async def project_terminal_task(
         TaskStatus.COMPLETED if terminal_status == "succeeded" else TaskStatus.FAILED
     )
     if current.status == expected:
+        if not terminal_task_projection_matches(
+            current, terminal_status=terminal_status, result=result,
+            failure_code=failure_code,
+            expected_agent_id=str(task.assigned_to or ""),
+            expected_metadata=task.metadata,
+        ):
+            raise MissionControlError(
+                f"task {task.id!r} has conflicting terminal projection"
+            )
         return
     if current.status in {
         TaskStatus.COMPLETED,
@@ -187,28 +188,40 @@ async def project_terminal_task(
 
 
 class MissionControlProjectionMixin:
-    """Shared projection, identity, recovery, and fencing mechanics."""
 
     _board: TaskBoard
     _runtime: Any
 
     @staticmethod
     def _attempt_metadata(
-        metadata: dict[str, Any] | None,
-        *,
-        mission_id: str,
-        attempt_id: str,
+        metadata: dict[str, Any] | None, *, mission_id: str, attempt_id: str,
         attempt_key: str,
         base: dict[str, Any] | None = None,
+        completion_contract: str | None = None,
     ) -> dict[str, Any]:
-        return {
-            **dict(base or {}),
-            **dict(metadata or {}),
-            "schema_version": SCHEMA_VERSION,
-            "mission_id": mission_id,
-            "attempt_id": attempt_id,
+        base_metadata = dict(base or {})
+        requested_metadata = dict(metadata or {})
+        observed = tuple(
+            completion_contract_from_metadata(value)
+            for value in (base_metadata, requested_metadata)
+            if COMPLETION_CONTRACT_METADATA_KEY in value
+        )
+        required = completion_contract
+        if required is None:
+            required = observed[0] if observed else ""
+        if required not in {"", GOVERNED_PATCH_COMPLETION_CONTRACT} or any(
+            value != required for value in observed
+        ):
+            raise MissionControlError("completion_contract lineage disagrees")
+        result = {
+            **base_metadata, **requested_metadata, "schema_version": SCHEMA_VERSION,
+            "mission_id": mission_id, "attempt_id": attempt_id,
             "attempt_key": attempt_key,
         }
+        result.pop(COMPLETION_CONTRACT_METADATA_KEY, None)
+        if required:
+            result[COMPLETION_CONTRACT_METADATA_KEY] = required
+        return result
 
     @staticmethod
     def _require_current_claim(
@@ -255,9 +268,21 @@ class MissionControlProjectionMixin:
         identity: ExecutionIdentity,
         receipt: RuntimeReceipt,
     ) -> None:
-        """Repair terminal owner projections without ever reopening the claim."""
+        current_task = await self._board.get(task.id)
+        if current_task is None:
+            raise MissionControlError(f"task {task.id!r} was not found")
+        require_same_completion_contract(
+            current_task.metadata, run.metadata, claim.metadata, identity.metadata
+        )
+        supporting = []
+        if completion_contract_from_metadata(identity.metadata):
+            supporting = await self._runtime.list_runtime_receipts(
+                run_id=identity.run_id, receipt_type=EFFECT_RECEIPT_TYPE, limit=2
+            )
         terminal_status, owner_status, result, failure_code, metadata = (
-            terminal_receipt_contract(receipt, identity, mission_id)
+            terminal_receipt_contract(
+                receipt, identity, mission_id, supporting_receipts=supporting
+            )
         )
         self._require_attempt_identity(
             run, mission_id, identity.task_id, identity.agent_id
@@ -273,9 +298,34 @@ class MissionControlProjectionMixin:
             raise MissionControlError(
                 f"attempt {identity.run_id!r} has conflicting terminal evidence"
             )
-        if run.status in OWNER_TERMINAL_ATTEMPT_STATUSES and run.status != owner_status:
+        if run.status not in {"running", owner_status}:
             raise MissionControlError(
                 f"attempt {identity.run_id!r} has conflicting terminal evidence"
+            )
+        claim_terminal = "completed" if terminal_status == "succeeded" else "failed"
+        claim_status = claim.status.lower()
+        if claim_status not in OPEN_CLAIM_STATUSES | {claim_terminal}:
+            raise MissionControlError(
+                f"claim {claim.claim_id!r} has conflicting terminal evidence"
+            )
+        if run.status == owner_status:
+            if not terminal_run_projection_matches(run, receipt):
+                raise MissionControlError(
+                    f"attempt {identity.run_id!r} has conflicting terminal evidence"
+                )
+        elif (
+            run.completed_at is not None
+            or run.failure_code
+            or run.started_at > receipt.created_at
+        ):
+            raise MissionControlError(
+                f"attempt {identity.run_id!r} has conflicting terminal evidence"
+            )
+        if claim_status == claim_terminal and not terminal_claim_projection_matches(
+            claim, receipt
+        ):
+            raise MissionControlError(
+                f"claim {claim.claim_id!r} has conflicting terminal evidence"
             )
         now = utc_now()
         if run.status != owner_status or run.completed_at is None:
@@ -283,7 +333,7 @@ class MissionControlProjectionMixin:
                 replace(
                     run,
                     status=owner_status,
-                    completed_at=run.completed_at or now,
+                    completed_at=receipt.created_at,
                     failure_code=failure_code,
                     metadata=self._attempt_metadata(
                         metadata,
@@ -294,17 +344,11 @@ class MissionControlProjectionMixin:
                     ),
                 )
             )
-        current_task = await self._board.get(task.id)
-        if current_task is None:
-            raise MissionControlError(f"task {task.id!r} was not found")
         if current_task.status in {
             TaskStatus.PENDING,
             TaskStatus.ASSIGNED,
             TaskStatus.RUNNING,
         }:
-            # A heartbeat can durably advance the run before TaskBoard reaches
-            # RUNNING.  Repair that earlier projection from the same fenced
-            # identity so terminal retry converges from PENDING or ASSIGNED.
             await self._project_running_task(
                 current_task,
                 mission_id=mission_id,
@@ -312,11 +356,8 @@ class MissionControlProjectionMixin:
                 attempt_id=identity.run_id,
                 claim_id=identity.claim_id,
             )
-        # TaskBoard remains open if either projection crashes. Closing the claim
-        # happens last, so a replacement cannot be admitted from partial state.
         await self._project_terminal_task(task, terminal_status, result, failure_code)
-        claim_terminal = "completed" if terminal_status == "succeeded" else "failed"
-        if claim.status != claim_terminal:
+        if claim_status != claim_terminal:
             await self._runtime.record_task_claim(
                 replace(
                     claim,
@@ -398,10 +439,7 @@ class MissionControlProjectionMixin:
         await project_running_task(self._board, task, **kwargs)
 
     async def _project_terminal_task(
-        self,
-        task: Task,
-        terminal_status: str,
-        result: str,
+        self, task: Task, terminal_status: str, result: str,
         failure_code: str,
     ) -> None:
         await project_terminal_task(
@@ -431,6 +469,7 @@ class MissionControlProjectionMixin:
             or run.assigned_to != agent_id
             or run.metadata.get("mission_id") != mission_id
             or run.metadata.get("schema_version") != SCHEMA_VERSION
+            or run.metadata.get("attempt_id") != run.run_id
         ):
             raise MissionControlError(f"attempt {run.run_id!r} has foreign identity")
 

@@ -16,6 +16,7 @@ from dharma_swarm.mission_control_mcp import (
     MISSION_CREATE,
     MISSION_CREATE_TASK,
     MISSION_FINISH_ATTEMPT,
+    MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT,
     MISSION_GET,
     MISSION_HEARTBEAT_LEASE,
     MISSION_LIST_TASKS,
@@ -167,6 +168,16 @@ class _FakeMissionControl:
         self, mission_id: str, task_id: str, agent_id: str, **kwargs: Any
     ) -> _View:
         self._record("finish_attempt", (mission_id, task_id, agent_id), kwargs)
+        return _View("receipt", str(kwargs["attempt_id"]))
+
+    async def finish_attempt_from_patch_effect(
+        self, mission_id: str, task_id: str, agent_id: str, **kwargs: Any
+    ) -> _View:
+        self._record(
+            "finish_attempt_from_patch_effect",
+            (mission_id, task_id, agent_id),
+            kwargs,
+        )
         return _View("receipt", str(kwargs["attempt_id"]))
 
 
@@ -432,6 +443,69 @@ async def test_create_task_converts_priority_on_authorized_path() -> None:
 
 
 @pytest.mark.asyncio
+async def test_patch_effect_finish_is_denied_by_default_without_control_call() -> None:
+    control = _FakeMissionControl()
+    service = MissionControlMCPService(control)
+
+    result = await service.finish_attempt_from_patch_effect(
+        "m-1",
+        "task-1",
+        "attempt-1",
+        "agent-1",
+        "effect:one",
+    )
+
+    assert result["error"]["code"] == "mutation_not_authorized"
+    assert control.calls == []
+
+
+@pytest.mark.asyncio
+async def test_patch_effect_finish_routes_only_exact_proof_identity_to_authorizer() -> (
+    None
+):
+    control = _FakeMissionControl()
+    requests: list[MutationRequest] = []
+
+    def authorize(request: MutationRequest) -> bool:
+        requests.append(request)
+        return request.tool_name == MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT
+
+    service = MissionControlMCPService(
+        control,
+        mutation_authorizer=authorize,
+        trusted_principal="operator:alice",
+    )
+    result = await service.finish_attempt_from_patch_effect(
+        "m-1",
+        "task-1",
+        "attempt-1",
+        "agent-1",
+        "effect:one",
+    )
+
+    assert result["ok"] is True
+    assert requests == [
+        MutationRequest(
+            tool_name=MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT,
+            principal="operator:alice",
+            mission_id="m-1",
+            task_id="task-1",
+            attempt_id="attempt-1",
+            agent_id="agent-1",
+            terminal_status="succeeded",
+            effect_key="effect:one",
+        )
+    ]
+    assert control.calls == [
+        (
+            "finish_attempt_from_patch_effect",
+            ("m-1", "task-1", "agent-1"),
+            {"attempt_id": "attempt-1", "effect_key": "effect:one"},
+        )
+    ]
+
+
+@pytest.mark.asyncio
 async def test_trusted_principal_overrides_spoofed_actor_and_metadata_fields() -> None:
     control = _FakeMissionControl()
     service = MissionControlMCPService(
@@ -512,6 +586,18 @@ async def test_fastmcp_registers_stable_names_and_honest_annotations() -> None:
     start_schema = tools[MISSION_START_ATTEMPT].inputSchema
     assert "attempt_key" in start_schema["properties"]
     assert "attempt_id" not in start_schema["properties"]
+    effect_schema = tools[MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT].inputSchema
+    assert set(effect_schema["properties"]) == {
+        "mission_id",
+        "task_id",
+        "attempt_id",
+        "agent_id",
+        "effect_key",
+    }
+    assert set(effect_schema["required"]) == set(effect_schema["properties"])
+    assert "consumed governed patch effect" in (
+        tools[MISSION_FINISH_ATTEMPT_FROM_PATCH_EFFECT].description or ""
+    )
 
 
 @pytest.mark.asyncio

@@ -22,6 +22,7 @@ from dharma_swarm.mission_control_a2a_owner_snapshot import (
     require_owner_schema,
 )
 from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
     MAX_LEASE_SECONDS,
     RECOVERY_RECEIPT_TYPE,
     SCHEMA_VERSION,
@@ -33,18 +34,15 @@ from dharma_swarm.mission_control_contract import (
     terminal_operation_metadata,
     terminal_receipt_contract,
 )
-from dharma_swarm.mission_control_effect_owner_graph import (
-    observe_recovery_owner_graph,
-)
+from dharma_swarm.mission_control_effect_owner_graph import observe_recovery_owner_graph
 from dharma_swarm.models import TaskStatus
 from dharma_swarm.runtime_state import RuntimeReceipt
+from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
 
 
 @dataclass(frozen=True, slots=True)
 class ExpiredProposalRecoveryObservation:
-    """Historical owner evidence which cannot inhabit issuance or apply."""
-
     mission_id: str
     task_id: str
     mission_attempt_id: str
@@ -57,12 +55,8 @@ class ExpiredProposalRecoveryObservation:
     lease_acked_at: datetime
     lease_stale_after: datetime
     observed_at: datetime
-    owner_transition: Literal[
-        "expired_active", "canonical_stale_recovery", "canonical_terminal"
-    ]
-    owner_reconciliation: Literal[
-        "expired_lease", "coherent", "needs_task_projection"
-    ]
+    owner_transition: Literal["expired_active", "canonical_stale_recovery", "canonical_terminal"]
+    owner_reconciliation: Literal["expired_lease", "coherent", "needs_task_projection"]
     transition_receipt_id: str
     transition_receipt_sha256: str
     successor_attempt_ids: tuple[str, ...]
@@ -93,19 +87,17 @@ class _ExpiredRecoveryBinding:
     proposal_receipt_sha256: str
 
 
-def _runtime_object(raw: object, label: str) -> dict[str, Any]:
+def _runtime_object(raw: object, label: str, *, compact: bool = False) -> dict[str, Any]:
     value = owner_object(raw, label)
-    if json.dumps(value, sort_keys=True, ensure_ascii=True) != raw:
+    separators = (",", ":") if compact else None
+    if json.dumps(value, sort_keys=True, ensure_ascii=True, separators=separators) != raw:
         raise MissionControlError(f"{label} is not in RuntimeState canonical form")
     return value
 
 
 def _attempt_identity(
-    connection: sqlite3.Connection,
-    expected: ExactProposalStoreExpectation,
-    attempt_id: str,
-    claim_id: str,
-) -> ExecutionIdentity:
+    connection: sqlite3.Connection, expected: ExactProposalStoreExpectation,
+    attempt_id: str, claim_id: str) -> ExecutionIdentity:
     ref = expected.native_ref
     row = one_owner_row(
         connection,
@@ -135,20 +127,22 @@ def _attempt_identity(
         any(owner_text(row, name) != value for name, value in values.items())
         or owner_text(row, "source") != "mission_control.start_attempt"
         or metadata
-        != {"schema_version": SCHEMA_VERSION, "mission_id": ref.mission_id}
+        != {
+            "schema_version": SCHEMA_VERSION,
+            "mission_id": ref.mission_id,
+            "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
+        }
     ):
         raise MissionControlError("Mission Control parent identity disagrees")
     return ExecutionIdentity(**values, metadata=metadata)
 
 
 def _runtime_receipt(row: sqlite3.Row) -> RuntimeReceipt:
-    payload = _runtime_object(
-        owner_text(row, "payload_json"), "Mission Control recovery receipt",
-    )
-    created_at = owner_time(row, "created_at")
+    receipt_type = owner_text(row, "receipt_type")
+    payload = _runtime_object(owner_text(row, "payload_json"), "Mission Control recovery receipt", compact=receipt_type == EFFECT_RECEIPT_TYPE)
     return RuntimeReceipt(
         receipt_id=owner_text(row, "receipt_id"),
-        receipt_type=owner_text(row, "receipt_type"),
+        receipt_type=receipt_type,
         status=owner_text(row, "status"),
         run_id=owner_text(row, "run_id"),
         task_id=owner_text(row, "task_id"),
@@ -160,19 +154,15 @@ def _runtime_receipt(row: sqlite3.Row) -> RuntimeReceipt:
         idempotency_key=owner_text(row, "idempotency_key"),
         side_effect_key=owner_text(row, "side_effect_key"),
         payload=payload,
-        created_at=created_at,
+        created_at=owner_time(row, "created_at"),
     )
 
 
 def _terminal_slot_matches(
-    row: sqlite3.Row,
-    receipt: RuntimeReceipt,
-    identity: ExecutionIdentity,
+    row: sqlite3.Row, receipt: RuntimeReceipt, identity: ExecutionIdentity,
     mission_id: str,
 ) -> bool:
-    operation_hash, expected_metadata = terminal_operation_metadata(
-        receipt, identity, mission_id,
-    )
+    operation_hash, expected_metadata = terminal_operation_metadata(receipt, identity, mission_id)
     metadata = _runtime_object(
         owner_text(row, "metadata_json"), "Mission Control terminal slot",
     )
@@ -266,6 +256,8 @@ def observe_expired_proposal_for_effect_recovery_from_connection(
         owner_text(task, "status") not in {status.value for status in TaskStatus}
         or task_metadata.get("schema_version") != SCHEMA_VERSION
         or task_metadata.get("mission_id") != ref.mission_id
+        or task_metadata.get("completion_contract")
+        != GOVERNED_PATCH_COMPLETION_CONTRACT
     ):
         raise MissionControlError("Mission Control task projection disagrees")
     run = one_owner_row(
@@ -280,6 +272,7 @@ def observe_expired_proposal_for_effect_recovery_from_connection(
         "mission_id": ref.mission_id,
         "attempt_id": attempt_id,
         "attempt_key": expected.attempt_key,
+        "completion_contract": GOVERNED_PATCH_COMPLETION_CONTRACT,
     }
     if (
         (
@@ -327,12 +320,13 @@ def observe_expired_proposal_for_effect_recovery_from_connection(
         f"mission_control:{attempt_id}:stale_recovery",
     )
     transition_rows = connection.execute(
-        "SELECT * FROM runtime_receipts WHERE receipt_type IN (?, ?)"
+        "SELECT * FROM runtime_receipts WHERE receipt_type IN (?, ?, ?)"
         " AND (run_id = ? OR side_effect_key IN (?, ?))"
         " ORDER BY created_at LIMIT 4",
         (
             TERMINAL_RECEIPT_TYPE,
             RECOVERY_RECEIPT_TYPE,
+            EFFECT_RECEIPT_TYPE,
             attempt_id,
             *transition_keys,
         ),
@@ -343,6 +337,9 @@ def observe_expired_proposal_for_effect_recovery_from_connection(
     recoveries = [
         row for row in transition_rows if row["receipt_type"] == RECOVERY_RECEIPT_TYPE
     ]
+    effects = [
+        row for row in transition_rows if row["receipt_type"] == EFFECT_RECEIPT_TYPE
+    ]
     transition_slots = connection.execute(
         "SELECT * FROM idempotency_records WHERE side_effect_key IN (?, ?) LIMIT 3",
         transition_keys,
@@ -352,14 +349,19 @@ def observe_expired_proposal_for_effect_recovery_from_connection(
     successors: tuple[str, ...] = ()
     if terminals:
         if (
-            len(transition_rows) != 1
-            or len(terminals) != 1
+            len(terminals) != 1
             or recoveries
+            or len(effects) != 1
             or len(transition_slots) != 1
         ):
             raise MissionControlError("canonical terminal evidence is not unique")
         terminal = _runtime_receipt(terminals[0])
-        terminal_receipt_contract(terminal, identity, ref.mission_id)
+        terminal_receipt_contract(
+            terminal,
+            identity,
+            ref.mission_id,
+            supporting_receipts=[_runtime_receipt(effects[0])],
+        )
         if (
             not _terminal_slot_matches(
                 transition_slots[0], terminal, identity, ref.mission_id,

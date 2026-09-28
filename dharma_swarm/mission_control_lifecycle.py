@@ -9,6 +9,7 @@ from functools import wraps
 from typing import Any
 
 from dharma_swarm.mission_control_contract import (
+    GOVERNED_PATCH_COMPLETION_CONTRACT,
     MAX_LEASE_SECONDS,
     OPEN_CLAIM_STATUSES,
     OWNER_TERMINAL_ATTEMPT_STATUSES,
@@ -19,13 +20,16 @@ from dharma_swarm.mission_control_contract import (
     claim_is_expired,
     claim_is_open,
     clean_identifier,
+    completion_contract_from_metadata,
     lease_view,
     session_id as mission_session_id,
     stable_id,
     utc_now,
+    require_same_completion_contract,
 )
 from dharma_swarm.models import TaskStatus
 from dharma_swarm.runtime_state import DelegationRun, TaskClaim
+from dharma_swarm.runtime_state_effect_fence import EFFECT_RECEIPT_TYPE
 from dharma_swarm.spine.identity import ExecutionIdentity
 
 
@@ -64,6 +68,11 @@ class MissionControlLifecycleMixin:
         task_id = clean_identifier(task_id, "task_id")
         agent_id = clean_identifier(agent_id, "agent_id")
         task = await self._require_task(mission_id, task_id)
+        task_completion_contract = completion_contract_from_metadata(task.metadata)
+        requested_metadata = dict(metadata or {})
+        requested_contract = completion_contract_from_metadata(requested_metadata)
+        if requested_contract and requested_contract != task_completion_contract:
+            raise MissionControlError("completion_contract cannot be added")
         if not 1 <= lease_seconds <= MAX_LEASE_SECONDS:
             raise MissionControlError(
                 f"lease_seconds must be between 1 and {MAX_LEASE_SECONDS}"
@@ -105,8 +114,73 @@ class MissionControlLifecycleMixin:
                 raise MissionControlError(
                     f"claim {claim.claim_id!r} has conflicting idempotency content"
                 )
+            require_same_completion_contract(
+                task.metadata,
+                existing.metadata,
+                identity.metadata,
+                claim.metadata,
+            )
+            self._attempt_metadata(
+                metadata,
+                base=existing.metadata,
+                mission_id=mission_id,
+                attempt_id=attempt_id,
+                attempt_key=key,
+                completion_contract=task_completion_contract,
+            )
+            retry_now = utc_now()
+            if (
+                existing.status == "completed"
+                and task_completion_contract
+                == GOVERNED_PATCH_COMPLETION_CONTRACT
+            ):
+                effects = await self._runtime.list_runtime_receipts(
+                    run_id=attempt_id,
+                    receipt_type=EFFECT_RECEIPT_TYPE,
+                    limit=2,
+                )
+                if len(effects) != 1:
+                    raise MissionControlError(
+                        "completed governed attempt lacks one exact effect receipt"
+                    )
+                await self._finish_attempt_from_patch_effect(
+                    mission_id,
+                    task_id,
+                    agent_id,
+                    attempt_id=attempt_id,
+                    effect_key=effects[0].side_effect_key,
+                    _recovery_only=False,
+                )
+                repaired = await self._runtime.get_delegation_run(attempt_id)
+                if repaired is None:
+                    raise MissionControlError(
+                        f"repaired attempt {attempt_id!r} disappeared"
+                    )
+                return await self._attempt_view(repaired)
+            if (
+                existing.status == "running"
+                and task_completion_contract == GOVERNED_PATCH_COMPLETION_CONTRACT
+                and claim.status.lower() in OPEN_CLAIM_STATUSES
+                and claim_is_expired(claim, retry_now)
+                and await self._runtime.list_runtime_receipts(
+                    run_id=attempt_id,
+                    receipt_type=EFFECT_RECEIPT_TYPE,
+                    limit=1,
+                )
+            ):
+                if not await self._recover_expired_claim(
+                    mission_id, claim, recovered_at=retry_now
+                ):
+                    raise MissionControlError(
+                        "expired governed effect did not repair its parent attempt"
+                    )
+                repaired = await self._runtime.get_delegation_run(attempt_id)
+                if repaired is None:
+                    raise MissionControlError(
+                        f"repaired attempt {attempt_id!r} disappeared"
+                    )
+                return await self._attempt_view(repaired)
             if existing.status not in OWNER_TERMINAL_ATTEMPT_STATUSES:
-                retry_now = utc_now()
                 self._require_current_claim(
                     claim,
                     claims,
@@ -188,6 +262,12 @@ class MissionControlLifecycleMixin:
         trace_id = stable_id("trace", attempt_id)
         identity = await self._runtime.get_execution_identity(attempt_id)
         if identity is None:
+            identity_metadata = {
+                "schema_version": SCHEMA_VERSION,
+                "mission_id": mission_id,
+            }
+            if task_completion_contract:
+                identity_metadata["completion_contract"] = task_completion_contract
             identity = ExecutionIdentity.new(
                 task_id=task_id,
                 agent_id=agent_id,
@@ -197,7 +277,7 @@ class MissionControlLifecycleMixin:
                 run_id=attempt_id,
                 claim_id=claim_id,
                 idempotency_key=key,
-                metadata={"schema_version": SCHEMA_VERSION, "mission_id": mission_id},
+                metadata=identity_metadata,
             )
             await self._runtime.record_execution_identity(
                 identity,
@@ -209,11 +289,13 @@ class MissionControlLifecycleMixin:
                 raise MissionControlError(
                     f"attempt {attempt_id!r} has conflicting idempotency content"
                 )
+            require_same_completion_contract(task.metadata, identity.metadata)
         common_metadata = self._attempt_metadata(
             metadata,
             mission_id=mission_id,
             attempt_id=attempt_id,
             attempt_key=key,
+            completion_contract=task_completion_contract,
         )
         if orphan_claim is None:
             claim = TaskClaim(
@@ -238,6 +320,7 @@ class MissionControlLifecycleMixin:
                 raise MissionControlError(
                     f"claim {claim.claim_id!r} has conflicting idempotency content"
                 )
+            require_same_completion_contract(task.metadata, claim.metadata)
             self._require_current_claim(
                 claim,
                 claims,
@@ -253,6 +336,7 @@ class MissionControlLifecycleMixin:
                 mission_id=mission_id,
                 attempt_id=attempt_id,
                 attempt_key=key,
+                completion_contract=task_completion_contract,
             )
         run = DelegationRun(
             run_id=attempt_id,
@@ -262,7 +346,10 @@ class MissionControlLifecycleMixin:
             session_id=mission_session_id(mission_id),
             claim_id=claim_id,
             assigned_by=str(assigned_by or "mission_control"),
-            started_at=now,
+            # A retried start may adopt the already-durable claim written
+            # before its predecessor crashed.  Its lineage begins at that
+            # durable claim boundary, not at the retry's wall clock.
+            started_at=claim.claimed_at,
             metadata=common_metadata,
         )
         run = await self._runtime.record_delegation_run(run)
@@ -310,6 +397,18 @@ class MissionControlLifecycleMixin:
         if claim_is_expired(claim, now):
             raise MissionControlError(f"claim {claim.claim_id!r} is expired")
         task = await self._require_task(mission_id, task_id)
+        identity = await self._runtime.get_execution_identity(run.run_id)
+        if identity is None:
+            raise MissionControlError(
+                f"execution identity for attempt {run.run_id!r} was not found"
+            )
+        self._require_identity(identity, mission_id, task_id, agent_id, run.run_id)
+        task_completion_contract = require_same_completion_contract(
+            task.metadata,
+            run.metadata,
+            claim.metadata,
+            identity.metadata,
+        )
         if task.status in {
             TaskStatus.COMPLETED,
             TaskStatus.FAILED,
@@ -333,6 +432,7 @@ class MissionControlLifecycleMixin:
                 mission_id=mission_id,
                 attempt_id=run.run_id,
                 attempt_key=attempt_key,
+                completion_contract=task_completion_contract,
             ),
         )
         updated = await self._runtime.record_task_claim(updated)
@@ -347,6 +447,7 @@ class MissionControlLifecycleMixin:
                         mission_id=mission_id,
                         attempt_id=run.run_id,
                         attempt_key=attempt_key,
+                        completion_contract=task_completion_contract,
                     ),
                 )
             )

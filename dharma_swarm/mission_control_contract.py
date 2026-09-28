@@ -7,7 +7,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Sequence
 
 from dharma_swarm.models import Task, TaskPriority, TaskStatus
 from dharma_swarm.runtime_state import (
@@ -35,6 +35,22 @@ _RECOVERY_RECEIPT_LEGACY_FIELDS = frozenset(
     {"schema_version", "mission_id", "attempt_id", "recovered_claim_id", "reason"}
 )
 _RECOVERY_RECEIPT_FIELDS = _RECOVERY_RECEIPT_LEGACY_FIELDS | {"expired_stale_after"}
+GOVERNED_PATCH_COMPLETION_CONTRACT = "governed_patch_effect_v1"
+GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA = (
+    "dharma.mission_control.governed_patch_completion.v1"
+)
+GOVERNED_PATCH_COMPLETION_RESULT = "governed patch effect completed"
+COMPLETION_CONTRACT_METADATA_KEY = "completion_contract"
+GOVERNED_PATCH_COMPLETION_METADATA_FIELDS = frozenset(
+    {
+        "schema_version", "mission_id", "attempt_id", "attempt_key",
+        "completion_contract", "proof_schema", "effect_key",
+        "effect_terminal_id", "effect_terminal_receipt_id",
+        "effect_terminal_receipt_sha256", "effect_fence_id",
+        "effect_binding_sha256", "candidate_bundle_sha256", "diff_sha256",
+        "base_sha", "postimage_sha256",
+    }
+)
 TASK_SCAN_LIMIT = 10_000
 RUNTIME_SCAN_LIMIT = 10_000
 MAX_LEASE_SECONDS = 15 * 60
@@ -43,6 +59,30 @@ TERMINAL_CAS_STALE_AFTER_SECONDS = 30.0
 
 class MissionControlError(RuntimeError):
     """Raised when a Mission Control identity or lifecycle invariant fails."""
+
+
+def completion_contract_from_metadata(metadata: dict[str, Any]) -> str:
+    """Return the one supported completion contract, rejecting aliases."""
+
+    if type(metadata) is not dict:
+        raise MissionControlError("completion contract metadata must be an object")
+    if COMPLETION_CONTRACT_METADATA_KEY not in metadata:
+        return ""
+    value = metadata[COMPLETION_CONTRACT_METADATA_KEY]
+    if type(value) is not str or value != GOVERNED_PATCH_COMPLETION_CONTRACT:
+        raise MissionControlError("completion_contract is unsupported")
+    return value
+
+
+def require_same_completion_contract(*metadata_values: dict[str, Any]) -> str:
+    """Return one exact lineage contract or fail on addition/removal/drift."""
+
+    contracts = tuple(
+        completion_contract_from_metadata(metadata) for metadata in metadata_values
+    )
+    if len(set(contracts)) > 1:
+        raise MissionControlError("completion_contract lineage disagrees")
+    return contracts[0] if contracts else ""
 
 
 class ReconciliationState(str, Enum):
@@ -271,6 +311,8 @@ def terminal_receipt_contract(
     receipt: RuntimeReceipt,
     identity: ExecutionIdentity,
     mission_id: str,
+    *,
+    supporting_receipts: Sequence[RuntimeReceipt] = (),
 ) -> tuple[str, str, str, str, dict[str, Any]]:
     """Validate terminal evidence and return its projection fields."""
     payload = receipt.payload
@@ -295,6 +337,23 @@ def terminal_receipt_contract(
     ):
         raise MissionControlError(
             f"attempt {identity.run_id!r} has conflicting terminal evidence"
+        )
+    identity_contract = completion_contract_from_metadata(identity.metadata)
+    metadata_contract = completion_contract_from_metadata(metadata)
+    if identity_contract != metadata_contract:
+        raise MissionControlError(
+            f"attempt {identity.run_id!r} has conflicting completion contracts"
+        )
+    if identity_contract == GOVERNED_PATCH_COMPLETION_CONTRACT:
+        from dharma_swarm.mission_control_effect_completion import (
+            validate_governed_patch_terminal_proof,
+        )
+
+        validate_governed_patch_terminal_proof(
+            receipt,
+            identity,
+            mission_id,
+            supporting_receipts,
         )
     owner_status = "completed" if status == "succeeded" else "failed"
     return (
@@ -421,6 +480,11 @@ __all__ = [
     "ACTIVE_CLAIM_STATUSES",
     "AgentLeaseView",
     "AttemptView",
+    "COMPLETION_CONTRACT_METADATA_KEY",
+    "GOVERNED_PATCH_COMPLETION_CONTRACT",
+    "GOVERNED_PATCH_COMPLETION_METADATA_FIELDS",
+    "GOVERNED_PATCH_COMPLETION_PROOF_SCHEMA",
+    "GOVERNED_PATCH_COMPLETION_RESULT",
     "MAX_LEASE_SECONDS",
     "MissionControlError",
     "MissionSnapshot",
@@ -442,10 +506,12 @@ __all__ = [
     "claim_is_expired",
     "claim_is_open",
     "clean_identifier",
+    "completion_contract_from_metadata",
     "lease_view",
     "mission_view",
     "public_attempt_status",
     "receipt_view",
+    "require_same_completion_contract",
     "session_id",
     "stable_id",
     "task_view",

@@ -138,7 +138,9 @@ class GovernedPatchEffectFence:
 
         def _on_collected(
             ref: "weakref.ReferenceType[EffectWarrant]",
-            *, tracked_id: int = tracked_id, warrants: dict = warrants,
+            *,
+            tracked_id: int = tracked_id,
+            warrants: dict[int, tuple[weakref.ReferenceType[EffectWarrant], str]] = warrants,
         ) -> None:
             if warrants.get(tracked_id, (None,))[0] is ref:
                 warrants.pop(tracked_id, None)

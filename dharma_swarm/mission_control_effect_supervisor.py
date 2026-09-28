@@ -149,7 +149,12 @@ class SupervisorAuthorityIssuer:
 
         def _on_collected(
             ref: "weakref.ReferenceType[SupervisorEffectAuthority]",
-            *, tracked_id: int = tracked_id, issued: dict = issued,
+            *,
+            tracked_id: int = tracked_id,
+            issued: dict[
+                int,
+                tuple[weakref.ReferenceType[SupervisorEffectAuthority], str],
+            ] = issued,
         ) -> None:
             if issued.get(tracked_id, (None,))[0] is ref:
                 issued.pop(tracked_id, None)
