@@ -92,3 +92,56 @@ id = "finnhub-access-token"
 [rules.allowlist]
 description = "dharma_swarm does not integrate with Finnhub"
 regexes = [".*"]
+
+
+# Independently adjudicated historical false positives only.
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Historical noncredential adjudication 1; exact commit, file and full line"
+condition = "AND"
+commits = ["ca17cbfabffc2997e875505991060b267d46522f"]
+paths = ["\\Adharma_swarm/foundry/live\\.py\\z"]
+regexTarget = "line"
+regexes = ["\\A\\n?    \\(\"groq\", \"https://api\\.groq\\.com/openai/v1\", \"GROQ_API_KEY\", \"llama-3\\.3-70b-versatile\"\\),\\z"]
+
+[[rules.allowlists]]
+description = "Historical noncredential adjudication 2; exact commit, file and full line"
+condition = "AND"
+commits = ["1faf0100550c4ed42b520f3450564c0f7889ebeb"]
+paths = ["\\Adashboard/src/lib/sadhanaOperatorControl\\.test\\.ts\\z"]
+regexTarget = "line"
+regexes = ["\\A\\n?    idempotency_key: \"idempotency-001\",\\z"]
+
+[[rules.allowlists]]
+description = "Historical noncredential adjudication 3; exact commit, file and full line"
+condition = "AND"
+commits = ["1faf0100550c4ed42b520f3450564c0f7889ebeb"]
+paths = ["\\Adashboard/src/lib/sadhanaOperatorControl\\.test\\.ts\\z"]
+regexTarget = "line"
+regexes = ["\\A\\n?    idempotencyKey: \"idempotency-001\",\\z"]
+
+[[rules.allowlists]]
+description = "Historical noncredential adjudication 4; exact commit, file and full line"
+condition = "AND"
+commits = ["1faf0100550c4ed42b520f3450564c0f7889ebeb"]
+paths = ["\\Adashboard/src/lib/sadhanaOperatorControl\\.test\\.ts\\z"]
+regexTarget = "line"
+regexes = ["\\A\\n?      idempotencyKey: \"idempotency-001\",\\z"]
+
+[[rules.allowlists]]
+description = "Historical noncredential adjudication 5; exact commit, file and full line"
+condition = "AND"
+commits = ["4ac37e5bd7233b67b9628cf1fe1d7b6e45791077"]
+paths = ["\\Adharma_swarm/forge_v1/forge_v2/pr_suite_validator\\.py\\z"]
+regexTarget = "line"
+regexes = ["\\A\\n?    receipt_signing_key: Ed25519PrivateKey \\| None = None,\\z"]
+
+[[rules.allowlists]]
+description = "Historical noncredential adjudication 6; exact commit, file and full line"
+condition = "AND"
+commits = ["4ac37e5bd7233b67b9628cf1fe1d7b6e45791077"]
+paths = ["\\Adharma_swarm/forge_v1/forge_v2/pr_suite_execution_profile\\.py\\z"]
+regexTarget = "line"
+regexes = ["\\A\\n?    signing_key: Ed25519PrivateKey \\| None,\\z"]

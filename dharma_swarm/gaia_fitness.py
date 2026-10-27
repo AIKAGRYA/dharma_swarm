@@ -1,8 +1,8 @@
 """GAIA fitness criterion for the Darwin Engine.
 
-Uses R_V-like contraction as ecological fitness:
-- R_V ~ 1.0 -> blind optimization, Goodhart drift
-- R_V < 1.0 -> self-correcting, catches proxy drift
+Ecological fitness is an operational behavioral proxy.
+R_V/PR-format values are compatibility fields, not measured geometry.
+Calibrated contraction categories are unavailable.
 
 Wraps GaiaObserver readings into FitnessScore compatible with
 evolution.py's PROPOSE->GATE->EVALUATE cycle.
