@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 PHI = (1 + math.sqrt(5)) / 2  # Golden ratio ≈ 1.618
 PHI_PLUS_1 = PHI + 1  # ≈ 2.618 — URA finding: L3/L4 word count ratio
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, TypeAdapter, model_validator
 
 from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
 from dharma_swarm.models import _new_id
@@ -118,17 +118,21 @@ class CorrelationResult(BaseModel):
                 conflicts = data.get(
                     "historical_contraction_recognition_overlap_conflicts", []
                 )
-                if isinstance(conflicts, list):
-                    conflict = {
-                        "field": "contraction_recognition_overlap",
-                        "existing_source": "historical_contraction_recognition_overlap",
-                        "existing_value": historical_overlap,
-                        "legacy_source": "legacy_top_level",
-                        "legacy_value": legacy_overlap,
-                    }
-                    if conflict not in conflicts:
-                        conflicts.append(conflict)
-                    data["historical_contraction_recognition_overlap_conflicts"] = conflicts
+                if not isinstance(conflicts, list):
+                    field = cls.model_fields[
+                        "historical_contraction_recognition_overlap_conflicts"
+                    ]
+                    conflicts = TypeAdapter(field.annotation).validate_python(conflicts)
+                conflict = {
+                    "field": "contraction_recognition_overlap",
+                    "existing_source": "historical_contraction_recognition_overlap",
+                    "existing_value": historical_overlap,
+                    "legacy_source": "legacy_top_level",
+                    "legacy_value": legacy_overlap,
+                }
+                if conflict not in conflicts:
+                    conflicts.append(conflict)
+                data["historical_contraction_recognition_overlap_conflicts"] = conflicts
         data["contraction_recognition_overlap"] = None
         data["classification_count"] = 0
         data["calibration_status"] = RV_CALIBRATION_STATUS

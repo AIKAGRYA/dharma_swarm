@@ -1,6 +1,8 @@
 """Public behavior for retired scientific classification and measurement custody."""
 
 import json
+from collections import deque
+from copy import deepcopy
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -607,6 +609,47 @@ def test_batch_result_retains_new_nested_overlap_conflict():
         "legacy_value": 0.9,
     }]
     assert BatchResult.model_validate(output) == batch
+
+
+@pytest.mark.parametrize("sequence_factory", [tuple, deque], ids=["tuple", "deque"])
+def test_correlation_result_preserves_accepted_conflict_sequences(sequence_factory):
+    from dharma_swarm.l4_rv_correlator import BatchResult
+
+    existing = {"field": "other", "values": ["keep"]}
+    payload = {
+        "n": 50,
+        "contraction_recognition_overlap": 0.9,
+        "historical_contraction_recognition_overlap": 0.1,
+        "historical_contraction_recognition_overlap_conflicts": sequence_factory(
+            [existing]
+        ),
+    }
+    original = deepcopy(payload)
+
+    result = CorrelationResult.model_validate(payload)
+    batch = BatchResult.model_validate({"correlation": payload})
+    expected_conflicts = [
+        existing,
+        {
+            "field": "contraction_recognition_overlap",
+            "existing_source": "historical_contraction_recognition_overlap",
+            "existing_value": 0.1,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": 0.9,
+        },
+    ]
+
+    assert payload == original
+    for correlation in (result, batch.correlation):
+        assert correlation.contraction_recognition_overlap is None
+        assert correlation.historical_contraction_recognition_overlap == 0.1
+        assert correlation.historical_contraction_recognition_overlap_conflicts == (
+            expected_conflicts
+        )
+    assert CorrelationResult.model_validate_json(result.model_dump_json()) == result
+    restored = BatchResult.model_validate_json(batch.model_dump_json())
+    assert restored == batch
+    assert restored.model_dump_json() == batch.model_dump_json()
 
 
 @pytest.mark.parametrize(
