@@ -112,7 +112,7 @@ class CorrelationResult(BaseModel):
         legacy_overlap = data.get("contraction_recognition_overlap")
         if legacy_overlap is not None:
             historical_overlap = data.get("historical_contraction_recognition_overlap")
-            if historical_overlap is None:
+            if "historical_contraction_recognition_overlap" not in data:
                 data["historical_contraction_recognition_overlap"] = legacy_overlap
             elif historical_overlap != legacy_overlap:
                 conflicts = data.get(
@@ -128,6 +128,7 @@ class CorrelationResult(BaseModel):
                     }
                     if conflict not in conflicts:
                         conflicts.append(conflict)
+                    data["historical_contraction_recognition_overlap_conflicts"] = conflicts
         data["contraction_recognition_overlap"] = None
         data["classification_count"] = 0
         data["calibration_status"] = RV_CALIBRATION_STATUS

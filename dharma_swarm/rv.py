@@ -77,8 +77,14 @@ def _preserve_historical_classification(data: Any) -> Any:
     data = copy.deepcopy(data)
     historical = data.get("historical_classification", {})
     conflicts = data.get("historical_classification_conflicts", [])
-    if not isinstance(historical, dict) or not isinstance(conflicts, list):
-        return data
+    if not isinstance(historical, dict):
+        historical = {"raw_historical_classification": historical}
+    if not isinstance(conflicts, list):
+        conflicts = [{
+            "field": "historical_classification_conflicts",
+            "existing_source": "historical_classification_conflicts",
+            "existing_value": conflicts,
+        }]
     had_historical = "historical_classification" in data
     had_conflicts = "historical_classification_conflicts" in data
     for key in ("is_contracted", "contraction_strength"):
@@ -86,7 +92,7 @@ def _preserve_historical_classification(data: Any) -> Any:
         data[key] = None
         if value is None:
             continue
-        if key not in historical or historical[key] is None:
+        if key not in historical:
             historical[key] = value
         elif historical[key] != value:
             conflict = {

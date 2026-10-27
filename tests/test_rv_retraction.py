@@ -397,6 +397,218 @@ def test_correlation_result_preserves_conflicting_legacy_overlap():
     assert restored == result
 
 
+def test_legacy_reading_retains_explicit_null_history():
+    payload = reading().model_dump(mode="json")
+    payload["historical_classification"] = {
+        "is_contracted": None,
+        "contraction_strength": None,
+    }
+    payload.update(is_contracted=True, contraction_strength="strong")
+    original = json.loads(json.dumps(payload))
+
+    restored = RVReading.model_validate(payload)
+
+    assert payload == original
+    assert restored.is_contracted is None
+    assert restored.contraction_strength is None
+    assert restored.historical_classification == original["historical_classification"]
+    assert restored.historical_classification_conflicts == [
+        {
+            "field": "is_contracted",
+            "existing_source": "historical_classification",
+            "existing_value": None,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": True,
+        },
+        {
+            "field": "contraction_strength",
+            "existing_source": "historical_classification",
+            "existing_value": None,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": "strong",
+        },
+    ]
+    assert RVReading.model_validate_json(restored.model_dump_json()) == restored
+
+
+async def test_tracker_and_observed_state_retain_explicit_null_history(tmp_path):
+    historical = {"is_contracted": None, "contraction_strength": None}
+    legacy = {"is_contracted": True, "contraction_strength": "strong"}
+    record = {
+        "rv": 0.4,
+        "best_fitness": 0.8,
+        "historical_classification": historical,
+        **legacy,
+    }
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_text(json.dumps(record) + "\n")
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+    row = tracker.get_readings()[0]
+
+    payload = {
+        "state": "saved",
+        "rv_measurement": 0.4,
+        "introspection": {"historical_classification": historical, **legacy},
+        "timestamp": 1.0,
+    }
+    original = json.loads(json.dumps(payload))
+    observed = ObservedState.from_dict(payload)
+    output = json.loads(json.dumps(observed.to_dict()))
+
+    assert payload == original
+    for introspection in (row, output["introspection"]):
+        assert introspection["is_contracted"] is None
+        assert introspection["contraction_strength"] is None
+        assert introspection["historical_classification"] == historical
+        assert [conflict["existing_value"] for conflict in introspection[
+            "historical_classification_conflicts"
+        ]] == [None, None]
+        assert [conflict["legacy_value"] for conflict in introspection[
+            "historical_classification_conflicts"
+        ]] == [True, "strong"]
+    assert ObservedState.from_dict(output).to_dict() == output
+
+    restored_dir = tmp_path / "restored"
+    restored_dir.mkdir()
+    (restored_dir / "evolution_rv.jsonl").write_text(json.dumps(row) + "\n")
+    restored = EvolutionRVTracker(restored_dir)
+    await restored.load()
+    assert restored.get_readings() == [row]
+
+
+async def test_malformed_history_is_annotated_without_current_verdicts(tmp_path):
+    historical = "corrupt-history"
+    raw_conflicts = {"unexpected": "metadata"}
+    legacy = {"is_contracted": True, "contraction_strength": "strong"}
+    expected_history = {"raw_historical_classification": historical, **legacy}
+    expected_conflicts = [{
+        "field": "historical_classification_conflicts",
+        "existing_source": "historical_classification_conflicts",
+        "existing_value": raw_conflicts,
+    }]
+    values = {
+        "historical_classification": historical,
+        "historical_classification_conflicts": raw_conflicts,
+        **legacy,
+    }
+
+    rv_payload = reading().model_dump(mode="json")
+    rv_payload.update(values)
+    restored_reading = RVReading.model_validate(rv_payload)
+
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_text(json.dumps({"rv": 0.4, "best_fitness": 0.8, **values}) + "\n")
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+    row = tracker.get_readings()[0]
+
+    observed = ObservedState.from_dict({
+        "state": "saved",
+        "rv_measurement": 0.4,
+        "introspection": values,
+        "timestamp": 1.0,
+    })
+    observed_output = json.loads(json.dumps(observed.to_dict()))
+
+    for output in (
+        restored_reading.model_dump(mode="json"),
+        row,
+        observed_output["introspection"],
+    ):
+        assert output["historical_classification"] == expected_history
+        assert output["historical_classification_conflicts"] == expected_conflicts
+    assert restored_reading.is_contracted is None
+    assert restored_reading.contraction_strength is None
+    assert row["is_contracted"] is None
+    assert row["contraction_strength"] is None
+    assert observed_output["introspection"]["is_contracted"] is None
+    assert observed_output["introspection"]["contraction_strength"] is None
+    assert RVReading.model_validate_json(restored_reading.model_dump_json()) == restored_reading
+    assert ObservedState.from_dict(observed_output).to_dict() == observed_output
+
+    restored_dir = tmp_path / "restored"
+    restored_dir.mkdir()
+    (restored_dir / "evolution_rv.jsonl").write_text(json.dumps(row) + "\n")
+    restored = EvolutionRVTracker(restored_dir)
+    await restored.load()
+    assert restored.get_readings() == [row]
+
+
+@pytest.mark.parametrize("historical_overlap", [0.1, 0.0, None])
+@pytest.mark.parametrize(
+    "initial_conflicts",
+    [None, [], [{"field": "other", "values": ["keep"]}]],
+)
+def test_correlation_result_persists_new_and_existing_conflict_lists(
+    historical_overlap, initial_conflicts,
+):
+    payload = {
+        "n": 50,
+        "pearson_r": -0.2,
+        "contraction_recognition_overlap": 0.9,
+        "historical_contraction_recognition_overlap": historical_overlap,
+    }
+    if initial_conflicts is not None:
+        payload["historical_contraction_recognition_overlap_conflicts"] = initial_conflicts
+    original = json.loads(json.dumps(payload))
+
+    result = CorrelationResult.model_validate(payload)
+    output = json.loads(result.model_dump_json())
+
+    assert payload == original
+    assert result.pearson_r == -0.2
+    assert result.contraction_recognition_overlap is None
+    assert result.historical_contraction_recognition_overlap == historical_overlap
+    assert result.historical_contraction_recognition_overlap_conflicts == [
+        *(initial_conflicts or []),
+        {
+            "field": "contraction_recognition_overlap",
+            "existing_source": "historical_contraction_recognition_overlap",
+            "existing_value": historical_overlap,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": 0.9,
+        },
+    ]
+    assert CorrelationResult.model_validate(output) == result
+
+
+def test_correlation_result_same_overlap_adds_no_conflict():
+    result = CorrelationResult.model_validate({
+        "n": 50,
+        "contraction_recognition_overlap": 0.9,
+        "historical_contraction_recognition_overlap": 0.9,
+    })
+    assert result.historical_contraction_recognition_overlap == 0.9
+    assert result.historical_contraction_recognition_overlap_conflicts == []
+    assert CorrelationResult.model_validate_json(result.model_dump_json()) == result
+
+
+def test_batch_result_retains_new_nested_overlap_conflict():
+    from dharma_swarm.l4_rv_correlator import BatchResult
+
+    batch = BatchResult.model_validate({
+        "correlation": {
+            "n": 50,
+            "contraction_recognition_overlap": 0.9,
+            "historical_contraction_recognition_overlap": 0.1,
+        },
+    })
+    output = json.loads(batch.model_dump_json())
+    correlation = output["correlation"]
+
+    assert correlation["contraction_recognition_overlap"] is None
+    assert correlation["historical_contraction_recognition_overlap"] == 0.1
+    assert correlation["historical_contraction_recognition_overlap_conflicts"] == [{
+        "field": "contraction_recognition_overlap",
+        "existing_source": "historical_contraction_recognition_overlap",
+        "existing_value": 0.1,
+        "legacy_source": "legacy_top_level",
+        "legacy_value": 0.9,
+    }]
+    assert BatchResult.model_validate(output) == batch
+
+
 @pytest.mark.parametrize(
     ("supplied", "expected"),
     [("residual_hidden", "residual_hidden"), (None, "unknown"), ("invalid", "unknown")],
