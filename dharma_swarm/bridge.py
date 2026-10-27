@@ -18,6 +18,7 @@ import logging
 import math
 import statistics
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Optional, get_args
 
@@ -631,14 +632,18 @@ class EvolutionBridge:
         Returns:
             List of dicts ready for JSON serialization alongside fitness scores.
         """
-        return [
-            {
-                "cycle_id": r["cycle_id"],
-                "rv": r["rv"],
-                "fitness": r["fitness"],
-                "rv_source": r["rv_source"],
-                "measurement_kind": r["measurement_kind"],
+        archived = []
+        for record in self._records:
+            row = {
+                "cycle_id": record["cycle_id"],
+                "rv": record["rv"],
+                "fitness": record["fitness"],
+                "rv_source": record["rv_source"],
+                "measurement_kind": record["measurement_kind"],
                 "calibration_status": RV_CALIBRATION_STATUS,
             }
-            for r in self._records
-        ]
+            for key in ("model_name", "early_layer", "late_layer", "measurement_details"):
+                if key in record:
+                    row[key] = deepcopy(record[key])
+            archived.append(row)
+        return archived

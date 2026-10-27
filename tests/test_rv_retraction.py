@@ -241,6 +241,95 @@ def test_evolution_bridge_known_proxy_association_does_not_imply_self_reference(
     assert "does not establish a mechanism or causation" in result["summary"]
 
 
+def _restore_evolution_archive(rows):
+    bridge = EvolutionBridge()
+    identity_fields = ("model_name", "early_layer", "late_layer", "measurement_details")
+    for row in rows:
+        metadata = {key: row[key] for key in identity_fields if key in row}
+        bridge.add_record(
+            row["cycle_id"], row["rv"], row["fitness"], row["rv_source"],
+            metadata=metadata, measurement_kind=row["measurement_kind"],
+        )
+    return bridge
+
+
+@pytest.mark.parametrize("kind", ["residual_hidden", "behavioral_proxy"])
+def test_evolution_bridge_archive_round_trip_preserves_comparable_statistics(kind):
+    bridge = EvolutionBridge()
+    metadata = evolution_metadata(kind)
+    for index in range(3):
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind=kind, metadata=metadata,
+        )
+    before = bridge.correlate()
+    archived = json.loads(json.dumps(bridge.format_for_archive()))
+    restored = _restore_evolution_archive(archived)
+
+    assert before["pearson_r"] == pytest.approx(-1)
+    assert restored.correlate() == before
+    assert [row["rv"] for row in archived] == pytest.approx([0.4, 0.5, 0.6])
+    assert [row["fitness"] for row in archived] == pytest.approx([0.9, 0.8, 0.7])
+    for key in ("model_name", "early_layer", "late_layer", "measurement_details"):
+        assert archived[0][key] == metadata[key]
+
+    owned_archive = bridge.format_for_archive()
+    owned_archive[0]["measurement_details"]["cohort"] = "changed"
+    assert bridge.correlate() == before
+
+
+@pytest.mark.parametrize(
+    ("kind", "override"),
+    [
+        ("residual_hidden", {"measurement_details": {"cohort": "other-cohort"}}),
+        ("residual_hidden", {"model_name": "other-model"}),
+        ("residual_hidden", {"early_layer": 3}),
+        ("residual_hidden", {"late_layer": 21}),
+        ("behavioral_proxy", {"measurement_details": {"cohort": "evolution-fixture", "formula": "other"}}),
+    ],
+)
+def test_evolution_bridge_archive_round_trip_withholds_mixed_identity(kind, override):
+    bridge = EvolutionBridge()
+    for index in range(3):
+        metadata = evolution_metadata(kind)
+        if index == 2:
+            metadata.update(override)
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind=kind, metadata=metadata,
+        )
+    archived = json.loads(json.dumps(bridge.format_for_archive()))
+    restored = _restore_evolution_archive(archived)
+
+    assert restored.correlate()["pearson_r"] is None
+    assert restored.correlate()["rv_trend"] is None
+    assert [row["rv"] for row in restored.format_for_archive()] == pytest.approx([0.4, 0.5, 0.6])
+    assert [row["fitness"] for row in restored.format_for_archive()] == pytest.approx([0.9, 0.8, 0.7])
+
+
+@pytest.mark.parametrize(
+    ("kind", "metadata"),
+    [
+        ("unknown", None),
+        ("residual_hidden", {"model_name": "fixture", "measurement_details": {"cohort": "evolution-fixture"}}),
+    ],
+)
+def test_evolution_bridge_archive_round_trip_does_not_invent_missing_identity(kind, metadata):
+    bridge = EvolutionBridge()
+    for index in range(3):
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind=kind, metadata=metadata,
+        )
+    archived = json.loads(json.dumps(bridge.format_for_archive()))
+    restored = _restore_evolution_archive(archived)
+
+    assert restored.correlate()["pearson_r"] is None
+    assert all("early_layer" not in row and "late_layer" not in row for row in archived)
+    assert [row["rv"] for row in restored.format_for_archive()] == pytest.approx([0.4, 0.5, 0.6])
+    assert [row["fitness"] for row in restored.format_for_archive()] == pytest.approx([0.9, 0.8, 0.7])
+
+
 def test_evolution_bridge_constant_comparable_series_reports_stable_trends():
     bridge = EvolutionBridge()
     for index in range(3):
