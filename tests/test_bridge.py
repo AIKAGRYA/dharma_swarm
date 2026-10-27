@@ -8,7 +8,6 @@ ResearchBridge CRUD and JSONL persistence, and edge cases.
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
 import pytest
@@ -22,8 +21,8 @@ from dharma_swarm.bridge import (
     _rank,
     _spearman_rho,
 )
-from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer, RecognitionType
-from dharma_swarm.rv import RV_CONTRACTION_THRESHOLD, RVReading
+from dharma_swarm.metrics import BehavioralSignature, RecognitionType
+from dharma_swarm.rv import RVReading
 
 
 # -- Helpers -----------------------------------------------------------------

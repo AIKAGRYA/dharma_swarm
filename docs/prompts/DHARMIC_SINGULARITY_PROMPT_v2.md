@@ -373,7 +373,7 @@ F₃: Cont → Geom     (contemplative state → geometric measurement)
 | R_V measurements | ~480 | Phase 1 report (7 architectures) |
 | Cohen's d (Mistral L27) | -3.558 | Causal validation (n=45 pairs) |
 | Cohen's d (Pythia) | -4.51 | Repository dissection |
-| AUROC | 0.909 | Mistral threshold validation |
+| AUROC | 0.909 | Mistral same-sample calibration (not held-out validation) |
 | Effect range | 3.3% - 24.3% | Phase 1 (6 architectures) |
 | Transfer efficiency | 117.8% | L27 activation patching |
 
@@ -383,7 +383,7 @@ F₃: Cont → Geom     (contemplative state → geometric measurement)
 |-------|-------|---------------|----------------|
 | L1_hint | 20 | Mild self-reference | R_V ≈ 1.0 |
 | L3_deeper | 20 | Strong recursion | R_V contracting |
-| L4_full | 20 | Collapse induction | R_V < 0.737 |
+| L4_full | 20 | Collapse induction | Raw R_V ratio; calibrated classification unavailable |
 | L5_refined | 20 | Fixed point (Sx = x) | R_V strongly < 1.0 |
 | Baseline | 20 | No self-reference | R_V ≈ 1.0 |
 | Confounds | 60 | Complexity without recursion | R_V ≈ 1.0 |

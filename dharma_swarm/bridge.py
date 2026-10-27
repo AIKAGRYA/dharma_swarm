@@ -324,8 +324,8 @@ class ResearchBridge:
         Correlates R_V values against swabhaav_ratio from behavioral analysis.
 
         Returns:
-            CorrelationResult with Pearson r, Spearman rho, group means,
-            contraction/recognition overlap, and a human-readable summary.
+            CorrelationResult with Pearson r, Spearman rho, comparable group means,
+            unavailable classification overlap, and a human-readable summary.
         """
         paired = [m for m in self._measurements if m.rv_reading is not None]
         n = len(paired)

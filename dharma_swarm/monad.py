@@ -166,7 +166,7 @@ class ObservedState(Generic[S]):
 
     @property
     def rv(self) -> float:
-        """R_V value, defaulting to 1.0 (no contraction) if unmeasured."""
+        """R_V value, using the legacy numeric default 1.0 if unmeasured."""
         return self.rv_measurement if self.rv_measurement is not None else 1.0
 
     def to_dict(

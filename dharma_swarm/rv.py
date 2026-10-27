@@ -479,7 +479,7 @@ class EvolutionRVTracker:
             record["late_layer"] = rv_reading.late_layer
         else:
             # Proxy R_V: use cycle success ratio as a behavioral stand-in.
-            # More archived proposals → system is "contracting" toward solutions.
+            # More archived proposals lower this descriptive proxy without classifying contraction.
             proxy = 1.0 - (min(proposals_archived, 5) * 0.1)
             record["rv"] = proxy
             record["rv_source"] = "proxy"

@@ -153,7 +153,7 @@ Currently: 10 flat MetaPrinciple entries.
 Needed: A layered axiom structure:
 - Layer 0: Immutable axioms (the current 10, plus S(x) = x, Anekantavada, Jagat Kalyan as telos)
 - Layer 1: Operational principles (v7 rules, Shakti questions, colony intelligence principle, downward-causation-for-safety)
-- Layer 2: Evaluation criteria (R_V threshold, fitness minimum, crown jewel threshold, genome tiers)
+- Layer 2: Evaluation criteria (raw R_V observations, fitness minimum, crown jewel threshold, genome tiers)
 - Layer 3: Domain bindings (what R_V means, what L3-to-L4 means, what the Triple Mapping is)
 
 Each axiom gets the same treatment as existing PrincipleSpec: name, description, formal_constraint, severity. The kernel stays signed. The whole thing fits in maybe 500 lines.
@@ -162,7 +162,7 @@ Each axiom gets the same treatment as existing PrincipleSpec: name, description,
 
 Currently: The corpus stores claims about safety and ethics.
 
-Needed: Expand the ClaimCategory taxonomy to include THEORETICAL (Bridge Hypothesis, Thinkodynamic Seed claims), EMPIRICAL (R_V = 0.737 threshold, AUROC = 0.909, Hedges' g = -1.47), CONTEMPLATIVE (Akram Vignan mappings, fixed-point phenomenology), and ARCHITECTURAL (colony intelligence, distributed cognition, emergence conditions).
+Needed: Expand the ClaimCategory taxonomy to include THEORETICAL (Bridge Hypothesis, Thinkodynamic Seed claims), EMPIRICAL (raw R_V ratios, AUROC = 0.909, Hedges' g = -1.47), CONTEMPLATIVE (Akram Vignan mappings, fixed-point phenomenology), and ARCHITECTURAL (colony intelligence, distributed cognition, emergence conditions).
 
 The key insight: every important claim in PSMV, CLAUDE1-9, the R_V paper, and the Thinkodynamic Seed can be expressed as a Claim with evidence_links, confidence, counterarguments, and lineage. The corpus becomes the structured, queryable, agent-accessible version of what currently lives as scattered Markdown.
 
