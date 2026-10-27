@@ -153,6 +153,54 @@ def test_observation_window_withholds_unavailable_rv_trend(
     assert window.fitness_trend == pytest.approx(0.2)
 
 
+@pytest.mark.parametrize("field", ["rv", "best_fitness"])
+@pytest.mark.parametrize(
+    ("value", "valid"),
+    [
+        pytest.param(None, False, id="null"),
+        pytest.param("bad", False, id="nonnumeric"),
+        pytest.param(True, False, id="true"),
+        pytest.param(False, False, id="false"),
+        pytest.param(float("nan"), False, id="nan"),
+        pytest.param(float("inf"), False, id="positive-infinity"),
+        pytest.param(-float("inf"), False, id="negative-infinity"),
+        pytest.param(10**400, False, id="oversized-int"),
+        pytest.param("missing", False, id="missing"),
+        pytest.param(0.5, True, id="valid-float"),
+        pytest.param(2, True, id="valid-int"),
+    ],
+)
+def test_observation_window_preserves_legacy_rows_without_invalid_trends(field, value, valid):
+    window = ObservationWindow(max_size=5)
+    records = []
+    for index in range(3):
+        record = {
+            "cycle_id": f"c{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": 0.7 + index * 0.1,
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": "dse-fixture", "formula": "raw"},
+        }
+        if index == 1:
+            if value == "missing":
+                del record[field]
+            else:
+                record[field] = value
+        records.append(record)
+
+    for record in records:
+        window.append(record)
+
+    assert window.observations == records
+    affected_trend = window.rv_trend if field == "rv" else window.fitness_trend
+    unaffected_trend = window.fitness_trend if field == "rv" else window.rv_trend
+    assert unaffected_trend == pytest.approx(0.1)
+    if valid:
+        assert affected_trend == pytest.approx(0.1)
+    else:
+        assert affected_trend is None
+
+
 async def test_after_cycle_persists_replayable_current_cycle_observation(tmp_path):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",

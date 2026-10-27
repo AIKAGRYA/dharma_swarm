@@ -1120,6 +1120,7 @@ def test_evolution_bridge_known_proxy_association_does_not_imply_self_reference(
         pytest.param(float("nan"), id="nan"),
         pytest.param(float("inf"), id="positive-infinity"),
         pytest.param(-float("inf"), id="negative-infinity"),
+        pytest.param(10**400, id="oversized-int"),
         pytest.param(0.55, id="valid"),
     ],
 )

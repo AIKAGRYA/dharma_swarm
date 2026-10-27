@@ -196,16 +196,25 @@ class ObservationWindow(BaseModel):
     rv_trajectory: list[float] = Field(default_factory=list)
     fitness_trajectory: list[float] = Field(default_factory=list)
 
+    @staticmethod
+    def _measurement_float(value: Any) -> float | None:
+        if type(value) not in (int, float):
+            return None
+        try:
+            return float(value)
+        except OverflowError:
+            return None
+
     def _refresh_trajectories(self) -> None:
         self.rv_trajectory = [
-            float(record["rv"])
+            value
             for record in self.observations
-            if record.get("rv") is not None
+            if (value := self._measurement_float(record.get("rv"))) is not None
         ]
         self.fitness_trajectory = [
-            float(record["best_fitness"])
+            value
             for record in self.observations
-            if record.get("best_fitness") is not None
+            if (value := self._measurement_float(record.get("best_fitness"))) is not None
         ]
 
     def append(self, record: dict[str, Any]) -> None:
@@ -216,24 +225,30 @@ class ObservationWindow(BaseModel):
 
     @property
     def rv_trend(self) -> float | None:
-        records = [
-            record for record in self.observations if record.get("rv") is not None
-        ]
-        if len(records) < 2:
+        if len(self.observations) < 2:
             return None
-        readings = [record.get("rv_reading") or record for record in records]
-        if comparable_measurement_identity(readings) is None:
+        readings = [record.get("rv_reading") or record for record in self.observations]
+        values = [self._measurement_float(record.get("rv")) for record in self.observations]
+        if comparable_measurement_identity(readings) is None or any(
+            value is None or not math.isfinite(value) for value in values
+        ):
             return None
-        if not all(map(math.isfinite, self.rv_trajectory)):
-            return None
-        diffs = [b - a for a, b in zip(self.rv_trajectory, self.rv_trajectory[1:])]
+        rv_values = [value for value in values if value is not None]
+        diffs = [b - a for a, b in zip(rv_values, rv_values[1:])]
         return sum(diffs) / len(diffs)
 
     @property
     def fitness_trend(self) -> float | None:
-        if len(self.fitness_trajectory) < 2:
+        if len(self.observations) < 2:
             return None
-        diffs = [b - a for a, b in zip(self.fitness_trajectory, self.fitness_trajectory[1:])]
+        values = [
+            self._measurement_float(record.get("best_fitness"))
+            for record in self.observations
+        ]
+        if any(value is None or not math.isfinite(value) for value in values):
+            return None
+        fitness_values = [value for value in values if value is not None]
+        diffs = [b - a for a, b in zip(fitness_values, fitness_values[1:])]
         return sum(diffs) / len(diffs)
 
 

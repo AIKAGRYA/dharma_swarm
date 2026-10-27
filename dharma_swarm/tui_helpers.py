@@ -489,12 +489,18 @@ def build_darwin_status_text(
             if str(row.get("component") or "").strip()
         }
         rv_readings = [row.get("rv_reading") or row for row in dse_rows]
-        rv_candidates = [_maybe_float(row.get("rv")) for row in dse_rows]
+        rv_candidates = [row.get("rv") for row in dse_rows]
         rv_values: list[float] = []
         if comparable_measurement_identity(rv_readings) is not None and all(
-            value is not None and math.isfinite(value) for value in rv_candidates
+            type(value) in (int, float) for value in rv_candidates
         ):
-            rv_values = [value for value in rv_candidates if value is not None]
+            try:
+                converted_rv_values = [float(value) for value in rv_candidates]
+            except OverflowError:
+                pass
+            else:
+                if all(math.isfinite(value) for value in converted_rv_values):
+                    rv_values = converted_rv_values
         fitness_values = [
             value
             for row in dse_rows

@@ -582,12 +582,17 @@ class EvolutionBridge:
                 "summary": f"Need >= 3 cycles for correlation (have {len(self._records)}).",
             }
 
-        rv_values = [r["rv"] for r in self._records]
-        fitness_values = [r["fitness"] for r in self._records]
-        if any(
-            type(value) not in (int, float) or not math.isfinite(value)
-            for value in rv_values + fitness_values
-        ):
+        raw_values = [r["rv"] for r in self._records] + [
+            r["fitness"] for r in self._records
+        ]
+        try:
+            if any(type(value) not in (int, float) for value in raw_values):
+                raise ValueError
+            rv_values = [float(r["rv"]) for r in self._records]
+            fitness_values = [float(r["fitness"]) for r in self._records]
+            if any(not math.isfinite(value) for value in rv_values + fitness_values):
+                raise ValueError
+        except (OverflowError, ValueError):
             return {
                 "n": len(self._records), "pearson_r": None, "spearman_rho": None,
                 "rv_trend": None, "fitness_trend": None,

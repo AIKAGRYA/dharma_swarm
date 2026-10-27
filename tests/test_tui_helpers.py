@@ -453,6 +453,60 @@ def test_build_darwin_status_text_withholds_incomparable_rv_mean(
     assert "avg_rv=" not in result
 
 
+@pytest.mark.parametrize(
+    ("value", "expected_mean"),
+    [
+        pytest.param(None, None, id="null"),
+        pytest.param("bad", None, id="nonnumeric"),
+        pytest.param(True, None, id="true"),
+        pytest.param(False, None, id="false"),
+        pytest.param(float("nan"), None, id="nan"),
+        pytest.param(float("inf"), None, id="positive-infinity"),
+        pytest.param(-float("inf"), None, id="negative-infinity"),
+        pytest.param(10**400, None, id="oversized-int"),
+        pytest.param("missing", None, id="missing"),
+        pytest.param(0.5, "0.50", id="valid-float"),
+        pytest.param(2, "1.00", id="valid-int"),
+    ],
+)
+def test_build_darwin_status_text_preserves_legacy_rows_without_invalid_rv_mean(
+    tmp_path,
+    monkeypatch,
+    value,
+    expected_mean,
+):
+    measurement = _dse_measurement()
+    rows = [
+        {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": 0.6,
+            **measurement,
+        }
+        for index in range(3)
+    ]
+    if value == "missing":
+        del rows[1]["rv"]
+    else:
+        rows[1]["rv"] = value
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=3" in result
+    assert "avg_fitness=0.60" in result
+    if expected_mean is None:
+        assert "avg_rv=" not in result
+    else:
+        assert f"avg_rv={expected_mean}" in result
+
+
 def test_build_darwin_status_text_reports_reciprocity_summary(tmp_path, monkeypatch):
     import dharma_swarm.tui_helpers as helpers
 
