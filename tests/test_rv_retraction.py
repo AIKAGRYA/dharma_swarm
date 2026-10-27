@@ -920,6 +920,34 @@ async def test_tracker_comparable_finite_legacy_numbers_return_exact_statistics(
     assert path.read_bytes() == before
 
 
+@pytest.mark.parametrize(
+    "rv_values",
+    [[1e308, 1e308, -1e308], [1e308, -1e308]],
+)
+async def test_tracker_nonfinite_derived_trend_is_unavailable(tmp_path, rv_values):
+    fitness_values = [0.9 - index * 0.1 for index in range(len(rv_values))]
+    records = [
+        {
+            "cycle_id": str(index),
+            "rv": rv,
+            "best_fitness": fitness_values[index],
+            "measurement_kind": "residual_hidden",
+            **evolution_metadata("residual_hidden"),
+        }
+        for index, rv in enumerate(rv_values)
+    ]
+    before = "".join(f"{json.dumps(record)}\n" for record in records).encode()
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_bytes(before)
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+
+    assert tracker.get_rv_fitness_pairs() == list(zip(rv_values, fitness_values))
+    assert tracker.get_trend() is None
+    assert [row["rv"] for row in tracker.get_readings()] == rv_values
+    assert path.read_bytes() == before
+
+
 async def test_tracker_large_integer_ranks_and_raw_values_remain_exact(tmp_path):
     rv_values = [2**53, 2**53 + 1, 2**53 + 2]
     records = [
@@ -1187,6 +1215,33 @@ def test_evolution_bridge_numeric_guard_preserves_raw_archive(field, value):
     unaffected = "fitness" if field == "rv" else "rv"
     expected = [0.9, 0.8, 0.7] if unaffected == "fitness" else [0.4, 0.5, 0.6]
     assert [row[unaffected] for row in archived] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("field", ["rv", "fitness"])
+def test_evolution_bridge_withholds_only_uncomputable_extreme_statistics(field):
+    extreme_values = [1e308, 1e308, -1e308]
+    bridge = EvolutionBridge()
+    for index in range(3):
+        values = {"rv": 0.4 + index * 0.1, "fitness": 0.9 - index * 0.1}
+        values[field] = extreme_values[index]
+        bridge.add_record(
+            str(index), values["rv"], values["fitness"],
+            measurement_kind="behavioral_proxy",
+            metadata=evolution_metadata("behavioral_proxy"),
+        )
+    archived = bridge.format_for_archive()
+
+    result = bridge.correlate()
+
+    unaffected = "fitness" if field == "rv" else "rv"
+    expected_trend = -0.1 if unaffected == "fitness" else 0.1
+    assert result["n"] == 3
+    assert result["pearson_r"] is None
+    assert result["spearman_rho"] == pytest.approx((1 if field == "rv" else -1) * 3**0.5 / 2)
+    assert result[f"{field}_trend"] is None
+    assert result[f"{unaffected}_trend"] == pytest.approx(expected_trend)
+    assert [row[field] for row in archived] == extreme_values
+    assert bridge.format_for_archive() == archived
 
 
 @pytest.mark.parametrize("field", ["rv", "fitness"])

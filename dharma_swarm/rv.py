@@ -542,12 +542,18 @@ class EvolutionRVTracker:
         n = len(rv_values)
         xs = list(range(n))
         mean_x = sum(xs) / n
-        mean_y = sum(rv_values) / n
-        num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, rv_values))
-        den = sum((x - mean_x) ** 2 for x in xs)
-        if abs(den) < 1e-12:
-            return 0.0
-        return num / den
+        try:
+            mean_y = sum(rv_values) / n
+            num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, rv_values))
+            den = sum((x - mean_x) ** 2 for x in xs)
+            if abs(den) < 1e-12:
+                return 0.0
+            trend = num / den
+            if not math.isfinite(trend):
+                return None
+            return trend
+        except ArithmeticError:
+            return None
 
     async def _persist(self, record: dict[str, Any]) -> None:
         """Append record to JSONL file. Failures are silently swallowed."""

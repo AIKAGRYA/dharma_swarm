@@ -599,13 +599,20 @@ class EvolutionBridge:
                 "summary": "Statistics unavailable: invalid or nonfinite observations. Raw records retained.",
             }
 
-        pearson = _pearson_r(rv_values, fitness_values)
-        spearman = _spearman_rho(rv_values, fitness_values)
+        def finite_statistic(operation, *args):
+            try:
+                value = operation(*args)
+                if value is not None and not math.isfinite(value):
+                    return None
+                return value
+            except ArithmeticError:
+                return None
 
-        # Trends
+        pearson = finite_statistic(_pearson_r, rv_values, fitness_values)
+        spearman = finite_statistic(_spearman_rho, rv_values, fitness_values)
         n = len(rv_values)
-        rv_trend = self._slope(rv_values)
-        fitness_trend = self._slope(fitness_values)
+        rv_trend = finite_statistic(self._slope, rv_values)
+        fitness_trend = finite_statistic(self._slope, fitness_values)
 
         summary_parts = [f"n={n} evolution cycles."]
         if pearson is not None:
