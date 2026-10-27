@@ -563,11 +563,17 @@ def build_darwin_status_text(
         dse_summary = [f"observations={len(dse_rows)}"]
         if components:
             dse_summary.append(f"components={len(components)}")
-        avg_rv = _mean(rv_values)
-        if avg_rv is not None:
+        try:
+            avg_rv = _mean(rv_values)
+        except ArithmeticError:
+            avg_rv = None
+        if avg_rv is not None and math.isfinite(avg_rv):
             dse_summary.append(f"avg_rv={avg_rv:.2f}")
-        avg_fitness = _mean(fitness_values)
-        if avg_fitness is not None:
+        try:
+            avg_fitness = _mean(fitness_values)
+        except ArithmeticError:
+            avg_fitness = None
+        if avg_fitness is not None and math.isfinite(avg_fitness):
             dse_summary.append(f"avg_fitness={avg_fitness:.2f}")
         lines.append("    " + "  ".join(dse_summary))
 

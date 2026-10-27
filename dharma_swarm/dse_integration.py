@@ -234,8 +234,12 @@ class ObservationWindow(BaseModel):
         ):
             return None
         rv_values = [value for value in values if value is not None]
-        diffs = [b - a for a, b in zip(rv_values, rv_values[1:])]
-        return sum(diffs) / len(diffs)
+        try:
+            diffs = [b - a for a, b in zip(rv_values, rv_values[1:])]
+            trend = sum(diffs) / len(diffs)
+        except ArithmeticError:
+            return None
+        return trend if math.isfinite(trend) else None
 
     @property
     def fitness_trend(self) -> float | None:
@@ -248,8 +252,12 @@ class ObservationWindow(BaseModel):
         if any(value is None or not math.isfinite(value) for value in values):
             return None
         fitness_values = [value for value in values if value is not None]
-        diffs = [b - a for a, b in zip(fitness_values, fitness_values[1:])]
-        return sum(diffs) / len(diffs)
+        try:
+            diffs = [b - a for a, b in zip(fitness_values, fitness_values[1:])]
+            trend = sum(diffs) / len(diffs)
+        except ArithmeticError:
+            return None
+        return trend if math.isfinite(trend) else None
 
 
 class CoordinationSnapshot(BaseModel):

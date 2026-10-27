@@ -201,6 +201,35 @@ def test_observation_window_preserves_legacy_rows_without_invalid_trends(field, 
         assert affected_trend is None
 
 
+@pytest.mark.parametrize("field", ["rv", "best_fitness"])
+def test_observation_window_withholds_nonfinite_derived_trends(field):
+    window = ObservationWindow(max_size=5)
+    records = []
+    for index, value in enumerate([1e308, 1e308, -1e308]):
+        record = {
+            "cycle_id": f"c{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": 0.7 + index * 0.1,
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": "dse-fixture", "formula": "raw"},
+        }
+        record[field] = value
+        records.append(record)
+
+    for record in records:
+        window.append(record)
+
+    affected_trend = window.rv_trend if field == "rv" else window.fitness_trend
+    unaffected_trend = window.fitness_trend if field == "rv" else window.rv_trend
+    affected_trajectory = (
+        window.rv_trajectory if field == "rv" else window.fitness_trajectory
+    )
+    assert affected_trend is None
+    assert unaffected_trend == pytest.approx(0.1)
+    assert affected_trajectory == [1e308, 1e308, -1e308]
+    assert window.observations == records
+
+
 async def test_after_cycle_persists_replayable_current_cycle_observation(tmp_path):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
