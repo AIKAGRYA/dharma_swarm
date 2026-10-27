@@ -28,7 +28,7 @@ PHI_PLUS_1 = PHI + 1  # ≈ 2.618 — URA finding: L3/L4 word count ratio
 
 from pydantic import BaseModel, Field, model_validator
 
-from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer, RecognitionType
+from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
 from dharma_swarm.models import _new_id
 from dharma_swarm.rv import RV_CALIBRATION_STATUS, MeasurementKind, RVReading, _prompt_hash
 
@@ -67,7 +67,8 @@ class CorrelationResult(BaseModel):
         spearman_rho: Spearman rank correlation between R_V and swabhaav_ratio.
         mean_rv_by_group: Mean R_V value per prompt group.
         mean_swabhaav_by_group: Mean swabhaav_ratio per prompt group.
-        contraction_recognition_overlap: Fraction where is_contracted AND GENUINE.
+        contraction_recognition_overlap: Always None; no calibrated classification exists.
+        historical_contraction_recognition_overlap: Old serialized aggregate, history only.
         summary: Human-readable interpretation of results.
         pearson_r_ci: Bootstrap 95% CI for Pearson r, or None if n < 3.
         spearman_rho_ci: Bootstrap 95% CI for Spearman rho, or None if n < 3.
@@ -340,19 +341,7 @@ class ResearchBridge:
                 m.behavioral.swabhaav_ratio for m in members
             )
 
-        # Contraction-recognition overlap
-        classifiable = [m for m in paired if m.rv_reading.is_contracted is not None]
-        contracted_and_genuine = sum(
-            1
-            for m in classifiable
-            if m.rv_reading is not None
-            and m.rv_reading.is_contracted
-            and m.behavioral.recognition_type == RecognitionType.GENUINE
-        )
-        overlap = contracted_and_genuine / len(classifiable) if classifiable else None
-
-        # Summary
-        summary = self._build_summary(n, pearson, spearman, overlap)
+        summary = self._build_summary(n, pearson, spearman, overlap=None)
         summary += f" Measurement kind: {next(iter(kinds))}; descriptive association only."
 
         return CorrelationResult(
@@ -361,8 +350,8 @@ class ResearchBridge:
             spearman_rho=spearman,
             mean_rv_by_group=mean_rv,
             mean_swabhaav_by_group=mean_swabhaav,
-            contraction_recognition_overlap=overlap,
-            classification_count=len(classifiable),
+            contraction_recognition_overlap=None,
+            classification_count=0,
             measurement_kind_counts=kinds,
             summary=summary,
         )
@@ -550,7 +539,7 @@ class EvolutionBridge:
             and summary string.
         """
         kinds = dict(Counter(r["measurement_kind"] for r in self._records))
-        if len(kinds) != 1 or "unknown" in kinds:
+        if kinds and (len(kinds) != 1 or "unknown" in kinds):
             return {
                 "n": len(self._records), "pearson_r": None, "spearman_rho": None,
                 "rv_trend": None, "fitness_trend": None,
@@ -563,6 +552,8 @@ class EvolutionBridge:
                 "n": len(self._records),
                 "pearson_r": None,
                 "spearman_rho": None,
+                "rv_trend": None,
+                "fitness_trend": None,
                 "measurement_kind_counts": kinds,
                 "calibration_status": RV_CALIBRATION_STATUS,
                 "summary": f"Need >= 3 cycles for correlation (have {len(self._records)}).",

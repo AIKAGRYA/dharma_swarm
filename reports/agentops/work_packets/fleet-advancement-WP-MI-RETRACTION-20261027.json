@@ -1,9 +1,9 @@
 {
   "id": "fleet-advancement-WP-MI-RETRACTION-20261027",
   "base_ref": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
-  "branch": "codex/fleet-advancement-mi-retraction-20261027",
+  "branch": "codex/fleet-advancement-mi-admission-20261028",
   "worktree": ".",
-  "intent": "Carry the September MI retraction into actual runtime consumers under ordered READOUT item10. Preserve raw numeric observations and historical loadability; report retired-threshold classification as unknown and distinguish residual-hidden, colony and behavioral-proxy measurements. Remove claims that .737 is validated without replacing it with a different validated threshold. Report unavailable downstream classification honestly. No research, provider calls, services, Raiei, trading, portfolio rewrite or merge. Narrow behavioral tests and independent review precede the required no-mistakes delivery gate. Ordered item14 now explicitly authorizes only a verified DocOps freshness repair needed for normal commit: regenerate actual manifest count tokens and managed inventory blocks, then set assertions.verified_at to the actual verification date after evidence; preserve TTL14 and every guard. Exact additional allowed paths are docs/docops/assertions.yaml, docs/governance/SOVEREIGN_MANIFEST.md and docs/docops/AUTO_INVENTORY.md. All other governance paths remain outside the exact allowed scope. No history rewrite, broad secret allowlist, ref deletion, hook bypass or shipping while the unresolved mandatory repository-history scan is failed.",
+  "intent": "Carry the September MI retraction into actual runtime consumers under ordered READOUT item10. Preserve raw numeric observations and historical loadability; report retired-threshold classification as unknown and distinguish residual-hidden, colony and behavioral-proxy measurements. Remove claims that .737 is validated without replacing it with a different validated threshold. Report unavailable downstream classification honestly. No research, provider calls, services, Raiei, trading, portfolio rewrite or merge. Narrow behavioral tests and independent review precede the required no-mistakes delivery gate. Ordered item14 now explicitly authorizes only a verified DocOps freshness repair needed for normal commit: regenerate actual manifest count tokens and managed inventory blocks, then set assertions.verified_at to the actual verification date after evidence; preserve TTL14 and every guard. Exact additional allowed paths are docs/docops/assertions.yaml, docs/governance/SOVEREIGN_MANIFEST.md and docs/docops/AUTO_INVENTORY.md. All other governance paths remain outside the exact allowed scope. No history rewrite, broad secret allowlist, ref deletion, hook bypass or shipping while the unresolved mandatory repository-history scan is failed. Active AXI review F1-F5 are authorized bounded direct-consumer fixes: update the integration fixtures and nullable overlap assertions; remove the Gaia demo retired-threshold verdict in favor of unavailable classification while retaining raw values; correct empty EvolutionBridge summary; remove dead current-overlap computation while preserving historical overlap serialization. Only tests/test_integration.py and scripts/gaia_demo.py are added to scope. F6 other historical categorical-analysis functions are explicitly deferred. No secret-scan policy/config edits. The exact clean d2 admission branch delegates these fixes to existing native run 01M5YYQX0Z9Y0PSVNMKKSA6PDR at descendant0c1bf841; after terminal custody resolution, this admission branch is the exact closeout target.",
   "allowed_files": [
     "dharma_swarm/rv.py",
     "dharma_swarm/monad.py",
@@ -24,7 +24,9 @@
     "reports/agentops/work_packets/fleet-advancement-WP-MI-RETRACTION-20261027.json",
     "docs/docops/assertions.yaml",
     "docs/governance/SOVEREIGN_MANIFEST.md",
-    "docs/docops/AUTO_INVENTORY.md"
+    "docs/docops/AUTO_INVENTORY.md",
+    "tests/test_integration.py",
+    "scripts/gaia_demo.py"
   ],
   "forbidden_files": [
     ".github/**",
@@ -39,7 +41,7 @@
   "gates": [
     {
       "name": "mi-contract-consumers",
-      "command": "python3 -m pytest -q tests/test_rv.py tests/test_monad_laws.py tests/test_bridge.py tests/test_ouroboros.py tests/test_rv_retraction.py",
+      "command": "python3 -m pytest -q tests/test_rv.py tests/test_monad_laws.py tests/test_bridge.py tests/test_ouroboros.py tests/test_rv_retraction.py tests/test_integration.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -107,7 +109,9 @@
       "scripts/docops/check_docops_integrity.py",
       "docs/docops/assertions.yaml",
       "docs/governance/SOVEREIGN_MANIFEST.md",
-      "docs/docops/AUTO_INVENTORY.md"
+      "docs/docops/AUTO_INVENTORY.md",
+      "tests/test_integration.py",
+      "scripts/gaia_demo.py"
     ],
     "honest_blockers": [
       "This correction does not validate any scientific threshold, consciousness inference or new measurement instrument.",
@@ -115,9 +119,10 @@
       "Main checkout staged restart-race work belongs to another lane and is excluded.",
       "No scientific campaign or active service is restarted; no merge is authorized.",
       "Item14 scope expansion permits only three DocOps files plus admission metadata; no TTL/guard weakening.",
-      "Mandatory repository-wide history gitleaks reports10 pre-existing findings on other refs; this refresh does not resolve that check and cannot authorize push."
+      "Mandatory repository-wide history gitleaks reports10 pre-existing findings on other refs; this refresh does not resolve that check and cannot authorize push.",
+      "Preflight runs on the named admission branch at original d2 baseline; native detached gate is not claimed to pass its own branch-bound preflight or closeout. Native pipeline alone applies the admitted changes; final closeout must run on this exact admission branch after terminal sanctioned custody recovery and fast-forward."
     ],
     "rollback": "Revert only the packet-scoped commit after recording the correction rationale; no runtime data or service state is changed.",
-    "packet_digest": "0a4b8270fdbe4c5bb6bdf154fea1f8bf85e48ed1c399960e8202b0b599d2bce7"
+    "packet_digest": "073ee2fd7936ebfb2856fadb085fe5db4eab6e7b21d50810849b8a9adda1af5a"
   }
 }

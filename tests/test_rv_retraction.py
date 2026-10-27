@@ -1,6 +1,7 @@
 """Public behavior for retired scientific classification and measurement custody."""
 
 import json
+from typing import get_args
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -9,7 +10,7 @@ from pydantic import ValidationError
 from dharma_swarm.bridge import CorrelationResult, EvolutionBridge, ResearchBridge
 from dharma_swarm.monad import ObservedState
 from dharma_swarm.ouroboros import colony_rv_reading
-from dharma_swarm.rv import EvolutionRVTracker, RVReading
+from dharma_swarm.rv import EvolutionRVTracker, MeasurementKind, RVReading
 
 
 def reading(value=0.6, kind="unknown"):
@@ -168,6 +169,62 @@ def test_evolution_bridge_rejects_unknown_kind_token():
     with pytest.raises(ValueError):
         bridge.add_record("bad", 0.2, 0.8, measurement_kind="validated-awareness")
     assert bridge.format_for_archive() == []
+
+
+def test_evolution_bridge_empty_and_short_known_kind_report_insufficient_cycles():
+    bridge = EvolutionBridge()
+    empty = bridge.correlate()
+    assert empty["n"] == 0
+    assert empty["pearson_r"] is None
+    assert empty["rv_trend"] is None
+    assert empty["measurement_kind_counts"] == {}
+    assert "have 0" in empty["summary"]
+    for index in range(2):
+        bridge.add_record(str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+                          measurement_kind="residual_hidden")
+    short = bridge.correlate()
+    assert short["n"] == 2
+    assert short["pearson_r"] is None
+    assert short["rv_trend"] is None
+    assert short["measurement_kind_counts"] == {"residual_hidden": 2}
+    assert "have 2" in short["summary"]
+
+
+def test_evolution_bridge_short_unknown_kind_is_withheld_not_pooled():
+    bridge = EvolutionBridge()
+    bridge.add_record("legacy", 0.4, 0.9)
+    result = bridge.correlate()
+    assert result["n"] == 1
+    assert result["pearson_r"] is None
+    assert result["measurement_kind_counts"] == {"unknown": 1}
+    assert "have 1" not in result["summary"]
+    assert "unknown" in result["summary"]
+
+
+def test_gaia_demo_prints_raw_ratio_and_unavailable_classification(monkeypatch, capsys):
+    import socket
+
+    from scripts import gaia_demo
+
+    def refuse(*_args, **_kwargs):
+        raise AssertionError("gaia_demo must run offline")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    gaia_demo.main()
+    lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
+
+    def value(prefix):
+        return next(line for line in lines if line.startswith(prefix))[len(prefix):].strip()
+
+    ratio = float(value("R_V-like reading:"))
+    assert 0.0 <= ratio <= 1.0
+    assert float(value("PR_late (after observation):")) == pytest.approx(ratio, abs=1e-3)
+    assert value("Measurement kind:") in get_args(MeasurementKind)
+    assert value("Contraction:").startswith("unavailable")
+    assert value("Strength:").startswith("unavailable")
+    assert not any(line.endswith((" YES", " NO")) for line in lines)
+    assert "contraction detected" not in "\n".join(lines)
 
 
 def test_historical_analysis_emits_numbers_without_retired_inference(monkeypatch, capsys):
