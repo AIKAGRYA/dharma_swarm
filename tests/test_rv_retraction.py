@@ -283,3 +283,63 @@ def test_research_annotation_exposes_retraction_as_contradiction():
     assert len(annotations) == 1
     assert annotations[0].connection_type == ResearchConnectionType.CONTRADICTION
     assert "same-sample calibration lacked held-out validation" in annotations[0].summary
+
+
+def test_field_graph_marks_rv_record_historical_and_unvalidated():
+    from dharma_swarm.field_graph import build_field_graph
+
+    nodes = build_field_graph().find_by_name("dgc-rv-contraction")
+    assert len(nodes) == 1
+    definition = nodes[0].definition
+    assert "Historical, unvalidated" in definition
+    assert "AUROC 0.909" in definition
+    assert "6 architectures" in definition
+    assert ".737 classifier is retired" in definition
+    assert "architectures validated" not in definition
+    assert "AUROC 0.909 discriminating" not in definition
+
+
+def test_research_director_prompt_does_not_promote_retired_classification():
+    from dharma_swarm.agent_constitution import get_agent_spec
+
+    spec = get_agent_spec("research_director")
+    assert spec is not None
+    prompt = spec.system_prompt
+    assert "Historical reports" in prompt
+    assert ".737 classifier is retired" in prompt
+    assert "held-out classification is unavailable" in prompt
+    assert "calibrated intuitions" not in prompt
+    assert "causal validation at L27" not in prompt
+
+
+def test_shakti_rv_contexts_preserve_history_without_current_validation():
+    from scripts.shakti_discovery import build_research_tasks
+
+    tasks = [task for task in build_research_tasks() if task.question.startswith("The R_V paper")]
+    assert len(tasks) == 2
+    contexts = [task.context_builder() for task in tasks]
+    for context in contexts:
+        assert "Historical, unvalidated" in context
+        assert "AUROC=0.909" in context
+        assert ".737 classifier is retired" in context
+        assert "Current results:" not in context
+        assert "Causal validation:" not in context
+        assert "causal validation at L27" not in context
+    assert "Bridge hypothesis (untested)" in contexts[0]
+    assert "held-out classification is unavailable" in contexts[1]
+
+
+async def test_telos_seed_marks_rv_abstract_evidence_historical(tmp_path):
+    from dharma_swarm.telos_graph import TelosGraph
+    from dharma_swarm.telos_substrate import TelosSubstrate
+
+    await TelosSubstrate(state_dir=tmp_path)._seed_telos_graph()
+    graph = TelosGraph(telos_dir=tmp_path / "telos")
+    await graph.load()
+    objective = await graph.get_by_name("RV COLM 2026 Abstract Submission")
+    assert objective is not None
+    description = objective.description
+    assert "Historical, unvalidated" in description
+    assert "Hedges g=-1.47, AUROC=0.909" in description
+    assert ".737 classifier is retired" in description
+    assert "causal at L27" not in description

@@ -946,8 +946,11 @@ TELOS_OBJECTIVES: list[dict[str, Any]] = [
         "progress": 0.9,
         "description": (
             "Submit abstract to COLM 2026. Geometric Signatures of "
-            "Self-Referential Processing. 250 words, key results: "
-            "Hedges g=-1.47, AUROC=0.909, causal at L27."
+            "Self-Referential Processing. 250 words. Historical, unvalidated "
+            "observations include Hedges g=-1.47, AUROC=0.909, and L27 ablation "
+            "results. The .737 classifier is retired after same-sample calibration "
+            "without held-out validation; no validated classification or awareness "
+            "mechanism is established."
         ),
         "target_date": "2026-03-26",
         "metadata": {"domain": "rv_empirical"},
