@@ -1109,6 +1109,59 @@ def test_evolution_bridge_known_proxy_association_does_not_imply_self_reference(
     assert "does not establish a mechanism or causation" in result["summary"]
 
 
+@pytest.mark.parametrize("field", ["rv", "fitness"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(None, id="null"),
+        pytest.param("not-a-number", id="nonnumeric"),
+        pytest.param(True, id="true"),
+        pytest.param(False, id="false"),
+        pytest.param(float("nan"), id="nan"),
+        pytest.param(float("inf"), id="positive-infinity"),
+        pytest.param(-float("inf"), id="negative-infinity"),
+        pytest.param(0.55, id="valid"),
+    ],
+)
+def test_evolution_bridge_numeric_guard_preserves_raw_archive(field, value):
+    bridge = EvolutionBridge()
+    for index in range(3):
+        rv = 0.4 + index * 0.1
+        fitness = 0.9 - index * 0.1
+        if index == 1:
+            if field == "rv":
+                rv = value
+            else:
+                fitness = value
+        bridge.add_record(
+            str(index), rv, fitness,
+            measurement_kind="behavioral_proxy",
+            metadata=evolution_metadata("behavioral_proxy"),
+        )
+    archived = bridge.format_for_archive()
+
+    result = bridge.correlate()
+
+    statistics = ("pearson_r", "spearman_rho", "rv_trend", "fitness_trend")
+    if value == 0.55:
+        assert all(result[key] is not None for key in statistics)
+        assert result["rv_trend"] == pytest.approx(0.1)
+        assert result["fitness_trend"] == pytest.approx(-0.1)
+    else:
+        assert all(result[key] is None for key in statistics)
+    assert result["n"] == 3
+    assert bridge.format_for_archive() == archived
+    actual = archived[1][field]
+    if isinstance(value, float) and value != value:
+        assert actual != actual
+    else:
+        assert actual == value
+        assert type(actual) is type(value)
+    unaffected = "fitness" if field == "rv" else "rv"
+    expected = [0.9, 0.8, 0.7] if unaffected == "fitness" else [0.4, 0.5, 0.6]
+    assert [row[unaffected] for row in archived] == pytest.approx(expected)
+
+
 def _restore_evolution_archive(rows):
     bridge = EvolutionBridge()
     identity_fields = ("model_name", "early_layer", "late_layer", "measurement_details")
