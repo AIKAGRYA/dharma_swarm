@@ -510,13 +510,16 @@ class EvolutionRVTracker:
             (record.get("rv"), record.get("best_fitness"))
             for record in self._readings
         ]
-        if any(
-            type(rv) not in (int, float)
-            or type(fitness) not in (int, float)
-            or not math.isfinite(rv)
-            or not math.isfinite(fitness)
-            for rv, fitness in pairs
-        ):
+        try:
+            if any(
+                type(rv) not in (int, float)
+                or type(fitness) not in (int, float)
+                or not math.isfinite(float(rv))
+                or not math.isfinite(float(fitness))
+                for rv, fitness in pairs
+            ):
+                return []
+        except OverflowError:
             return []
         return pairs
 

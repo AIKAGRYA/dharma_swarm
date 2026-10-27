@@ -217,11 +217,11 @@ class MetaEvolutionEngine:
         value: Any,
         default: float | None = 0.0,
     ) -> float | None:
-        if value is None or isinstance(value, bool):
+        if type(value) not in (int, float):
             return default
         try:
             parsed = float(value)
-        except (TypeError, ValueError):
+        except OverflowError:
             return default
         if not math.isfinite(parsed):
             return default

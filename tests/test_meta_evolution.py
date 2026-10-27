@@ -427,6 +427,8 @@ async def test_default_threshold_evolves_on_flat_fitness(engine_paths, tmp_path,
         {"observation_count": 2},
         {"rv_trend": None, "fitness_trend": None, "approaching_fixed_point": None},
         {"rv_trend": float("nan"), "fitness_trend": float("inf")},
+        {"rv_trend": 10**400, "fitness_trend": 10**400},
+        {"rv_trend": "0.25", "fitness_trend": "0.25"},
         {"rv_trend": "invalid", "fitness_trend": False, "approaching_fixed_point": 0},
     ],
 )
@@ -458,7 +460,7 @@ async def test_meta_cycle_preserves_unavailable_coordination_values(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("rv_trend", [0.0, 0.2, -0.2])
+@pytest.mark.parametrize("rv_trend", [0.0, 0.2, -0.2, 1])
 @pytest.mark.parametrize("verdict", [False, True])
 async def test_meta_cycle_preserves_known_coordination_values(
     engine_paths,

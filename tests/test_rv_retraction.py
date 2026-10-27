@@ -854,6 +854,8 @@ async def test_tracker_returned_record_is_a_private_snapshot(tmp_path):
         pytest.param(float("nan"), id="nan"),
         pytest.param(float("inf"), id="positive-infinity"),
         pytest.param(-float("inf"), id="negative-infinity"),
+        pytest.param(10**400, id="oversized-int"),
+        pytest.param("0.25", id="numeric-text"),
         pytest.param(_MISSING, id="missing"),
     ],
 )
@@ -915,6 +917,30 @@ async def test_tracker_comparable_finite_legacy_numbers_return_exact_statistics(
     assert tracker.get_rv_fitness_pairs() == [(0.4, 0.9), (0.5, 0.8), (0.6, 0.7)]
     assert tracker.get_trend() == pytest.approx(0.1)
     assert [row["rv"] for row in tracker.get_readings()] == [0.4, 0.5, 0.6]
+    assert path.read_bytes() == before
+
+
+async def test_tracker_large_integer_ranks_and_raw_values_remain_exact(tmp_path):
+    rv_values = [2**53, 2**53 + 1, 2**53 + 2]
+    records = [
+        {
+            "cycle_id": str(index),
+            "rv": rv,
+            "best_fitness": 0.9 - index * 0.1,
+            "measurement_kind": "residual_hidden",
+            **evolution_metadata("residual_hidden"),
+        }
+        for index, rv in enumerate(rv_values)
+    ]
+    before = "".join(f"{json.dumps(record)}\n" for record in records).encode()
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_bytes(before)
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+
+    assert tracker.get_rv_fitness_pairs() == list(zip(rv_values, [0.9, 0.8, 0.7]))
+    assert tracker.get_trend() == pytest.approx(1.0)
+    assert [row["rv"] for row in tracker.get_readings()] == rv_values
     assert path.read_bytes() == before
 
 
@@ -1161,6 +1187,29 @@ def test_evolution_bridge_numeric_guard_preserves_raw_archive(field, value):
     unaffected = "fitness" if field == "rv" else "rv"
     expected = [0.9, 0.8, 0.7] if unaffected == "fitness" else [0.4, 0.5, 0.6]
     assert [row[unaffected] for row in archived] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("field", ["rv", "fitness"])
+def test_evolution_bridge_large_integer_ranks_remain_exact(field):
+    exact_values = [2**53, 2**53 + 1, 2**53 + 2]
+    bridge = EvolutionBridge()
+    for index in range(3):
+        values = {"rv": 0.4 + index * 0.1, "fitness": 0.4 + index * 0.1}
+        values[field] = exact_values[index]
+        bridge.add_record(
+            str(index), values["rv"], values["fitness"],
+            measurement_kind="behavioral_proxy",
+            metadata=evolution_metadata("behavioral_proxy"),
+        )
+    archived = bridge.format_for_archive()
+
+    result = bridge.correlate()
+
+    assert result["spearman_rho"] == pytest.approx(1.0)
+    assert result[f"{field}_trend"] == pytest.approx(1.0)
+    assert [row[field] for row in archived] == exact_values
+    assert all(type(row[field]) is int for row in archived)
+    assert bridge.format_for_archive() == archived
 
 
 def _restore_evolution_archive(rows):
