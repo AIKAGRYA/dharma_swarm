@@ -44,7 +44,138 @@ def test_legacy_reading_round_trip_does_not_invent_provenance():
     assert restored.measurement_kind == "unknown"
     assert restored.is_contracted is None
     assert restored.contraction_strength is None
+    assert restored.historical_classification == {}
+    assert restored.historical_classification_conflicts == []
     assert RVReading.model_validate_json(restored.model_dump_json()) == restored
+
+
+@pytest.mark.parametrize("contracted", [True, False])
+def test_legacy_reading_preserves_classification_only_as_history(contracted):
+    payload = reading(0.4, "residual_hidden").model_dump(mode="json")
+    payload.update(is_contracted=contracted, contraction_strength="strong")
+    original = json.loads(json.dumps(payload))
+
+    restored = RVReading.model_validate(payload)
+
+    assert payload == original
+    assert restored.rv == 0.4
+    assert restored.pr_early == 10
+    assert restored.pr_late == 4
+    assert restored.measurement_kind == "residual_hidden"
+    assert restored.measurement_details == {"cohort": "retraction-fixture"}
+    assert restored.is_contracted is None
+    assert restored.contraction_strength is None
+    assert restored.historical_classification == {
+        "is_contracted": contracted,
+        "contraction_strength": "strong",
+    }
+    assert restored.historical_classification_conflicts == []
+    serialized = restored.model_dump(mode="json")
+    assert "is_contracted" not in serialized
+    assert "contraction_strength" not in serialized
+    assert RVReading.model_validate_json(restored.model_dump_json()) == restored
+
+
+def test_legacy_reading_retains_existing_history_and_conflicting_values():
+    payload = reading().model_dump(mode="json")
+    payload["historical_classification"] = {
+        "is_contracted": False,
+        "contraction_strength": "weak",
+        "raw_legacy_field": {"keep": [1, 2]},
+    }
+    payload["historical_classification_conflicts"] = [
+        {"field": "other", "values": ["keep"]},
+    ]
+    payload.update(is_contracted=True, contraction_strength="strong")
+    original = json.loads(json.dumps(payload))
+
+    restored = RVReading.model_validate(payload)
+
+    assert payload == original
+    assert restored.historical_classification == original["historical_classification"]
+    assert restored.historical_classification_conflicts == [
+        {"field": "other", "values": ["keep"]},
+        {
+            "field": "is_contracted",
+            "existing_source": "historical_classification",
+            "existing_value": False,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": True,
+        },
+        {
+            "field": "contraction_strength",
+            "existing_source": "historical_classification",
+            "existing_value": "weak",
+            "legacy_source": "legacy_top_level",
+            "legacy_value": "strong",
+        },
+    ]
+    assert restored.is_contracted is None
+    assert restored.contraction_strength is None
+    assert RVReading.model_validate_json(restored.model_dump_json()) == restored
+
+
+def test_nested_observed_state_preserves_legacy_classification_history():
+    rv_payload = reading(0.4, "residual_hidden").model_dump(mode="json")
+    rv_payload.update(is_contracted=True, contraction_strength="strong")
+    payload = {"state": "saved", "rv_reading": rv_payload, "timestamp": 1.0}
+    original = json.loads(json.dumps(payload))
+
+    observed = ObservedState.from_dict(payload)
+    output = json.loads(json.dumps(observed.to_dict()))
+    restored = ObservedState.from_dict(output)
+
+    assert payload == original
+    assert restored.rv_measurement == 0.4
+    assert restored.rv_reading is not None
+    assert restored.rv_reading.historical_classification == {
+        "is_contracted": True,
+        "contraction_strength": "strong",
+    }
+    assert restored.rv_reading.is_contracted is None
+    assert restored.rv_reading.contraction_strength is None
+    assert restored.to_dict() == output
+
+
+async def test_research_bridge_load_save_preserves_legacy_classification_history(tmp_path):
+    path = tmp_path / "legacy-pairs.jsonl"
+    seed = ResearchBridge(path)
+    paired = await seed.add_measurement(
+        "legacy", "L4", "A factual response.",
+        rv_reading=reading(0.4, "residual_hidden"),
+    )
+    payload = paired.model_dump(mode="json")
+    payload["rv_reading"].update(is_contracted=False, contraction_strength="strong")
+    path.write_text(json.dumps(payload) + "\n")
+
+    bridge = ResearchBridge(path)
+    await bridge.load()
+    restored = bridge.get_measurements()[0].rv_reading
+
+    assert restored is not None
+    assert restored.rv == 0.4
+    assert restored.measurement_kind == "residual_hidden"
+    assert restored.historical_classification == {
+        "is_contracted": False,
+        "contraction_strength": "strong",
+    }
+    assert restored.is_contracted is None
+    assert restored.contraction_strength is None
+
+    await bridge.save()
+    persisted = json.loads(path.read_text())
+    assert persisted["rv_reading"]["historical_classification"] == {
+        "is_contracted": False,
+        "contraction_strength": "strong",
+    }
+    assert persisted["rv_reading"]["rv"] == 0.4
+    assert "is_contracted" not in persisted["rv_reading"]
+    assert "contraction_strength" not in persisted["rv_reading"]
+
+    reloaded = ResearchBridge(path)
+    await reloaded.load()
+    await reloaded.save()
+    assert json.loads(path.read_text()) == persisted
 
 
 def test_unrecognized_instrument_cannot_assert_a_scientific_verdict():

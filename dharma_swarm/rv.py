@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, get_args
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 if TYPE_CHECKING:
     import torch
@@ -100,6 +100,38 @@ class RVReading(BaseModel):
     measurement_kind: MeasurementKind = "unknown"
     measurement_details: dict[str, str] = Field(default_factory=dict)
     calibration_status: Literal["unvalidated_retired_threshold"] = RV_CALIBRATION_STATUS
+    historical_classification: dict[str, Any] = Field(default_factory=dict)
+    historical_classification_conflicts: list[dict[str, Any]] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def preserve_historical_classification(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = copy.deepcopy(data)
+        historical = data.get("historical_classification", {})
+        conflicts = data.get("historical_classification_conflicts", [])
+        if not isinstance(historical, dict) or not isinstance(conflicts, list):
+            return data
+        for key in ("is_contracted", "contraction_strength"):
+            value = data.pop(key, None)
+            if value is None:
+                continue
+            if key not in historical:
+                historical[key] = value
+            elif historical[key] != value:
+                conflict = {
+                    "field": key,
+                    "existing_source": "historical_classification",
+                    "existing_value": historical[key],
+                    "legacy_source": "legacy_top_level",
+                    "legacy_value": value,
+                }
+                if conflict not in conflicts:
+                    conflicts.append(conflict)
+        data["historical_classification"] = historical
+        data["historical_classification_conflicts"] = conflicts
+        return data
 
     @property
     def is_contracted(self) -> None:
