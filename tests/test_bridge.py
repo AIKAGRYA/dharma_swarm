@@ -727,26 +727,19 @@ class TestBuildSummary:
     """Tests for _build_summary static method."""
 
     def test_strong_negative_message(self):
-        summary = ResearchBridge._build_summary(
-            n=50, pearson=-0.72, spearman=-0.68, overlap=0.8
-        )
+        summary = ResearchBridge._build_summary(n=50, pearson=-0.72, spearman=-0.68)
         assert "does not establish self-reference or awareness" in summary
         assert "n=50" in summary
 
     def test_strong_positive_warning(self):
-        summary = ResearchBridge._build_summary(
-            n=30, pearson=0.65, spearman=0.60, overlap=0.1
-        )
+        summary = ResearchBridge._build_summary(n=30, pearson=0.65, spearman=0.60)
         assert "unexpected direction" in summary
 
     def test_no_pearson(self):
-        summary = ResearchBridge._build_summary(
-            n=2, pearson=None, spearman=None, overlap=0.0
-        )
+        summary = ResearchBridge._build_summary(n=2, pearson=None, spearman=None)
         assert "Insufficient data" in summary
 
-    def test_overlap_formatted(self):
-        summary = ResearchBridge._build_summary(
-            n=10, pearson=-0.5, spearman=-0.4, overlap=0.75
-        )
-        assert "75.0%" in summary
+    def test_overlap_always_unavailable(self):
+        summary = ResearchBridge._build_summary(n=10, pearson=-0.5, spearman=-0.4)
+        assert "overlap unavailable" in summary
+        assert "%" not in summary

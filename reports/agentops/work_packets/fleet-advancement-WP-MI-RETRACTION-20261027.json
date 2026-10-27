@@ -3,7 +3,7 @@
   "base_ref": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
   "branch": "codex/fleet-advancement-mi-admission-20261028",
   "worktree": ".",
-  "intent": "Carry the September MI retraction into actual runtime consumers under ordered READOUT item10. Preserve raw numeric observations and historical loadability; report retired-threshold classification as unknown and distinguish residual-hidden, colony and behavioral-proxy measurements. Remove claims that .737 is validated without replacing it with a different validated threshold. Report unavailable downstream classification honestly. No research, provider calls, services, Raiei, trading, portfolio rewrite or merge. Narrow behavioral tests and independent review precede the required no-mistakes delivery gate. Ordered item14 now explicitly authorizes only a verified DocOps freshness repair needed for normal commit: regenerate actual manifest count tokens and managed inventory blocks, then set assertions.verified_at to the actual verification date after evidence; preserve TTL14 and every guard. Exact additional allowed paths are docs/docops/assertions.yaml, docs/governance/SOVEREIGN_MANIFEST.md and docs/docops/AUTO_INVENTORY.md. All other governance paths remain outside the exact allowed scope. No history rewrite, broad secret allowlist, ref deletion, hook bypass or shipping while the unresolved mandatory repository-history scan is failed. Active AXI review F1-F5 are authorized bounded direct-consumer fixes: update the integration fixtures and nullable overlap assertions; remove the Gaia demo retired-threshold verdict in favor of unavailable classification while retaining raw values; correct empty EvolutionBridge summary; remove dead current-overlap computation while preserving historical overlap serialization. Only tests/test_integration.py and scripts/gaia_demo.py are added to scope. F6 other historical categorical-analysis functions are explicitly deferred. No secret-scan policy/config edits. The exact clean d2 admission branch delegates these fixes to existing native run 01M5YYQX0Z9Y0PSVNMKKSA6PDR at descendant0c1bf841; after terminal custody resolution, this admission branch is the exact closeout target.",
+  "intent": "Carry the September MI retraction into actual runtime consumers under ordered READOUT item10. Preserve raw numeric observations and historical loadability; report retired-threshold classification as unknown and distinguish residual-hidden, colony and behavioral-proxy measurements. Remove claims that .737 is validated without replacing it with a different validated threshold. Report unavailable downstream classification honestly. No research, provider calls, services, Raiei, trading, portfolio rewrite or merge. Narrow behavioral tests and independent review precede the required no-mistakes delivery gate. Ordered item14 now explicitly authorizes only a verified DocOps freshness repair needed for normal commit: regenerate actual manifest count tokens and managed inventory blocks, then set assertions.verified_at to the actual verification date after evidence; preserve TTL14 and every guard. Exact additional allowed paths are docs/docops/assertions.yaml, docs/governance/SOVEREIGN_MANIFEST.md and docs/docops/AUTO_INVENTORY.md. All other governance paths remain outside the exact allowed scope. No history rewrite, broad secret allowlist, ref deletion, hook bypass or shipping while the unresolved mandatory repository-history scan is failed. Active AXI review F1-F5 are authorized bounded direct-consumer fixes: update the integration fixtures and nullable overlap assertions; remove the Gaia demo retired-threshold verdict in favor of unavailable classification while retaining raw values; correct empty EvolutionBridge summary; remove dead current-overlap computation while preserving historical overlap serialization. Only tests/test_integration.py and scripts/gaia_demo.py are added to scope. F6 other historical categorical-analysis functions are explicitly deferred. No secret-scan policy/config edits. The exact clean d2 admission branch delegates these fixes to existing native run 01M5YYQX0Z9Y0PSVNMKKSA6PDR at descendant0c1bf841; after terminal custody resolution, this admission branch is the exact closeout target. Review round2 now authorizes exactly one additional source path dharma_swarm/gaia_fitness.py: label its known live ecological-fitness observation as behavioral_proxy, preserve the raw formula/result and existing numeric fields, identify nominal PR-format fields as unmeasured placeholders, correct only directly associated gaia_observer_function/observe_ledger prose, and record actual formula provenance. Tighten already-admitted public-output/provenance tests. Remove dead private ResearchBridge summary overlap parameter/percentage branch and adapt its existing tests. No changed fitness/economics, broad Gaia refactor, scanner policy or F6 expansion. Delegate from the same original-d2 admission branch to existing native run current4be0e923b2236e1d0265aba0306b41b4f9f85071.",
   "allowed_files": [
     "dharma_swarm/rv.py",
     "dharma_swarm/monad.py",
@@ -26,7 +26,8 @@
     "docs/governance/SOVEREIGN_MANIFEST.md",
     "docs/docops/AUTO_INVENTORY.md",
     "tests/test_integration.py",
-    "scripts/gaia_demo.py"
+    "scripts/gaia_demo.py",
+    "dharma_swarm/gaia_fitness.py"
   ],
   "forbidden_files": [
     ".github/**",
@@ -41,7 +42,7 @@
   "gates": [
     {
       "name": "mi-contract-consumers",
-      "command": "python3 -m pytest -q tests/test_rv.py tests/test_monad_laws.py tests/test_bridge.py tests/test_ouroboros.py tests/test_rv_retraction.py tests/test_integration.py",
+      "command": "python3 -m pytest -q tests/test_rv.py tests/test_monad_laws.py tests/test_bridge.py tests/test_ouroboros.py tests/test_rv_retraction.py tests/test_integration.py tests/test_gaia_fitness.py",
       "expected_exit": 0,
       "timeout_seconds": 300
     },
@@ -111,7 +112,8 @@
       "docs/governance/SOVEREIGN_MANIFEST.md",
       "docs/docops/AUTO_INVENTORY.md",
       "tests/test_integration.py",
-      "scripts/gaia_demo.py"
+      "scripts/gaia_demo.py",
+      "dharma_swarm/gaia_fitness.py"
     ],
     "honest_blockers": [
       "This correction does not validate any scientific threshold, consciousness inference or new measurement instrument.",
@@ -123,6 +125,6 @@
       "Preflight runs on the named admission branch at original d2 baseline; native detached gate is not claimed to pass its own branch-bound preflight or closeout. Native pipeline alone applies the admitted changes; final closeout must run on this exact admission branch after terminal sanctioned custody recovery and fast-forward."
     ],
     "rollback": "Revert only the packet-scoped commit after recording the correction rationale; no runtime data or service state is changed.",
-    "packet_digest": "073ee2fd7936ebfb2856fadb085fe5db4eab6e7b21d50810849b8a9adda1af5a"
+    "packet_digest": "f1ea80da193a259e4d287da6a9ece855dfc9e7a63024c950827cd869eb91fcd7"
   }
 }

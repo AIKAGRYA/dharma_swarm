@@ -341,7 +341,7 @@ class ResearchBridge:
                 m.behavioral.swabhaav_ratio for m in members
             )
 
-        summary = self._build_summary(n, pearson, spearman, overlap=None)
+        summary = self._build_summary(n, pearson, spearman)
         summary += f" Measurement kind: {next(iter(kinds))}; descriptive association only."
 
         return CorrelationResult(
@@ -418,7 +418,6 @@ class ResearchBridge:
         n: int,
         pearson: float | None,
         spearman: float | None,
-        overlap: float | None,
     ) -> str:
         """Build a human-readable summary from correlation results.
 
@@ -426,7 +425,6 @@ class ResearchBridge:
             n: Sample size.
             pearson: Pearson r or None.
             spearman: Spearman rho or None.
-            overlap: Contraction-recognition overlap fraction.
 
         Returns:
             Multi-sentence interpretation string.
@@ -457,10 +455,7 @@ class ResearchBridge:
         if spearman is not None:
             parts.append(f"Spearman rho={spearman:.3f}.")
 
-        if overlap is None:
-            parts.append("Contraction-recognition overlap unavailable: no calibrated classifications.")
-        else:
-            parts.append(f"Contraction-recognition overlap: {overlap:.1%} of classifiable pairs.")
+        parts.append("Contraction-recognition overlap unavailable: no calibrated classifications.")
 
         return " ".join(parts)
 

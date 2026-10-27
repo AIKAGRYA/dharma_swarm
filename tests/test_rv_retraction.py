@@ -1,7 +1,6 @@
 """Public behavior for retired scientific classification and measurement custody."""
 
 import json
-from typing import get_args
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -10,7 +9,7 @@ from pydantic import ValidationError
 from dharma_swarm.bridge import CorrelationResult, EvolutionBridge, ResearchBridge
 from dharma_swarm.monad import ObservedState
 from dharma_swarm.ouroboros import colony_rv_reading
-from dharma_swarm.rv import EvolutionRVTracker, MeasurementKind, RVReading
+from dharma_swarm.rv import RV_CALIBRATION_STATUS, EvolutionRVTracker, RVReading
 
 
 def reading(value=0.6, kind="unknown"):
@@ -128,6 +127,7 @@ async def test_known_instrument_mean_is_descriptive_with_no_classification(tmp_p
     assert result.contraction_recognition_overlap is None
     assert result.classification_count == 0
     assert result.measurement_kind_counts == {"residual_hidden": 3}
+    assert "overlap unavailable" in result.summary
     assert json.loads(result.model_dump_json())["contraction_recognition_overlap"] is None
 
 
@@ -219,12 +219,38 @@ def test_gaia_demo_prints_raw_ratio_and_unavailable_classification(monkeypatch, 
 
     ratio = float(value("R_V-like reading:"))
     assert 0.0 <= ratio <= 1.0
+    assert float(value("PR_early (before observation):")) == 1.0
     assert float(value("PR_late (after observation):")) == pytest.approx(ratio, abs=1e-3)
-    assert value("Measurement kind:") in get_args(MeasurementKind)
-    assert value("Contraction:").startswith("unavailable")
+    assert value("Measurement kind:") == "behavioral_proxy"
+    contraction = value("Contraction:")
+    assert contraction.startswith("unavailable")
+    assert RV_CALIBRATION_STATUS in contraction
     assert value("Strength:").startswith("unavailable")
     assert not any(line.endswith((" YES", " NO")) for line in lines)
     assert "contraction detected" not in "\n".join(lines)
+
+
+def test_gaia_observe_ledger_carries_behavioral_proxy_provenance():
+    from dharma_swarm.gaia_fitness import gaia_observer_function, observe_ledger
+    from dharma_swarm.gaia_ledger import GaiaLedger
+
+    ledger = GaiaLedger()
+    reading = gaia_observer_function(ledger)
+    assert reading.measurement_kind == "behavioral_proxy"
+    assert reading.pr_early == 1.0
+    assert reading.pr_late == reading.rv
+    assert reading.is_contracted is None
+    assert reading.contraction_strength is None
+    formula = reading.measurement_details["formula"]
+    assert all(term in formula for term in
+               ("verification_coverage", "oracle_diversity", "violation_rate"))
+
+    observed = observe_ledger(ledger)
+    assert observed.rv == pytest.approx(reading.rv)
+    assert observed.is_contracted is None
+    assert observed.introspection["measurement_kind"] == "behavioral_proxy"
+    assert observed.introspection["contraction_strength"] is None
+    assert observed.to_dict()["introspection"]["measurement_kind"] == "behavioral_proxy"
 
 
 def test_historical_analysis_emits_numbers_without_retired_inference(monkeypatch, capsys):
