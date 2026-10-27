@@ -39,6 +39,7 @@ from dharma_swarm.rv import (
     RV_CALIBRATION_STATUS,
     MeasurementKind,
     RVReading,
+    _preserve_historical_classification,
 )
 
 # ── Type Variables ──────────────────────────────────────────────────────────
@@ -113,14 +114,7 @@ class ObservedState(Generic[S]):
         if self.rv_measurement is not None or self.rv_reading is not None or any(
             key in self.introspection for key in ("is_contracted", "contraction_strength")
         ):
-            self.introspection = dict(self.introspection)
-            historical = dict(self.introspection.get("historical_classification", {}))
-            for key in ("is_contracted", "contraction_strength"):
-                if self.introspection.get(key) is not None:
-                    historical.setdefault(key, self.introspection[key])
-                self.introspection[key] = None
-            if historical:
-                self.introspection["historical_classification"] = historical
+            self.introspection = _preserve_historical_classification(self.introspection)
             self.introspection["calibration_status"] = RV_CALIBRATION_STATUS
             supplied_kind = self.introspection.get("measurement_kind")
             self.introspection["measurement_kind"] = (

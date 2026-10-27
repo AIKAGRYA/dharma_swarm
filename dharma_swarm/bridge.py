@@ -90,6 +90,9 @@ class CorrelationResult(BaseModel):
     mean_swabhaav_by_group: dict[str, float] = Field(default_factory=dict)
     contraction_recognition_overlap: Optional[float] = None
     historical_contraction_recognition_overlap: Optional[float] = None
+    historical_contraction_recognition_overlap_conflicts: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
     classification_count: int = 0
     calibration_status: str = RV_CALIBRATION_STATUS
     measurement_kind_counts: dict[str, int] = Field(default_factory=dict)
@@ -105,10 +108,26 @@ class CorrelationResult(BaseModel):
         """Old serialized aggregates retain their number as history only."""
         if not isinstance(data, dict):
             return data
-        data = dict(data)
-        if data.get("contraction_recognition_overlap") is not None:
-            data.setdefault("historical_contraction_recognition_overlap",
-                            data["contraction_recognition_overlap"])
+        data = deepcopy(data)
+        legacy_overlap = data.get("contraction_recognition_overlap")
+        if legacy_overlap is not None:
+            historical_overlap = data.get("historical_contraction_recognition_overlap")
+            if historical_overlap is None:
+                data["historical_contraction_recognition_overlap"] = legacy_overlap
+            elif historical_overlap != legacy_overlap:
+                conflicts = data.get(
+                    "historical_contraction_recognition_overlap_conflicts", []
+                )
+                if isinstance(conflicts, list):
+                    conflict = {
+                        "field": "contraction_recognition_overlap",
+                        "existing_source": "historical_contraction_recognition_overlap",
+                        "existing_value": historical_overlap,
+                        "legacy_source": "legacy_top_level",
+                        "legacy_value": legacy_overlap,
+                    }
+                    if conflict not in conflicts:
+                        conflicts.append(conflict)
         data["contraction_recognition_overlap"] = None
         data["classification_count"] = 0
         data["calibration_status"] = RV_CALIBRATION_STATUS

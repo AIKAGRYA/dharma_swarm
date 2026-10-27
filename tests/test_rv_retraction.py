@@ -250,6 +250,153 @@ def test_monad_historical_strength_cannot_escape_as_current_classification():
     assert payload["introspection"] == {"contraction_strength": "strong"}
 
 
+async def test_tracker_load_preserves_conflicting_legacy_classification(tmp_path):
+    record = {
+        "rv": 0.4,
+        "best_fitness": 0.8,
+        "measurement_kind": "residual_hidden",
+        **evolution_metadata("residual_hidden"),
+        "historical_classification": {
+            "is_contracted": False,
+            "contraction_strength": "moderate",
+            "raw_legacy_field": {"keep": [1, 2]},
+        },
+        "historical_classification_conflicts": [{"field": "other", "values": ["keep"]}],
+        "is_contracted": True,
+        "contraction_strength": "strong",
+    }
+    path = tmp_path / "evolution_rv.jsonl"
+    before = json.dumps(record) + "\n"
+    path.write_text(before)
+
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+    rows = tracker.get_readings()
+
+    assert path.read_text() == before
+    assert rows[0]["rv"] == 0.4
+    assert rows[0]["best_fitness"] == 0.8
+    assert rows[0]["is_contracted"] is None
+    assert rows[0]["contraction_strength"] is None
+    assert rows[0]["historical_classification"] == record["historical_classification"]
+    assert rows[0]["historical_classification_conflicts"] == [
+        {"field": "other", "values": ["keep"]},
+        {
+            "field": "is_contracted",
+            "existing_source": "historical_classification",
+            "existing_value": False,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": True,
+        },
+        {
+            "field": "contraction_strength",
+            "existing_source": "historical_classification",
+            "existing_value": "moderate",
+            "legacy_source": "legacy_top_level",
+            "legacy_value": "strong",
+        },
+    ]
+    assert tracker.get_rv_fitness_pairs() == [(0.4, 0.8)]
+
+    restored_dir = tmp_path / "restored"
+    restored_dir.mkdir()
+    (restored_dir / "evolution_rv.jsonl").write_text(
+        json.dumps(json.loads(json.dumps(rows[0]))) + "\n"
+    )
+    restored = EvolutionRVTracker(restored_dir)
+    await restored.load()
+    assert restored.get_readings() == rows
+
+
+def test_observed_state_preserves_conflicting_introspection_history():
+    payload = {
+        "state": "saved",
+        "rv_measurement": 0.4,
+        "introspection": {
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": "fixture", "formula": "raw-formula"},
+            "historical_classification": {
+                "is_contracted": False,
+                "contraction_strength": "moderate",
+                "raw_legacy_field": {"keep": [1, 2]},
+            },
+            "historical_classification_conflicts": [{"field": "other", "values": ["keep"]}],
+            "is_contracted": True,
+            "contraction_strength": "strong",
+        },
+        "timestamp": 1.0,
+    }
+    original = json.loads(json.dumps(payload))
+
+    observed = ObservedState.from_dict(payload)
+    output = json.loads(json.dumps(observed.to_dict()))
+    restored = ObservedState.from_dict(output)
+
+    assert payload == original
+    assert observed.rv_measurement == 0.4
+    assert observed.is_contracted is None
+    assert output["introspection"]["is_contracted"] is None
+    assert output["introspection"]["contraction_strength"] is None
+    assert output["introspection"]["historical_classification"] == original[
+        "introspection"
+    ]["historical_classification"]
+    assert output["introspection"]["historical_classification_conflicts"][1:] == [
+        {
+            "field": "is_contracted",
+            "existing_source": "historical_classification",
+            "existing_value": False,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": True,
+        },
+        {
+            "field": "contraction_strength",
+            "existing_source": "historical_classification",
+            "existing_value": "moderate",
+            "legacy_source": "legacy_top_level",
+            "legacy_value": "strong",
+        },
+    ]
+    assert output["introspection"]["measurement_kind"] == "behavioral_proxy"
+    assert output["introspection"]["measurement_details"] == original[
+        "introspection"
+    ]["measurement_details"]
+    assert restored.to_dict() == output
+
+
+def test_correlation_result_preserves_conflicting_legacy_overlap():
+    payload = {
+        "n": 50,
+        "pearson_r": -0.2,
+        "contraction_recognition_overlap": 0.9,
+        "historical_contraction_recognition_overlap": 0.1,
+        "historical_contraction_recognition_overlap_conflicts": [
+            {"field": "other", "values": ["keep"]}
+        ],
+    }
+    original = json.loads(json.dumps(payload))
+
+    result = CorrelationResult.model_validate(payload)
+    output = json.loads(result.model_dump_json())
+    restored = CorrelationResult.model_validate(output)
+
+    assert payload == original
+    assert result.pearson_r == -0.2
+    assert result.contraction_recognition_overlap is None
+    assert result.historical_contraction_recognition_overlap == 0.1
+    assert result.historical_contraction_recognition_overlap_conflicts == [
+        {"field": "other", "values": ["keep"]},
+        {
+            "field": "contraction_recognition_overlap",
+            "existing_source": "historical_contraction_recognition_overlap",
+            "existing_value": 0.1,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": 0.9,
+        },
+    ]
+    assert output["classification_count"] == 0
+    assert restored == result
+
+
 @pytest.mark.parametrize(
     ("supplied", "expected"),
     [("residual_hidden", "residual_hidden"), (None, "unknown"), ("invalid", "unknown")],

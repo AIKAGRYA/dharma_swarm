@@ -71,6 +71,40 @@ def _torch_available() -> bool:
 
 # ── Data Model ──────────────────────────────────────────────────────────────
 
+def _preserve_historical_classification(data: Any) -> Any:
+    if not isinstance(data, dict):
+        return data
+    data = copy.deepcopy(data)
+    historical = data.get("historical_classification", {})
+    conflicts = data.get("historical_classification_conflicts", [])
+    if not isinstance(historical, dict) or not isinstance(conflicts, list):
+        return data
+    had_historical = "historical_classification" in data
+    had_conflicts = "historical_classification_conflicts" in data
+    for key in ("is_contracted", "contraction_strength"):
+        value = data.get(key)
+        data[key] = None
+        if value is None:
+            continue
+        if key not in historical or historical[key] is None:
+            historical[key] = value
+        elif historical[key] != value:
+            conflict = {
+                "field": key,
+                "existing_source": "historical_classification",
+                "existing_value": historical[key],
+                "legacy_source": "legacy_top_level",
+                "legacy_value": value,
+            }
+            if conflict not in conflicts:
+                conflicts.append(conflict)
+    if historical or had_historical:
+        data["historical_classification"] = historical
+    if conflicts or had_conflicts:
+        data["historical_classification_conflicts"] = conflicts
+    return data
+
+
 class RVReading(BaseModel):
     """A raw ratio observation with an explicit instrument kind.
 
@@ -106,32 +140,7 @@ class RVReading(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def preserve_historical_classification(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        data = copy.deepcopy(data)
-        historical = data.get("historical_classification", {})
-        conflicts = data.get("historical_classification_conflicts", [])
-        if not isinstance(historical, dict) or not isinstance(conflicts, list):
-            return data
-        for key in ("is_contracted", "contraction_strength"):
-            value = data.pop(key, None)
-            if value is None:
-                continue
-            if key not in historical:
-                historical[key] = value
-            elif historical[key] != value:
-                conflict = {
-                    "field": key,
-                    "existing_source": "historical_classification",
-                    "existing_value": historical[key],
-                    "legacy_source": "legacy_top_level",
-                    "legacy_value": value,
-                }
-                if conflict not in conflicts:
-                    conflicts.append(conflict)
-        data["historical_classification"] = historical
-        data["historical_classification_conflicts"] = conflicts
-        return data
+        return _preserve_historical_classification(data)
 
     @property
     def is_contracted(self) -> None:
@@ -539,14 +548,7 @@ class EvolutionRVTracker:
                 for line in f:
                     line = line.strip()
                     if line:
-                        record = json.loads(line)
-                        historical = dict(record.get("historical_classification", {}))
-                        for key in ("is_contracted", "contraction_strength"):
-                            if record.get(key) is not None:
-                                historical.setdefault(key, record[key])
-                            record[key] = None
-                        if historical:
-                            record["historical_classification"] = historical
+                        record = _preserve_historical_classification(json.loads(line))
                         if record.get("measurement_kind") not in get_args(MeasurementKind):
                             record["measurement_kind"] = "unknown"
                         record["calibration_status"] = RV_CALIBRATION_STATUS
