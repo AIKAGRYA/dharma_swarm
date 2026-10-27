@@ -308,7 +308,7 @@ class ResearchBridge:
             prompt_hash=_prompt_hash(prompt_text),
             prompt_group=prompt_group,
             prompt_text=prompt_text,
-            rv_reading=rv_reading,
+            rv_reading=deepcopy(rv_reading),
             behavioral=behavioral,
             generated_text=generated_text,
         )

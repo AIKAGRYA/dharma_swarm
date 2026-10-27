@@ -243,6 +243,10 @@ class ObservedState(Generic[S]):
                 "prompt_group": reading.prompt_group,
                 "prompt_hash": reading.prompt_hash,
                 "contraction_strength": reading.contraction_strength,
+                "historical_classification": deepcopy(reading.historical_classification),
+                "historical_classification_conflicts": deepcopy(
+                    reading.historical_classification_conflicts
+                ),
             },
             timestamp=reading.timestamp.timestamp(),
         )

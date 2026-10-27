@@ -682,6 +682,122 @@ async def test_research_bridge_withholds_mixed_or_unknown_statistics(tmp_path, k
     assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx([0.4, 0.6])
 
 
+async def test_research_bridge_snapshots_accepted_reading_provenance(tmp_path):
+    path = tmp_path / "pairs.jsonl"
+    bridge = ResearchBridge(path)
+    first = reading(
+        0.4,
+        "residual_hidden",
+        measurement_details={"cohort": "cohort-a"},
+        historical_classification={"raw": {"accepted": True}},
+    )
+    accepted = deepcopy(first)
+    await bridge.add_measurement("first", "same", "First response.", rv_reading=first)
+
+    first.rv = 0.99
+    first.measurement_details["cohort"] = "cohort-b"
+    first.historical_classification["raw"]["accepted"] = False
+    for value in (0.6, 0.8):
+        await bridge.add_measurement(
+            str(value),
+            "same",
+            "Another response.",
+            rv_reading=reading(
+                value,
+                "residual_hidden",
+                measurement_details={"cohort": "cohort-b"},
+            ),
+        )
+
+    assert bridge.get_measurements()[0].rv_reading == accepted
+    assert bridge.compute_correlation().mean_rv_by_group == {}
+    assert bridge.group_summary()["same"]["mean_rv"] is None
+
+    restored = ResearchBridge(path)
+    await restored.load()
+    assert restored.get_measurements()[0].rv_reading == accepted
+    assert restored.compute_correlation().mean_rv_by_group == {}
+
+    compatible = ResearchBridge(tmp_path / "compatible.jsonl")
+    for value in (0.4, 0.6, 0.8):
+        await compatible.add_measurement(
+            str(value),
+            "same",
+            "A factual response.",
+            rv_reading=reading(value, "residual_hidden"),
+        )
+    assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(0.6)
+
+
+@pytest.mark.parametrize("composition", ["flatten", "multiply", "bind"])
+def test_monad_composition_preserves_reading_classification_history(composition):
+    inner_conflicts = [{"field": "inner_prior", "values": [False, True]}]
+    outer_conflicts = [{"field": "outer_prior", "values": ["weak", "strong"]}]
+    inner_reading = reading(
+        0.8,
+        "residual_hidden",
+        historical_classification={"is_contracted": False, "contraction_strength": None},
+        historical_classification_conflicts=inner_conflicts,
+    )
+    outer_reading = reading(
+        0.4,
+        "residual_hidden",
+        historical_classification={"is_contracted": True, "contraction_strength": "strong"},
+        historical_classification_conflicts=outer_conflicts,
+    )
+    original_inner = deepcopy(inner_reading)
+    original_outer = deepcopy(outer_reading)
+    inner = ObservedState.from_rv_reading("core", inner_reading)
+
+    if composition == "bind":
+        result = bind(
+            inner,
+            lambda state: ObservedState.from_rv_reading("next", outer_reading),
+        )
+        assert result.state == "next"
+    else:
+        outer = ObservedState.from_rv_reading(inner, outer_reading)
+        result = flatten(outer) if composition == "flatten" else SelfObservationMonad.multiply(outer)
+        assert result.state == "core"
+
+    assert result.rv_reading == outer_reading
+    assert result.rv_measurement == 0.4
+    assert result.introspection["historical_classification"] == {
+        "is_contracted": True,
+        "contraction_strength": "strong",
+    }
+    assert result.introspection["historical_classification_conflicts"] == [
+        *inner_conflicts,
+        *outer_conflicts,
+        {
+            "field": "is_contracted",
+            "existing_source": "inner_introspection.historical_classification",
+            "existing_value": False,
+            "legacy_source": "outer_introspection.historical_classification",
+            "legacy_value": True,
+        },
+        {
+            "field": "contraction_strength",
+            "existing_source": "inner_introspection.historical_classification",
+            "existing_value": None,
+            "legacy_source": "outer_introspection.historical_classification",
+            "legacy_value": "strong",
+        },
+    ]
+    assert result.introspection["is_contracted"] is None
+    assert result.introspection["contraction_strength"] is None
+    assert result.rv_reading.is_contracted is None
+    assert result.rv_reading.contraction_strength is None
+    assert inner_reading == original_inner
+    assert outer_reading == original_outer
+
+    output = json.loads(json.dumps(result.to_dict()))
+    restored = ObservedState.from_dict(output)
+    assert restored == result
+    assert restored.to_dict() == output
+    assert ObservedState.from_dict(restored.to_dict()).to_dict() == output
+
+
 async def test_known_instrument_mean_is_descriptive_with_no_classification(tmp_path):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
     for value in (0.4, 0.6, 0.8):
