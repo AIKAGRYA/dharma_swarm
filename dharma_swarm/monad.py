@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import math
 import time
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, get_args
@@ -257,6 +258,63 @@ KleisliMorphism = Callable[[A], ObservedState[B]]
 """Type alias for a Kleisli morphism: A -> T(B)."""
 
 
+def _merge_introspection(
+    inner: dict[str, Any], outer: dict[str, Any]
+) -> dict[str, Any]:
+    classification_keys = (
+        "is_contracted",
+        "contraction_strength",
+        "historical_classification",
+        "historical_classification_conflicts",
+    )
+    inner_metadata = (
+        _preserve_historical_classification(inner)
+        if any(key in inner for key in classification_keys)
+        else deepcopy(inner)
+    )
+    outer_metadata = (
+        _preserve_historical_classification(outer)
+        if any(key in outer for key in classification_keys)
+        else deepcopy(outer)
+    )
+    merged = {**inner_metadata, **outer_metadata}
+    if (
+        "historical_classification" not in inner_metadata
+        and "historical_classification" not in outer_metadata
+        and "historical_classification_conflicts" not in inner_metadata
+        and "historical_classification_conflicts" not in outer_metadata
+    ):
+        return merged
+
+    inner_history = inner_metadata.get("historical_classification", {})
+    outer_history = outer_metadata.get("historical_classification", {})
+    conflicts: list[dict[str, Any]] = []
+    for conflict in (
+        *inner_metadata.get("historical_classification_conflicts", []),
+        *outer_metadata.get("historical_classification_conflicts", []),
+    ):
+        if conflict not in conflicts:
+            conflicts.append(conflict)
+    for key in inner_history:
+        if key in outer_history and inner_history[key] != outer_history[key]:
+            conflict = {
+                "field": key,
+                "existing_source": "inner_introspection.historical_classification",
+                "existing_value": inner_history[key],
+                "legacy_source": "outer_introspection.historical_classification",
+                "legacy_value": outer_history[key],
+            }
+            if conflict not in conflicts:
+                conflicts.append(conflict)
+    merged["historical_classification"] = {**inner_history, **outer_history}
+    if conflicts or (
+        "historical_classification_conflicts" in inner_metadata
+        or "historical_classification_conflicts" in outer_metadata
+    ):
+        merged["historical_classification_conflicts"] = conflicts
+    return merged
+
+
 # ── The Self-Observation Monad ─────────────────────────────────────────────
 
 class SelfObservationMonad:
@@ -330,7 +388,10 @@ class SelfObservationMonad:
             observed.observation_depth = state.observation_depth + 1
 
         if introspection:
-            observed.introspection.update(introspection)
+            observed.introspection = _merge_introspection(
+                observed.introspection, introspection
+            )
+            observed.__post_init__()
 
         return observed
 
@@ -395,7 +456,9 @@ class SelfObservationMonad:
         pr_late = outer.pr_late if outer.pr_late is not None else inner.pr_late
 
         # Merge introspection: outer augments inner
-        merged_introspection = {**inner.introspection, **outer.introspection}
+        merged_introspection = _merge_introspection(
+            inner.introspection, outer.introspection
+        )
         merged_introspection["flatten_from_depth"] = outer.observation_depth
 
         ts_outer = outer.timestamp
@@ -806,6 +869,8 @@ def bind(
         pr_early=result.pr_early if result.pr_early is not None else observed.pr_early,
         pr_late=result.pr_late if result.pr_late is not None else observed.pr_late,
         observation_depth=observed.observation_depth + result.observation_depth,
-        introspection={**observed.introspection, **result.introspection},
+        introspection=_merge_introspection(
+            observed.introspection, result.introspection
+        ),
         timestamp=ts,
     )

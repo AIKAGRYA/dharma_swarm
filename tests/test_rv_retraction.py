@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from dharma_swarm.bridge import CorrelationResult, EvolutionBridge, ResearchBridge
-from dharma_swarm.monad import ObservedState
+from dharma_swarm.monad import ObservedState, SelfObservationMonad, bind, flatten
 from dharma_swarm.ouroboros import colony_rv_reading
 from dharma_swarm.rv import RV_CALIBRATION_STATUS, EvolutionRVTracker, RVReading
 
@@ -1060,3 +1060,201 @@ async def test_telos_seed_marks_rv_abstract_evidence_historical(tmp_path):
     assert "Hedges g=-1.47, AUROC=0.909" in description
     assert ".737 classifier is retired" in description
     assert "causal at L27" not in description
+
+
+@pytest.mark.parametrize("with_reading", [False, True], ids=["proxy", "rv-reading"])
+def test_observe_retires_merged_caller_classification_and_preserves_history(with_reading):
+    supplied = {
+        "is_contracted": True,
+        "contraction_strength": "strong",
+        "raw_metadata": {"keep": [1, 2]},
+    }
+    original = deepcopy(supplied)
+    observer = (lambda _: reading(0.4, "residual_hidden")) if with_reading else None
+
+    observed = SelfObservationMonad(observer).observe("state", introspection=supplied)
+    output = json.loads(json.dumps(observed.to_dict()))
+    restored = ObservedState.from_dict(output)
+
+    assert supplied == original
+    assert observed.is_contracted is None
+    assert observed.introspection["is_contracted"] is None
+    assert observed.introspection["contraction_strength"] is None
+    assert observed.introspection["historical_classification"] == {
+        "is_contracted": True,
+        "contraction_strength": "strong",
+    }
+    assert observed.introspection["raw_metadata"] == original["raw_metadata"]
+    assert observed.rv_measurement == (0.4 if with_reading else None)
+    assert restored.to_dict() == output
+
+
+@pytest.mark.parametrize("operation", ["flatten", "bind"])
+def test_monad_composition_merges_classification_history_without_input_mutation(operation):
+    inner_metadata = {
+        "shared": "inner",
+        "inner_only": "retained",
+        "historical_classification": {
+            "is_contracted": False,
+            "inner_legacy": {"keep": [1]},
+        },
+        "historical_classification_conflicts": [{"field": "inner", "raw": "keep"}],
+    }
+    outer_metadata = {
+        "shared": "outer",
+        "outer_only": "retained",
+        "historical_classification": {
+            "is_contracted": True,
+            "outer_legacy": 0,
+        },
+        "historical_classification_conflicts": [{"field": "outer", "raw": False}],
+    }
+    inner_original = deepcopy(inner_metadata)
+    outer_original = deepcopy(outer_metadata)
+    inner = ObservedState(
+        state="core",
+        rv_measurement=0.5,
+        observation_depth=1,
+        introspection=inner_metadata,
+        timestamp=1.0,
+    )
+
+    if operation == "flatten":
+        nested = ObservedState(
+            state=inner,
+            rv_measurement=0.4,
+            observation_depth=2,
+            introspection=outer_metadata,
+            timestamp=2.0,
+        )
+        result = flatten(nested)
+        assert result.state == "core"
+        assert result.timestamp == 2.0
+    else:
+        result = bind(inner, lambda _: ObservedState(
+            state="bound",
+            rv_measurement=0.4,
+            observation_depth=2,
+            introspection=outer_metadata,
+            timestamp=3.0,
+        ))
+        assert result.state == "bound"
+        assert result.timestamp == 3.0
+
+    assert inner_metadata == inner_original
+    assert outer_metadata == outer_original
+    assert result.rv_measurement == 0.4
+    assert result.observation_depth == 3
+    assert result.is_contracted is None
+    assert result.introspection["is_contracted"] is None
+    assert result.introspection["contraction_strength"] is None
+    assert result.introspection["shared"] == "outer"
+    assert result.introspection["inner_only"] == "retained"
+    assert result.introspection["outer_only"] == "retained"
+    assert result.introspection["historical_classification"] == {
+        "is_contracted": True,
+        "inner_legacy": {"keep": [1]},
+        "outer_legacy": 0,
+    }
+    assert result.introspection["historical_classification_conflicts"] == [
+        {"field": "inner", "raw": "keep"},
+        {"field": "outer", "raw": False},
+        {
+            "field": "is_contracted",
+            "existing_source": "inner_introspection.historical_classification",
+            "existing_value": False,
+            "legacy_source": "outer_introspection.historical_classification",
+            "legacy_value": True,
+        },
+    ]
+    output = json.loads(json.dumps(result.to_dict()))
+    assert ObservedState.from_dict(output).to_dict() == output
+
+
+def test_evolution_bridge_snapshots_provenance_before_caller_mutation():
+    bridge = EvolutionBridge()
+    shared = evolution_metadata("behavioral_proxy")
+    shared["measurement_details"]["cohort"] = "cohort-a"
+    bridge.add_record(
+        "0", 0.4, 0.9, measurement_kind="behavioral_proxy", metadata=shared
+    )
+
+    shared["measurement_details"]["cohort"] = "cohort-b"
+    for index in (1, 2):
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind="behavioral_proxy", metadata=shared,
+        )
+
+    archived = json.loads(json.dumps(bridge.format_for_archive()))
+    assert archived[0]["measurement_details"]["cohort"] == "cohort-a"
+    assert [row["measurement_details"]["cohort"] for row in archived[1:]] == [
+        "cohort-b", "cohort-b"
+    ]
+    assert bridge.correlate()["pearson_r"] is None
+    restored = _restore_evolution_archive(archived)
+    assert restored.format_for_archive() == archived
+    assert restored.correlate()["pearson_r"] is None
+
+    compatible = EvolutionBridge()
+    unchanged = evolution_metadata("behavioral_proxy")
+    for index in range(3):
+        compatible.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind="behavioral_proxy", metadata=unchanged,
+        )
+    assert compatible.correlate()["pearson_r"] == pytest.approx(-1)
+
+
+@pytest.mark.parametrize("sequence_factory", [tuple, deque], ids=["tuple", "deque"])
+def test_rv_reading_preserves_accepted_conflict_sequences_across_json_boundaries(
+    sequence_factory,
+):
+    from dharma_swarm.l4_rv_correlator import (
+        BatchResult,
+        L4CompressionResult,
+        L4RVPairedResult,
+    )
+
+    existing = {"field": "other", "raw": "keep"}
+    payload = reading(0.4, "residual_hidden").model_dump(mode="json")
+    payload["historical_classification_conflicts"] = sequence_factory([existing])
+    original = deepcopy(payload)
+
+    direct = RVReading.model_validate(payload)
+    observed = ObservedState.from_dict({
+        "state": "saved", "rv_reading": payload, "timestamp": 1.0,
+    })
+    paired = L4RVPairedResult.model_validate({
+        "prompt_text": "prompt",
+        "prompt_group": "L4",
+        "generated_text": "response",
+        "rv_reading": payload,
+        "l4_result": L4CompressionResult().model_dump(),
+    })
+    batch = BatchResult(paired_results=[paired])
+
+    assert payload == original
+    for current in (
+        direct,
+        observed.rv_reading,
+        paired.rv_reading,
+        batch.paired_results[0].rv_reading,
+    ):
+        assert current is not None
+        assert current.rv == 0.4
+        assert current.pr_early == 10
+        assert current.pr_late == 4
+        assert current.measurement_kind == "residual_hidden"
+        assert current.is_contracted is None
+        assert current.contraction_strength is None
+        assert current.historical_classification_conflicts == [existing]
+
+    direct_json = direct.model_dump_json()
+    observed_output = json.loads(json.dumps(observed.to_dict()))
+    paired_json = paired.model_dump_json()
+    batch_json = batch.model_dump_json()
+    assert RVReading.model_validate_json(direct_json).model_dump_json() == direct_json
+    assert ObservedState.from_dict(observed_output).to_dict() == observed_output
+    assert L4RVPairedResult.model_validate_json(paired_json).model_dump_json() == paired_json
+    assert BatchResult.model_validate_json(batch_json).model_dump_json() == batch_json

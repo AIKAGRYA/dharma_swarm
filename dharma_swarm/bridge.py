@@ -545,7 +545,7 @@ class EvolutionBridge:
         if measurement_kind not in get_args(MeasurementKind):
             raise ValueError(f"Unknown measurement kind: {measurement_kind}")
         self._records.append({
-            **(metadata or {}),
+            **deepcopy(metadata or {}),
             "cycle_id": cycle_id,
             "rv": rv,
             "fitness": fitness,

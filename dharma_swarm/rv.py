@@ -23,12 +23,13 @@ import hashlib
 import json
 import logging
 import math
+from collections import deque
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, get_args
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, TypeAdapter, model_validator
 
 if TYPE_CHECKING:
     import torch
@@ -146,6 +147,14 @@ class RVReading(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def preserve_historical_classification(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            conflicts = data.get("historical_classification_conflicts")
+            if isinstance(conflicts, (tuple, deque)):
+                data = copy.deepcopy(data)
+                field = cls.model_fields["historical_classification_conflicts"]
+                data["historical_classification_conflicts"] = TypeAdapter(
+                    field.annotation
+                ).validate_python(conflicts)
         return _preserve_historical_classification(data)
 
     @property
