@@ -12,11 +12,26 @@ from dharma_swarm.ouroboros import colony_rv_reading
 from dharma_swarm.rv import RV_CALIBRATION_STATUS, EvolutionRVTracker, RVReading
 
 
-def reading(value=0.6, kind="unknown"):
-    return RVReading(
+def reading(value=0.6, kind="unknown", **overrides):
+    values = dict(
         rv=value, pr_early=10, pr_late=10 * value, model_name="fixture",
         early_layer=2, late_layer=22, prompt_hash="fixture", measurement_kind=kind,
+        measurement_details={"cohort": "retraction-fixture"},
     )
+    values.update(overrides)
+    return RVReading(**values)
+
+
+def evolution_metadata(kind):
+    details = {"cohort": "evolution-fixture"}
+    if kind in {"behavioral_proxy", "colony_density"}:
+        details["formula"] = f"{kind} fixture formula"
+    return {
+        "model_name": "fixture",
+        "early_layer": 2,
+        "late_layer": 22,
+        "measurement_details": details,
+    }
 
 
 def test_legacy_reading_round_trip_does_not_invent_provenance():
@@ -64,6 +79,9 @@ async def test_tracker_separates_proxy_from_residual_and_does_not_pool(tmp_path)
     assert proxy["measurement_kind"] == "behavioral_proxy"
     assert residual["rv"] == 0.4
     assert residual["measurement_kind"] == "residual_hidden"
+    assert residual["model_name"] == "fixture"
+    assert residual["early_layer"] == 2
+    assert residual["late_layer"] == 22
     rows = [json.loads(line) for line in (tmp_path / "evolution_rv.jsonl").read_text().splitlines()]
     assert all(row["is_contracted"] is None for row in rows)
     assert tracker.get_rv_fitness_pairs() == []
@@ -101,6 +119,20 @@ def test_monad_historical_strength_cannot_escape_as_current_classification():
     assert payload["introspection"] == {"contraction_strength": "strong"}
 
 
+@pytest.mark.parametrize(
+    ("supplied", "expected"),
+    [("residual_hidden", "residual_hidden"), (None, "unknown"), ("invalid", "unknown")],
+)
+def test_monad_scalar_round_trip_preserves_only_valid_explicit_kind(supplied, expected):
+    introspection = {} if supplied is None else {"measurement_kind": supplied}
+    observed = ObservedState(state="saved", rv_measurement=0.4, introspection=introspection)
+    restored = ObservedState.from_dict(observed.to_dict())
+    assert restored.introspection["measurement_kind"] == expected
+    assert restored.introspection["is_contracted"] is None
+    assert restored.introspection["contraction_strength"] is None
+    assert restored.rv_measurement == 0.4
+
+
 @pytest.mark.parametrize("kinds", [("residual_hidden", "colony_density"), ("unknown", "unknown")])
 async def test_research_bridge_withholds_mixed_or_unknown_statistics(tmp_path, kinds):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
@@ -131,6 +163,45 @@ async def test_known_instrument_mean_is_descriptive_with_no_classification(tmp_p
     assert json.loads(result.model_dump_json())["contraction_recognition_overlap"] is None
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"model_name": "other-model"},
+        {"early_layer": 3},
+        {"late_layer": 21},
+        {"measurement_details": {"cohort": "other-cohort"}},
+        {"measurement_details": {}},
+    ],
+)
+async def test_research_bridge_withholds_incompatible_same_kind_statistics(tmp_path, overrides):
+    bridge = ResearchBridge(tmp_path / "pairs.jsonl")
+    await bridge.add_measurement("one", "same", "First response.", rv_reading=reading(0.4, "residual_hidden"))
+    await bridge.add_measurement(
+        "two", "same", "Second different response.",
+        rv_reading=reading(0.6, "residual_hidden", **overrides),
+    )
+    result = bridge.compute_correlation()
+    assert result.n == 2
+    assert result.mean_rv_by_group == {}
+    assert bridge.group_summary()["same"]["mean_rv"] is None
+    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx([0.4, 0.6])
+
+
+async def test_research_bridge_withholds_different_proxy_formulas(tmp_path):
+    bridge = ResearchBridge(tmp_path / "pairs.jsonl")
+    for index, formula in enumerate(("formula-a", "formula-b")):
+        await bridge.add_measurement(
+            str(index), "same", f"Response {index}",
+            rv_reading=reading(
+                0.4 + index * 0.2, "behavioral_proxy",
+                measurement_details={"cohort": "retraction-fixture", "formula": formula},
+            ),
+        )
+    result = bridge.compute_correlation()
+    assert result.mean_rv_by_group == {}
+    assert bridge.group_summary()["same"]["mean_rv"] is None
+
+
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
 async def test_nonfinite_readings_never_become_statistics_or_classifications(tmp_path, value):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
@@ -144,7 +215,10 @@ async def test_nonfinite_readings_never_become_statistics_or_classifications(tmp
 def test_evolution_bridge_keeps_raw_archive_and_refuses_cross_instrument_pooling():
     bridge = EvolutionBridge()
     for index, kind in enumerate(("residual_hidden", "colony_density", "behavioral_proxy")):
-        bridge.add_record(str(index), 0.4 + index * 0.1, 0.9 - index * 0.1, measurement_kind=kind)
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind=kind, metadata=evolution_metadata(kind),
+        )
     result = bridge.correlate()
     assert result["pearson_r"] is None
     assert result["rv_trend"] is None
@@ -155,13 +229,31 @@ def test_evolution_bridge_keeps_raw_archive_and_refuses_cross_instrument_pooling
 def test_evolution_bridge_known_proxy_association_does_not_imply_self_reference():
     bridge = EvolutionBridge()
     for index in range(3):
-        bridge.add_record(str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-                          measurement_kind="behavioral_proxy")
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind="behavioral_proxy",
+            metadata=evolution_metadata("behavioral_proxy"),
+        )
     result = bridge.correlate()
     assert result["pearson_r"] == pytest.approx(-1)
     assert result["measurement_kind_counts"] == {"behavioral_proxy": 3}
     assert result["calibration_status"] == "unvalidated_retired_threshold"
     assert "does not establish a mechanism or causation" in result["summary"]
+
+
+def test_evolution_bridge_constant_comparable_series_reports_stable_trends():
+    bridge = EvolutionBridge()
+    for index in range(3):
+        bridge.add_record(
+            str(index), 0.4, 0.8,
+            measurement_kind="behavioral_proxy",
+            metadata=evolution_metadata("behavioral_proxy"),
+        )
+    result = bridge.correlate()
+    assert result["rv_trend"] == 0.0
+    assert result["fitness_trend"] == 0.0
+    assert "R_V trend: +0.0000/cycle (stable)." in result["summary"]
+    assert "Fitness trend: +0.0000/cycle (stable)." in result["summary"]
 
 
 def test_evolution_bridge_rejects_unknown_kind_token():
@@ -180,8 +272,11 @@ def test_evolution_bridge_empty_and_short_known_kind_report_insufficient_cycles(
     assert empty["measurement_kind_counts"] == {}
     assert "have 0" in empty["summary"]
     for index in range(2):
-        bridge.add_record(str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-                          measurement_kind="residual_hidden")
+        bridge.add_record(
+            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            measurement_kind="residual_hidden",
+            metadata=evolution_metadata("residual_hidden"),
+        )
     short = bridge.correlate()
     assert short["n"] == 2
     assert short["pearson_r"] is None

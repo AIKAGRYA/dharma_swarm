@@ -1,12 +1,8 @@
 """L4-R_V Correlation Engine for DHARMA SWARM.
 
-THE MISSING EXPERIMENT: Runs both R_V measurement (geometric contraction)
-and L4 compression protocol (behavioral compression) on the SAME prompts,
-then computes statistical correlation.
-
-Bridge hypothesis: R_V contraction in Value space correlates with
-L4 behavioral compression ability. If true, geometric signature
-CAUSES the phenomenological phase transition.
+Runs raw R_V observations and the L4 compression protocol on the same
+prompts, then computes descriptive associations for explicitly comparable
+measurement cohorts. These associations do not establish causation.
 
 Provider-agnostic: accepts any async generate function.
 Uses existing rv.py, bridge.py, metrics.py infrastructure.
@@ -31,7 +27,7 @@ from dharma_swarm.bridge import (
     _spearman_rho,
 )
 from dharma_swarm.metrics import MetricsAnalyzer
-from dharma_swarm.rv import RVMeasurer, RVReading
+from dharma_swarm.rv import RVMeasurer, RVReading, comparable_measurement_identity
 
 logger = logging.getLogger(__name__)
 
@@ -279,20 +275,28 @@ class L4RVCorrelator:
             mean_fidelity[grp] = statistics.mean(fids) if fids else 0.0
             pass_rate[grp] = statistics.mean(passes) if passes else 0.0
 
-        # Cohen's d between L4 and baseline R_V groups
-        cohens_d = self._cohens_d_groups(results, "L4_full", "baseline")
-
-        # Bootstrap CIs for correlation
-        rv_vals = [
-            r.rv_reading.rv for r in results if r.rv_reading is not None
-        ]
+        readings = [r.rv_reading for r in results if r.rv_reading is not None]
+        rv_vals = [reading.rv for reading in readings]
         swab_vals = [
             r.behavioral_swabhaav
             for r in results
             if r.rv_reading is not None
         ]
-        pearson_ci = _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
-        spearman_ci = _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
+        comparable = comparable_measurement_identity(readings) is not None
+        finite = all(map(math.isfinite, rv_vals + swab_vals))
+
+        cohens_d = (
+            self._cohens_d_groups(results, "L4_full", "baseline")
+            if comparable and finite else None
+        )
+        pearson_ci = (
+            _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
+            if comparable and finite else None
+        )
+        spearman_ci = (
+            _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
+            if comparable and finite else None
+        )
 
         # Patch CIs into correlation result
         if correlation:

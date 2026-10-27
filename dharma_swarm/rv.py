@@ -23,6 +23,7 @@ import hashlib
 import json
 import logging
 import math
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, get_args
@@ -109,6 +110,67 @@ class RVReading(BaseModel):
     def contraction_strength(self) -> None:
         """No calibrated strength categories are available for these readings."""
         return None
+
+
+def _measurement_identity(measurement: RVReading | dict[str, Any]) -> tuple[Any, ...] | None:
+    def field(name: str) -> Any:
+        if isinstance(measurement, dict):
+            return measurement.get(name)
+        return getattr(measurement, name, None)
+
+    kind = field("measurement_kind") or "unknown"
+    if kind not in get_args(MeasurementKind) or kind == "unknown":
+        return None
+    details = field("measurement_details")
+    if not isinstance(details, dict):
+        return None
+    cohort = details.get("cohort")
+    if (
+        not isinstance(cohort, str)
+        or not cohort.strip()
+        or cohort.strip().lower() == "unknown"
+    ):
+        return None
+
+    identity: list[Any] = [kind, cohort.strip()]
+    if kind in {"attention_value", "residual_hidden"}:
+        model_name = field("model_name")
+        early_layer = field("early_layer")
+        late_layer = field("late_layer")
+        if (
+            not isinstance(model_name, str)
+            or not model_name.strip()
+            or model_name.strip().lower() == "unknown"
+        ):
+            return None
+        if any(
+            isinstance(layer, bool) or not isinstance(layer, int) or layer < 0
+            for layer in (early_layer, late_layer)
+        ):
+            return None
+        identity.extend((model_name.strip(), early_layer, late_layer))
+    if kind in {"behavioral_proxy", "colony_density"}:
+        formula = details.get("formula")
+        if (
+            not isinstance(formula, str)
+            or not formula.strip()
+            or formula.strip().lower() == "unknown"
+        ):
+            return None
+        identity.append(formula.strip())
+    return tuple(identity)
+
+
+def comparable_measurement_identity(
+    measurements: Iterable[RVReading | dict[str, Any]],
+) -> tuple[Any, ...] | None:
+    """Return one explicit shared measurement identity, or None when pooling is invalid."""
+    identities = [_measurement_identity(measurement) for measurement in measurements]
+    if not identities or any(identity is None for identity in identities):
+        return None
+    if len(set(identities)) != 1:
+        return None
+    return identities[0]
 
 
 # ── Core Metric ─────────────────────────────────────────────────────────────
@@ -356,6 +418,9 @@ class EvolutionRVTracker:
             record["rv_source"] = "geometric"
             record["measurement_kind"] = rv_reading.measurement_kind
             record["measurement_details"] = dict(rv_reading.measurement_details)
+            record["model_name"] = rv_reading.model_name
+            record["early_layer"] = rv_reading.early_layer
+            record["late_layer"] = rv_reading.late_layer
         else:
             # Proxy R_V: use cycle success ratio as a behavioral stand-in.
             # More archived proposals → system is "contracting" toward solutions.
@@ -378,23 +443,23 @@ class EvolutionRVTracker:
         return record
 
     def get_rv_fitness_pairs(self) -> list[tuple[float, float]]:
-        """Return finite descriptive pairs only for one known instrument kind.
+        """Return finite pairs only for explicitly comparable measurements.
 
-        Mixed or unknown provenance is not pooled. Raw observations remain
-        available via get_readings(); this is not a validation of comparability.
+        Raw observations remain available via get_readings() when pooled
+        statistics are unavailable.
         """
-        kinds = {r.get("measurement_kind", "unknown") for r in self._readings}
-        if len(kinds) != 1 or "unknown" in kinds:
-            return []
-        if any(not math.isfinite(r["rv"]) or not math.isfinite(r["best_fitness"])
-               for r in self._readings if "rv" in r and "best_fitness" in r):
-            return []
-        return [
-            (r["rv"], r["best_fitness"])
-            for r in self._readings
-            if "rv" in r and "best_fitness" in r
-            and math.isfinite(r["rv"]) and math.isfinite(r["best_fitness"])
+        candidates = [
+            record for record in self._readings
+            if "rv" in record and "best_fitness" in record
         ]
+        if comparable_measurement_identity(candidates) is None:
+            return []
+        if any(
+            not math.isfinite(record["rv"]) or not math.isfinite(record["best_fitness"])
+            for record in candidates
+        ):
+            return []
+        return [(record["rv"], record["best_fitness"]) for record in candidates]
 
     def get_readings(self) -> list[dict[str, Any]]:
         """Return raw observations and their current interpretation separately."""
@@ -404,9 +469,8 @@ class EvolutionRVTracker:
         """Compute R_V trend slope across evolution cycles.
 
         Returns:
-            Positive slope if R_V increasing (less contraction over time),
-            negative if R_V decreasing. None for fewer than two finite points,
-            mixed instruments or unknown provenance; no scientific verdict.
+            Positive slope if R_V increasing, negative if decreasing. None for
+            fewer than two finite points or incomparable provenance; no scientific verdict.
         """
         pairs = self.get_rv_fitness_pairs()
         if len(pairs) < 2:

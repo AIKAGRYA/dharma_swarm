@@ -9,7 +9,7 @@ operational swarm.  It:
    disagreements (H¹ obstructions backed by Anekanta).
 4. Feeds coordination results back to the DarwinEngine so future
    cycles can incorporate collective intelligence.
-5. Tracks the observation stream for fixed-point convergence (L5).
+5. Tracks raw observation streams without scientific fixed-point promotion.
 
 Usage::
 
@@ -35,7 +35,7 @@ from pydantic import BaseModel, Field
 from dharma_swarm.archive import ArchiveEntry
 from dharma_swarm.coalgebra import EvolutionObservation, build_evolution_observation
 from dharma_swarm.evolution import CycleResult, Proposal
-from dharma_swarm.monad import SelfObservationMonad, is_idempotent
+from dharma_swarm.monad import SelfObservationMonad
 from dharma_swarm.rv import RVReading
 from dharma_swarm.sheaf import (
     CoordinationProtocol,
@@ -242,7 +242,7 @@ class CoordinationSnapshot(BaseModel):
     rv_trend: float | None = None
     fitness_trend: float | None = None
     observation_count: int = 0
-    approaching_fixed_point: bool = False
+    approaching_fixed_point: bool | None = None
 
 
 class DSEIntegrator:
@@ -349,6 +349,11 @@ class DSEIntegrator:
             late_layer=0,
             prompt_hash="0" * 16,
             prompt_group="evolution_cycle",
+            measurement_kind="behavioral_proxy",
+            measurement_details={
+                "formula": "1 - min(proposals_archived, 5) * 0.1",
+                "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=proxy), not measured participation ratios",
+            },
         )
 
     async def after_cycle(
@@ -381,13 +386,9 @@ class DSEIntegrator:
             proposals,
         )
 
-        # 2. Observe the current cycle, then probe one step deeper for stability.
+        # 2. Observe the current cycle.
         observed = self._monad.observe(observation)
         self._last_observed = observed
-
-        # 3. Check for fixed-point convergence (L5 condition)
-        double = self._monad.observe(observed)
-        approaching_fp = is_idempotent(double, tolerance=0.05)
 
         # Extract component from archive entries or proposals
         component = None
@@ -415,6 +416,14 @@ class DSEIntegrator:
                 "late_layer": 0,
                 "prompt_hash": observed.introspection.get("prompt_hash", "0" * 16),
                 "prompt_group": observed.introspection.get("prompt_group", "evolution_cycle"),
+                "measurement_kind": (
+                    observed.rv_reading.measurement_kind
+                    if observed.rv_reading is not None else "unknown"
+                ),
+                "measurement_details": (
+                    dict(observed.rv_reading.measurement_details)
+                    if observed.rv_reading is not None else {}
+                ),
             }
 
         # 4. Record to observation window + JSONL
@@ -431,7 +440,7 @@ class DSEIntegrator:
                 "rv": observed.rv_measurement,
                 "best_fitness": result.best_fitness,
                 "proposals_archived": result.proposals_archived,
-                "approaching_fixed_point": approaching_fp,
+                "approaching_fixed_point": None,
                 "discoveries_count": len(observation.discoveries),
                 "lessons": observation.discoveries[:5],
                 "component": component,
@@ -881,9 +890,7 @@ class DSEIntegrator:
                 observation_count=len(self._window.observations),
                 rv_trend=self._window.rv_trend,
                 fitness_trend=self._window.fitness_trend,
-                approaching_fixed_point=any(
-                    o.get("approaching_fixed_point") for o in self._window.observations[-3:]
-                ),
+                approaching_fixed_point=None,
             )
 
         # Build virtual agents and channels (all-to-all within evolution)
@@ -958,9 +965,7 @@ class DSEIntegrator:
             rv_trend=self._window.rv_trend,
             fitness_trend=self._window.fitness_trend,
             observation_count=len(self._window.observations),
-            approaching_fixed_point=any(
-                o.get("approaching_fixed_point") for o in self._window.observations[-3:]
-            ),
+            approaching_fixed_point=None,
         )
 
     async def _persist_observation(self, record: dict[str, Any]) -> None:
@@ -1022,11 +1027,6 @@ class DSEIntegrator:
                 context["exploration_hint"] = (
                     f"H¹ ≠ 0: {snap.productive_disagreements} productive disagreements "
                     f"across components. Consider exploring: {', '.join(snap.disagreement_claims[:3])}"
-                )
-            if snap.approaching_fixed_point:
-                context["convergence_hint"] = (
-                    "System approaching observation fixed point (L5). "
-                    "Consider bolder mutations to escape or validate stability."
                 )
 
         # Ouroboros: inject behavioral drift warnings

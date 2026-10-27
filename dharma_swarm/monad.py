@@ -33,10 +33,11 @@ import math
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Generic, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, Optional, TypeVar, Union, get_args
 
 from dharma_swarm.rv import (
     RV_CALIBRATION_STATUS,
+    MeasurementKind,
     RVReading,
 )
 
@@ -121,8 +122,12 @@ class ObservedState(Generic[S]):
             if historical:
                 self.introspection["historical_classification"] = historical
             self.introspection["calibration_status"] = RV_CALIBRATION_STATUS
+            supplied_kind = self.introspection.get("measurement_kind")
             self.introspection["measurement_kind"] = (
-                self.rv_reading.measurement_kind if self.rv_reading is not None else "unknown"
+                self.rv_reading.measurement_kind
+                if self.rv_reading is not None
+                else supplied_kind if supplied_kind in get_args(MeasurementKind)
+                else "unknown"
             )
         if self.rv_reading is None:
             return

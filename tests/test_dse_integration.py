@@ -184,6 +184,45 @@ async def test_after_cycle_replaces_last_observed_with_current_cycle(tmp_path):
     assert records[-1]["observation_depth"] == 1
 
 
+async def test_repeated_proxy_observations_leave_fixed_point_verdict_unavailable(tmp_path):
+    integrator = DSEIntegrator(
+        archive_path=tmp_path / "evolution",
+        coordination_interval=1,
+    )
+    current = ArchiveEntry(
+        component="child.py",
+        change_type="mutation",
+        description="same state",
+        diff="- old\n+ new\n",
+        fitness=FitnessScore(correctness=0.4, dharmic_alignment=1.0, safety=1.0),
+        status="applied",
+    )
+    proposal = _proposal("child.py", "same state")
+
+    first = await integrator.after_cycle(
+        CycleResult(cycle_id="cycle-1", proposals_archived=1, best_fitness=0.4),
+        [proposal],
+        [current],
+    )
+    second = await integrator.after_cycle(
+        CycleResult(cycle_id="cycle-2", proposals_archived=1, best_fitness=0.4),
+        [proposal],
+        [current],
+    )
+
+    assert first is not None
+    assert second is not None
+    assert second.approaching_fixed_point is None
+    assert [record["rv_measurement"] for record in integrator._window.observations] == [0.9, 0.9]
+    assert all(
+        record["approaching_fixed_point"] is None
+        for record in integrator._window.observations
+    )
+    context = integrator.get_coordination_context()
+    assert context["approaching_fixed_point"] is None
+    assert "convergence_hint" not in context
+
+
 def test_compose_cycle_text_dedupes_repeated_discoveries_and_lessons():
     result = CycleResult(
         cycle_id="cycle-compose",
@@ -449,6 +488,19 @@ async def test_after_cycle_persists_l4_bridge_measurement(tmp_path):
         "Reflection on the cycle"
     )
     assert measurements[0]["rv_reading"]["rv"] == pytest.approx(0.9)
+    assert measurements[0]["rv_reading"]["measurement_kind"] == "behavioral_proxy"
+    assert measurements[0]["rv_reading"]["measurement_details"] == {
+        "formula": "1 - min(proposals_archived, 5) * 0.1",
+        "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=proxy), not measured participation ratios",
+    }
+
+    reloaded = ResearchBridge(data_path=bridge_path)
+    await reloaded.load()
+    reading = reloaded.get_measurements()[0].rv_reading
+    assert reading is not None
+    assert reading.measurement_kind == "behavioral_proxy"
+    assert reading.measurement_details["formula"] == "1 - min(proposals_archived, 5) * 0.1"
+    assert reloaded.compute_correlation().mean_rv_by_group == {}
 
 
 async def test_after_cycle_persists_reciprocity_summary_to_observation_log(tmp_path):

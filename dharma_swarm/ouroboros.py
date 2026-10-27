@@ -222,12 +222,7 @@ class OuroborosObserver:
         }
 
     def as_rv_reading(self) -> RVReading | None:
-        """Convert the latest behavioral observation to an R_V-like reading.
-
-        Maps behavioral health to R_V semantics:
-        - High mimicry / low witness → R_V ≈ 1.0 (no self-observation)
-        - Low mimicry / high witness → R_V < 1.0 (self-observation active)
-        """
+        """Convert the latest behavioral observation to an explicitly raw proxy."""
         if not self._history:
             return None
 
@@ -235,7 +230,6 @@ class OuroborosObserver:
         witness = latest["signature"]["swabhaav_ratio"]
         is_mimicry = latest["is_mimicry"]
 
-        # R_V proxy: inverted witness score (high witness = low R_V = contraction)
         rv = 1.0 - (witness * 0.5) if not is_mimicry else 0.95
 
         return RVReading(
@@ -247,6 +241,11 @@ class OuroborosObserver:
             late_layer=0,
             prompt_hash="behavioral_" + latest.get("cycle_id", "unknown")[:8],
             prompt_group="ouroboros",
+            measurement_kind="behavioral_proxy",
+            measurement_details={
+                "formula": "0.95 if is_mimicry else 1 - swabhaav_ratio * 0.5",
+                "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=rv), not measured participation ratios",
+            },
         )
 
     def summary(self) -> dict[str, Any]:

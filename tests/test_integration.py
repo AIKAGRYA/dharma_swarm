@@ -78,6 +78,7 @@ def _make_rv_reading(
         prompt_hash="abcdef1234567890",
         prompt_group=group,
         measurement_kind=kind,
+        measurement_details={"cohort": "integration-fixture"},
     )
 
 

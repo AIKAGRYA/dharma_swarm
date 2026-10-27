@@ -41,6 +41,7 @@ def _make_rv_reading(**overrides) -> RVReading:
         prompt_hash="abcdef0123456789",
         prompt_group="L4",
         measurement_kind="residual_hidden",
+        measurement_details={"cohort": "bridge-fixture"},
     )
     defaults.update(overrides)
     return RVReading(**defaults)

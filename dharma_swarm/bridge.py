@@ -30,7 +30,13 @@ from pydantic import BaseModel, Field, model_validator
 
 from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
 from dharma_swarm.models import _new_id
-from dharma_swarm.rv import RV_CALIBRATION_STATUS, MeasurementKind, RVReading, _prompt_hash
+from dharma_swarm.rv import (
+    RV_CALIBRATION_STATUS,
+    MeasurementKind,
+    RVReading,
+    _prompt_hash,
+    comparable_measurement_identity,
+)
 
 
 # -- Data Models -------------------------------------------------------------
@@ -306,10 +312,10 @@ class ResearchBridge:
                 summary="No paired measurements with R_V readings available.",
             )
 
-        if len(kinds) != 1 or "unknown" in kinds:
+        if comparable_measurement_identity([m.rv_reading for m in paired]) is None:
             return CorrelationResult(
                 n=n, measurement_kind_counts=kinds,
-                summary="Pooled statistics unavailable: mixed or unknown measurement kinds. "
+                summary="Pooled statistics unavailable: missing or incompatible measurement identity. "
                 "Raw readings are retained; scientific classification is unvalidated.",
             )
 
@@ -361,7 +367,7 @@ class ResearchBridge:
 
         Returns:
             Dict mapping group name to a dict of mean metric values:
-            ``mean_rv`` (None if missing, nonfinite, mixed or unknown), ``mean_swabhaav``,
+            ``mean_rv`` (None if nonfinite or incomparable), ``mean_swabhaav``,
             ``mean_entropy``, ``mean_self_ref``, ``count``.
         """
         groups: dict[str, list[PairedMeasurement]] = {}
@@ -370,13 +376,10 @@ class ResearchBridge:
 
         result: dict[str, dict[str, Any]] = {}
         for group, members in sorted(groups.items()):
-            rv_vals = [
-                m.rv_reading.rv for m in members if m.rv_reading is not None
-            ]
-            kinds = dict(Counter(
-                m.rv_reading.measurement_kind for m in members if m.rv_reading is not None
-            ))
-            comparable = len(kinds) == 1 and "unknown" not in kinds
+            readings = [m.rv_reading for m in members if m.rv_reading is not None]
+            rv_vals = [reading.rv for reading in readings]
+            kinds = dict(Counter(reading.measurement_kind for reading in readings))
+            comparable = comparable_measurement_identity(readings) is not None
             result[group] = {
                 "mean_rv": statistics.mean(rv_vals)
                 if rv_vals and comparable and all(map(math.isfinite, rv_vals)) else None,
@@ -489,7 +492,7 @@ class EvolutionBridge:
     itself. EvolutionBridge takes R_V readings from EvolutionRVTracker and
     correlates them with fitness scores from the Darwin Engine archive.
 
-    Associations are descriptive and require one known measurement kind.
+    Associations are descriptive and require explicitly comparable measurements.
     They do not establish self-reference or a cause of fitness improvement.
     """
 
@@ -534,13 +537,13 @@ class EvolutionBridge:
             and summary string.
         """
         kinds = dict(Counter(r["measurement_kind"] for r in self._records))
-        if kinds and (len(kinds) != 1 or "unknown" in kinds):
+        if self._records and comparable_measurement_identity(self._records) is None:
             return {
                 "n": len(self._records), "pearson_r": None, "spearman_rho": None,
                 "rv_trend": None, "fitness_trend": None,
                 "measurement_kind_counts": kinds,
                 "calibration_status": RV_CALIBRATION_STATUS,
-                "summary": "Pooled statistics unavailable: mixed or unknown measurement kinds. Raw records retained.",
+                "summary": "Pooled statistics unavailable: missing, unknown, mixed, or incompatible measurement identity. Raw records retained.",
             }
         if len(self._records) < 3:
             return {
@@ -586,12 +589,12 @@ class EvolutionBridge:
                     "this does not establish a mechanism or causation."
                 )
         if rv_trend is not None:
-            direction = "decreasing" if rv_trend < 0 else "increasing"
+            direction = "increasing" if rv_trend > 0 else "decreasing" if rv_trend < 0 else "stable"
             summary_parts.append(
                 f"R_V trend: {rv_trend:+.4f}/cycle ({direction})."
             )
         if fitness_trend is not None:
-            direction = "improving" if fitness_trend > 0 else "degrading"
+            direction = "improving" if fitness_trend > 0 else "degrading" if fitness_trend < 0 else "stable"
             summary_parts.append(
                 f"Fitness trend: {fitness_trend:+.4f}/cycle ({direction})."
             )

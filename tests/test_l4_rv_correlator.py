@@ -27,23 +27,28 @@ from dharma_swarm.rv import RVReading
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 
-def _mock_rv_reading(rv: float, group: str = "unknown") -> RVReading:
+def _mock_rv_reading(value: float, group: str = "unknown", **overrides) -> RVReading:
     """Create a mock RVReading with given R_V value."""
-    return RVReading(
-        rv=rv,
+    values = dict(
+        rv=value,
         pr_early=10.0,
-        pr_late=rv * 10.0,
+        pr_late=value * 10.0,
         model_name="test-model",
         early_layer=2,
         late_layer=20,
         prompt_hash="abc123",
         prompt_group=group,
+        measurement_kind="residual_hidden",
+        measurement_details={"cohort": "l4-fixture"},
     )
+    values.update(overrides)
+    return RVReading(**values)
 
 
 def _make_correlator(
     gen_responses: list[str] | None = None,
     rv_values: list[float] | None = None,
+    reading_overrides: list[dict] | None = None,
 ) -> L4RVCorrelator:
     """Create a correlator with mocked generate_fn and RVMeasurer.
 
@@ -62,14 +67,16 @@ def _make_correlator(
 
     rv_idx = {"i": 0}
     rv_list = rv_values or [0.7]
+    overrides_list = reading_overrides or [{}]
 
     measurer = MagicMock()
     measurer.is_available.return_value = True
 
     async def mock_measure(prompt: str, group: str = "unknown") -> RVReading:
         idx = rv_idx["i"] % len(rv_list)
+        overrides = overrides_list[rv_idx["i"] % len(overrides_list)]
         rv_idx["i"] += 1
-        return _mock_rv_reading(rv_list[idx], group)
+        return _mock_rv_reading(rv_list[idx], group, **overrides)
 
     measurer.measure = mock_measure
 
@@ -338,6 +345,56 @@ class TestRunBatch:
         correlator = _make_correlator()
         result = await correlator.run_batch([])
         assert result.n_total == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "reading_overrides",
+        [
+            [{"measurement_kind": "unknown"}],
+            [{}, {"measurement_kind": "behavioral_proxy"}],
+            [{}, {"model_name": "other-model"}],
+            [{}, {"early_layer": 3}],
+            [{}, {"measurement_details": {"cohort": "other-cohort"}}],
+            [{"measurement_details": {}}],
+            [{"rv": float("nan")}],
+            [
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-a"},
+                },
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-b"},
+                },
+            ],
+        ],
+    )
+    async def test_batch_withholds_all_rv_statistics_for_incomparable_readings(
+        self, reading_overrides
+    ):
+        correlator = _make_correlator(
+            rv_values=[0.6, 0.65, 0.95, 0.98],
+            reading_overrides=reading_overrides,
+        )
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        assert result.n_with_rv == 4
+        assert len(result.paired_results) == 4
+        assert result.mean_compression_by_group
+        assert result.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert result.spearman_rho_ci is None
+        assert result.correlation is not None
+        assert result.correlation.pearson_r is None
+        assert result.correlation.mean_rv_by_group == {}
+        assert result.correlation.cohens_d_l4_baseline is None
+        assert result.correlation.pearson_r_ci is None
+        assert result.correlation.spearman_rho_ci is None
 
 
 # ── Prompt Bank Loader Tests ─────────────────────────────────────────────────
