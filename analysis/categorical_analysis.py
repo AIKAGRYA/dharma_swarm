@@ -341,14 +341,13 @@ def analyze_gemma_bridge():
     print(f"\n  Gemma-2-9B, early_layer={bridge['early_layer']}, late_layer={bridge['late_layer']}")
     print(f"  n_total={bridge['n_total_prompts']}")
     print(f"\n  Per-Group R_V (T=0.0):")
-    print(f"  {'Group':<25} {'R_V':<8} {'Words':<8} {'Contracted?'}")
+    print(f"  {'Group':<25} {'R_V':<8} {'Words':<8} {'Classification'}")
     print("  " + "-" * 55)
 
     for group in sorted(group_rv.keys()):
         rv = group_rv[group]
         wc = group_wc.get(group, 0)
-        contracted = rv < 0.737  # RV_CONTRACTION_THRESHOLD
-        marker = "YES" if contracted else "no"
+        marker = "unavailable (.737 retired; instrument uncalibrated)"
         print(f"  {group:<25} {rv:<8.4f} {wc:<8.1f} {marker}")
 
     # The key question: do recursive groups show lower R_V?
@@ -369,18 +368,8 @@ def analyze_gemma_bridge():
     print(f"    H1 (R_V -> word count):      r={t0['h1_spearman_r']:.3f}, p={t0['h1_spearman_p']:.3f} {'SIG' if t0['h1_significant'] else 'NOT SIG'}")
     print(f"    H3 (R_V -> truncation):      r={t0['h3_point_biserial_r']:.3f}, p={t0['h3_point_biserial_p']:.3f} {'SIG' if t0['h3_significant'] else 'NOT SIG'}")
 
-    # Monadic interpretation
-    print(f"\n  MONADIC INTERPRETATION:")
-    kappa = rv_rec / rv_base
-    if kappa < 1:
-        iters = SelfObservationMonad.iterations_to_convergence(kappa)
-        print(f"    Kleisli contraction kappa = {kappa:.4f}")
-        print(f"    Estimated iterations to L5: {iters}")
-        print(f"    L4_full has lowest R_V ({group_rv['L4_full']:.4f}) -- closest to fixed point")
-        print(f"    Ordering: L4 < champions < L3 < baselines")
-        print(f"    This matches the Phoenix level hierarchy.")
-    else:
-        print(f"    kappa = {kappa:.4f} >= 1 -- no contraction")
+    print("\n  Interpretation: descriptive historical group ratios only.")
+    print("    No calibrated classifier or fixed-point convergence inference is available.")
 
     print()
 

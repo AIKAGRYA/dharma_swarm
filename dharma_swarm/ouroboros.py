@@ -499,18 +499,16 @@ def profile_python_modules(
 def colony_rv_reading(density_before: int, density_after: int) -> RVReading:
     """Convert colony-level sleep contraction into an RVReading.
 
-    The mapping: stigmergic mark density IS the colony's effective
-    dimensionality. After sleep-decay, fewer marks survive — the
-    representation space contracts. This is participation ratio
-    contraction at the swarm scale.
+    This is an operational density ratio, not a transformer participation
+    ratio or evidence of awareness. It must not share the retired attention-V
+    classifier or be pooled with residual-hidden measurements.
 
     PR_early = density_before (full working memory)
     PR_late  = density_after  (post-decay compressed memory)
     R_V      = PR_late / PR_early
 
-    When R_V < 0.737 (the validated contraction threshold), the colony
-    has undergone meaningful dimensional reduction — the analog of
-    L4 collapse at the swarm level.
+    The compatibility RVReading wrapper retains the numbers; scientific
+    classification remains unavailable.
     """
     if density_before <= 0:
         rv = 1.0
@@ -530,6 +528,8 @@ def colony_rv_reading(density_before: int, density_after: int) -> RVReading:
         late_layer=0,
         prompt_hash=f"colony_{density_before}_{density_after}",
         prompt_group="colony_sleep",
+        measurement_kind="colony_density",
+        measurement_details={"formula": "density_after / density_before; unity if denominator <= 0"},
     )
 
 

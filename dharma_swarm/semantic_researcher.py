@@ -129,11 +129,11 @@ RESEARCH_CONNECTIONS: dict[str, list[dict[str, Any]]] = {
     ],
     "rv_contraction": [
         {
-            "source": "dharma_swarm geometric_lens Phase 1 (validated AUROC 0.909)",
+            "source": "mech-interp-latent-lab-phase1 MECH_INTERP_ATLAS (2026-09-17), MI-026",
             "field": "mechanistic interpretability",
-            "type": "validation",
-            "summary": "R_V < 0.737 discriminates self-referential from baseline prompts with AUROC 0.909 — internal validation of contraction signature",
-            "confidence": 0.9,
+            "type": "contradiction",
+            "summary": "The .737 classifier is retired: same-sample calibration lacked held-out validation. Raw association does not establish self-reference or awareness; thresholds cannot transfer across attention-V, residual-hidden and operational proxies.",
+            "confidence": 1.0,
         },
     ],
     "anekanta": [

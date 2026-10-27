@@ -69,15 +69,15 @@ class TestObservedState:
 
     def test_is_contracted_true(self):
         obs = _make_observed(rv=0.5)
-        assert obs.is_contracted is True
+        assert obs.is_contracted is None
 
     def test_is_contracted_false(self):
         obs = _make_observed(rv=0.9)
-        assert obs.is_contracted is False
+        assert obs.is_contracted is None
 
     def test_is_contracted_none_rv(self):
         obs = _make_observed(rv=None)
-        assert obs.is_contracted is False
+        assert obs.is_contracted is None
 
     def test_rv_property_default(self):
         obs = _make_observed(rv=None)
@@ -95,7 +95,7 @@ class TestObservedState:
         assert obs.observation_depth == 1
         assert obs.introspection["model"] == "test-model"
         assert obs.introspection["prompt_group"] == "L4"
-        assert obs.introspection["contraction_strength"] == "strong"
+        assert obs.introspection["contraction_strength"] is None
 
     def test_generic_state_types(self):
         """ObservedState works with any state type."""

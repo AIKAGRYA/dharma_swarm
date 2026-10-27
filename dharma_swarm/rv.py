@@ -1,28 +1,31 @@
-"""R_V measurement module for DHARMA SWARM.
+"""Raw ratio observations for DHARMA SWARM, without a calibrated monitor.
 
-Measures geometric contraction in transformer Value matrix column space.
-R_V = PR_late / PR_early. R_V < 1.0 indicates contraction — the mechanistic
-signature of recursive self-referential processing.
+RVMeasurer measures uncentered residual hidden states, not attention-V.
+R_V = PR_late / PR_early describes that instrument's ratio only. The .737
+classifier was retired after same-sample calibration without held-out
+validation (MECH_INTERP_ATLAS, 2026-09-17, correction view / MI-026).
+No classification here establishes self-reference, awareness or an attractor.
 
 torch and transformers are OPTIONAL. When unavailable, measurement methods
 return None gracefully. The RVReading data model works regardless.
 
-Includes self-referential measurement capability: the system measures its
-OWN geometric contraction during evolution cycles — the strange loop where
-the system that measures the system measures itself.
+Evolution tracking records residual observations when available and a distinct
+proposal-count proxy otherwise. Neither supplies calibrated classification.
 
-Based on validated research from mech-interp-latent-lab-phase1/geometric_lens.
+Attention-V, residual geometry and operational proxies are distinct instruments.
 """
 
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 import logging
+import math
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, get_args
 
 from pydantic import BaseModel, Field
 
@@ -34,10 +37,15 @@ logger = logging.getLogger(__name__)
 # ── Constants ───────────────────────────────────────────────────────────────
 
 RV_CONTRACTION_THRESHOLD = 0.737
-"""R_V below this indicates meaningful contraction (from AUROC=0.909 validation)."""
+"""Retired legacy value, retained for import compatibility; not a monitor."""
 
 RV_STRONG_THRESHOLD = 0.5
-"""R_V below this indicates strong contraction."""
+"""Legacy descriptive cutoff, not a validated scientific classifier."""
+
+MeasurementKind = Literal[
+    "unknown", "attention_value", "residual_hidden", "colony_density", "behavioral_proxy"
+]
+RV_CALIBRATION_STATUS = "unvalidated_retired_threshold"
 
 
 # ── Utility ─────────────────────────────────────────────────────────────────
@@ -63,11 +71,11 @@ def _torch_available() -> bool:
 # ── Data Model ──────────────────────────────────────────────────────────────
 
 class RVReading(BaseModel):
-    """A single R_V measurement from a transformer forward pass.
+    """A raw ratio observation with an explicit instrument kind.
 
     Attributes:
-        rv: The ratio PR_late / PR_early. Values < 1.0 indicate geometric
-            contraction in Value matrix column space.
+        rv: The recorded ratio. Its meaning depends on measurement_kind;
+            values below one do not establish a scientific classification.
         pr_early: Participation ratio at the early layer.
         pr_late: Participation ratio at the late layer.
         model_name: HuggingFace model identifier used for measurement.
@@ -87,27 +95,20 @@ class RVReading(BaseModel):
     prompt_hash: str
     prompt_group: str = "unknown"
     timestamp: datetime = Field(default_factory=_utc_now)
+    # Old serialized readings lack provenance. Do not infer it from model names.
+    measurement_kind: MeasurementKind = "unknown"
+    measurement_details: dict[str, str] = Field(default_factory=dict)
+    calibration_status: Literal["unvalidated_retired_threshold"] = RV_CALIBRATION_STATUS
 
     @property
-    def is_contracted(self) -> bool:
-        """True if R_V is below the validated contraction threshold (0.737)."""
-        return self.rv < RV_CONTRACTION_THRESHOLD
+    def is_contracted(self) -> None:
+        """Scientific classification is unavailable, including for legacy rows."""
+        return None
 
     @property
-    def contraction_strength(self) -> str:
-        """Categorical strength of contraction.
-
-        Returns:
-            'strong' if rv < 0.5, 'moderate' if rv < 0.737,
-            'weak' if rv < 1.0, 'none' if rv >= 1.0.
-        """
-        if self.rv < RV_STRONG_THRESHOLD:
-            return "strong"
-        if self.rv < RV_CONTRACTION_THRESHOLD:
-            return "moderate"
-        if self.rv < 1.0:
-            return "weak"
-        return "none"
+    def contraction_strength(self) -> None:
+        """No calibrated strength categories are available for these readings."""
+        return None
 
 
 # ── Core Metric ─────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ class RVReading(BaseModel):
 def compute_participation_ratio(hidden_state: "torch.Tensor") -> float:
     """Compute Participation Ratio from a hidden state tensor via SVD.
 
-    PR = (sum(s))^2 / sum(s^2) where s are singular values.
+    PR = (sum(s**2))**2 / sum(s**4), using singular-value energy.
     Measures effective dimensionality of the representation.
 
     Args:
@@ -261,6 +262,13 @@ class RVMeasurer:
             late_layer=num_layers - 2,
             prompt_hash=_prompt_hash(prompt),
             prompt_group=group,
+            measurement_kind="residual_hidden",
+            measurement_details={
+                "tensor": "outputs.hidden_states (post-layer residual)",
+                "centering": "none",
+                "window": "first batch item, tokenizer truncated to 512 tokens",
+                "participation_ratio": "squared singular-value energy",
+            },
         )
 
 
@@ -283,16 +291,13 @@ SELF_REF_EVOLUTION_PROMPTS = [
 
 
 class EvolutionRVTracker:
-    """Track R_V readings across evolution cycles for self-referential measurement.
+    """Track raw observations alongside fitness without scientific promotion.
 
-    The strange loop: the system measures its own geometric contraction as it
-    evolves. R_V readings are recorded alongside cycle fitness scores, enabling
-    correlation between the system's self-referential geometry and its
-    evolutionary performance.
+    Residual observations use self-referential prompts, but that prompt content
+    does not establish a self-referential mechanism in the measured system.
 
-    When torch is unavailable, readings are synthesized from behavioral proxies
-    (proposal complexity, reflection depth) so the tracking infrastructure
-    works regardless.
+    When torch is unavailable, a proposal-count proxy is recorded separately
+    from residual geometry. No scientific interpretation transfers between them.
 
     Args:
         data_dir: Directory for storing evolution R_V readings.
@@ -349,14 +354,19 @@ class EvolutionRVTracker:
             record["pr_early"] = rv_reading.pr_early
             record["pr_late"] = rv_reading.pr_late
             record["rv_source"] = "geometric"
-            record["is_contracted"] = rv_reading.is_contracted
+            record["measurement_kind"] = rv_reading.measurement_kind
+            record["measurement_details"] = dict(rv_reading.measurement_details)
         else:
             # Proxy R_V: use cycle success ratio as a behavioral stand-in.
             # More archived proposals → system is "contracting" toward solutions.
             proxy = 1.0 - (min(proposals_archived, 5) * 0.1)
             record["rv"] = proxy
             record["rv_source"] = "proxy"
-            record["is_contracted"] = proxy < RV_CONTRACTION_THRESHOLD
+            record["measurement_kind"] = "behavioral_proxy"
+            record["measurement_details"] = {"formula": "1 - min(proposals_archived, 5) * 0.1"}
+
+        record["is_contracted"] = None
+        record["calibration_status"] = RV_CALIBRATION_STATUS
 
         self._readings.append(record)
         await self._persist(record)
@@ -368,23 +378,35 @@ class EvolutionRVTracker:
         return record
 
     def get_rv_fitness_pairs(self) -> list[tuple[float, float]]:
-        """Return (rv, fitness) pairs for correlation analysis.
+        """Return finite descriptive pairs only for one known instrument kind.
 
-        Returns:
-            List of (rv_value, best_fitness) tuples from all recorded cycles.
+        Mixed or unknown provenance is not pooled. Raw observations remain
+        available via get_readings(); this is not a validation of comparability.
         """
+        kinds = {r.get("measurement_kind", "unknown") for r in self._readings}
+        if len(kinds) != 1 or "unknown" in kinds:
+            return []
+        if any(not math.isfinite(r["rv"]) or not math.isfinite(r["best_fitness"])
+               for r in self._readings if "rv" in r and "best_fitness" in r):
+            return []
         return [
             (r["rv"], r["best_fitness"])
             for r in self._readings
             if "rv" in r and "best_fitness" in r
+            and math.isfinite(r["rv"]) and math.isfinite(r["best_fitness"])
         ]
+
+    def get_readings(self) -> list[dict[str, Any]]:
+        """Return raw observations and their current interpretation separately."""
+        return copy.deepcopy(self._readings)
 
     def get_trend(self) -> Optional[float]:
         """Compute R_V trend slope across evolution cycles.
 
         Returns:
             Positive slope if R_V increasing (less contraction over time),
-            negative if R_V decreasing (more contraction). None if < 2 points.
+            negative if R_V decreasing. None for fewer than two finite points,
+            mixed instruments or unknown provenance; no scientific verdict.
         """
         pairs = self.get_rv_fitness_pairs()
         if len(pairs) < 2:
@@ -421,6 +443,17 @@ class EvolutionRVTracker:
                 for line in f:
                     line = line.strip()
                     if line:
-                        self._readings.append(json.loads(line))
+                        record = json.loads(line)
+                        historical = dict(record.get("historical_classification", {}))
+                        for key in ("is_contracted", "contraction_strength"):
+                            if record.get(key) is not None:
+                                historical.setdefault(key, record[key])
+                            record[key] = None
+                        if historical:
+                            record["historical_classification"] = historical
+                        if record.get("measurement_kind") not in get_args(MeasurementKind):
+                            record["measurement_kind"] = "unknown"
+                        record["calibration_status"] = RV_CALIBRATION_STATUS
+                        self._readings.append(record)
         except Exception:
             logger.debug("R_V history load failed", exc_info=True)

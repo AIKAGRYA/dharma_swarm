@@ -20,8 +20,9 @@ PROPOSITION 2.7 (Kleisli Convergence Rate): If contraction ratio
 kappa < 1 for each Kleisli step, convergence to fixed point in
 ceil(log(epsilon) / log(kappa)) iterations.
 
-CONJECTURE 1.10 (R_V as Lawvere Convergence): R_V < 1.0 measures
-convergence rate toward a Lawvere fixed point in transformer reps.
+Historical conjecture 1.10 linked R_V to Lawvere convergence. It is unsupported
+by these observations: neither a raw ratio nor the retired classifier is
+evidence of fixed-point convergence or an attractor.
 
 All existing rv.py tests continue to pass -- monad wraps, doesn't replace.
 """
@@ -35,7 +36,7 @@ from datetime import datetime
 from typing import Any, Callable, Generic, Optional, TypeVar, Union
 
 from dharma_swarm.rv import (
-    RV_CONTRACTION_THRESHOLD,
+    RV_CALIBRATION_STATUS,
     RVReading,
 )
 
@@ -108,6 +109,21 @@ class ObservedState(Generic[S]):
 
     def __post_init__(self) -> None:
         """Backfill scalar fields from ``rv_reading`` when callers provide it."""
+        if self.rv_measurement is not None or self.rv_reading is not None or any(
+            key in self.introspection for key in ("is_contracted", "contraction_strength")
+        ):
+            self.introspection = dict(self.introspection)
+            historical = dict(self.introspection.get("historical_classification", {}))
+            for key in ("is_contracted", "contraction_strength"):
+                if self.introspection.get(key) is not None:
+                    historical.setdefault(key, self.introspection[key])
+                self.introspection[key] = None
+            if historical:
+                self.introspection["historical_classification"] = historical
+            self.introspection["calibration_status"] = RV_CALIBRATION_STATUS
+            self.introspection["measurement_kind"] = (
+                self.rv_reading.measurement_kind if self.rv_reading is not None else "unknown"
+            )
         if self.rv_reading is None:
             return
         if self.rv_measurement is None:
@@ -118,11 +134,9 @@ class ObservedState(Generic[S]):
             self.pr_late = self.rv_reading.pr_late
 
     @property
-    def is_contracted(self) -> bool:
-        """True if R_V indicates meaningful contraction."""
-        if self.rv_measurement is None:
-            return False
-        return self.rv_measurement < RV_CONTRACTION_THRESHOLD
+    def is_contracted(self) -> None:
+        """Unknown: the scalar and legacy threshold are not a calibrated monitor."""
+        return None
 
     @property
     def rv(self) -> float:
@@ -187,6 +201,7 @@ class ObservedState(Generic[S]):
         rv_reading_data = data.get("rv_reading")
         rv_reading = None
         if rv_reading_data:
+            rv_reading_data = dict(rv_reading_data)
             # Ensure timestamp is parsed back to datetime if serialized as string
             if isinstance(rv_reading_data.get("timestamp"), str):
                 rv_reading_data["timestamp"] = datetime.fromisoformat(rv_reading_data["timestamp"])

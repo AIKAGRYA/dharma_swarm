@@ -1,0 +1,123 @@
+{
+  "id": "fleet-advancement-WP-MI-RETRACTION-20261027",
+  "base_ref": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
+  "branch": "codex/fleet-advancement-mi-retraction-20261027",
+  "worktree": ".",
+  "intent": "Carry the September MI retraction into actual runtime consumers under ordered READOUT item10. Preserve raw numeric observations and historical loadability; report retired-threshold classification as unknown and distinguish residual-hidden, colony and behavioral-proxy measurements. Remove claims that .737 is validated without replacing it with a different validated threshold. Report unavailable downstream classification honestly. No research, provider calls, services, Raiei, trading, portfolio rewrite or merge. Narrow behavioral tests and independent review precede the required no-mistakes delivery gate. Ordered item14 now explicitly authorizes only a verified DocOps freshness repair needed for normal commit: regenerate actual manifest count tokens and managed inventory blocks, then set assertions.verified_at to the actual verification date after evidence; preserve TTL14 and every guard. Exact additional allowed paths are docs/docops/assertions.yaml, docs/governance/SOVEREIGN_MANIFEST.md and docs/docops/AUTO_INVENTORY.md. All other governance paths remain outside the exact allowed scope. No history rewrite, broad secret allowlist, ref deletion, hook bypass or shipping while the unresolved mandatory repository-history scan is failed.",
+  "allowed_files": [
+    "dharma_swarm/rv.py",
+    "dharma_swarm/monad.py",
+    "dharma_swarm/bridge.py",
+    "dharma_swarm/ouroboros.py",
+    "dharma_swarm/pulse.py",
+    "dharma_swarm/semantic_researcher.py",
+    "dharma_swarm/telos_substrate.py",
+    "analysis/categorical_analysis.py",
+    "tests/test_rv.py",
+    "tests/test_monad_laws.py",
+    "tests/test_bridge.py",
+    "tests/test_ouroboros.py",
+    "tests/test_pulse.py",
+    "tests/test_semantic_researcher.py",
+    "tests/test_telos_substrate.py",
+    "tests/test_rv_retraction.py",
+    "reports/agentops/work_packets/fleet-advancement-WP-MI-RETRACTION-20261027.json",
+    "docs/docops/assertions.yaml",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/docops/AUTO_INVENTORY.md"
+  ],
+  "forbidden_files": [
+    ".github/**",
+    "Makefile",
+    "dharma_swarm/ginko*",
+    "dharma_swarm/forge_lab/**",
+    "dharma_swarm/foundry/**",
+    "dharma_swarm/operator_core/**",
+    "scripts/governance/**",
+    "scripts/runtime/**"
+  ],
+  "gates": [
+    {
+      "name": "mi-contract-consumers",
+      "command": "python3 -m pytest -q tests/test_rv.py tests/test_monad_laws.py tests/test_bridge.py tests/test_ouroboros.py tests/test_rv_retraction.py",
+      "expected_exit": 0,
+      "timeout_seconds": 300
+    },
+    {
+      "name": "docops-full-current-evidence",
+      "command": "python3 scripts/docops/check_docops_integrity.py",
+      "expected_exit": 0,
+      "timeout_seconds": 120
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "expected_exit": 0,
+      "timeout_seconds": 60
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "unrecognized-measurement-kind-rejected",
+      "command": "python3 -c \"from dharma_swarm.rv import RVReading; RVReading(rv=0.5,pr_early=2.0,pr_late=1.0,model_name='test',early_layer=0,late_layer=1,prompt_hash='test',measurement_kind='validated-awareness')\"",
+      "expected_exit": 1,
+      "timeout_seconds": 60
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(research): retire unvalidated R_V classifications"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  },
+  "session_entry": {
+    "schema": "dharma_swarm.session_entry.v1",
+    "tool_versions": {
+      "python": "3.13.12",
+      "git": "2.50.1",
+      "make": "3.81"
+    },
+    "authority_precedence": [
+      "executable",
+      "tests",
+      "locks",
+      "git",
+      "owner_files"
+    ],
+    "work_packet": "WP-MI-RETRACTION-20261027",
+    "active_track": "fleet-advancement-2026-08",
+    "owner": "@dhyana",
+    "collision": {
+      "checked_at_sha": "d2b2f40447cfd4e23e0a1d1618a9f19376c2ed84",
+      "status": "clear",
+      "details": []
+    },
+    "interface_mismatches": [
+      "RVMeasurer observes residual hidden states, not attention-V. Legacy classification transfers a retired threshold to uncalibrated residual and operational proxies. Bridge currently turns unavailable classification into numeric overlap."
+    ],
+    "closest_existing_implementation": [
+      "dharma_swarm/rv.py",
+      "dharma_swarm/monad.py",
+      "dharma_swarm/bridge.py",
+      "dharma_swarm/ouroboros.py",
+      "tests/test_rv.py",
+      "tests/test_bridge.py",
+      "scripts/docops/check_docops_integrity.py",
+      "docs/docops/assertions.yaml",
+      "docs/governance/SOVEREIGN_MANIFEST.md",
+      "docs/docops/AUTO_INVENTORY.md"
+    ],
+    "honest_blockers": [
+      "This correction does not validate any scientific threshold, consciousness inference or new measurement instrument.",
+      "Historical rows without measurement provenance remain unknown; no labels are fabricated from ambiguous names.",
+      "Main checkout staged restart-race work belongs to another lane and is excluded.",
+      "No scientific campaign or active service is restarted; no merge is authorized.",
+      "Item14 scope expansion permits only three DocOps files plus admission metadata; no TTL/guard weakening.",
+      "Mandatory repository-wide history gitleaks reports10 pre-existing findings on other refs; this refresh does not resolve that check and cannot authorize push."
+    ],
+    "rollback": "Revert only the packet-scoped commit after recording the correction rationale; no runtime data or service state is changed.",
+    "packet_digest": "0a4b8270fdbe4c5bb6bdf154fea1f8bf85e48ed1c399960e8202b0b599d2bce7"
+  }
+}

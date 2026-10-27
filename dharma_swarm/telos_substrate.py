@@ -85,7 +85,8 @@ TELOS_OBJECTIVES: list[dict[str, Any]] = [
         "progress": 0.0,
         "description": (
             "Live Grafana/Streamlit dashboard showing R_V scores per inference "
-            "request. Alert when R_V drops below threshold (0.737). "
+            "request with instrument provenance. The .737 threshold is retired; "
+            "scientific classification is unavailable and must not trigger alerts. "
             "WebSocket streaming from API to dashboard."
         ),
         "target_date": "2026-10-01",

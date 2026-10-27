@@ -40,6 +40,7 @@ def _make_rv_reading(**overrides) -> RVReading:
         late_layer=22,
         prompt_hash="abcdef0123456789",
         prompt_group="L4",
+        measurement_kind="residual_hidden",
     )
     defaults.update(overrides)
     return RVReading(**defaults)
@@ -128,7 +129,7 @@ class TestCorrelationResult:
         assert cr.pearson_r is None
         assert cr.spearman_rho is None
         assert cr.mean_rv_by_group == {}
-        assert cr.contraction_recognition_overlap == 0.0
+        assert cr.contraction_recognition_overlap is None
 
     def test_creation_full(self):
         cr = CorrelationResult(
@@ -607,7 +608,8 @@ class TestResearchBridgeComputeCorrelation:
 
         result = bridge.compute_correlation()
         # 1 out of 3 should be contracted AND genuine
-        assert result.contraction_recognition_overlap == pytest.approx(1 / 3)
+        assert result.contraction_recognition_overlap is None
+        assert result.classification_count == 0
 
     async def test_summary_contains_n(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
@@ -644,18 +646,19 @@ class TestResearchBridgeGroupSummary:
         assert "L4" in summary
         assert "baseline" in summary
 
-    async def test_group_without_rv_has_nan(self, tmp_path):
+    async def test_group_without_rv_is_unavailable(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
         await bridge.add_measurement("p", "L4", "Response text.")
         summary = bridge.group_summary()
-        assert math.isnan(summary["L4"]["mean_rv"])
+        assert summary["L4"]["mean_rv"] is None
 
     async def test_group_summary_keys(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
         rv = _make_rv_reading(rv=0.6)
         await bridge.add_measurement("p", "L3", "Response.", rv_reading=rv)
         summary = bridge.group_summary()
-        expected_keys = {"mean_rv", "mean_swabhaav", "mean_entropy", "mean_self_ref", "count"}
+        expected_keys = {"mean_rv", "mean_swabhaav", "mean_entropy", "mean_self_ref", "count",
+                         "measurement_kind_counts", "calibration_status"}
         assert set(summary["L3"].keys()) == expected_keys
 
 
@@ -727,7 +730,7 @@ class TestBuildSummary:
         summary = ResearchBridge._build_summary(
             n=50, pearson=-0.72, spearman=-0.68, overlap=0.8
         )
-        assert "Strong negative correlation" in summary
+        assert "does not establish self-reference or awareness" in summary
         assert "n=50" in summary
 
     def test_strong_positive_warning(self):
