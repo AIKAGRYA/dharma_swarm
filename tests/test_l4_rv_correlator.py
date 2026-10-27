@@ -396,6 +396,114 @@ class TestRunBatch:
         assert result.correlation.pearson_r_ci is None
         assert result.correlation.spearman_rho_ci is None
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "historical_overrides,batch_overrides",
+        [
+            ({"measurement_kind": "unknown", "measurement_details": {}}, None),
+            (
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-a"},
+                },
+                None,
+            ),
+            ({"model_name": "other-model"}, None),
+            ({"early_layer": 3}, None),
+            ({"late_layer": 19}, None),
+            ({"measurement_details": {"cohort": "other-cohort"}}, None),
+            (
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-a"},
+                },
+                [{
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-b"},
+                }],
+            ),
+            ({"rv": float("nan")}, None),
+        ],
+    )
+    async def test_batch_withholds_statistics_when_full_history_is_unavailable(
+        self, historical_overrides, batch_overrides
+    ):
+        correlator = _make_correlator(
+            rv_values=[0.6, 0.65, 0.95, 0.98],
+            reading_overrides=batch_overrides,
+        )
+        await correlator._bridge.add_measurement(
+            prompt_text="historical prompt",
+            prompt_group="L4_full",
+            generated_text="historical response",
+            rv_reading=_mock_rv_reading(0.4, "L4_full", **historical_overrides),
+        )
+
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        assert result.n_with_rv == 4
+        assert len(result.paired_results) == 4
+        assert len(correlator._bridge.get_measurements()) == 5
+        assert result.mean_compression_by_group
+        assert result.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert result.spearman_rho_ci is None
+        assert result.correlation is not None
+        assert result.correlation.n == 5
+        assert result.correlation.pearson_r is None
+        assert result.correlation.mean_rv_by_group == {}
+        assert result.correlation.cohens_d_l4_baseline is None
+        assert result.correlation.pearson_r_ci is None
+        assert result.correlation.spearman_rho_ci is None
+
+    @pytest.mark.asyncio
+    async def test_batch_derived_statistics_use_compatible_full_history(
+        self, monkeypatch
+    ):
+        correlator = _make_correlator(rv_values=[0.6, 0.65, 0.95, 0.98])
+        await correlator._bridge.add_measurement(
+            prompt_text="historical prompt",
+            prompt_group="L4_full",
+            generated_text="historical response",
+            rv_reading=_mock_rv_reading(0.4, "L4_full"),
+        )
+        bootstrap_samples = []
+
+        def fake_bootstrap(xs, ys, stat_fn):
+            bootstrap_samples.append((list(xs), list(ys)))
+            return (-0.5, 0.5)
+
+        monkeypatch.setattr(
+            "dharma_swarm.l4_rv_correlator._bootstrap_ci", fake_bootstrap
+        )
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        expected_rv = [0.4, 0.6, 0.65, 0.95, 0.98]
+        assert len(bootstrap_samples) == 2
+        assert all(sample[0] == expected_rv for sample in bootstrap_samples)
+        assert all(len(sample[1]) == 5 for sample in bootstrap_samples)
+        assert result.n_with_rv == 4
+        assert result.pearson_r_ci == (-0.5, 0.5)
+        assert result.spearman_rho_ci == (-0.5, 0.5)
+        assert result.cohens_d_l4_baseline == pytest.approx(
+            _cohens_d([0.4, 0.6, 0.65], [0.95, 0.98])
+        )
+        assert result.correlation is not None
+        assert result.correlation.n == 5
+        assert result.correlation.pearson_r_ci == (-0.5, 0.5)
+        assert result.correlation.spearman_rho_ci == (-0.5, 0.5)
+        assert result.correlation.cohens_d_l4_baseline == result.cohens_d_l4_baseline
+
 
 # ── Prompt Bank Loader Tests ─────────────────────────────────────────────────
 

@@ -45,11 +45,38 @@ def _proposal(component: str, description: str, *, parent_id: str | None = None)
     )
 
 
+def _window_reading(value: float, **overrides) -> dict:
+    reading = {
+        "rv": value,
+        "pr_early": 10.0,
+        "pr_late": value * 10.0,
+        "model_name": "test-model",
+        "early_layer": 2,
+        "late_layer": 20,
+        "prompt_hash": "abc123",
+        "prompt_group": "evolution_cycle",
+        "measurement_kind": "residual_hidden",
+        "measurement_details": {"cohort": "dse-fixture"},
+    }
+    reading.update(overrides)
+    return reading
+
+
 def test_observation_window_preserves_zero_metric_values():
     window = ObservationWindow(max_size=5)
 
-    window.append({"cycle_id": "c1", "rv": 0.0, "best_fitness": 0.0})
-    window.append({"cycle_id": "c2", "rv": 0.2, "best_fitness": 0.4})
+    window.append({
+        "cycle_id": "c1",
+        "rv": 0.0,
+        "best_fitness": 0.0,
+        "rv_reading": _window_reading(0.0),
+    })
+    window.append({
+        "cycle_id": "c2",
+        "rv": 0.2,
+        "best_fitness": 0.4,
+        "rv_reading": _window_reading(0.2),
+    })
 
     assert window.rv_trajectory == [0.0, 0.2]
     assert window.fitness_trajectory == [0.0, 0.4]
@@ -69,6 +96,61 @@ def test_observation_window_trim_drops_stale_metrics_from_trimmed_records():
     assert window.fitness_trajectory == [0.0]
     assert window.rv_trend is None
     assert window.fitness_trend is None
+
+
+@pytest.mark.parametrize(
+    "rv_values,reading_overrides",
+    [
+        ([0.4, 0.7], None),
+        ([0.4, 0.7], [{}, {"measurement_kind": "unknown"}]),
+        (
+            [0.4, 0.7],
+            [{}, {
+                "measurement_kind": "behavioral_proxy",
+                "measurement_details": {"cohort": "dse-fixture", "formula": "formula-a"},
+            }],
+        ),
+        ([0.4, 0.7], [{}, {"model_name": "other-model"}]),
+        ([0.4, 0.7], [{}, {"early_layer": 3}]),
+        ([0.4, 0.7], [{}, {"late_layer": 19}]),
+        ([0.4, 0.7], [{}, {"measurement_details": {"cohort": "other-cohort"}}]),
+        (
+            [0.4, 0.7],
+            [
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "dse-fixture", "formula": "formula-a"},
+                },
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "dse-fixture", "formula": "formula-b"},
+                },
+            ],
+        ),
+        ([0.4, float("nan")], [{}, {}]),
+    ],
+)
+def test_observation_window_withholds_unavailable_rv_trend(
+    rv_values, reading_overrides
+):
+    window = ObservationWindow(max_size=5)
+    for index, value in enumerate(rv_values):
+        record = {
+            "cycle_id": f"c{index}",
+            "rv": value,
+            "best_fitness": index * 0.2,
+        }
+        if reading_overrides is not None:
+            record["rv_reading"] = _window_reading(
+                value, **reading_overrides[index]
+            )
+        window.append(record)
+
+    assert len(window.observations) == 2
+    assert window.rv_trajectory == pytest.approx(rv_values, nan_ok=True)
+    assert window.fitness_trajectory == [0.0, 0.2]
+    assert window.rv_trend is None
+    assert window.fitness_trend == pytest.approx(0.2)
 
 
 async def test_after_cycle_persists_replayable_current_cycle_observation(tmp_path):
@@ -213,6 +295,8 @@ async def test_repeated_proxy_observations_leave_fixed_point_verdict_unavailable
     assert first is not None
     assert second is not None
     assert second.approaching_fixed_point is None
+    assert second.rv_trend is None
+    assert integrator._window.rv_trajectory == [0.9, 0.9]
     assert [record["rv_measurement"] for record in integrator._window.observations] == [0.9, 0.9]
     assert all(
         record["approaching_fixed_point"] is None
@@ -220,6 +304,7 @@ async def test_repeated_proxy_observations_leave_fixed_point_verdict_unavailable
     )
     context = integrator.get_coordination_context()
     assert context["approaching_fixed_point"] is None
+    assert context["rv_trend"] is None
     assert "convergence_hint" not in context
 
 

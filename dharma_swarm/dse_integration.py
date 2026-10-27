@@ -36,7 +36,7 @@ from dharma_swarm.archive import ArchiveEntry
 from dharma_swarm.coalgebra import EvolutionObservation, build_evolution_observation
 from dharma_swarm.evolution import CycleResult, Proposal
 from dharma_swarm.monad import SelfObservationMonad
-from dharma_swarm.rv import RVReading
+from dharma_swarm.rv import RVReading, comparable_measurement_identity
 from dharma_swarm.sheaf import (
     CoordinationProtocol,
     Discovery,
@@ -216,7 +216,15 @@ class ObservationWindow(BaseModel):
 
     @property
     def rv_trend(self) -> float | None:
-        if len(self.rv_trajectory) < 2:
+        records = [
+            record for record in self.observations if record.get("rv") is not None
+        ]
+        if len(records) < 2:
+            return None
+        readings = [record.get("rv_reading") or record for record in records]
+        if comparable_measurement_identity(readings) is None:
+            return None
+        if not all(map(math.isfinite, self.rv_trajectory)):
             return None
         diffs = [b - a for a, b in zip(self.rv_trajectory, self.rv_trajectory[1:])]
         return sum(diffs) / len(diffs)

@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from dharma_swarm.bridge import (
     CorrelationResult,
+    PairedMeasurement,
     ResearchBridge,
     _pearson_r,
     _spearman_rho,
@@ -275,27 +276,32 @@ class L4RVCorrelator:
             mean_fidelity[grp] = statistics.mean(fids) if fids else 0.0
             pass_rate[grp] = statistics.mean(passes) if passes else 0.0
 
-        readings = [r.rv_reading for r in results if r.rv_reading is not None]
-        rv_vals = [reading.rv for reading in readings]
-        swab_vals = [
-            r.behavioral_swabhaav
-            for r in results
-            if r.rv_reading is not None
+        paired = [
+            measurement
+            for measurement in self._bridge.get_measurements()
+            if measurement.rv_reading is not None
         ]
-        comparable = comparable_measurement_identity(readings) is not None
-        finite = all(map(math.isfinite, rv_vals + swab_vals))
+        rv_vals = [measurement.rv_reading.rv for measurement in paired]
+        swab_vals = [measurement.behavioral.swabhaav_ratio for measurement in paired]
+        statistics_available = (
+            comparable_measurement_identity(
+                [measurement.rv_reading for measurement in paired]
+            )
+            is not None
+            and all(map(math.isfinite, rv_vals + swab_vals))
+        )
 
         cohens_d = (
-            self._cohens_d_groups(results, "L4_full", "baseline")
-            if comparable and finite else None
+            self._cohens_d_groups(paired, "L4_full", "baseline")
+            if statistics_available else None
         )
         pearson_ci = (
             _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
-            if comparable and finite else None
+            if statistics_available else None
         )
         spearman_ci = (
             _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
-            if comparable and finite else None
+            if statistics_available else None
         )
 
         # Patch CIs into correlation result
@@ -306,7 +312,7 @@ class L4RVCorrelator:
 
         return BatchResult(
             n_total=len(results),
-            n_with_rv=len(rv_vals),
+            n_with_rv=sum(result.rv_reading is not None for result in results),
             correlation=correlation,
             cohens_d_l4_baseline=cohens_d,
             pearson_r_ci=pearson_ci,
@@ -319,7 +325,7 @@ class L4RVCorrelator:
 
     def _cohens_d_groups(
         self,
-        results: list[L4RVPairedResult],
+        results: list[L4RVPairedResult | PairedMeasurement],
         group_a: str,
         group_b: str,
     ) -> Optional[float]:
