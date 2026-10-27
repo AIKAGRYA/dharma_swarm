@@ -111,7 +111,33 @@ class ObservedState(Generic[S]):
     """Backward-compatible alias carrying the source RVReading when available."""
 
     def __post_init__(self) -> None:
-        """Backfill scalar fields from ``rv_reading`` when callers provide it."""
+        """Compose reading metadata and backfill supplied scalar fields."""
+        if self.rv_reading is not None:
+            history = self.introspection.get("historical_classification", {})
+            conflicts = self.introspection.get("historical_classification_conflicts", [])
+            if (
+                not isinstance(history, dict)
+                or any(
+                    key not in history or history[key] != value
+                    for key, value in self.rv_reading.historical_classification.items()
+                )
+                or not isinstance(conflicts, list)
+                or any(
+                    conflict not in conflicts
+                    for conflict in self.rv_reading.historical_classification_conflicts
+                )
+            ):
+                self.introspection = _merge_introspection(
+                    {
+                        "historical_classification": deepcopy(
+                            self.rv_reading.historical_classification
+                        ),
+                        "historical_classification_conflicts": deepcopy(
+                            self.rv_reading.historical_classification_conflicts
+                        ),
+                    },
+                    self.introspection,
+                )
         if self.rv_measurement is not None or self.rv_reading is not None or any(
             key in self.introspection for key in ("is_contracted", "contraction_strength")
         ):

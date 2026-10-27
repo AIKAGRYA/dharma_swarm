@@ -300,7 +300,7 @@ class ResearchBridge:
             rv_reading: Optional mechanistic R_V measurement.
 
         Returns:
-            The newly created PairedMeasurement.
+            An independent snapshot of the newly created PairedMeasurement.
         """
         behavioral = self._analyzer.analyze(generated_text)
 
@@ -315,7 +315,7 @@ class ResearchBridge:
 
         self._measurements.append(measurement)
         await self.save()
-        return measurement
+        return deepcopy(measurement)
 
     def compute_correlation(self) -> CorrelationResult:
         """Compute statistical correlation between R_V and behavioral metrics.
@@ -433,11 +433,11 @@ class ResearchBridge:
             group: If provided, only return measurements in this prompt group.
 
         Returns:
-            List of PairedMeasurement objects.
+            Independent snapshots of the selected PairedMeasurement objects.
         """
         if group is None:
-            return list(self._measurements)
-        return [m for m in self._measurements if m.prompt_group == group]
+            return deepcopy(self._measurements)
+        return deepcopy([m for m in self._measurements if m.prompt_group == group])
 
     # -- Private helpers -----------------------------------------------------
 

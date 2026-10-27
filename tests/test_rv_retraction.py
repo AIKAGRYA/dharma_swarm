@@ -729,34 +729,176 @@ async def test_research_bridge_snapshots_accepted_reading_provenance(tmp_path):
     assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(0.6)
 
 
+@pytest.mark.parametrize("accessor", ["add", "all", "filtered"])
+async def test_research_bridge_returned_measurements_are_private_snapshots(
+    tmp_path, accessor
+):
+    path = tmp_path / f"{accessor}-pairs.jsonl"
+    bridge = ResearchBridge(path)
+    first = reading(
+        0.4,
+        "residual_hidden",
+        measurement_details={"cohort": "cohort-a"},
+        historical_classification={"raw": {"accepted": True}},
+    )
+    accepted = deepcopy(first)
+
+    if accessor == "add":
+        returned = await bridge.add_measurement(
+            "first", "same", "First response.", rv_reading=first
+        )
+    else:
+        await bridge.add_measurement("first", "same", "First response.", rv_reading=first)
+        group = None if accessor == "all" else "same"
+        returned = bridge.get_measurements(group=group)[0]
+    accepted_id = returned.id
+
+    returned.rv_reading.rv = 0.99
+    returned.rv_reading.measurement_details["cohort"] = "cohort-b"
+    returned.rv_reading.historical_classification["raw"]["accepted"] = False
+    for value in (0.6, 0.8):
+        await bridge.add_measurement(
+            str(value),
+            "same",
+            "Another response.",
+            rv_reading=reading(
+                value,
+                "residual_hidden",
+                measurement_details={"cohort": "cohort-b"},
+            ),
+        )
+
+    archived = bridge.get_measurements()[0]
+    assert archived.id == accepted_id
+    assert archived.rv_reading == accepted
+    assert first == accepted
+    assert bridge.compute_correlation().mean_rv_by_group == {}
+    assert bridge.group_summary()["same"]["mean_rv"] is None
+
+    await bridge.save()
+    restored = ResearchBridge(path)
+    await restored.load()
+    assert restored.get_measurements()[0].rv_reading == accepted
+    assert restored.compute_correlation().mean_rv_by_group == {}
+
+    compatible = ResearchBridge(tmp_path / f"{accessor}-compatible.jsonl")
+    for value in (0.4, 0.6, 0.8):
+        await compatible.add_measurement(
+            str(value),
+            "same",
+            "A factual response.",
+            rv_reading=reading(value, "residual_hidden"),
+        )
+    assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(0.6)
+
+
+async def test_tracker_returned_record_is_a_private_snapshot(tmp_path):
+    tracker = EvolutionRVTracker(tmp_path)
+    source = reading(
+        0.4,
+        "residual_hidden",
+        measurement_details={"cohort": "cohort-a"},
+    )
+    original_source = deepcopy(source)
+    measurer = Mock()
+    measurer.is_available.return_value = True
+    measurer.measure = AsyncMock(return_value=source)
+    first = await tracker.measure_cycle("a", 0.8, 1, measurer=measurer)
+    accepted = deepcopy(first)
+
+    first["rv"] = 0.2
+    first["measurement_details"]["cohort"] = "cohort-b"
+    measurer.measure.return_value = reading(
+        0.6,
+        "residual_hidden",
+        measurement_details={"cohort": "cohort-b"},
+    )
+    await tracker.measure_cycle("b", 0.7, 1, measurer=measurer)
+
+    assert source == original_source
+    assert tracker.get_readings()[0] == accepted
+    assert tracker.get_rv_fitness_pairs() == []
+    assert tracker.get_trend() is None
+
+    restored = EvolutionRVTracker(tmp_path)
+    await restored.load()
+    restored_first = restored.get_readings()[0]
+    for key, value in accepted.items():
+        assert restored_first[key] == value
+    assert restored.get_rv_fitness_pairs() == []
+    assert restored.get_trend() is None
+
+    compatible = EvolutionRVTracker(tmp_path / "compatible")
+    compatible_measurer = Mock()
+    compatible_measurer.is_available.return_value = True
+    compatible_measurer.measure = AsyncMock(return_value=source)
+    await compatible.measure_cycle("a", 0.8, 1, measurer=compatible_measurer)
+    compatible_measurer.measure.return_value = reading(
+        0.6,
+        "residual_hidden",
+        measurement_details={"cohort": "cohort-a"},
+    )
+    await compatible.measure_cycle("b", 0.7, 1, measurer=compatible_measurer)
+    assert compatible.get_rv_fitness_pairs() == [(0.4, 0.8), (0.6, 0.7)]
+    assert compatible.get_trend() == pytest.approx(0.2)
+
+
+@pytest.mark.parametrize("construction", ["embedding", "direct", "deserialized"])
 @pytest.mark.parametrize("composition", ["flatten", "multiply", "bind"])
-def test_monad_composition_preserves_reading_classification_history(composition):
+def test_monad_composition_preserves_reading_classification_history(
+    construction, composition
+):
     inner_conflicts = [{"field": "inner_prior", "values": [False, True]}]
     outer_conflicts = [{"field": "outer_prior", "values": ["weak", "strong"]}]
     inner_reading = reading(
         0.8,
         "residual_hidden",
-        historical_classification={"is_contracted": False, "contraction_strength": None},
+        historical_classification={
+            "is_contracted": False,
+            "contraction_strength": None,
+            "inner_only": {"keep": [1]},
+        },
         historical_classification_conflicts=inner_conflicts,
     )
     outer_reading = reading(
         0.4,
         "residual_hidden",
-        historical_classification={"is_contracted": True, "contraction_strength": "strong"},
+        historical_classification={
+            "is_contracted": True,
+            "contraction_strength": "strong",
+            "outer_only": 0,
+        },
         historical_classification_conflicts=outer_conflicts,
     )
     original_inner = deepcopy(inner_reading)
     original_outer = deepcopy(outer_reading)
-    inner = ObservedState.from_rv_reading("core", inner_reading)
+
+    def make_observed(state, source):
+        if construction == "embedding":
+            return ObservedState.from_rv_reading(state, source)
+        if construction == "direct":
+            return ObservedState(
+                state=state,
+                rv_reading=source,
+                timestamp=source.timestamp.timestamp(),
+            )
+        serialized_state = state
+        if isinstance(state, ObservedState):
+            serialized_state = {**state.to_dict(), "__observed_state__": True}
+        return ObservedState.from_dict({
+            "state": serialized_state,
+            "rv_reading": json.loads(source.model_dump_json()),
+            "introspection": {},
+            "timestamp": source.timestamp.timestamp(),
+        })
+
+    inner = make_observed("core", inner_reading)
 
     if composition == "bind":
-        result = bind(
-            inner,
-            lambda state: ObservedState.from_rv_reading("next", outer_reading),
-        )
+        result = bind(inner, lambda state: make_observed("next", outer_reading))
         assert result.state == "next"
     else:
-        outer = ObservedState.from_rv_reading(inner, outer_reading)
+        outer = make_observed(inner, outer_reading)
         result = flatten(outer) if composition == "flatten" else SelfObservationMonad.multiply(outer)
         assert result.state == "core"
 
@@ -765,6 +907,8 @@ def test_monad_composition_preserves_reading_classification_history(composition)
     assert result.introspection["historical_classification"] == {
         "is_contracted": True,
         "contraction_strength": "strong",
+        "inner_only": {"keep": [1]},
+        "outer_only": 0,
     }
     assert result.introspection["historical_classification_conflicts"] == [
         *inner_conflicts,

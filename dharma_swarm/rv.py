@@ -496,7 +496,7 @@ class EvolutionRVTracker:
             "Evolution R_V for cycle %s: rv=%.3f (%s), fitness=%.3f",
             cycle_id, record["rv"], record["rv_source"], best_fitness,
         )
-        return record
+        return copy.deepcopy(record)
 
     def get_rv_fitness_pairs(self) -> list[tuple[float, float]]:
         """Return finite pairs only for explicitly comparable measurements.
