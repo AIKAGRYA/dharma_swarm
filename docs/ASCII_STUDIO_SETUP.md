@@ -81,7 +81,7 @@ ascii_studio/
 
 Convert R_V participation ratio contraction data into ASCII animations:
 - Encode PR_late/PR_early ratio as frame-by-frame ASCII density
-- High raw R_V (1.0) = full character density, low raw R_V = sparse visualization (descriptive only; no calibrated contraction classification)
+- High R_V (1.0) = full character density, low R_V (<0.737) = sparse/contracted
 - Layer-by-layer animation showing contraction through transformer depth
 - Export as static HTML for paper supplementary materials
 
