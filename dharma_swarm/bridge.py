@@ -354,8 +354,18 @@ class ResearchBridge:
         rv_values = [m.rv_reading.rv for m in paired if m.rv_reading is not None]
         swabhaav_values = [m.behavioral.swabhaav_ratio for m in paired]
 
-        pearson = _pearson_r(rv_values, swabhaav_values)
-        spearman = _spearman_rho(rv_values, swabhaav_values)
+        try:
+            pearson = _pearson_r(rv_values, swabhaav_values)
+        except ArithmeticError:
+            pearson = None
+        if pearson is not None and not math.isfinite(pearson):
+            pearson = None
+        try:
+            spearman = _spearman_rho(rv_values, swabhaav_values)
+        except ArithmeticError:
+            spearman = None
+        if spearman is not None and not math.isfinite(spearman):
+            spearman = None
 
         # Group means
         mean_rv: dict[str, float] = {}
@@ -365,12 +375,24 @@ class ResearchBridge:
             groups.setdefault(m.prompt_group, []).append(m)
 
         for group, members in sorted(groups.items()):
-            mean_rv[group] = statistics.mean(
-                m.rv_reading.rv for m in members if m.rv_reading is not None
-            )
-            mean_swabhaav[group] = statistics.mean(
-                m.behavioral.swabhaav_ratio for m in members
-            )
+            try:
+                group_rv_mean = statistics.mean(
+                    m.rv_reading.rv for m in members if m.rv_reading is not None
+                )
+            except ArithmeticError:
+                pass
+            else:
+                if math.isfinite(group_rv_mean):
+                    mean_rv[group] = group_rv_mean
+            try:
+                group_swabhaav_mean = statistics.mean(
+                    m.behavioral.swabhaav_ratio for m in members
+                )
+            except ArithmeticError:
+                pass
+            else:
+                if math.isfinite(group_swabhaav_mean):
+                    mean_swabhaav[group] = group_swabhaav_mean
 
         summary = self._build_summary(n, pearson, spearman)
         summary += f" Measurement kind: {next(iter(kinds))}; descriptive association only."

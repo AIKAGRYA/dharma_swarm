@@ -458,8 +458,72 @@ class TestResearchBridgeGetMeasurements:
         assert len(bridge.get_measurements()) == 2
 
 
+async def _load_bridge_with_rv_values(
+    data_path: Path, rv_values: list[float]
+) -> ResearchBridge:
+    groups = ["L4_full", "L4_full", "baseline"]
+    behaviors = [0.2, 0.4, 0.8]
+    measurements = []
+    for index, (rv, group, behavior) in enumerate(zip(rv_values, groups, behaviors)):
+        reading = _make_rv_reading(
+            rv=rv, prompt_group=group, prompt_hash=f"{index:016d}"
+        )
+        measurement = _make_measurement(
+            prompt_hash=f"{index:016d}",
+            prompt_group=group,
+            prompt_text=f"prompt {index}",
+            rv_reading=reading,
+            behavioral=_make_behavioral(swabhaav_ratio=behavior),
+            generated_text=f"generated {index}",
+        )
+        measurements.append(measurement.model_dump(mode="json"))
+    data_path.write_text(
+        "".join(json.dumps(measurement) + "\n" for measurement in measurements),
+        encoding="utf-8",
+    )
+    bridge = ResearchBridge(data_path=data_path)
+    await bridge.load()
+    return bridge
+
+
 class TestResearchBridgeComputeCorrelation:
     """Tests for compute_correlation."""
+
+    async def test_extreme_finite_values_withhold_only_pearson(self, tmp_path):
+        data_path = tmp_path / "extreme.jsonl"
+        bridge = await _load_bridge_with_rv_values(
+            data_path, [1e308, 1e308, -1e308]
+        )
+        raw_before = data_path.read_bytes()
+
+        result = bridge.compute_correlation()
+
+        assert result.n == 3
+        assert result.pearson_r is None
+        assert result.spearman_rho == pytest.approx(-0.8660254037844387)
+        assert result.mean_rv_by_group == {"L4_full": 1e308, "baseline": -1e308}
+        assert result.mean_swabhaav_by_group == {
+            "L4_full": pytest.approx(0.3),
+            "baseline": pytest.approx(0.8),
+        }
+        assert [m.rv_reading.rv for m in bridge.get_measurements()] == [
+            1e308, 1e308, -1e308
+        ]
+        assert data_path.read_bytes() == raw_before
+
+    async def test_finite_control_after_persisted_load(self, tmp_path):
+        data_path = tmp_path / "finite.jsonl"
+        bridge = await _load_bridge_with_rv_values(data_path, [0.2, 0.4, 0.8])
+        raw_before = data_path.read_bytes()
+
+        result = bridge.compute_correlation()
+
+        assert result.n == 3
+        assert result.pearson_r == pytest.approx(1.0)
+        assert result.spearman_rho == pytest.approx(1.0)
+        assert result.mean_rv_by_group == {"L4_full": 0.30000000000000004, "baseline": 0.8}
+        assert [m.rv_reading.rv for m in bridge.get_measurements()] == [0.2, 0.4, 0.8]
+        assert data_path.read_bytes() == raw_before
 
     async def test_empty_bridge(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")

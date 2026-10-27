@@ -291,18 +291,28 @@ class L4RVCorrelator:
             and all(map(math.isfinite, rv_vals + swab_vals))
         )
 
-        cohens_d = (
-            self._cohens_d_groups(paired, "L4_full", "baseline")
-            if statistics_available else None
-        )
-        pearson_ci = (
-            _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
-            if statistics_available else None
-        )
-        spearman_ci = (
-            _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
-            if statistics_available else None
-        )
+        cohens_d = None
+        pearson_ci = None
+        spearman_ci = None
+        if statistics_available:
+            try:
+                cohens_d = self._cohens_d_groups(paired, "L4_full", "baseline")
+            except ArithmeticError:
+                pass
+            if cohens_d is not None and not math.isfinite(cohens_d):
+                cohens_d = None
+            try:
+                pearson_ci = _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
+            except ArithmeticError:
+                pass
+            if pearson_ci is not None and not all(map(math.isfinite, pearson_ci)):
+                pearson_ci = None
+            try:
+                spearman_ci = _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
+            except ArithmeticError:
+                pass
+            if spearman_ci is not None and not all(map(math.isfinite, spearman_ci)):
+                spearman_ci = None
 
         # Patch CIs into correlation result
         if correlation:
