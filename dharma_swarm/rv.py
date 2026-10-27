@@ -504,18 +504,21 @@ class EvolutionRVTracker:
         Raw observations remain available via get_readings() when pooled
         statistics are unavailable.
         """
-        candidates = [
-            record for record in self._readings
-            if "rv" in record and "best_fitness" in record
-        ]
-        if comparable_measurement_identity(candidates) is None:
+        if comparable_measurement_identity(self._readings) is None:
             return []
+        pairs = [
+            (record.get("rv"), record.get("best_fitness"))
+            for record in self._readings
+        ]
         if any(
-            not math.isfinite(record["rv"]) or not math.isfinite(record["best_fitness"])
-            for record in candidates
+            type(rv) not in (int, float)
+            or type(fitness) not in (int, float)
+            or not math.isfinite(rv)
+            or not math.isfinite(fitness)
+            for rv, fitness in pairs
         ):
             return []
-        return [(record["rv"], record["best_fitness"]) for record in candidates]
+        return pairs
 
     def get_readings(self) -> list[dict[str, Any]]:
         """Return raw observations and their current interpretation separately."""

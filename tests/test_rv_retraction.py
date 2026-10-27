@@ -13,6 +13,8 @@ from dharma_swarm.monad import ObservedState, SelfObservationMonad, bind, flatte
 from dharma_swarm.ouroboros import colony_rv_reading
 from dharma_swarm.rv import RV_CALIBRATION_STATUS, EvolutionRVTracker, RVReading
 
+_MISSING = object()
+
 
 def reading(value=0.6, kind="unknown", **overrides):
     values = dict(
@@ -841,6 +843,79 @@ async def test_tracker_returned_record_is_a_private_snapshot(tmp_path):
     await compatible.measure_cycle("b", 0.7, 1, measurer=compatible_measurer)
     assert compatible.get_rv_fitness_pairs() == [(0.4, 0.8), (0.6, 0.7)]
     assert compatible.get_trend() == pytest.approx(0.2)
+
+
+@pytest.mark.parametrize("field", ["rv", "best_fitness"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(None, id="null"),
+        pytest.param("not-a-number", id="nonnumeric"),
+        pytest.param(float("nan"), id="nan"),
+        pytest.param(float("inf"), id="positive-infinity"),
+        pytest.param(-float("inf"), id="negative-infinity"),
+        pytest.param(_MISSING, id="missing"),
+    ],
+)
+async def test_tracker_invalid_or_missing_numbers_make_whole_cohort_unavailable(
+    tmp_path, field, value
+):
+    records = [
+        {
+            "cycle_id": str(index),
+            "rv": rv,
+            "best_fitness": 0.9 - index * 0.1,
+            "measurement_kind": "residual_hidden",
+            **evolution_metadata("residual_hidden"),
+        }
+        for index, rv in enumerate((0.4, 0.5, 0.6))
+    ]
+    if value is _MISSING:
+        records[1].pop(field)
+    else:
+        records[1][field] = value
+    before = "".join(f"{json.dumps(record)}\n" for record in records).encode()
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_bytes(before)
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+
+    assert tracker.get_rv_fitness_pairs() == []
+    assert tracker.get_trend() is None
+    assert path.read_bytes() == before
+    readings = tracker.get_readings()
+    assert [row["cycle_id"] for row in readings] == ["0", "1", "2"]
+    unaffected = "best_fitness" if field == "rv" else "rv"
+    assert readings[1][unaffected] == records[1][unaffected]
+    if value is _MISSING:
+        assert field not in readings[1]
+    elif isinstance(value, float) and value != value:
+        assert readings[1][field] != readings[1][field]
+    else:
+        assert readings[1][field] == value
+
+
+async def test_tracker_comparable_finite_legacy_numbers_return_exact_statistics(tmp_path):
+    records = [
+        {
+            "cycle_id": str(index),
+            "rv": rv,
+            "best_fitness": 0.9 - index * 0.1,
+            "measurement_kind": "residual_hidden",
+            **evolution_metadata("residual_hidden"),
+        }
+        for index, rv in enumerate((0.4, 0.5, 0.6))
+    ]
+    before = "".join(f"{json.dumps(record)}\n" for record in records).encode()
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_bytes(before)
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+
+    assert tracker.get_rv_fitness_pairs() == [(0.4, 0.9), (0.5, 0.8), (0.6, 0.7)]
+    assert tracker.get_trend() == pytest.approx(0.1)
+    assert [row["rv"] for row in tracker.get_readings()] == [0.4, 0.5, 0.6]
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("construction", ["embedding", "direct", "deserialized"])
