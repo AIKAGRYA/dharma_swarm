@@ -176,14 +176,20 @@ class MetaEvolutionEngine:
             "productive_disagreement_claim_keys": self._coordination_string_list(
                 summary.get("productive_disagreement_claim_keys"),
             ),
-            "rv_trend": self._coordination_float(summary.get("rv_trend")),
-            "fitness_trend": self._coordination_float(summary.get("fitness_trend")),
+            "rv_trend": self._coordination_float(
+                summary.get("rv_trend"),
+                default=None,
+            ),
+            "fitness_trend": self._coordination_float(
+                summary.get("fitness_trend"),
+                default=None,
+            ),
             "observation_count": self._coordination_int(
                 summary.get("observation_count"),
             ),
             "approaching_fixed_point": self._coordination_bool(
                 summary.get("approaching_fixed_point"),
-                default=False,
+                default=None,
             ),
         }
         self._coordination_history.append(payload)
@@ -207,7 +213,10 @@ class MetaEvolutionEngine:
         return max(default, parsed)
 
     @staticmethod
-    def _coordination_float(value: Any, default: float = 0.0) -> float:
+    def _coordination_float(
+        value: Any,
+        default: float | None = 0.0,
+    ) -> float | None:
         if value is None or isinstance(value, bool):
             return default
         try:
@@ -219,7 +228,7 @@ class MetaEvolutionEngine:
         return parsed
 
     @staticmethod
-    def _coordination_bool(value: Any, *, default: bool) -> bool:
+    def _coordination_bool(value: Any, *, default: bool | None) -> bool | None:
         if isinstance(value, bool):
             return value
         return default
@@ -410,24 +419,32 @@ class MetaEvolutionEngine:
             else 0.0
             for item in recent
         ]
-        trend_regression = [
-            min(
-                1.0,
-                max(0.0, -float(item.get("rv_trend", 0.0) or 0.0))
-                + max(0.0, -float(item.get("fitness_trend", 0.0) or 0.0)),
+        trend_regression: list[float | None] = []
+        fixed_point_stall: list[float | None] = []
+        for item in recent:
+            known_trends = [
+                float(item[key])
+                for key in ("rv_trend", "fitness_trend")
+                if item.get(key) is not None
+            ]
+            trend_regression.append(
+                min(1.0, sum(max(0.0, -value) for value in known_trends))
+                if known_trends
+                else None
             )
-            for item in recent
-        ]
-        fixed_point_stall = [
-            1.0
-            if bool(item.get("approaching_fixed_point")) and (
-                not bool(item.get("is_globally_coherent", True))
-                or float(item.get("rv_trend", 0.0) or 0.0) <= 0.0
-                or float(item.get("fitness_trend", 0.0) or 0.0) <= 0.0
-            )
-            else 0.0
-            for item in recent
-        ]
+            verdict = item.get("approaching_fixed_point")
+            if verdict is None:
+                fixed_point_stall.append(None)
+            else:
+                fixed_point_stall.append(
+                    1.0
+                    if verdict
+                    and (
+                        not bool(item.get("is_globally_coherent", True))
+                        or any(value <= 0.0 for value in known_trends)
+                    )
+                    else 0.0
+                )
         counts: dict[str, int] = {}
         for item in recent:
             for claim_key in item.get("productive_disagreement_claim_keys", []):
@@ -437,6 +454,12 @@ class MetaEvolutionEngine:
             if counts
             else 0.0
         )
+        known_trend_regression = [
+            value for value in trend_regression if value is not None
+        ]
+        known_fixed_point_stall = [
+            value for value in fixed_point_stall if value is not None
+        ]
         return min(
             1.0,
             (0.32 * mean(disagreement_levels))
@@ -444,8 +467,8 @@ class MetaEvolutionEngine:
             + (0.12 * mean(dimensionality))
             + (0.10 * repeated_claims)
             + (0.08 * mean(truth_scarcity))
-            + (0.08 * mean(trend_regression))
-            + (0.06 * mean(fixed_point_stall)),
+            + (0.08 * mean(known_trend_regression) if known_trend_regression else 0.0)
+            + (0.06 * mean(known_fixed_point_stall) if known_fixed_point_stall else 0.0),
         )
 
     def _current_coordination_summary(self) -> dict[str, Any]:

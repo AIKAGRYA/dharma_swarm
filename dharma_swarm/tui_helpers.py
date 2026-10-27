@@ -7,9 +7,12 @@ Used by both the old monolithic tui.py and the new tui/ package so that
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 import shutil
 import sqlite3
+
+from dharma_swarm.rv import comparable_measurement_identity
 
 HOME = Path.home()
 DHARMA_STATE = HOME / ".dharma"
@@ -485,19 +488,25 @@ def build_darwin_status_text(
             for row in dse_rows
             if str(row.get("component") or "").strip()
         }
-        rv_values = [
-            value
-            for row in dse_rows
-            if (value := _maybe_float(row.get("rv"))) is not None
-        ]
+        rv_readings = [row.get("rv_reading") or row for row in dse_rows]
+        rv_candidates = [_maybe_float(row.get("rv")) for row in dse_rows]
+        rv_values: list[float] = []
+        if comparable_measurement_identity(rv_readings) is not None and all(
+            value is not None and math.isfinite(value) for value in rv_candidates
+        ):
+            rv_values = [value for value in rv_candidates if value is not None]
         fitness_values = [
             value
             for row in dse_rows
             if (value := _maybe_float(row.get("best_fitness"))) is not None
         ]
-        fixed_point_count = sum(
-            1 for row in dse_rows if _as_bool(row.get("approaching_fixed_point"))
-        )
+        fixed_point_verdicts = [
+            value
+            for row in dse_rows
+            if isinstance((value := row.get("approaching_fixed_point")), bool)
+        ]
+        fixed_point_count = sum(fixed_point_verdicts)
+        fixed_point_unavailable = len(dse_rows) - len(fixed_point_verdicts)
 
         ouroboros_count = 0
         mimicry_count = 0
@@ -606,7 +615,15 @@ def build_darwin_status_text(
             lines.append("    reciprocity " + "  ".join(reciprocity_summary))
 
         latest_component = str(dse_rows[-1].get("component") or "").strip()
-        tail_summary = [f"fixed_point={fixed_point_count}/{len(dse_rows)}"]
+        tail_summary = []
+        if fixed_point_verdicts:
+            tail_summary.append(
+                f"fixed_point_raw={fixed_point_count}/{len(fixed_point_verdicts)}"
+            )
+        if fixed_point_unavailable:
+            tail_summary.append(
+                f"fixed_point_unavailable={fixed_point_unavailable}/{len(dse_rows)}"
+            )
         if latest_component:
             tail_summary.append(f"latest_component={latest_component}")
         lines.append("    " + "  ".join(tail_summary))

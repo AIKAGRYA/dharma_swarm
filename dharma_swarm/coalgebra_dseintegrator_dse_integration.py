@@ -57,11 +57,6 @@ def _coordination_context(snapshot: CoordinationSnapshot) -> dict[str, Any]:
             f"across components. Consider exploring: "
             f"{', '.join(snapshot.disagreement_claims[:3])}"
         )
-    if snapshot.approaching_fixed_point:
-        context["convergence_hint"] = (
-            "System approaching observation fixed point (L5). "
-            "Consider bolder mutations to escape or validate stability."
-        )
     return context
 
 
@@ -97,7 +92,7 @@ class DSECycleBridge(BaseModel):
     productive_disagreements: int = 0
     global_truth_claims: list[str] = Field(default_factory=list)
     disagreement_claims: list[str] = Field(default_factory=list)
-    approaching_fixed_point: bool = False
+    approaching_fixed_point: bool | None = None
     context: dict[str, Any] = Field(default_factory=dict)
     formal_structures: list[str] = Field(
         default_factory=lambda: list(_FORMAL_STRUCTURES),
@@ -118,11 +113,9 @@ def build_dse_cycle_bridge(
     next_state = observation.next_state
     cycle_id = _clean_text(getattr(next_state, "cycle_id", ""))
     discoveries = _clean_discoveries(observation.discoveries)
-    resolved_approaching_fixed_point = (
-        coordination_snapshot.approaching_fixed_point
-        if approaching_fixed_point is None and coordination_snapshot is not None
-        else bool(approaching_fixed_point)
-    )
+    resolved_approaching_fixed_point = approaching_fixed_point
+    if resolved_approaching_fixed_point is None and coordination_snapshot is not None:
+        resolved_approaching_fixed_point = coordination_snapshot.approaching_fixed_point
     context = (
         dict(coordination_context)
         if coordination_context is not None
