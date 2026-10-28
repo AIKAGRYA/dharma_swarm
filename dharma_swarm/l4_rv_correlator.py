@@ -383,6 +383,8 @@ def _cohens_d(group_a: list[float], group_b: list[float]) -> Optional[float]:
     pooled_var = ((na - 1) * var_a + (nb - 1) * var_b) / (na + nb - 2)
     pooled_sd = math.sqrt(pooled_var)
 
+    if not all(map(math.isfinite, (pooled_var, pooled_sd))):
+        raise ArithmeticError("Nonfinite Cohen's d intermediate")
     if pooled_sd < 1e-15:
         return None
 

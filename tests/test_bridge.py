@@ -14,6 +14,7 @@ import pytest
 
 from dharma_swarm.bridge import (
     CorrelationResult,
+    EvolutionBridge,
     PairedMeasurement,
     ResearchBridge,
     _interpret_r,
@@ -511,6 +512,58 @@ class TestResearchBridgeComputeCorrelation:
             1e308, 1e308, -1e308
         ]
         assert data_path.read_bytes() == raw_before
+
+    async def test_finite_denominator_overflow_withholds_only_pearson(self, tmp_path):
+        data_path = tmp_path / "denominator-overflow.jsonl"
+        rv_values = [1e154, 1e154, -1e154]
+        bridge = await _load_bridge_with_rv_values(data_path, rv_values)
+        raw_before = data_path.read_bytes()
+
+        result = bridge.compute_correlation()
+
+        assert result.n == 3
+        assert result.pearson_r is None
+        assert result.spearman_rho == pytest.approx(-0.8660254037844387)
+        assert result.mean_swabhaav_by_group == {
+            "L4_full": pytest.approx(0.3),
+            "baseline": 0.8,
+        }
+        assert [m.rv_reading.rv for m in bridge.get_measurements()] == rv_values
+        assert data_path.read_bytes() == raw_before
+
+    @pytest.mark.parametrize(
+        "rv_values,expected_pearson,expected_spearman",
+        [
+            ([1e154, 1e154, -1e154], None, -0.8660254037844387),
+            ([0.2, 0.4, 0.8], 1.0, 1.0),
+        ],
+    )
+    def test_evolution_bridge_rejects_false_zero_and_preserves_finite_control(
+        self, rv_values, expected_pearson, expected_spearman
+    ):
+        bridge = EvolutionBridge()
+        metadata = {
+            "model_name": "test-model",
+            "early_layer": 2,
+            "late_layer": 22,
+            "measurement_details": {"cohort": "bridge-fixture"},
+        }
+        for index, (rv, fitness) in enumerate(zip(rv_values, [0.2, 0.4, 0.8])):
+            bridge.add_record(
+                str(index), rv, fitness,
+                metadata=metadata,
+                measurement_kind="residual_hidden",
+            )
+
+        result = bridge.correlate()
+
+        assert result["n"] == 3
+        if expected_pearson is None:
+            assert result["pearson_r"] is None
+        else:
+            assert result["pearson_r"] == pytest.approx(expected_pearson)
+        assert result["spearman_rho"] == pytest.approx(expected_spearman)
+        assert [row["rv"] for row in bridge.format_for_archive()] == rv_values
 
     async def test_finite_control_after_persisted_load(self, tmp_path):
         data_path = tmp_path / "finite.jsonl"

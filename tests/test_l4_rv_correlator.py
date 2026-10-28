@@ -563,6 +563,35 @@ class TestRunBatch:
         assert correlator._bridge.data_path.read_bytes() == raw_before
 
     @pytest.mark.asyncio
+    async def test_batch_withholds_false_zero_from_pooled_variance_overflow(self, tmp_path):
+        from dharma_swarm.bridge import ResearchBridge
+
+        rv_values = [1e154, 1e154, -1e154, 0.0, 0.0, 0.0]
+        correlator = _make_correlator(rv_values=rv_values)
+        correlator._bridge = ResearchBridge(data_path=tmp_path / "pooled.jsonl")
+
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "L4_full"),
+            ("prompt four", "baseline"),
+            ("prompt five", "baseline"),
+            ("prompt six", "baseline"),
+        ])
+
+        assert result.n_total == 6
+        assert result.n_with_rv == 6
+        assert result.cohens_d_l4_baseline is None
+        assert result.correlation is not None
+        assert result.correlation.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert result.correlation.pearson_r_ci is None
+        assert [m.rv_reading.rv for m in result.paired_results] == rv_values
+        assert [
+            m.rv_reading.rv for m in correlator._bridge.get_measurements()
+        ] == rv_values
+
+    @pytest.mark.asyncio
     async def test_batch_contains_effect_arithmetic_without_bridge_correlation(
         self, tmp_path
     ):

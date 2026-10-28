@@ -165,6 +165,11 @@ def _pearson_r(xs: list[float], ys: list[float]) -> Optional[float]:
 
     if denom_x < 1e-15 or denom_y < 1e-15:
         return None
+    if not all(
+        math.isfinite(value)
+        for value in (numerator, denom_x, denom_y, denom_x * denom_y)
+    ):
+        raise ArithmeticError("Nonfinite Pearson correlation intermediate")
 
     return numerator / (denom_x * denom_y)
 
