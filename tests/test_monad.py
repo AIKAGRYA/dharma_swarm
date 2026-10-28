@@ -42,6 +42,77 @@ def _reading(rv: float) -> RVReading:
     )
 
 
+def test_from_rv_reading_snapshots_caller_reading() -> None:
+    state = {"payload": "value"}
+    source = RVReading(
+        rv=0.4,
+        pr_early=10.0,
+        pr_late=4.0,
+        model_name="fixture",
+        early_layer=2,
+        late_layer=22,
+        prompt_hash="fixture",
+        prompt_group="original-group",
+        timestamp=_ts(0),
+        measurement_kind="residual_hidden",
+        measurement_details={"cohort": "cohort-a"},
+        historical_classification={
+            "is_contracted": False,
+            "nested": {"values": ["original"]},
+        },
+        historical_classification_conflicts=[{"field": "legacy", "values": [False]}],
+    )
+
+    observed = ObservedState.from_rv_reading(state, source)
+
+    assert observed.state is state
+    assert observed.rv_reading == source
+    assert observed.rv_reading is not source
+    assert type(observed.rv_reading) is RVReading
+    assert observed.rv_measurement == 0.4
+    assert observed.pr_early == 10.0
+    assert observed.pr_late == 4.0
+    assert observed.observation_depth == 1
+    assert observed.timestamp == _ts(0).timestamp()
+    assert observed.introspection["is_contracted"] is None
+    assert observed.introspection["contraction_strength"] is None
+    assert observed.introspection["measurement_kind"] == "residual_hidden"
+    original_output = observed.to_dict()
+    serialized = json.loads(json.dumps(original_output))
+    assert ObservedState.from_dict(serialized).to_dict() == serialized
+
+    source.rv = 0.9
+    source.measurement_details["cohort"] = "cohort-b"
+    source.historical_classification["nested"]["values"].append("caller")
+    source.historical_classification_conflicts[0]["values"].append(True)
+
+    assert observed.to_dict() == original_output
+    assert observed.rv_reading.rv == 0.4
+    assert observed.rv_reading.measurement_details == {"cohort": "cohort-a"}
+    assert observed.rv_reading.historical_classification["nested"] == {
+        "values": ["original"]
+    }
+    assert observed.rv_reading.historical_classification_conflicts == [
+        {"field": "legacy", "values": [False]}
+    ]
+
+    observed.rv_reading.rv = 0.2
+    observed.rv_reading.measurement_details["cohort"] = "observed-cohort"
+    observed.rv_reading.historical_classification["nested"]["values"].append("observed")
+    observed.rv_reading.historical_classification_conflicts[0]["values"].append(
+        "observed"
+    )
+
+    assert source.rv == 0.9
+    assert source.measurement_details == {"cohort": "cohort-b"}
+    assert source.historical_classification["nested"] == {
+        "values": ["original", "caller"]
+    }
+    assert source.historical_classification_conflicts == [
+        {"field": "legacy", "values": [False, True]}
+    ]
+
+
 def test_pure_is_neutral() -> None:
     value = pure({"x": 1})
 

@@ -257,6 +257,7 @@ class ObservedState(Generic[S]):
         PROPOSITION: This is the canonical embedding of rv.py data
         into the monadic structure.
         """
+        reading = deepcopy(reading)
         return cls(
             state=state,
             rv_reading=reading,
