@@ -1,6 +1,6 @@
 {
   "schema_version": "quality_ratchet_baseline.v1",
-  "tightened_on": "2026-08-30",
+  "tightened_on": "2026-10-28",
   "counters": {
     "boundary_contract_violations": 1,
     "boundary_unfrozen_records": 7,

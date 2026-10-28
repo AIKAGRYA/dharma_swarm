@@ -1,8 +1,11 @@
 """Public behavior for retired scientific classification and measurement custody."""
 
 import json
+import pickle
 from collections import deque
+from collections.abc import Iterable
 from copy import deepcopy
+from typing import Any, get_type_hints
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -36,6 +39,47 @@ def evolution_metadata(kind):
         "late_layer": 22,
         "measurement_details": details,
     }
+
+
+def test_rv_public_imports_and_runtime_type_hints_remain_resolvable():
+    from dharma_swarm import rv
+
+    for cls in (rv.RVReading, rv.RVMeasurer, rv.EvolutionRVTracker):
+        assert cls.__module__ == "dharma_swarm.rv"
+        assert pickle.loads(pickle.dumps(cls)) is cls
+    assert get_type_hints(rv._measurement_identity)["measurement"] == (
+        RVReading | dict[str, Any]
+    )
+    assert get_type_hints(rv.comparable_measurement_identity)["measurements"] == (
+        Iterable[RVReading | dict[str, Any]]
+    )
+    assert get_type_hints(rv._preserve_historical_classification) == {
+        "data": Any, "return": Any,
+    }
+    assert get_type_hints(RVReading)["measurement_kind"] == rv.MeasurementKind
+
+
+def test_public_contract_helpers_preserve_nested_history_and_comparability():
+    from dharma_swarm.rv import comparable_measurement_identity
+
+    payload = reading(0.4, "residual_hidden").model_dump(mode="json")
+    payload.update(is_contracted=True, historical_classification={"is_contracted": False})
+    original = deepcopy(payload)
+    observed = ObservedState.from_dict({"state": "saved", "rv_reading": payload})
+    restored = ObservedState.from_dict(json.loads(json.dumps(observed.to_dict())))
+    assert payload == original
+    assert restored.rv_reading is not None
+    assert restored.rv_reading.rv == 0.4
+    assert restored.rv_reading.historical_classification == {"is_contracted": False}
+    assert restored.rv_reading.historical_classification_conflicts[0]["legacy_value"] is True
+    assert restored.rv_reading.is_contracted is None
+    assert comparable_measurement_identity([observed.rv_reading, restored.rv_reading]) == (
+        "residual_hidden", "retraction-fixture", "fixture", 2, 22,
+    )
+    assert comparable_measurement_identity([restored.rv_reading, reading()]) is None
+    incompatible = reading(0.4, "residual_hidden", late_layer=23)
+    assert comparable_measurement_identity([restored.rv_reading, incompatible]) is None
+    assert ObservedState.from_dict(restored.to_dict()).to_dict() == restored.to_dict()
 
 
 def test_legacy_reading_round_trip_does_not_invent_provenance():
