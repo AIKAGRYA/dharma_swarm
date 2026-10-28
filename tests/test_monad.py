@@ -390,17 +390,19 @@ def test_composition_retains_ordinary_references_and_owns_history(
         metadata["historical_classification"]["nested"]["values"].append("caller")
         metadata["historical_classification_conflicts"][0]["values"].append("caller")
         if result is not source:
-            source.introspection["historical_classification"]["nested"]["values"].append(
-                "source"
-            )
-            source.introspection["historical_classification_conflicts"][0]["values"].append(
-                "source"
-            )
-        assert result.introspection["historical_classification"] == original_metadata[
-            "historical_classification"
-        ]
-        assert result.introspection["historical_classification_conflicts"] == (
-            original_metadata["historical_classification_conflicts"]
+            source.introspection["historical_classification"]["nested"][
+                "values"
+            ].append("source")
+            source.introspection["historical_classification_conflicts"][0][
+                "values"
+            ].append("source")
+        assert (
+            result.introspection["historical_classification"]
+            == original_metadata["historical_classification"]
+        )
+        assert (
+            result.introspection["historical_classification_conflicts"]
+            == (original_metadata["historical_classification_conflicts"])
         )
     else:
         assert result.introspection == {"ordinary": ordinary}
