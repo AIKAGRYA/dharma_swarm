@@ -194,7 +194,9 @@ class MetaEvolutionEngine:
         }
         self._coordination_history.append(payload)
         if len(self._coordination_history) > self.n_object_cycles:
-            self._coordination_history = self._coordination_history[-self.n_object_cycles :]
+            self._coordination_history = self._coordination_history[
+                -self.n_object_cycles :
+            ]
 
     @staticmethod
     def _coordination_int(value: Any, default: int = 0) -> int:
@@ -373,9 +375,7 @@ class MetaEvolutionEngine:
         gradients: list[float] = []
         for key in FITNESS_DIMENSIONS:
             if key in {"correctness", "dharmic_alignment", "safety", "economic_value"}:
-                gradients.append(
-                    (-0.60 * pressure) - (0.20 * coordination_pressure)
-                )
+                gradients.append((-0.60 * pressure) - (0.20 * coordination_pressure))
             elif key in {"performance", "utilization", "efficiency"}:
                 gradients.append(-0.45 * pressure)
             else:
@@ -383,12 +383,17 @@ class MetaEvolutionEngine:
 
         gradients.extend(
             [
-                -0.90 * (pressure + stagnation + coordination_pressure),  # mutation_rate
-                -0.70 * (pressure + stagnation + coordination_pressure),  # exploration_coeff
+                -0.90
+                * (pressure + stagnation + coordination_pressure),  # mutation_rate
+                -0.70
+                * (pressure + stagnation + coordination_pressure),  # exploration_coeff
                 (0.30 * instability)
                 + (0.20 * coordination_pressure)
                 - (0.10 * fitness_gap),  # circuit_breaker_limit
-                -0.50 * (pressure + stagnation + (0.5 * coordination_pressure)),  # map_elites_n_bins
+                -0.50
+                * (
+                    pressure + stagnation + (0.5 * coordination_pressure)
+                ),  # map_elites_n_bins
             ]
         )
         return gradients
@@ -407,8 +412,7 @@ class MetaEvolutionEngine:
             for item in recent
         ]
         dimensionality = [
-            min(1.0, float(item.get("cohomological_dimension", 0)))
-            for item in recent
+            min(1.0, float(item.get("cohomological_dimension", 0))) for item in recent
         ]
         truth_scarcity = [
             1.0
@@ -435,16 +439,16 @@ class MetaEvolutionEngine:
             verdict = item.get("approaching_fixed_point")
             if verdict is None:
                 fixed_point_stall.append(None)
+            elif not verdict:
+                fixed_point_stall.append(0.0)
+            elif not bool(item.get("is_globally_coherent", True)) or any(
+                value <= 0.0 for value in known_trends
+            ):
+                fixed_point_stall.append(1.0)
+            elif len(known_trends) == 2:
+                fixed_point_stall.append(0.0)
             else:
-                fixed_point_stall.append(
-                    1.0
-                    if verdict
-                    and (
-                        not bool(item.get("is_globally_coherent", True))
-                        or any(value <= 0.0 for value in known_trends)
-                    )
-                    else 0.0
-                )
+                fixed_point_stall.append(None)
         counts: dict[str, int] = {}
         for item in recent:
             for claim_key in item.get("productive_disagreement_claim_keys", []):
@@ -468,7 +472,9 @@ class MetaEvolutionEngine:
             + (0.10 * repeated_claims)
             + (0.08 * mean(truth_scarcity))
             + (0.08 * mean(known_trend_regression) if known_trend_regression else 0.0)
-            + (0.06 * mean(known_fixed_point_stall) if known_fixed_point_stall else 0.0),
+            + (
+                0.06 * mean(known_fixed_point_stall) if known_fixed_point_stall else 0.0
+            ),
         )
 
     def _current_coordination_summary(self) -> dict[str, Any]:
@@ -479,7 +485,10 @@ class MetaEvolutionEngine:
     def _natural_gradient_step_size(self, fitness_trajectory: list[float]) -> float:
         """Scale natural-gradient updates with recent fitness quality."""
         if not fitness_trajectory:
-            return max(0.05, min(0.35, 0.10 + (0.10 * self._coordination_uncertainty_pressure())))
+            return max(
+                0.05,
+                min(0.35, 0.10 + (0.10 * self._coordination_uncertainty_pressure())),
+            )
         final = max(0.0, min(1.0, fitness_trajectory[-1]))
         fitness_gap = 1.0 - final
         return max(
@@ -512,8 +521,7 @@ class MetaEvolutionEngine:
         return MetaParameters(
             fitness_weights=normalize_fitness_weights(blended_weights),
             mutation_rate=(
-                (primary.mutation_rate * w)
-                + (secondary.mutation_rate * inverse)
+                (primary.mutation_rate * w) + (secondary.mutation_rate * inverse)
             ),
             exploration_coeff=(
                 (primary.exploration_coeff * w)
