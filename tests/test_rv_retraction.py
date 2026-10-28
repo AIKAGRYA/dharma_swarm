@@ -991,6 +991,92 @@ def test_correlation_result_same_overlap_adds_no_conflict():
     assert CorrelationResult.model_validate_json(result.model_dump_json()) == result
 
 
+@pytest.mark.parametrize("overlap", [0.9, None, math.inf, -math.inf])
+def test_correlation_result_same_scalar_overlap_adds_no_conflict(overlap):
+    result = CorrelationResult.model_validate(
+        {
+            "n": 50,
+            "contraction_recognition_overlap": overlap,
+            "historical_contraction_recognition_overlap": overlap,
+        }
+    )
+
+    assert result.contraction_recognition_overlap is None
+    assert result.historical_contraction_recognition_overlap == overlap
+    assert result.historical_contraction_recognition_overlap_conflicts == []
+
+
+@pytest.mark.parametrize(
+    ("historical", "legacy"), [(math.inf, -math.inf), (-math.inf, math.inf)]
+)
+def test_correlation_result_distinguishes_signed_infinity_overlap(historical, legacy):
+    result = CorrelationResult.model_validate(
+        {
+            "n": 50,
+            "contraction_recognition_overlap": legacy,
+            "historical_contraction_recognition_overlap": historical,
+        }
+    )
+
+    conflicts = result.historical_contraction_recognition_overlap_conflicts
+    assert len(conflicts) == 1
+    assert conflicts[0]["existing_value"] == historical
+    assert conflicts[0]["legacy_value"] == legacy
+
+
+def test_correlation_result_equivalent_nan_overlap_adds_no_conflict():
+    payload = {
+        "n": 50,
+        "contraction_recognition_overlap": float("nan"),
+        "historical_contraction_recognition_overlap": float("nan"),
+    }
+
+    result = CorrelationResult.model_validate(payload)
+
+    assert math.isnan(payload["contraction_recognition_overlap"])
+    assert math.isnan(payload["historical_contraction_recognition_overlap"])
+    assert result.contraction_recognition_overlap is None
+    assert math.isnan(result.historical_contraction_recognition_overlap)
+    assert result.historical_contraction_recognition_overlap_conflicts == []
+    restored = result
+    for _ in range(4):
+        restored = CorrelationResult.model_validate(
+            json.loads(json.dumps(restored.model_dump()))
+        )
+        assert restored.historical_contraction_recognition_overlap_conflicts == []
+
+
+def test_correlation_result_deduplicates_equivalent_nan_conflict():
+    existing = {
+        "field": "contraction_recognition_overlap",
+        "existing_source": "historical_contraction_recognition_overlap",
+        "existing_value": float("nan"),
+        "legacy_source": "legacy_top_level",
+        "legacy_value": float("nan"),
+    }
+    payload = {
+        "n": 50,
+        "contraction_recognition_overlap": float("nan"),
+        "historical_contraction_recognition_overlap": float("nan"),
+        "historical_contraction_recognition_overlap_conflicts": [existing],
+    }
+
+    result = CorrelationResult.model_validate(payload)
+
+    assert len(payload["historical_contraction_recognition_overlap_conflicts"]) == 1
+    conflicts = result.historical_contraction_recognition_overlap_conflicts
+    assert len(conflicts) == 1
+    assert conflicts[0]["field"] == "contraction_recognition_overlap"
+    assert math.isnan(conflicts[0]["existing_value"])
+    assert math.isnan(conflicts[0]["legacy_value"])
+    restored = result
+    for _ in range(4):
+        restored = CorrelationResult.model_validate(
+            json.loads(json.dumps(restored.model_dump()))
+        )
+        assert len(restored.historical_contraction_recognition_overlap_conflicts) == 1
+
+
 def test_batch_result_retains_new_nested_overlap_conflict():
     from dharma_swarm.l4_rv_correlator import BatchResult
 

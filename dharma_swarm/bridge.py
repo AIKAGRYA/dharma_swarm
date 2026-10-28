@@ -22,11 +22,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Optional, get_args
 
-logger = logging.getLogger(__name__)
-
-PHI = (1 + math.sqrt(5)) / 2  # Golden ratio ≈ 1.618
-PHI_PLUS_1 = PHI + 1  # ≈ 2.618 — URA finding: L3/L4 word count ratio
-
 from pydantic import BaseModel, Field, TypeAdapter, model_validator
 
 from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
@@ -39,6 +34,12 @@ from dharma_swarm.rv import (
     _prompt_hash,
     comparable_measurement_identity,
 )
+from dharma_swarm.rv_contract import _historical_values_equal
+
+logger = logging.getLogger(__name__)
+
+PHI = (1 + math.sqrt(5)) / 2  # Golden ratio ≈ 1.618
+PHI_PLUS_1 = PHI + 1  # ≈ 2.618 — URA finding: L3/L4 word count ratio
 
 
 # -- Data Models -------------------------------------------------------------
@@ -115,7 +116,7 @@ class CorrelationResult(BaseModel):
             historical_overlap = data.get("historical_contraction_recognition_overlap")
             if "historical_contraction_recognition_overlap" not in data:
                 data["historical_contraction_recognition_overlap"] = legacy_overlap
-            elif historical_overlap != legacy_overlap:
+            elif not _historical_values_equal(historical_overlap, legacy_overlap):
                 conflicts = data.get(
                     "historical_contraction_recognition_overlap_conflicts", []
                 )
@@ -131,7 +132,10 @@ class CorrelationResult(BaseModel):
                     "legacy_source": "legacy_top_level",
                     "legacy_value": legacy_overlap,
                 }
-                if conflict not in conflicts:
+                if not any(
+                    _historical_values_equal(conflict, existing)
+                    for existing in conflicts
+                ):
                     conflicts.append(conflict)
                 data["historical_contraction_recognition_overlap_conflicts"] = conflicts
         data["contraction_recognition_overlap"] = None
@@ -355,15 +359,20 @@ class ResearchBridge:
 
         if comparable_measurement_identity([m.rv_reading for m in paired]) is None:
             return CorrelationResult(
-                n=n, measurement_kind_counts=kinds,
+                n=n,
+                measurement_kind_counts=kinds,
                 summary="Pooled statistics unavailable: missing or incompatible measurement identity. "
                 "Raw readings are retained; scientific classification is unvalidated.",
             )
 
-        if any(not math.isfinite(m.rv_reading.rv) or
-               not math.isfinite(m.behavioral.swabhaav_ratio) for m in paired):
+        if any(
+            not math.isfinite(m.rv_reading.rv)
+            or not math.isfinite(m.behavioral.swabhaav_ratio)
+            for m in paired
+        ):
             return CorrelationResult(
-                n=n, measurement_kind_counts=kinds,
+                n=n,
+                measurement_kind_counts=kinds,
                 summary="Statistics unavailable: nonfinite paired observations. Raw readings retained.",
             )
 
@@ -411,7 +420,9 @@ class ResearchBridge:
                     mean_swabhaav[group] = group_swabhaav_mean
 
         summary = self._build_summary(n, pearson, spearman)
-        summary += f" Measurement kind: {next(iter(kinds))}; descriptive association only."
+        summary += (
+            f" Measurement kind: {next(iter(kinds))}; descriptive association only."
+        )
 
         return CorrelationResult(
             n=n,
@@ -445,7 +456,8 @@ class ResearchBridge:
             comparable = comparable_measurement_identity(readings) is not None
             result[group] = {
                 "mean_rv": statistics.mean(rv_vals)
-                if rv_vals and comparable and all(map(math.isfinite, rv_vals)) else None,
+                if rv_vals and comparable and all(map(math.isfinite, rv_vals))
+                else None,
                 "measurement_kind_counts": kinds,
                 "calibration_status": RV_CALIBRATION_STATUS,
                 "mean_swabhaav": _finite_mean(
@@ -460,9 +472,7 @@ class ResearchBridge:
 
         return result
 
-    def get_measurements(
-        self, group: str | None = None
-    ) -> list[PairedMeasurement]:
+    def get_measurements(self, group: str | None = None) -> list[PairedMeasurement]:
         """Retrieve stored measurements, optionally filtered by group.
 
         Args:
@@ -520,7 +530,9 @@ class ResearchBridge:
         if spearman is not None:
             parts.append(f"Spearman rho={spearman:.3f}.")
 
-        parts.append("Contraction-recognition overlap unavailable: no calibrated classifications.")
+        parts.append(
+            "Contraction-recognition overlap unavailable: no calibrated classifications."
+        )
 
         return " ".join(parts)
 
@@ -581,15 +593,17 @@ class EvolutionBridge:
         """
         if measurement_kind not in get_args(MeasurementKind):
             raise ValueError(f"Unknown measurement kind: {measurement_kind}")
-        self._records.append({
-            **deepcopy(metadata or {}),
-            "cycle_id": cycle_id,
-            "rv": rv,
-            "fitness": fitness,
-            "rv_source": rv_source,
-            "measurement_kind": measurement_kind,
-            "calibration_status": RV_CALIBRATION_STATUS,
-        })
+        self._records.append(
+            {
+                **deepcopy(metadata or {}),
+                "cycle_id": cycle_id,
+                "rv": rv,
+                "fitness": fitness,
+                "rv_source": rv_source,
+                "measurement_kind": measurement_kind,
+                "calibration_status": RV_CALIBRATION_STATUS,
+            }
+        )
 
     def correlate(self) -> dict[str, Any]:
         """Compute correlation between R_V and fitness across evolution cycles.
@@ -601,8 +615,11 @@ class EvolutionBridge:
         kinds = dict(Counter(r["measurement_kind"] for r in self._records))
         if self._records and comparable_measurement_identity(self._records) is None:
             return {
-                "n": len(self._records), "pearson_r": None, "spearman_rho": None,
-                "rv_trend": None, "fitness_trend": None,
+                "n": len(self._records),
+                "pearson_r": None,
+                "spearman_rho": None,
+                "rv_trend": None,
+                "fitness_trend": None,
                 "measurement_kind_counts": kinds,
                 "calibration_status": RV_CALIBRATION_STATUS,
                 "summary": "Pooled statistics unavailable: missing, unknown, mixed, or incompatible measurement identity. Raw records retained.",
@@ -629,8 +646,11 @@ class EvolutionBridge:
                 raise ValueError
         except (OverflowError, ValueError):
             return {
-                "n": len(self._records), "pearson_r": None, "spearman_rho": None,
-                "rv_trend": None, "fitness_trend": None,
+                "n": len(self._records),
+                "pearson_r": None,
+                "spearman_rho": None,
+                "rv_trend": None,
+                "fitness_trend": None,
                 "measurement_kind_counts": kinds,
                 "calibration_status": RV_CALIBRATION_STATUS,
                 "summary": "Statistics unavailable: invalid or nonfinite observations. Raw records retained.",
@@ -664,12 +684,22 @@ class EvolutionBridge:
                     "this does not establish a mechanism or causation."
                 )
         if rv_trend is not None:
-            direction = "increasing" if rv_trend > 0 else "decreasing" if rv_trend < 0 else "stable"
-            summary_parts.append(
-                f"R_V trend: {rv_trend:+.4f}/cycle ({direction})."
+            direction = (
+                "increasing"
+                if rv_trend > 0
+                else "decreasing"
+                if rv_trend < 0
+                else "stable"
             )
+            summary_parts.append(f"R_V trend: {rv_trend:+.4f}/cycle ({direction}).")
         if fitness_trend is not None:
-            direction = "improving" if fitness_trend > 0 else "degrading" if fitness_trend < 0 else "stable"
+            direction = (
+                "improving"
+                if fitness_trend > 0
+                else "degrading"
+                if fitness_trend < 0
+                else "stable"
+            )
             summary_parts.append(
                 f"Fitness trend: {fitness_trend:+.4f}/cycle ({direction})."
             )

@@ -466,7 +466,9 @@ class DSEIntegrator:
                 "prompt_group": observed.introspection.get(
                     "prompt_group", "evolution_cycle"
                 ),
-                "measurement_kind": "unknown",
+                "measurement_kind": observed.introspection.get(
+                    "measurement_kind", "unknown"
+                ),
                 "measurement_details": {},
             }
 

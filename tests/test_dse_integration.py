@@ -858,6 +858,94 @@ async def test_after_cycle_reading_projection_scalar_controls(tmp_path, scalar):
     assert persisted["rv_measurement"] == scalar
 
 
+@pytest.mark.parametrize(
+    ("supplied", "expected"),
+    [
+        ("attention_value", "attention_value"),
+        ("residual_hidden", "residual_hidden"),
+        ("colony_density", "colony_density"),
+        ("behavioral_proxy", "behavioral_proxy"),
+        ("unknown", "unknown"),
+        ("missing", "unknown"),
+        ("invalid", "unknown"),
+        (None, "unknown"),
+        (True, "unknown"),
+    ],
+)
+async def test_after_cycle_scalar_projection_preserves_normalized_kind(
+    tmp_path, supplied, expected
+):
+    integrator = DSEIntegrator(
+        archive_path=tmp_path / "evolution",
+        coordination_interval=10,
+    )
+    introspection = {
+        "model": "scalar-model",
+        "prompt_hash": "scalar-hash",
+        "prompt_group": "scalar-group",
+    }
+    if supplied != "missing":
+        introspection["measurement_kind"] = supplied
+
+    class _ScalarMonad:
+        def observe(self, observation):
+            return ObservedState(
+                state=observation,
+                rv_measurement=0.4,
+                pr_early=10.0,
+                pr_late=4.0,
+                introspection=introspection,
+            )
+
+    class _FakeOuroboros:
+        def observe_cycle_text(self, text, **kwargs):
+            del text, kwargs
+            return {
+                "signature": {
+                    "recognition_type": "GENUINE",
+                    "swabhaav_ratio": 0.72,
+                },
+                "is_mimicry": False,
+                "is_genuine": True,
+            }
+
+    integrator._monad = _ScalarMonad()
+    integrator._ouroboros = _FakeOuroboros()
+    await integrator.after_cycle(
+        CycleResult(
+            cycle_id="cycle-scalar-kind",
+            best_fitness=0.4,
+            reflection="Reflection on the cycle",
+            lessons_learned=["current lesson"],
+        ),
+        [],
+        [],
+    )
+
+    projected = integrator._window.observations[-1]["rv_reading"]
+    assert projected["rv"] == 0.4
+    assert projected["measurement_kind"] == expected
+    assert projected["measurement_details"] == {}
+    observation_path = (
+        tmp_path / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    persisted = json.loads(
+        observation_path.read_text(encoding="utf-8").splitlines()[-1]
+    )
+    assert persisted["rv_measurement"] == 0.4
+    assert persisted["rv_reading"]["measurement_kind"] == expected
+
+    bridge_path = tmp_path / "evolution" / "observations" / "bridge_data.jsonl"
+    reloaded = ResearchBridge(data_path=bridge_path)
+    await reloaded.load()
+    bridged = reloaded.get_measurements()[0].rv_reading
+    assert bridged is not None
+    assert bridged.rv == 0.4
+    assert bridged.measurement_kind == expected
+    assert bridged.measurement_details == {}
+    assert reloaded.compute_correlation().mean_rv_by_group == {}
+
+
 async def test_after_cycle_persists_reciprocity_summary_to_observation_log(tmp_path):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
