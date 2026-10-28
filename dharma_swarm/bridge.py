@@ -35,6 +35,7 @@ from dharma_swarm.rv import (
     RV_CALIBRATION_STATUS,
     MeasurementKind,
     RVReading,
+    _preserve_historical_classification,
     _prompt_hash,
     comparable_measurement_identity,
 )
@@ -707,15 +708,24 @@ class EvolutionBridge:
         """
         archived = []
         for record in self._records:
+            record = _preserve_historical_classification(record)
             row = {
                 "cycle_id": record["cycle_id"],
                 "rv": record["rv"],
                 "fitness": record["fitness"],
                 "rv_source": record["rv_source"],
                 "measurement_kind": record["measurement_kind"],
+                "is_contracted": None,
                 "calibration_status": RV_CALIBRATION_STATUS,
             }
-            for key in ("model_name", "early_layer", "late_layer", "measurement_details"):
+            for key in (
+                "model_name",
+                "early_layer",
+                "late_layer",
+                "measurement_details",
+                "historical_classification",
+                "historical_classification_conflicts",
+            ):
                 if key in record:
                     row[key] = deepcopy(record[key])
             archived.append(row)

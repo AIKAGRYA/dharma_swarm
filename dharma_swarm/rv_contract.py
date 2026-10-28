@@ -79,6 +79,24 @@ def _preserve_historical_classification(data: Any) -> Any:
     return data
 
 
+def _accepted_reading_projection(reading: Any) -> dict[str, Any]:
+    return {
+        "rv": reading.rv,
+        "pr_early": reading.pr_early,
+        "pr_late": reading.pr_late,
+        "rv_source": "geometric",
+        "measurement_kind": reading.measurement_kind,
+        "measurement_details": dict(reading.measurement_details),
+        "model_name": reading.model_name,
+        "early_layer": reading.early_layer,
+        "late_layer": reading.late_layer,
+        "historical_classification": copy.deepcopy(reading.historical_classification),
+        "historical_classification_conflicts": copy.deepcopy(
+            reading.historical_classification_conflicts
+        ),
+    }
+
+
 def _measurement_identity(measurement: Any) -> tuple[Any, ...] | None:
     def field(name: str) -> Any:
         if isinstance(measurement, dict):

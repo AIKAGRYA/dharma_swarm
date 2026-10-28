@@ -22,6 +22,7 @@ All failures are non-fatal — the integrator never blocks the core pipeline.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import math
@@ -218,7 +219,7 @@ class ObservationWindow(BaseModel):
         ]
 
     def append(self, record: dict[str, Any]) -> None:
-        self.observations.append(record)
+        self.observations.append(copy.deepcopy(record))
         if len(self.observations) > self.max_size:
             self.observations = self.observations[-self.max_size:]
         self._refresh_trajectories()

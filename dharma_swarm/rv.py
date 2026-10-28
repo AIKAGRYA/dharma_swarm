@@ -378,15 +378,7 @@ class EvolutionRVTracker:
         }
 
         if rv_reading is not None:
-            record["rv"] = rv_reading.rv
-            record["pr_early"] = rv_reading.pr_early
-            record["pr_late"] = rv_reading.pr_late
-            record["rv_source"] = "geometric"
-            record["measurement_kind"] = rv_reading.measurement_kind
-            record["measurement_details"] = dict(rv_reading.measurement_details)
-            record["model_name"] = rv_reading.model_name
-            record["early_layer"] = rv_reading.early_layer
-            record["late_layer"] = rv_reading.late_layer
+            record.update(_rv_contract._accepted_reading_projection(rv_reading))
         else:
             # Proxy R_V: use cycle success ratio as a behavioral stand-in.
             # More archived proposals lower this descriptive proxy without classifying contraction.

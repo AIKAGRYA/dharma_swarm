@@ -12,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from dharma_swarm.bridge import CorrelationResult, EvolutionBridge, ResearchBridge
+from dharma_swarm.dse_integration import ObservationWindow
 from dharma_swarm.monad import ObservedState, SelfObservationMonad, bind, flatten
 from dharma_swarm.ouroboros import colony_rv_reading
 from dharma_swarm.rv import RV_CALIBRATION_STATUS, EvolutionRVTracker, RVReading
@@ -406,6 +407,110 @@ async def test_tracker_separates_proxy_from_residual_and_does_not_pool(tmp_path)
     assert tracker.get_rv_fitness_pairs() == []
     assert tracker.get_trend() is None
     assert [r["rv"] for r in tracker.get_readings()] == [0.5, 0.4]
+
+
+async def test_tracker_snapshots_accepted_history_through_return_disk_and_load(
+    tmp_path,
+):
+    historical = {
+        "is_contracted": False,
+        "raw_legacy_field": {"keep": [None, False]},
+    }
+    conflicts = [
+        {
+            "field": "is_contracted",
+            "existing_source": "historical_classification",
+            "existing_value": False,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": 0,
+        }
+    ]
+    accepted = reading(
+        0.4,
+        "residual_hidden",
+        historical_classification=historical,
+        historical_classification_conflicts=conflicts,
+    )
+    measurer = Mock()
+    measurer.is_available.return_value = True
+    measurer.measure = AsyncMock(return_value=accepted)
+    tracker = EvolutionRVTracker(tmp_path)
+
+    returned = await tracker.measure_cycle("residual", 0.9, 2, measurer=measurer)
+
+    assert returned["historical_classification"] == historical
+    assert returned["historical_classification_conflicts"] == conflicts
+    assert returned["historical_classification"]["is_contracted"] is False
+    conflict = returned["historical_classification_conflicts"][0]
+    assert type(conflict["legacy_value"]) is int
+    assert returned["is_contracted"] is None
+
+    accepted.historical_classification["is_contracted"] = True
+    accepted.historical_classification["raw_legacy_field"]["keep"][0] = "changed"
+    accepted.historical_classification_conflicts[0]["legacy_value"] = 1
+    returned["historical_classification"]["is_contracted"] = True
+    returned["historical_classification_conflicts"][0]["legacy_value"] = 1
+
+    persisted = json.loads((tmp_path / "evolution_rv.jsonl").read_text())
+    restored = EvolutionRVTracker(tmp_path)
+    await restored.load()
+    for row in (tracker.get_readings()[0], persisted, restored.get_readings()[0]):
+        assert row["historical_classification"] == historical
+        assert row["historical_classification_conflicts"] == conflicts
+        assert row["historical_classification"]["is_contracted"] is False
+        assert (
+            type(row["historical_classification_conflicts"][0]["legacy_value"]) is int
+        )
+        assert row["is_contracted"] is None
+
+
+def test_observation_window_snapshots_mixed_cohort_provenance():
+    window = ObservationWindow()
+    records = [
+        {
+            "cycle_id": cohort,
+            "rv": rv,
+            "best_fitness": 0.8,
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": cohort, "formula": "fixture"},
+        }
+        for cohort, rv in (("a", 0.2), ("b", 0.6))
+    ]
+    accepted = deepcopy(records)
+    for record in records:
+        window.append(record)
+
+    assert window.rv_trend is None
+    records[1]["measurement_details"]["cohort"] = "a"
+    records[1]["measurement_details"]["formula"] = "changed"
+
+    assert window.observations == accepted
+    assert window.rv_trend is None
+
+
+def test_observation_window_preserves_ordinary_trends_and_max_size():
+    window = ObservationWindow(max_size=2)
+    records = [
+        {
+            "cycle_id": str(index),
+            "rv": rv,
+            "best_fitness": fitness,
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": "a", "formula": "fixture"},
+        }
+        for index, (rv, fitness) in enumerate(((0.2, 1.0), (0.4, 3.0), (0.6, 5.0)))
+    ]
+    for record in records:
+        window.append(record)
+    for record in records:
+        record["measurement_details"]["cohort"] = "changed"
+        record["rv"] = 99.0
+
+    assert [row["cycle_id"] for row in window.observations] == ["1", "2"]
+    assert window.rv_trajectory == [0.4, 0.6]
+    assert window.fitness_trajectory == [3.0, 5.0]
+    assert window.rv_trend == pytest.approx(0.2)
+    assert window.fitness_trend == pytest.approx(2.0)
 
 
 async def test_tracker_historical_classification_is_retained_only_as_history(tmp_path):
@@ -1675,9 +1780,17 @@ def test_evolution_bridge_large_integer_ranks_remain_exact(field):
 
 def _restore_evolution_archive(rows):
     bridge = EvolutionBridge()
-    identity_fields = ("model_name", "early_layer", "late_layer", "measurement_details")
+    metadata_fields = (
+        "model_name",
+        "early_layer",
+        "late_layer",
+        "measurement_details",
+        "historical_classification",
+        "historical_classification_conflicts",
+        "is_contracted",
+    )
     for row in rows:
-        metadata = {key: row[key] for key in identity_fields if key in row}
+        metadata = {key: row[key] for key in metadata_fields if key in row}
         bridge.add_record(
             row["cycle_id"],
             row["rv"],
@@ -1687,6 +1800,59 @@ def _restore_evolution_archive(rows):
             measurement_kind=row["measurement_kind"],
         )
     return bridge
+
+
+def test_evolution_bridge_archive_preserves_history_conflicts_and_ownership():
+    conflict = {
+        "field": "is_contracted",
+        "existing_source": "historical_classification",
+        "existing_value": False,
+        "legacy_source": "legacy_top_level",
+        "legacy_value": 0,
+    }
+    metadata = {
+        **evolution_metadata("residual_hidden"),
+        "historical_classification": {
+            "is_contracted": False,
+            "raw_legacy_field": {"keep": [None]},
+        },
+        "historical_classification_conflicts": [conflict],
+        "is_contracted": 0,
+    }
+    accepted = deepcopy(metadata)
+    bridge = EvolutionBridge()
+    bridge.add_record(
+        "cycle",
+        0.4,
+        0.8,
+        rv_source="geometric",
+        metadata=metadata,
+        measurement_kind="residual_hidden",
+    )
+    metadata["historical_classification"]["is_contracted"] = True
+    metadata["historical_classification_conflicts"][0]["legacy_value"] = 1
+    metadata["measurement_details"]["cohort"] = "changed"
+
+    archived = json.loads(json.dumps(bridge.format_for_archive()))
+    row = archived[0]
+    assert row["rv"] == 0.4
+    assert row["fitness"] == 0.8
+    assert row["measurement_details"] == accepted["measurement_details"]
+    assert row["historical_classification"] == accepted["historical_classification"]
+    assert row["historical_classification"]["is_contracted"] is False
+    assert row["historical_classification_conflicts"] == accepted[
+        "historical_classification_conflicts"
+    ]
+    assert type(row["historical_classification_conflicts"][0]["legacy_value"]) is int
+    assert row["is_contracted"] is None
+
+    restored = _restore_evolution_archive(archived)
+    assert restored.format_for_archive() == archived
+    archived[0]["historical_classification"]["is_contracted"] = True
+    archived[0]["historical_classification_conflicts"][0]["legacy_value"] = 1
+    archived[0]["measurement_details"]["cohort"] = "changed"
+    assert bridge.format_for_archive() == restored.format_for_archive()
+    assert restored.format_for_archive()[0]["is_contracted"] is None
 
 
 @pytest.mark.parametrize("kind", ["residual_hidden", "behavioral_proxy"])
