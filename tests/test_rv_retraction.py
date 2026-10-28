@@ -119,11 +119,47 @@ def test_public_contract_helpers_preserve_nested_history_and_comparability():
         "fixture",
         2,
         22,
+        ("tensor", None),
+        ("centering", None),
+        ("participation_ratio", None),
     )
     assert comparable_measurement_identity([restored.rv_reading, reading()]) is None
     incompatible = reading(0.4, "residual_hidden", late_layer=23)
     assert comparable_measurement_identity([restored.rv_reading, incompatible]) is None
     assert ObservedState.from_dict(restored.to_dict()).to_dict() == restored.to_dict()
+
+
+@pytest.mark.parametrize("kind", ["attention_value", "residual_hidden"])
+@pytest.mark.parametrize("key", ["tensor", "centering", "participation_ratio"])
+def test_measurement_identity_requires_matching_instrument_declarations(kind, key):
+    from dharma_swarm.rv import comparable_measurement_identity
+
+    declarations = {
+        "tensor": "value" if kind == "attention_value" else "hidden",
+        "centering": "mean",
+        "participation_ratio": "singular-value-energy",
+    }
+    first = reading(
+        0.4, kind, measurement_details={"cohort": "retraction-fixture", **declarations}
+    ).model_dump()
+    second = reading(
+        0.6, kind, measurement_details={"cohort": "retraction-fixture", **declarations}
+    ).model_dump()
+    assert comparable_measurement_identity([first, second]) is not None
+
+    conflicting = deepcopy(second)
+    conflicting["measurement_details"][key] = "different-declaration"
+    assert comparable_measurement_identity([first, conflicting]) is None
+
+    absent = deepcopy(second)
+    del absent["measurement_details"][key]
+    assert comparable_measurement_identity([first, absent]) is None
+    assert comparable_measurement_identity([absent, deepcopy(absent)]) is not None
+
+    malformed = deepcopy(second)
+    malformed["measurement_details"][key] = 7
+    assert comparable_measurement_identity([first, malformed]) is None
+    assert comparable_measurement_identity([malformed, deepcopy(malformed)]) is None
 
 
 def test_legacy_reading_round_trip_does_not_invent_provenance():
@@ -1478,6 +1514,39 @@ async def test_research_bridge_withholds_incompatible_same_kind_statistics(
     )
 
 
+@pytest.mark.parametrize("kind", ["attention_value", "residual_hidden"])
+@pytest.mark.parametrize("key", ["tensor", "centering", "participation_ratio"])
+async def test_research_bridge_withholds_conflicting_instrument_statistics(
+    tmp_path, kind, key
+):
+    declarations = {
+        "tensor": "value" if kind == "attention_value" else "hidden",
+        "centering": "mean",
+        "participation_ratio": "singular-value-energy",
+    }
+    conflicting = dict(declarations, **{key: "different-declaration"})
+    bridge = ResearchBridge(tmp_path / "pairs.jsonl")
+    for index, details in enumerate((declarations, conflicting)):
+        await bridge.add_measurement(
+            str(index),
+            "same",
+            f"Response {index}",
+            rv_reading=reading(
+                0.4 + index * 0.2,
+                kind,
+                measurement_details={"cohort": "retraction-fixture", **details},
+            ),
+        )
+
+    result = bridge.compute_correlation()
+    assert result.n == 2
+    assert result.mean_rv_by_group == {}
+    assert bridge.group_summary()["same"]["mean_rv"] is None
+    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx(
+        [0.4, 0.6]
+    )
+
+
 async def test_research_bridge_withholds_different_proxy_formulas(tmp_path):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
     for index, formula in enumerate(("formula-a", "formula-b")):
@@ -1840,9 +1909,10 @@ def test_evolution_bridge_archive_preserves_history_conflicts_and_ownership():
     assert row["measurement_details"] == accepted["measurement_details"]
     assert row["historical_classification"] == accepted["historical_classification"]
     assert row["historical_classification"]["is_contracted"] is False
-    assert row["historical_classification_conflicts"] == accepted[
-        "historical_classification_conflicts"
-    ]
+    assert (
+        row["historical_classification_conflicts"]
+        == accepted["historical_classification_conflicts"]
+    )
     assert type(row["historical_classification_conflicts"][0]["legacy_value"]) is int
     assert row["is_contracted"] is None
 

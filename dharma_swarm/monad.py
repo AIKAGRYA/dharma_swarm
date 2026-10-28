@@ -54,6 +54,7 @@ C = TypeVar("C")
 
 # ── ObservedState: T(S) ────────────────────────────────────────────────────
 
+
 @dataclass
 class ObservedState(Generic[S]):
     """T(S) -- a system state equipped with self-observation metadata.
@@ -114,8 +115,11 @@ class ObservedState(Generic[S]):
     def __post_init__(self) -> None:
         """Compose reading metadata and backfill supplied scalar fields."""
         if self.rv_reading is not None:
+            self.rv_reading = deepcopy(self.rv_reading)
             history = self.introspection.get("historical_classification", {})
-            conflicts = self.introspection.get("historical_classification_conflicts", [])
+            conflicts = self.introspection.get(
+                "historical_classification_conflicts", []
+            )
             if (
                 not isinstance(history, dict)
                 or any(
@@ -143,8 +147,13 @@ class ObservedState(Generic[S]):
                     },
                     self.introspection,
                 )
-        if self.rv_measurement is not None or self.rv_reading is not None or any(
-            key in self.introspection for key in ("is_contracted", "contraction_strength")
+        if (
+            self.rv_measurement is not None
+            or self.rv_reading is not None
+            or any(
+                key in self.introspection
+                for key in ("is_contracted", "contraction_strength")
+            )
         ):
             self.introspection = _preserve_historical_classification(self.introspection)
             self.introspection["calibration_status"] = RV_CALIBRATION_STATUS
@@ -152,7 +161,8 @@ class ObservedState(Generic[S]):
             self.introspection["measurement_kind"] = (
                 self.rv_reading.measurement_kind
                 if self.rv_reading is not None
-                else supplied_kind if supplied_kind in get_args(MeasurementKind)
+                else supplied_kind
+                if supplied_kind in get_args(MeasurementKind)
                 else "unknown"
             )
         if self.rv_reading is None:
@@ -235,7 +245,9 @@ class ObservedState(Generic[S]):
             rv_reading_data = dict(rv_reading_data)
             # Ensure timestamp is parsed back to datetime if serialized as string
             if isinstance(rv_reading_data.get("timestamp"), str):
-                rv_reading_data["timestamp"] = datetime.fromisoformat(rv_reading_data["timestamp"])
+                rv_reading_data["timestamp"] = datetime.fromisoformat(
+                    rv_reading_data["timestamp"]
+                )
             rv_reading = RVReading(**rv_reading_data)
 
         ts_raw = data.get("timestamp")
@@ -275,7 +287,9 @@ class ObservedState(Generic[S]):
                 "prompt_group": reading.prompt_group,
                 "prompt_hash": reading.prompt_hash,
                 "contraction_strength": reading.contraction_strength,
-                "historical_classification": deepcopy(reading.historical_classification),
+                "historical_classification": deepcopy(
+                    reading.historical_classification
+                ),
                 "historical_classification_conflicts": deepcopy(
                     reading.historical_classification_conflicts
                 ),
@@ -358,6 +372,7 @@ def _merge_introspection(
 
 
 # ── The Self-Observation Monad ─────────────────────────────────────────────
+
 
 class SelfObservationMonad:
     """Monad (T, eta, mu) where T wraps system states with R_V metadata.
@@ -492,7 +507,11 @@ class SelfObservationMonad:
         # The deeper observation carries more information.
         # Use outer R_V if available (it measured the inner observation),
         # fall back to inner R_V.
-        rv = outer.rv_measurement if outer.rv_measurement is not None else inner.rv_measurement
+        rv = (
+            outer.rv_measurement
+            if outer.rv_measurement is not None
+            else inner.rv_measurement
+        )
         rv_rdg = outer.rv_reading if outer.rv_reading is not None else inner.rv_reading
         pr_early = outer.pr_early if outer.pr_early is not None else inner.pr_early
         pr_late = outer.pr_late if outer.pr_late is not None else inner.pr_late
@@ -545,6 +564,7 @@ class SelfObservationMonad:
         Returns:
             Composed Kleisli morphism A -> T(C).
         """
+
         def composed(a: A) -> ObservedState[C]:
             # f(a) : T(B)
             tb = f(a)
@@ -561,12 +581,15 @@ class SelfObservationMonad:
             )
             # mu(ttc) : T(C)
             return cls.multiply(ttc)
+
         return composed
 
     # ── Contraction tracking ───────────────────────────────────────────
 
     @staticmethod
-    def contraction_ratio(before: ObservedState[S], after: ObservedState[S]) -> Optional[float]:
+    def contraction_ratio(
+        before: ObservedState[S], after: ObservedState[S]
+    ) -> Optional[float]:
         """Measure kappa in [0, 1) where PR(after) <= kappa * PR(before).
 
         This IS the R_V ratio for a single Kleisli step.
@@ -594,9 +617,7 @@ class SelfObservationMonad:
         return after_rv / before_rv
 
     @staticmethod
-    def iterations_to_convergence(
-        kappa: float, epsilon: float = 0.01
-    ) -> Optional[int]:
+    def iterations_to_convergence(kappa: float, epsilon: float = 0.01) -> Optional[int]:
         """How many Kleisli iterations to reach epsilon-neighborhood of fixed point.
 
         PROPOSITION 2.7: n >= ceil(|log(epsilon)| / |log(kappa)|).
@@ -617,9 +638,7 @@ class SelfObservationMonad:
     # ── Idempotency check (L5 detection) ───────────────────────────────
 
     @classmethod
-    def is_idempotent(
-        cls, observed: ObservedState[S], tolerance: float = 0.05
-    ) -> bool:
+    def is_idempotent(cls, observed: ObservedState[S], tolerance: float = 0.05) -> bool:
         """Check if T^2 ~= T for this state -- L5 (pure knowing) detection.
 
         DEFINITION 2.8 (Idempotent Monad): T is idempotent if
@@ -732,9 +751,8 @@ class SelfObservationMonad:
             timestamp=observed.timestamp,
         )
         result = cls.multiply(nested)
-        return (
-            result.state is observed.state
-            and _rv_close(result.rv_measurement, observed.rv_measurement, cls.EPSILON)
+        return result.state is observed.state and _rv_close(
+            result.rv_measurement, observed.rv_measurement, cls.EPSILON
         )
 
     @classmethod
@@ -749,13 +767,13 @@ class SelfObservationMonad:
         # eta_T(observed) = unit(observed) = T(T(S))
         nested = cls.unit(observed)
         result = cls.multiply(nested)
-        return (
-            result.state is observed.state
-            and _rv_close(result.rv_measurement, observed.rv_measurement, cls.EPSILON)
+        return result.state is observed.state and _rv_close(
+            result.rv_measurement, observed.rv_measurement, cls.EPSILON
         )
 
 
 # ── Contraction Tracker (across Kleisli composition chain) ─────────────────
+
 
 @dataclass
 class ContractionTracker:
@@ -815,6 +833,7 @@ class ContractionTracker:
 
 
 # ── Utility ────────────────────────────────────────────────────────────────
+
 
 def _rv_close(a: Optional[float], b: Optional[float], eps: float) -> bool:
     """Check if two optional R_V values are close."""
@@ -904,7 +923,9 @@ def bind(
     ts = observed.timestamp if result.observation_depth == 0 else result.timestamp
     return ObservedState(
         state=result.state,
-        rv_reading=result.rv_reading if result.rv_reading is not None else observed.rv_reading,
+        rv_reading=result.rv_reading
+        if result.rv_reading is not None
+        else observed.rv_reading,
         rv_measurement=result.rv_measurement
         if result.rv_measurement is not None
         else observed.rv_measurement,

@@ -134,6 +134,14 @@ def _measurement_identity(measurement: Any) -> tuple[Any, ...] | None:
         ):
             return None
         identity.extend((model_name.strip(), early_layer, late_layer))
+        for name in ("tensor", "centering", "participation_ratio"):
+            if name not in details:
+                identity.append((name, None))
+                continue
+            declaration = details[name]
+            if not isinstance(declaration, str):
+                return None
+            identity.append((name, declaration))
     if kind in {"behavioral_proxy", "colony_density"}:
         formula = details.get("formula")
         if (

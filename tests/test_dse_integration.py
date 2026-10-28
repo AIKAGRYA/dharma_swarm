@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -19,7 +20,8 @@ from dharma_swarm.evolution import (
     EvolutionStatus,
     Proposal,
 )
-from dharma_swarm.monad import ObservedState
+from dharma_swarm.monad import ObservedState, SelfObservationMonad
+from dharma_swarm.rv import RVReading
 
 
 @pytest.fixture
@@ -31,7 +33,9 @@ def engine_paths(tmp_path):
     }
 
 
-def _proposal(component: str, description: str, *, parent_id: str | None = None) -> Proposal:
+def _proposal(
+    component: str, description: str, *, parent_id: str | None = None
+) -> Proposal:
     return Proposal(
         component=component,
         change_type="mutation",
@@ -65,18 +69,22 @@ def _window_reading(value: float, **overrides) -> dict:
 def test_observation_window_preserves_zero_metric_values():
     window = ObservationWindow(max_size=5)
 
-    window.append({
-        "cycle_id": "c1",
-        "rv": 0.0,
-        "best_fitness": 0.0,
-        "rv_reading": _window_reading(0.0),
-    })
-    window.append({
-        "cycle_id": "c2",
-        "rv": 0.2,
-        "best_fitness": 0.4,
-        "rv_reading": _window_reading(0.2),
-    })
+    window.append(
+        {
+            "cycle_id": "c1",
+            "rv": 0.0,
+            "best_fitness": 0.0,
+            "rv_reading": _window_reading(0.0),
+        }
+    )
+    window.append(
+        {
+            "cycle_id": "c2",
+            "rv": 0.2,
+            "best_fitness": 0.4,
+            "rv_reading": _window_reading(0.2),
+        }
+    )
 
     assert window.rv_trajectory == [0.0, 0.2]
     assert window.fitness_trajectory == [0.0, 0.4]
@@ -105,10 +113,16 @@ def test_observation_window_trim_drops_stale_metrics_from_trimmed_records():
         ([0.4, 0.7], [{}, {"measurement_kind": "unknown"}]),
         (
             [0.4, 0.7],
-            [{}, {
-                "measurement_kind": "behavioral_proxy",
-                "measurement_details": {"cohort": "dse-fixture", "formula": "formula-a"},
-            }],
+            [
+                {},
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {
+                        "cohort": "dse-fixture",
+                        "formula": "formula-a",
+                    },
+                },
+            ],
         ),
         ([0.4, 0.7], [{}, {"model_name": "other-model"}]),
         ([0.4, 0.7], [{}, {"early_layer": 3}]),
@@ -119,11 +133,17 @@ def test_observation_window_trim_drops_stale_metrics_from_trimmed_records():
             [
                 {
                     "measurement_kind": "behavioral_proxy",
-                    "measurement_details": {"cohort": "dse-fixture", "formula": "formula-a"},
+                    "measurement_details": {
+                        "cohort": "dse-fixture",
+                        "formula": "formula-a",
+                    },
                 },
                 {
                     "measurement_kind": "behavioral_proxy",
-                    "measurement_details": {"cohort": "dse-fixture", "formula": "formula-b"},
+                    "measurement_details": {
+                        "cohort": "dse-fixture",
+                        "formula": "formula-b",
+                    },
                 },
             ],
         ),
@@ -141,9 +161,7 @@ def test_observation_window_withholds_unavailable_rv_trend(
             "best_fitness": index * 0.2,
         }
         if reading_overrides is not None:
-            record["rv_reading"] = _window_reading(
-                value, **reading_overrides[index]
-            )
+            record["rv_reading"] = _window_reading(value, **reading_overrides[index])
         window.append(record)
 
     assert len(window.observations) == 2
@@ -170,7 +188,9 @@ def test_observation_window_withholds_unavailable_rv_trend(
         pytest.param(2, True, id="valid-int"),
     ],
 )
-def test_observation_window_preserves_legacy_rows_without_invalid_trends(field, value, valid):
+def test_observation_window_preserves_legacy_rows_without_invalid_trends(
+    field, value, valid
+):
     window = ObservationWindow(max_size=5)
     records = []
     for index in range(3):
@@ -304,7 +324,9 @@ async def test_after_cycle_replaces_last_observed_with_current_cycle(tmp_path):
                 change_type="mutation",
                 description="first state",
                 diff="- first\n+ first+\n",
-                fitness=FitnessScore(correctness=0.3, dharmic_alignment=1.0, safety=1.0),
+                fitness=FitnessScore(
+                    correctness=0.3, dharmic_alignment=1.0, safety=1.0
+                ),
                 status="applied",
             )
         ],
@@ -324,7 +346,9 @@ async def test_after_cycle_replaces_last_observed_with_current_cycle(tmp_path):
                 change_type="mutation",
                 description="second state",
                 diff="- second\n+ second+\n",
-                fitness=FitnessScore(correctness=0.7, dharmic_alignment=1.0, safety=1.0),
+                fitness=FitnessScore(
+                    correctness=0.7, dharmic_alignment=1.0, safety=1.0
+                ),
                 status="applied",
             )
         ],
@@ -343,7 +367,9 @@ async def test_after_cycle_replaces_last_observed_with_current_cycle(tmp_path):
     assert records[-1]["observation_depth"] == 1
 
 
-async def test_repeated_proxy_observations_leave_fixed_point_verdict_unavailable(tmp_path):
+async def test_repeated_proxy_observations_leave_fixed_point_verdict_unavailable(
+    tmp_path,
+):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
         coordination_interval=1,
@@ -374,7 +400,10 @@ async def test_repeated_proxy_observations_leave_fixed_point_verdict_unavailable
     assert second.approaching_fixed_point is None
     assert second.rv_trend is None
     assert integrator._window.rv_trajectory == [0.9, 0.9]
-    assert [record["rv_measurement"] for record in integrator._window.observations] == [0.9, 0.9]
+    assert [record["rv_measurement"] for record in integrator._window.observations] == [
+        0.9,
+        0.9,
+    ]
     assert all(
         record["approaching_fixed_point"] is None
         for record in integrator._window.observations
@@ -409,7 +438,9 @@ def test_compose_cycle_text_dedupes_repeated_discoveries_and_lessons():
     )
 
 
-async def test_run_cycle_emits_only_current_cycle_archive_delta(engine_paths, monkeypatch):
+async def test_run_cycle_emits_only_current_cycle_archive_delta(
+    engine_paths, monkeypatch
+):
     engine = DarwinEngine(**engine_paths)
     await engine.init()
     historic = ArchiveEntry(
@@ -661,8 +692,170 @@ async def test_after_cycle_persists_l4_bridge_measurement(tmp_path):
     reading = reloaded.get_measurements()[0].rv_reading
     assert reading is not None
     assert reading.measurement_kind == "behavioral_proxy"
-    assert reading.measurement_details["formula"] == "1 - min(proposals_archived, 5) * 0.1"
+    assert (
+        reading.measurement_details["formula"] == "1 - min(proposals_archived, 5) * 0.1"
+    )
     assert reloaded.compute_correlation().mean_rv_by_group == {}
+
+
+async def test_after_cycle_preserves_complete_accepted_reading(tmp_path):
+    integrator = DSEIntegrator(
+        archive_path=tmp_path / "evolution",
+        coordination_interval=10,
+    )
+    accepted = RVReading(
+        rv=0.4,
+        pr_early=10.0,
+        pr_late=4.0,
+        model_name="fixture",
+        early_layer=2,
+        late_layer=22,
+        prompt_hash="fixture-hash",
+        prompt_group="fixture-group",
+        timestamp=datetime(2026, 3, 10, tzinfo=timezone.utc),
+        measurement_kind="residual_hidden",
+        measurement_details={
+            "cohort": "dse-full",
+            "tensor": "hidden",
+            "centering": "mean",
+            "participation_ratio": "singular-value-energy",
+        },
+        historical_classification={
+            "is_contracted": False,
+            "nested": {"values": ["accepted"]},
+        },
+        historical_classification_conflicts=[{"field": "legacy", "values": [False, 0]}],
+    )
+    expected = accepted.model_copy(deep=True)
+    integrator._monad = SelfObservationMonad(observer=lambda _: accepted)
+
+    class _FakeOuroboros:
+        def observe_cycle_text(
+            self,
+            text: str,
+            *,
+            cycle_id: str = "",
+            source: str = "evolution",
+        ) -> dict[str, object]:
+            del text, cycle_id, source
+            return {
+                "signature": {
+                    "recognition_type": "GENUINE",
+                    "swabhaav_ratio": 0.72,
+                },
+                "is_mimicry": False,
+                "is_genuine": True,
+            }
+
+    integrator._ouroboros = _FakeOuroboros()
+    current = ArchiveEntry(
+        component="child.py",
+        change_type="mutation",
+        description="child archive state",
+        diff="- parent\n+ child\n",
+        fitness=FitnessScore(correctness=0.4, dharmic_alignment=1.0, safety=1.0),
+        status="applied",
+    )
+    await integrator.after_cycle(
+        CycleResult(
+            cycle_id="cycle-full-reading",
+            proposals_submitted=1,
+            proposals_archived=1,
+            best_fitness=0.4,
+            reflection="Reflection on the cycle",
+            lessons_learned=["current lesson"],
+        ),
+        [_proposal("child.py", "proposal description")],
+        [current],
+    )
+
+    accepted.measurement_details["cohort"] = "caller-mutated"
+    accepted.historical_classification["nested"]["values"].append("caller")
+    accepted.historical_classification_conflicts[0]["values"].append(True)
+
+    window_reading = integrator._window.observations[-1]["rv_reading"]
+    assert window_reading == expected.model_dump()
+    observation_path = (
+        tmp_path / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    persisted = json.loads(
+        observation_path.read_text(encoding="utf-8").splitlines()[-1]
+    )
+    expected_reading = expected.model_dump(mode="json")
+    persisted_timestamp = persisted["rv_reading"].pop("timestamp")
+    expected_timestamp = expected_reading.pop("timestamp")
+    assert datetime.fromisoformat(persisted_timestamp) == datetime.fromisoformat(
+        expected_timestamp
+    )
+    assert persisted["rv_reading"] == expected_reading
+    assert persisted["rv_measurement"] == 0.4
+    assert persisted["approaching_fixed_point"] is None
+
+    bridge_path = tmp_path / "evolution" / "observations" / "bridge_data.jsonl"
+    reloaded = ResearchBridge(data_path=bridge_path)
+    await reloaded.load()
+    bridged = reloaded.get_measurements()[0].rv_reading
+    assert bridged == expected
+    assert bridged is not None
+    assert bridged.early_layer == 2
+    assert bridged.late_layer == 22
+    assert bridged.timestamp == expected.timestamp
+    assert bridged.historical_classification["is_contracted"] is False
+    assert bridged.historical_classification_conflicts == (
+        expected.historical_classification_conflicts
+    )
+
+
+@pytest.mark.parametrize("scalar", [0.4, None], ids=["scalar", "no-reading"])
+async def test_after_cycle_reading_projection_scalar_controls(tmp_path, scalar):
+    integrator = DSEIntegrator(
+        archive_path=tmp_path / "evolution",
+        coordination_interval=10,
+    )
+
+    class _ScalarMonad:
+        def observe(self, observation):
+            return ObservedState(
+                state=observation,
+                rv_measurement=scalar,
+                pr_early=10.0 if scalar is not None else None,
+                pr_late=4.0 if scalar is not None else None,
+                introspection={
+                    "model": "scalar-model",
+                    "prompt_hash": "scalar-hash",
+                    "prompt_group": "scalar-group",
+                },
+            )
+
+    integrator._monad = _ScalarMonad()
+    await integrator.after_cycle(
+        CycleResult(cycle_id=f"cycle-{scalar}", best_fitness=0.4), [], []
+    )
+
+    projected = integrator._window.observations[-1]["rv_reading"]
+    expected = None
+    if scalar is not None:
+        expected = {
+            "rv": 0.4,
+            "pr_early": 10.0,
+            "pr_late": 4.0,
+            "model_name": "scalar-model",
+            "early_layer": 0,
+            "late_layer": 0,
+            "prompt_hash": "scalar-hash",
+            "prompt_group": "scalar-group",
+            "measurement_kind": "unknown",
+            "measurement_details": {},
+        }
+    assert projected == expected
+    observation_path = (
+        tmp_path / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    persisted = json.loads(
+        observation_path.read_text(encoding="utf-8").splitlines()[-1]
+    )
+    assert persisted["rv_reading"] == expected
+    assert persisted["rv_measurement"] == scalar
 
 
 async def test_after_cycle_persists_reciprocity_summary_to_observation_log(tmp_path):
@@ -748,10 +941,15 @@ async def test_after_cycle_persists_reciprocity_summary_to_observation_log(tmp_p
         for line in obs_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert persisted[-1]["reciprocity"] == integrator._window.observations[-1]["reciprocity"]
+    assert (
+        persisted[-1]["reciprocity"]
+        == integrator._window.observations[-1]["reciprocity"]
+    )
 
 
-async def test_after_cycle_omits_invalid_reciprocity_summary_from_observation_log(tmp_path):
+async def test_after_cycle_omits_invalid_reciprocity_summary_from_observation_log(
+    tmp_path,
+):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
         coordination_interval=10,
@@ -812,7 +1010,9 @@ async def test_after_cycle_omits_invalid_reciprocity_summary_from_observation_lo
     assert "reciprocity" not in persisted[-1]
 
 
-async def test_after_cycle_marks_reciprocity_summary_stale_when_refresh_is_invalid(tmp_path):
+async def test_after_cycle_marks_reciprocity_summary_stale_when_refresh_is_invalid(
+    tmp_path,
+):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
         coordination_interval=10,
@@ -912,7 +1112,10 @@ async def test_after_cycle_marks_reciprocity_summary_stale_when_refresh_is_inval
         "total_routed_usd": 5000.0,
         "issue_codes": [],
     }
-    assert integrator._last_reciprocity_error == "total_routed_usd must be a finite number >= 0"
+    assert (
+        integrator._last_reciprocity_error
+        == "total_routed_usd must be a finite number >= 0"
+    )
     assert integrator._window.observations[-1]["reciprocity"] == {
         "source": "reciprocity_commons",
         "summary_type": "ledger_summary",
@@ -936,10 +1139,15 @@ async def test_after_cycle_marks_reciprocity_summary_stale_when_refresh_is_inval
         for line in obs_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert persisted[-1]["reciprocity"] == integrator._window.observations[-1]["reciprocity"]
+    assert (
+        persisted[-1]["reciprocity"]
+        == integrator._window.observations[-1]["reciprocity"]
+    )
 
 
-async def test_after_cycle_records_canonical_evaluations_when_binding_available(tmp_path):
+async def test_after_cycle_records_canonical_evaluations_when_binding_available(
+    tmp_path,
+):
     class _FakeOuroboros:
         def observe_cycle_text(
             self,
@@ -999,7 +1207,9 @@ async def test_after_cycle_records_canonical_evaluations_when_binding_available(
             self.fact_id = fact_id
 
     class _FakeResult:
-        def __init__(self, artifact_id: str, event_id: str, summary: dict[str, object]) -> None:
+        def __init__(
+            self, artifact_id: str, event_id: str, summary: dict[str, object]
+        ) -> None:
             self.artifact = _FakeArtifact(artifact_id)
             self.facts = [_FakeFact(f"fact-{artifact_id}")]
             self.receipt = {"event_id": event_id}
@@ -1162,12 +1372,15 @@ async def test_after_cycle_records_canonical_evaluations_when_binding_available(
         for line in obs_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert persisted[-1]["canonical_evaluations"] == (
-        integrator._window.observations[-1]["canonical_evaluations"]
+    assert (
+        persisted[-1]["canonical_evaluations"]
+        == (integrator._window.observations[-1]["canonical_evaluations"])
     )
 
 
-async def test_after_cycle_builds_lazy_registry_paths_from_archive_root(tmp_path, monkeypatch):
+async def test_after_cycle_builds_lazy_registry_paths_from_archive_root(
+    tmp_path, monkeypatch
+):
     seen: dict[str, object] = {}
 
     class _FakeRuntimeState:
@@ -1244,9 +1457,13 @@ async def test_after_cycle_builds_lazy_registry_paths_from_archive_root(tmp_path
                 "is_genuine": True,
             }
 
-    monkeypatch.setattr("dharma_swarm.runtime_state.RuntimeStateStore", _FakeRuntimeState)
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_state.RuntimeStateStore", _FakeRuntimeState
+    )
     monkeypatch.setattr("dharma_swarm.memory_lattice.MemoryLattice", _FakeMemoryLattice)
-    monkeypatch.setattr("dharma_swarm.evaluation_registry.EvaluationRegistry", _FakeRegistry)
+    monkeypatch.setattr(
+        "dharma_swarm.evaluation_registry.EvaluationRegistry", _FakeRegistry
+    )
 
     integrator = DSEIntegrator(
         archive_path=tmp_path / "runtime-root" / "evolution",
@@ -1565,7 +1782,9 @@ def test_get_coordination_context_includes_reciprocity_warning(tmp_path):
     }
 
 
-def test_get_coordination_context_exposes_health_without_coordination_snapshot(tmp_path):
+def test_get_coordination_context_exposes_health_without_coordination_snapshot(
+    tmp_path,
+):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
         coordination_interval=10,

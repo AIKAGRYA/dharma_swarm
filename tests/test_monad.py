@@ -113,6 +113,63 @@ def test_from_rv_reading_snapshots_caller_reading() -> None:
     ]
 
 
+def test_observed_state_constructor_snapshots_caller_reading() -> None:
+    source = RVReading(
+        rv=0.4,
+        pr_early=10.0,
+        pr_late=4.0,
+        model_name="fixture",
+        early_layer=2,
+        late_layer=22,
+        prompt_hash="fixture",
+        prompt_group="original-group",
+        timestamp=_ts(0),
+        measurement_kind="residual_hidden",
+        measurement_details={"cohort": "cohort-a"},
+        historical_classification={
+            "is_contracted": False,
+            "nested": {"values": ["original"]},
+        },
+        historical_classification_conflicts=[{"field": "legacy", "values": [False]}],
+    )
+    ordinary = ObservedState(state="ordinary", rv_reading=source)
+    metadata = {"supplied": {"values": ["keep"]}}
+    observed = ObservedState(
+        state="scalar-controlled",
+        rv_reading=source,
+        rv_measurement=0.45,
+        pr_early=11.0,
+        pr_late=4.5,
+        observation_depth=3,
+        introspection=metadata,
+        timestamp=_ts(5),
+    )
+    ordinary_output = ordinary.to_dict()
+    original_output = observed.to_dict()
+
+    assert ordinary.rv_reading is not source
+    assert ordinary.rv_measurement == 0.4
+    assert ordinary.pr_early == 10.0
+    assert ordinary.pr_late == 4.0
+    assert observed.rv_reading is not source
+    assert observed.state == "scalar-controlled"
+    assert observed.rv_measurement == 0.45
+    assert observed.pr_early == 11.0
+    assert observed.pr_late == 4.5
+    assert observed.observation_depth == 3
+    assert observed.timestamp == _ts(5)
+
+    source.rv = 0.9
+    source.measurement_details["cohort"] = "cohort-b"
+    source.historical_classification["nested"]["values"].append("caller")
+    source.historical_classification_conflicts[0]["values"].append(True)
+
+    assert ordinary.to_dict() == ordinary_output
+    assert observed.to_dict() == original_output
+    assert observed.introspection["supplied"] == {"values": ["keep"]}
+    assert metadata == {"supplied": {"values": ["keep"]}}
+
+
 def test_pure_is_neutral() -> None:
     value = pure({"x": 1})
 
