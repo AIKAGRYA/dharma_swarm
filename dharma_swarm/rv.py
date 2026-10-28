@@ -449,6 +449,8 @@ class EvolutionRVTracker:
         xs = list(range(n))
         mean_x = sum(xs) / n
         try:
+            if any(type(value) is int and float(value) != value for value in rv_values):
+                return None
             mean_y = sum(rv_values) / n
             num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, rv_values))
             den = sum((x - mean_x) ** 2 for x in xs)

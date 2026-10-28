@@ -668,7 +668,13 @@ class EvolutionBridge:
         pearson = finite_statistic(_pearson_r, rv_values, fitness_values)
         spearman = finite_statistic(_spearman_rho, rv_values, fitness_values)
         n = len(rv_values)
-        rv_trend = finite_statistic(self._slope, rv_values)
+        try:
+            if any(type(value) is int and float(value) != value for value in rv_values):
+                rv_trend = None
+            else:
+                rv_trend = finite_statistic(self._slope, rv_values)
+        except OverflowError:
+            rv_trend = None
         fitness_trend = finite_statistic(self._slope, fitness_values)
 
         summary_parts = [f"n={n} evolution cycles."]

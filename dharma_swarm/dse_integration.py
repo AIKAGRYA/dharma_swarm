@@ -254,6 +254,11 @@ class ObservationWindow(BaseModel):
             return None
         rv_values = [value for value in values if value is not None]
         try:
+            if any(
+                type(record.get("rv")) is int and float(record["rv"]) != record["rv"]
+                for record in self.observations
+            ):
+                return None
             diffs = [b - a for a, b in zip(rv_values, rv_values[1:])]
             trend = sum(diffs) / len(diffs)
         except ArithmeticError:

@@ -1482,7 +1482,43 @@ async def test_tracker_large_integer_ranks_and_raw_values_remain_exact(tmp_path)
     await tracker.load()
 
     assert tracker.get_rv_fitness_pairs() == list(zip(rv_values, [0.9, 0.8, 0.7]))
-    assert tracker.get_trend() == pytest.approx(1.0)
+    assert tracker.get_trend() is None
+    assert [row["rv"] for row in tracker.get_readings()] == rv_values
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("rv_values", "expected_trend"),
+    [
+        ([2**54 + 1, 2**54, 2**54 + 2], None),
+        ([2**54, 2**54 + 4, 2**54 + 8], 4.0),
+    ],
+)
+async def test_tracker_integer_trend_preserves_precision_contract(
+    tmp_path, rv_values, expected_trend
+):
+    fitness_values = [0.9, 0.8, 0.7]
+    records = [
+        {
+            "cycle_id": str(index),
+            "rv": rv,
+            "best_fitness": fitness_values[index],
+            "measurement_kind": "residual_hidden",
+            **evolution_metadata("residual_hidden"),
+        }
+        for index, rv in enumerate(rv_values)
+    ]
+    before = "".join(f"{json.dumps(record)}\n" for record in records).encode()
+    path = tmp_path / "evolution_rv.jsonl"
+    path.write_bytes(before)
+    tracker = EvolutionRVTracker(tmp_path)
+    await tracker.load()
+
+    assert tracker.get_rv_fitness_pairs() == list(zip(rv_values, fitness_values))
+    if expected_trend is None:
+        assert tracker.get_trend() is None
+    else:
+        assert tracker.get_trend() == pytest.approx(expected_trend)
     assert [row["rv"] for row in tracker.get_readings()] == rv_values
     assert path.read_bytes() == before
 
@@ -1971,9 +2007,46 @@ def test_evolution_bridge_large_integer_ranks_remain_exact(field):
     result = bridge.correlate()
 
     assert result["spearman_rho"] == pytest.approx(1.0)
-    assert result[f"{field}_trend"] == pytest.approx(1.0)
+    if field == "rv":
+        assert result["rv_trend"] is None
+    else:
+        assert result["fitness_trend"] == pytest.approx(1.0)
     assert [row[field] for row in archived] == exact_values
     assert all(type(row[field]) is int for row in archived)
+    assert bridge.format_for_archive() == archived
+
+
+@pytest.mark.parametrize(
+    ("rv_values", "expected_trend", "expected_spearman"),
+    [
+        ([2**54 + 1, 2**54, 2**54 + 2], None, 0.5),
+        ([2**54, 2**54 + 4, 2**54 + 8], 4.0, 1.0),
+    ],
+)
+def test_evolution_bridge_integer_trend_preserves_precision_contract(
+    rv_values, expected_trend, expected_spearman
+):
+    bridge = EvolutionBridge()
+    for index, rv in enumerate(rv_values):
+        bridge.add_record(
+            str(index),
+            rv,
+            0.4 + index * 0.1,
+            measurement_kind="behavioral_proxy",
+            metadata=evolution_metadata("behavioral_proxy"),
+        )
+    archived = bridge.format_for_archive()
+
+    result = bridge.correlate()
+
+    assert result["spearman_rho"] == pytest.approx(expected_spearman)
+    assert result["fitness_trend"] == pytest.approx(0.1)
+    if expected_trend is None:
+        assert result["rv_trend"] is None
+    else:
+        assert result["rv_trend"] == pytest.approx(expected_trend)
+    assert [row["rv"] for row in archived] == rv_values
+    assert all(type(row["rv"]) is int for row in archived)
     assert bridge.format_for_archive() == archived
 
 

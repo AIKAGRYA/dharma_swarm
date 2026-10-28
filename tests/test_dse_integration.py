@@ -320,6 +320,38 @@ def test_observation_window_withholds_nonfinite_derived_trends(field):
     assert window.observations == records
 
 
+@pytest.mark.parametrize(
+    ("rv_values", "expected_trend"),
+    [
+        ([2**54 + 1, 2**54, 2**54 + 2], None),
+        ([2**54, 2**54 + 4, 2**54 + 8], 4.0),
+    ],
+)
+def test_observation_window_integer_trend_preserves_precision_contract(
+    rv_values, expected_trend
+):
+    window = ObservationWindow(max_size=5)
+    records = []
+    for index, value in enumerate(rv_values):
+        record = {
+            "cycle_id": f"c{index}",
+            "rv": value,
+            "best_fitness": index * 0.2,
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": "dse-fixture", "formula": "raw"},
+        }
+        records.append(record)
+        window.append(record)
+
+    assert window.observations == records
+    assert window.rv_trajectory == [float(value) for value in rv_values]
+    assert window.fitness_trend == pytest.approx(0.2)
+    if expected_trend is None:
+        assert window.rv_trend is None
+    else:
+        assert window.rv_trend == pytest.approx(expected_trend)
+
+
 async def test_after_cycle_persists_replayable_current_cycle_observation(tmp_path):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
