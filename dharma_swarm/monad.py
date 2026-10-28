@@ -217,7 +217,7 @@ class ObservedState(Generic[S]):
             "pr_early": self.pr_early,
             "pr_late": self.pr_late,
             "observation_depth": self.observation_depth,
-            "introspection": dict(self.introspection),
+            "introspection": deepcopy(self.introspection),
             "timestamp": ts_val,
         }
         return result

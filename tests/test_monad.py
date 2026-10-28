@@ -273,6 +273,63 @@ def test_observed_state_constructor_snapshots_caller_reading() -> None:
     assert metadata == {"supplied": {"values": ["keep"]}}
 
 
+def test_to_dict_snapshots_nested_introspection() -> None:
+    introspection = {
+        "historical_classification": {"nested": {"values": ["accepted"]}},
+        "historical_classification_conflicts": [{"values": ["accepted"]}],
+        "ordinary": {"values": [1, False, None]},
+    }
+    original_introspection = deepcopy(introspection)
+    observed = ObservedState(
+        state={"value": 3},
+        rv_measurement=0.4,
+        pr_early=1.0,
+        pr_late=0.4,
+        observation_depth=2,
+        introspection=introspection,
+        timestamp=_ts(18),
+    )
+    expected_introspection = {
+        **original_introspection,
+        "is_contracted": None,
+        "contraction_strength": None,
+        "calibration_status": "unvalidated_retired_threshold",
+        "measurement_kind": "unknown",
+    }
+
+    def serialize(value):
+        return {"serialized": value["value"]}
+
+    first = observed.to_dict(state_serializer=serialize)
+    second = observed.to_dict(state_serializer=serialize)
+
+    assert (
+        first
+        == second
+        == {
+            "state": {"serialized": 3},
+            "rv_measurement": 0.4,
+            "rv_reading": None,
+            "pr_early": 1.0,
+            "pr_late": 0.4,
+            "observation_depth": 2,
+            "introspection": expected_introspection,
+            "timestamp": _ts(18).isoformat(),
+        }
+    )
+
+    first["introspection"]["historical_classification"]["nested"]["values"].append(
+        "caller"
+    )
+    first["introspection"]["historical_classification_conflicts"][0]["values"].append(
+        "caller"
+    )
+
+    assert observed.introspection == expected_introspection
+    assert observed.to_dict(state_serializer=serialize) == second
+    assert introspection == original_introspection
+
+
 def test_pure_is_neutral() -> None:
     value = pure({"x": 1})
 
