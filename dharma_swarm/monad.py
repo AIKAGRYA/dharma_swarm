@@ -42,6 +42,7 @@ from dharma_swarm.rv import (
     RVReading,
     _preserve_historical_classification,
 )
+from dharma_swarm.rv_contract import _historical_values_equal
 
 # ── Type Variables ──────────────────────────────────────────────────────────
 
@@ -118,12 +119,16 @@ class ObservedState(Generic[S]):
             if (
                 not isinstance(history, dict)
                 or any(
-                    key not in history or history[key] != value
+                    key not in history
+                    or not _historical_values_equal(history[key], value)
                     for key, value in self.rv_reading.historical_classification.items()
                 )
                 or not isinstance(conflicts, list)
                 or any(
-                    conflict not in conflicts
+                    not any(
+                        _historical_values_equal(conflict, existing)
+                        for existing in conflicts
+                    )
                     for conflict in self.rv_reading.historical_classification_conflicts
                 )
             ):
@@ -324,10 +329,14 @@ def _merge_introspection(
         *inner_metadata.get("historical_classification_conflicts", []),
         *outer_metadata.get("historical_classification_conflicts", []),
     ):
-        if conflict not in conflicts:
+        if not any(
+            _historical_values_equal(conflict, existing) for existing in conflicts
+        ):
             conflicts.append(conflict)
     for key in inner_history:
-        if key in outer_history and inner_history[key] != outer_history[key]:
+        if key in outer_history and not _historical_values_equal(
+            inner_history[key], outer_history[key]
+        ):
             conflict = {
                 "field": key,
                 "existing_source": "inner_introspection.historical_classification",
@@ -335,7 +344,9 @@ def _merge_introspection(
                 "legacy_source": "outer_introspection.historical_classification",
                 "legacy_value": outer_history[key],
             }
-            if conflict not in conflicts:
+            if not any(
+                _historical_values_equal(conflict, existing) for existing in conflicts
+            ):
                 conflicts.append(conflict)
     merged["historical_classification"] = {**inner_history, **outer_history}
     if conflicts or (

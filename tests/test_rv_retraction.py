@@ -206,6 +206,94 @@ def test_legacy_reading_retains_existing_history_and_conflicting_values():
     assert RVReading.model_validate_json(restored.model_dump_json()) == restored
 
 
+@pytest.mark.parametrize(
+    ("historical", "legacy", "expect_conflict"),
+    [
+        (False, 0, True),
+        (True, 1, True),
+        (False, False, False),
+        (True, True, False),
+        (0, 0, False),
+        (1, 1, False),
+        (False, True, True),
+        (0, 1, True),
+    ],
+)
+def test_legacy_reading_history_comparison_preserves_json_scalar_types(
+    historical, legacy, expect_conflict
+):
+    payload = reading().model_dump(mode="json")
+    payload["historical_classification"] = {"is_contracted": historical}
+    payload["is_contracted"] = legacy
+    original = deepcopy(payload)
+
+    restored = RVReading.model_validate(payload)
+
+    assert payload == original
+    assert restored.historical_classification == {"is_contracted": historical}
+    assert type(restored.historical_classification["is_contracted"]) is type(historical)
+    assert restored.is_contracted is None
+    assert restored.contraction_strength is None
+    expected_conflicts = []
+    if expect_conflict:
+        expected_conflicts = [
+            {
+                "field": "is_contracted",
+                "existing_source": "historical_classification",
+                "existing_value": historical,
+                "legacy_source": "legacy_top_level",
+                "legacy_value": legacy,
+            }
+        ]
+    assert restored.historical_classification_conflicts == expected_conflicts
+    if expect_conflict:
+        conflict = restored.historical_classification_conflicts[0]
+        assert type(conflict["existing_value"]) is type(historical)
+        assert type(conflict["legacy_value"]) is type(legacy)
+
+    serialized = json.loads(json.dumps(restored.model_dump(mode="json")))
+    round_tripped = RVReading.model_validate(serialized)
+    assert round_tripped.model_dump(mode="json") == serialized
+    assert round_tripped.historical_classification_conflicts == expected_conflicts
+    if expect_conflict:
+        conflict = round_tripped.historical_classification_conflicts[0]
+        assert type(conflict["existing_value"]) is type(historical)
+        assert type(conflict["legacy_value"]) is type(legacy)
+
+
+def test_legacy_reading_conflict_identity_preserves_nested_json_scalar_types():
+    existing_conflict = {
+        "field": "is_contracted",
+        "existing_source": "historical_classification",
+        "existing_value": True,
+        "legacy_source": "legacy_top_level",
+        "legacy_value": {"nested": [False]},
+    }
+    payload = reading().model_dump(mode="json")
+    payload["historical_classification"] = {"is_contracted": True}
+    payload["historical_classification_conflicts"] = [existing_conflict]
+    payload["is_contracted"] = {"nested": [0]}
+    original = deepcopy(payload)
+
+    restored = RVReading.model_validate(payload)
+
+    assert payload == original
+    assert restored.historical_classification_conflicts == [
+        existing_conflict,
+        {**existing_conflict, "legacy_value": {"nested": [0]}},
+    ]
+    first, second = restored.historical_classification_conflicts
+    assert type(first["legacy_value"]["nested"][0]) is bool
+    assert type(second["legacy_value"]["nested"][0]) is int
+
+    serialized = json.loads(json.dumps(restored.model_dump(mode="json")))
+    round_tripped = RVReading.model_validate(serialized)
+    assert round_tripped.model_dump(mode="json") == serialized
+    first, second = round_tripped.historical_classification_conflicts
+    assert type(first["legacy_value"]["nested"][0]) is bool
+    assert type(second["legacy_value"]["nested"][0]) is int
+
+
 def test_nested_observed_state_preserves_legacy_classification_history():
     rv_payload = reading(0.4, "residual_hidden").model_dump(mode="json")
     rv_payload.update(is_contracted=True, contraction_strength="strong")

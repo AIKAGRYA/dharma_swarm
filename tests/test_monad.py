@@ -202,6 +202,118 @@ def test_flatten_merges_nested_observation() -> None:
     assert flat.timestamp == _ts(4)
 
 
+def test_observed_state_merges_type_distinct_reading_history() -> None:
+    reading = _reading(0.4)
+    reading.historical_classification = {"is_contracted": 0}
+    reading.historical_classification_conflicts = [
+        {
+            "field": "is_contracted",
+            "existing_source": "historical_classification",
+            "existing_value": True,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": 0,
+        }
+    ]
+    introspection = {
+        "historical_classification": {"is_contracted": False},
+        "historical_classification_conflicts": [
+            {
+                "field": "is_contracted",
+                "existing_source": "historical_classification",
+                "existing_value": True,
+                "legacy_source": "legacy_top_level",
+                "legacy_value": False,
+            }
+        ],
+    }
+    original = json.loads(json.dumps(introspection))
+
+    observed = ObservedState(
+        state="saved", rv_reading=reading, introspection=introspection
+    )
+
+    assert introspection == original
+    conflicts = observed.introspection["historical_classification_conflicts"]
+    assert conflicts[:2] == [
+        reading.historical_classification_conflicts[0],
+        original["historical_classification_conflicts"][0],
+    ]
+    assert type(conflicts[0]["legacy_value"]) is int
+    assert type(conflicts[1]["legacy_value"]) is bool
+    assert conflicts[2] == {
+        "field": "is_contracted",
+        "existing_source": "inner_introspection.historical_classification",
+        "existing_value": 0,
+        "legacy_source": "outer_introspection.historical_classification",
+        "legacy_value": False,
+    }
+    assert type(conflicts[2]["existing_value"]) is int
+    assert type(conflicts[2]["legacy_value"]) is bool
+    assert observed.introspection["is_contracted"] is None
+
+    serialized = json.loads(json.dumps(observed.to_dict()))
+    restored = ObservedState.from_dict(serialized)
+    assert restored.to_dict() == serialized
+
+
+@pytest.mark.parametrize(
+    ("inner_value", "outer_value", "expect_conflict"),
+    [
+        (False, 0, True),
+        (True, 1, True),
+        (False, False, False),
+        (0, 0, False),
+        (False, True, True),
+    ],
+)
+def test_flatten_preserves_type_distinct_history(
+    inner_value, outer_value, expect_conflict
+) -> None:
+    inner_metadata = {"historical_classification": {"is_contracted": inner_value}}
+    outer_metadata = {"historical_classification": {"is_contracted": outer_value}}
+    inner = ObservedState(state={"id": 1}, introspection=inner_metadata)
+    outer = ObservedState(state=inner, introspection=outer_metadata)
+
+    flat = flatten(outer)
+
+    assert flat.state == {"id": 1}
+    assert flat.observation_depth == 2
+    assert flat.introspection["historical_classification"] == {
+        "is_contracted": outer_value
+    }
+    current = flat.introspection["historical_classification"]["is_contracted"]
+    assert type(current) is type(outer_value)
+    expected_conflicts = []
+    if expect_conflict:
+        expected_conflicts = [
+            {
+                "field": "is_contracted",
+                "existing_source": "inner_introspection.historical_classification",
+                "existing_value": inner_value,
+                "legacy_source": "outer_introspection.historical_classification",
+                "legacy_value": outer_value,
+            }
+        ]
+    assert flat.introspection.get("historical_classification_conflicts", []) == (
+        expected_conflicts
+    )
+    if expect_conflict:
+        conflict = flat.introspection["historical_classification_conflicts"][0]
+        assert type(conflict["existing_value"]) is type(inner_value)
+        assert type(conflict["legacy_value"]) is type(outer_value)
+    assert flat.introspection["is_contracted"] is None
+    assert inner_metadata == {
+        "historical_classification": {"is_contracted": inner_value}
+    }
+    assert outer_metadata == {
+        "historical_classification": {"is_contracted": outer_value}
+    }
+
+    serialized = json.loads(json.dumps(flat.to_dict()))
+    restored = ObservedState.from_dict(serialized)
+    assert restored.to_dict() == serialized
+
+
 def test_kleisli_compose_is_associative_for_deterministic_morphisms() -> None:
     def f(value: int) -> ObservedState[int]:
         return ObservedState(

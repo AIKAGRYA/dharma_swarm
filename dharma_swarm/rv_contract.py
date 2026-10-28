@@ -20,6 +20,21 @@ MeasurementKind = Literal[
 ]
 
 
+def _historical_values_equal(left: Any, right: Any) -> bool:
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is bool and type(right) is bool and left is right
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(
+            _historical_values_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(
+            _historical_values_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right)
+        )
+    return left == right
+
+
 def _preserve_historical_classification(data: Any) -> Any:
     if not isinstance(data, dict):
         return data
@@ -45,7 +60,7 @@ def _preserve_historical_classification(data: Any) -> Any:
             continue
         if key not in historical:
             historical[key] = value
-        elif historical[key] != value:
+        elif not _historical_values_equal(historical[key], value):
             conflict = {
                 "field": key,
                 "existing_source": "historical_classification",
@@ -53,7 +68,9 @@ def _preserve_historical_classification(data: Any) -> Any:
                 "legacy_source": "legacy_top_level",
                 "legacy_value": value,
             }
-            if conflict not in conflicts:
+            if not any(
+                _historical_values_equal(conflict, existing) for existing in conflicts
+            ):
                 conflicts.append(conflict)
     if historical or had_historical:
         data["historical_classification"] = historical
