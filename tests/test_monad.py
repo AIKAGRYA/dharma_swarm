@@ -94,17 +94,19 @@ def test_bind_right_unit() -> None:
 
 
 def test_flatten_merges_nested_observation() -> None:
+    inner_metadata = {"inner": True}
+    outer_metadata = {"outer": True}
     inner = ObservedState(
         state={"id": 1},
         rv_reading=_reading(0.7),
-        introspection={"inner": True},
+        introspection=inner_metadata,
         observation_depth=1,
         timestamp=_ts(3),
     )
     outer = ObservedState(
         state=inner,
         rv_reading=_reading(0.5),
-        introspection={"outer": True},
+        introspection=outer_metadata,
         observation_depth=1,
         timestamp=_ts(4),
     )
@@ -113,7 +115,18 @@ def test_flatten_merges_nested_observation() -> None:
 
     assert flat.state == {"id": 1}
     assert flat.rv_reading == _reading(0.5)
-    assert flat.introspection == {"inner": True, "outer": True}
+    assert flat.introspection == {
+        "inner": True,
+        "outer": True,
+        "is_contracted": None,
+        "contraction_strength": None,
+        "calibration_status": "unvalidated_retired_threshold",
+        "measurement_kind": "unknown",
+    }
+    assert flat.rv_reading.is_contracted is None
+    assert flat.rv_reading.contraction_strength is None
+    assert inner_metadata == {"inner": True}
+    assert outer_metadata == {"outer": True}
     assert flat.observation_depth == 2
     assert flat.timestamp == _ts(4)
 
