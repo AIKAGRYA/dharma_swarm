@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+from copy import deepcopy
 from datetime import datetime, timezone
 
 import pytest
@@ -40,6 +42,107 @@ def _reading(rv: float) -> RVReading:
         prompt_group="test",
         timestamp=_ts(0),
     )
+
+
+def _assert_raw_history_value(actual, expected) -> None:
+    if isinstance(expected, dict):
+        assert isinstance(actual, dict)
+        assert actual.keys() == expected.keys()
+        for key in expected:
+            _assert_raw_history_value(actual[key], expected[key])
+    elif isinstance(expected, list):
+        assert isinstance(actual, list)
+        assert len(actual) == len(expected)
+        for actual_item, expected_item in zip(actual, expected):
+            _assert_raw_history_value(actual_item, expected_item)
+    elif type(expected) is float and math.isnan(expected):
+        assert type(actual) is float
+        assert math.isnan(actual)
+    else:
+        assert type(actual) is type(expected)
+        assert actual == expected
+
+
+@pytest.mark.parametrize("nested", [False, True], ids=["direct", "nested"])
+@pytest.mark.parametrize(
+    ("existing", "supplied", "conflict_count"),
+    [
+        (float("nan"), float("nan"), 0),
+        ({"nested": [float("nan")]}, {"nested": [float("nan")]}, 0),
+        (0.5, 0.5, 0),
+        (False, False, 0),
+        (None, None, 0),
+        (float("inf"), float("inf"), 0),
+        (-float("inf"), -float("inf"), 0),
+        (float("inf"), -float("inf"), 1),
+        (False, 0, 1),
+    ],
+    ids=[
+        "same-nan-scalar",
+        "same-nan-nested",
+        "same-finite",
+        "same-false",
+        "same-null",
+        "same-positive-infinity",
+        "same-negative-infinity",
+        "distinct-signed-infinities",
+        "distinct-false-zero",
+    ],
+)
+def test_observed_state_history_round_trips_are_idempotent(
+    existing, supplied, conflict_count, nested
+) -> None:
+    source = _reading(0.4)
+    source.historical_classification = {"contraction_strength": deepcopy(existing)}
+    original_source = deepcopy(source)
+    introspection = {
+        "historical_classification": {"contraction_strength": deepcopy(supplied)}
+    }
+    original_introspection = deepcopy(introspection)
+    observed = ObservedState(
+        state="saved", rv_reading=source, introspection=introspection
+    )
+    if nested:
+        observed = ObservedState(
+            state=observed,
+            rv_reading=source,
+            introspection=deepcopy(original_introspection),
+            observation_depth=2,
+        )
+
+    conflict_counts = []
+    for _ in range(5):
+        states = [observed]
+        if nested:
+            states.append(observed.state)
+        conflict_counts.append(
+            [
+                len(state.introspection.get("historical_classification_conflicts", []))
+                for state in states
+            ]
+        )
+        observed = ObservedState.from_dict(observed.to_dict())
+
+    expected_width = 2 if nested else 1
+    assert conflict_counts == [[conflict_count] * expected_width] * 5
+    states = [observed]
+    if nested:
+        states.append(observed.state)
+    for state in states:
+        assert state.rv_reading is not None
+        _assert_raw_history_value(
+            state.rv_reading.historical_classification["contraction_strength"],
+            existing,
+        )
+        _assert_raw_history_value(
+            state.introspection["historical_classification"]["contraction_strength"],
+            supplied,
+        )
+        assert state.is_contracted is None
+        assert state.introspection["is_contracted"] is None
+        assert state.introspection["contraction_strength"] is None
+    assert source == original_source
+    assert introspection == original_introspection
 
 
 def test_from_rv_reading_snapshots_caller_reading() -> None:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import math
 from datetime import datetime, timezone
 from collections.abc import Iterable
 from typing import Any, Literal, get_args
@@ -23,6 +24,13 @@ MeasurementKind = Literal[
 def _historical_values_equal(left: Any, right: Any) -> bool:
     if isinstance(left, bool) or isinstance(right, bool):
         return type(left) is bool and type(right) is bool and left is right
+    if (
+        type(left) is float
+        and type(right) is float
+        and math.isnan(left)
+        and math.isnan(right)
+    ):
+        return True
     if isinstance(left, dict) and isinstance(right, dict):
         return left.keys() == right.keys() and all(
             _historical_values_equal(left[key], right[key]) for key in left

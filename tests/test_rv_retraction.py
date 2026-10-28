@@ -1,6 +1,7 @@
 """Public behavior for retired scientific classification and measurement custody."""
 
 import json
+import math
 import pickle
 from collections import deque
 from collections.abc import Iterable
@@ -34,6 +35,45 @@ def reading(value=0.6, kind="unknown", **overrides):
     )
     values.update(overrides)
     return RVReading(**values)
+
+
+@pytest.mark.parametrize("nested_history", [False, True], ids=["scalar", "nested"])
+def test_raw_nan_history_remains_stable_through_public_round_trips(nested_history):
+    value = {"nested": [float("nan")]} if nested_history else float("nan")
+    source = reading(
+        historical_classification={"contraction_strength": deepcopy(value)}
+    )
+    original_source = deepcopy(source)
+    introspection = {
+        "historical_classification": {"contraction_strength": deepcopy(value)}
+    }
+    original_introspection = deepcopy(introspection)
+    observed = ObservedState(
+        state="saved", rv_reading=source, introspection=introspection
+    )
+
+    for _ in range(5):
+        assert (
+            observed.introspection.get("historical_classification_conflicts", []) == []
+        )
+        observed = ObservedState.from_dict(observed.to_dict())
+
+    assert observed.rv_reading is not None
+    restored_values = [
+        observed.rv_reading.historical_classification["contraction_strength"],
+        observed.introspection["historical_classification"]["contraction_strength"],
+        source.historical_classification["contraction_strength"],
+        introspection["historical_classification"]["contraction_strength"],
+    ]
+    for restored in restored_values:
+        raw_nan = restored["nested"][0] if nested_history else restored
+        assert type(raw_nan) is float
+        assert math.isnan(raw_nan)
+    assert observed.is_contracted is None
+    assert observed.introspection["is_contracted"] is None
+    assert observed.introspection["contraction_strength"] is None
+    assert source == original_source
+    assert introspection == original_introspection
 
 
 def evolution_metadata(kind):
