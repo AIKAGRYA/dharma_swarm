@@ -353,6 +353,83 @@ def _dse_measurement(**overrides):
     return measurement
 
 
+@pytest.mark.parametrize(
+    "case",
+    [
+        "omitted",
+        "explicit-none",
+        "matching",
+        "zero",
+        "mismatch",
+        "empty",
+        "nonmapping",
+        "missing",
+        "null",
+        "boolean",
+        "text",
+        "nan",
+        "infinity",
+        "oversized-int",
+    ],
+)
+def test_build_darwin_status_text_requires_nested_rv_agreement(
+    tmp_path,
+    monkeypatch,
+    case,
+):
+    outer_values = [0.0, 0.2] if case == "zero" else [0.4, 0.7]
+    rows = []
+    for index, value in enumerate(outer_values):
+        row = {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": value,
+            **_dse_measurement(),
+        }
+        if case == "explicit-none":
+            row["rv_reading"] = None
+        elif case != "omitted":
+            reading = {"rv": value, **_dse_measurement()}
+            if index == 1:
+                if case == "mismatch":
+                    reading["rv"] = 20.0
+                elif case == "empty":
+                    reading = {}
+                elif case == "nonmapping":
+                    reading = "invalid"
+                elif case == "missing":
+                    del reading["rv"]
+                elif case == "null":
+                    reading["rv"] = None
+                elif case == "boolean":
+                    reading["rv"] = True
+                elif case == "text":
+                    reading["rv"] = str(value)
+                elif case == "nan":
+                    reading["rv"] = float("nan")
+                elif case == "infinity":
+                    reading["rv"] = float("inf")
+                elif case == "oversized-int":
+                    reading["rv"] = 10**400
+            row["rv_reading"] = reading
+        rows.append(row)
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=2" in result
+    if case in {"omitted", "explicit-none", "matching", "zero"}:
+        expected_mean = sum(outer_values) / len(outer_values)
+        assert f"avg_rv={expected_mean:.2f}" in result
+    else:
+        assert "avg_rv=" not in result
+
+
 def test_build_darwin_status_text_marks_unavailable_verdicts(tmp_path, monkeypatch):
     rows = [
         {"component": "probe", "rv": 0.4, "approaching_fixed_point": None},
@@ -650,8 +727,7 @@ def test_build_darwin_status_text_reports_reciprocity_summary(tmp_path, monkeypa
     assert "challenged=1" in result
     assert "routed_usd=5000.00" in result
     assert (
-        "issue_codes=routing_missing_project,verified_ecology_missing_audit"
-        in result
+        "issue_codes=routing_missing_project,verified_ecology_missing_audit" in result
     )
 
 
@@ -888,7 +964,8 @@ def test_build_runtime_status_data_returns_structured_dict(tmp_path, monkeypatch
 
     monkeypatch.setattr(helpers, "DHARMA_STATE", dharma_dir)
     monkeypatch.setattr(
-        helpers.shutil, "which",
+        helpers.shutil,
+        "which",
         lambda prog: f"/mock/bin/{prog}" if prog != "claude" else None,
     )
 

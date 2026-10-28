@@ -92,6 +92,76 @@ def test_observation_window_preserves_zero_metric_values():
     assert window.fitness_trend == pytest.approx(0.4)
 
 
+@pytest.mark.parametrize(
+    "case",
+    [
+        "omitted",
+        "explicit-none",
+        "matching",
+        "zero",
+        "mismatch",
+        "empty",
+        "nonmapping",
+        "missing",
+        "null",
+        "boolean",
+        "text",
+        "nan",
+        "infinity",
+        "oversized-int",
+    ],
+)
+def test_observation_window_requires_nested_rv_agreement(case):
+    outer_values = [0.0, 0.2] if case == "zero" else [0.4, 0.7]
+    records = []
+    for index, value in enumerate(outer_values):
+        record = {
+            "cycle_id": f"c{index}",
+            "rv": value,
+            "best_fitness": index * 0.2,
+            "measurement_kind": "behavioral_proxy",
+            "measurement_details": {"cohort": "dse-fixture", "formula": "raw"},
+        }
+        if case == "explicit-none":
+            record["rv_reading"] = None
+        elif case != "omitted":
+            reading = _window_reading(value)
+            if index == 1:
+                if case == "mismatch":
+                    reading["rv"] = 20.0
+                elif case == "empty":
+                    reading = {}
+                elif case == "nonmapping":
+                    reading = "invalid"
+                elif case == "missing":
+                    del reading["rv"]
+                elif case == "null":
+                    reading["rv"] = None
+                elif case == "boolean":
+                    reading["rv"] = True
+                elif case == "text":
+                    reading["rv"] = str(value)
+                elif case == "nan":
+                    reading["rv"] = float("nan")
+                elif case == "infinity":
+                    reading["rv"] = float("inf")
+                elif case == "oversized-int":
+                    reading["rv"] = 10**400
+            record["rv_reading"] = reading
+        records.append(record)
+
+    window = ObservationWindow(max_size=5)
+    for record in records:
+        window.append(record)
+
+    assert window.observations == records
+    assert window.rv_trajectory == outer_values
+    if case in {"omitted", "explicit-none", "matching", "zero"}:
+        assert window.rv_trend == pytest.approx(outer_values[1] - outer_values[0])
+    else:
+        assert window.rv_trend is None
+
+
 def test_observation_window_trim_drops_stale_metrics_from_trimmed_records():
     window = ObservationWindow(max_size=2)
 

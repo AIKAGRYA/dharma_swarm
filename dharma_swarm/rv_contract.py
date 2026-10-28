@@ -142,7 +142,7 @@ def _measurement_identity(measurement: Any) -> tuple[Any, ...] | None:
         ):
             return None
         identity.extend((model_name.strip(), early_layer, late_layer))
-        for name in ("tensor", "centering", "participation_ratio"):
+        for name in ("tensor", "centering", "participation_ratio", "window"):
             if name not in details:
                 identity.append((name, None))
                 continue

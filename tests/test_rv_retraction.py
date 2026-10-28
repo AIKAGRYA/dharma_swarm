@@ -162,6 +162,7 @@ def test_public_contract_helpers_preserve_nested_history_and_comparability():
         ("tensor", None),
         ("centering", None),
         ("participation_ratio", None),
+        ("window", None),
     )
     assert comparable_measurement_identity([restored.rv_reading, reading()]) is None
     incompatible = reading(0.4, "residual_hidden", late_layer=23)
@@ -170,7 +171,9 @@ def test_public_contract_helpers_preserve_nested_history_and_comparability():
 
 
 @pytest.mark.parametrize("kind", ["attention_value", "residual_hidden"])
-@pytest.mark.parametrize("key", ["tensor", "centering", "participation_ratio"])
+@pytest.mark.parametrize(
+    "key", ["tensor", "centering", "participation_ratio", "window"]
+)
 def test_measurement_identity_requires_matching_instrument_declarations(kind, key):
     from dharma_swarm.rv import comparable_measurement_identity
 
@@ -178,6 +181,7 @@ def test_measurement_identity_requires_matching_instrument_declarations(kind, ke
         "tensor": "value" if kind == "attention_value" else "hidden",
         "centering": "mean",
         "participation_ratio": "singular-value-energy",
+        "window": "first:512",
     }
     first = reading(
         0.4, kind, measurement_details={"cohort": "retraction-fixture", **declarations}

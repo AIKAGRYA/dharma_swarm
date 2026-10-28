@@ -229,13 +229,28 @@ class ObservationWindow(BaseModel):
     def rv_trend(self) -> float | None:
         if len(self.observations) < 2:
             return None
-        readings = [record.get("rv_reading") or record for record in self.observations]
         values = [
             self._measurement_float(record.get("rv")) for record in self.observations
         ]
-        if comparable_measurement_identity(readings) is None or any(
-            value is None or not math.isfinite(value) for value in values
-        ):
+        if any(value is None or not math.isfinite(value) for value in values):
+            return None
+        readings = []
+        for record in self.observations:
+            reading = record.get("rv_reading")
+            if reading is None:
+                readings.append(record)
+                continue
+            if not isinstance(reading, dict):
+                return None
+            nested_value = self._measurement_float(reading.get("rv"))
+            if (
+                nested_value is None
+                or not math.isfinite(nested_value)
+                or reading.get("rv") != record.get("rv")
+            ):
+                return None
+            readings.append(reading)
+        if comparable_measurement_identity(readings) is None:
             return None
         rv_values = [value for value in values if value is not None]
         try:
