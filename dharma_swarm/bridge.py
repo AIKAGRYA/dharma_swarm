@@ -499,7 +499,8 @@ class ResearchBridge:
                 )
         else:
             parts.append(
-                "Insufficient data or zero variance for Pearson correlation."
+                "Insufficient data, zero variance, or arithmetic/nonfinite "
+                "unavailability for Pearson correlation."
             )
 
         if spearman is not None:

@@ -507,6 +507,61 @@ def test_build_darwin_status_text_preserves_legacy_rows_without_invalid_rv_mean(
         assert f"avg_rv={expected_mean}" in result
 
 
+@pytest.mark.parametrize(
+    ("value", "expected_mean"),
+    [
+        pytest.param(None, None, id="null"),
+        pytest.param("bad", None, id="nonnumeric"),
+        pytest.param("0.5", None, id="numeric-text"),
+        pytest.param(True, None, id="true"),
+        pytest.param(False, None, id="false"),
+        pytest.param(float("nan"), None, id="nan"),
+        pytest.param(float("inf"), None, id="positive-infinity"),
+        pytest.param(-float("inf"), None, id="negative-infinity"),
+        pytest.param(10**400, None, id="oversized-int"),
+        pytest.param("missing", None, id="missing"),
+        pytest.param(0.5, "0.43", id="valid-float"),
+        pytest.param(2, "0.93", id="valid-int"),
+    ],
+)
+def test_build_darwin_status_text_preserves_legacy_rows_without_invalid_fitness_mean(
+    tmp_path,
+    monkeypatch,
+    value,
+    expected_mean,
+):
+    measurement = _dse_measurement()
+    rows = [
+        {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": fitness,
+            **measurement,
+        }
+        for index, fitness in enumerate([0.2, 0.4, 0.6])
+    ]
+    if value == "missing":
+        del rows[1]["best_fitness"]
+    else:
+        rows[1]["best_fitness"] = value
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=3" in result
+    assert "avg_rv=0.50" in result
+    if expected_mean is None:
+        assert "avg_fitness=" not in result
+    else:
+        assert f"avg_fitness={expected_mean}" in result
+
+
 @pytest.mark.parametrize("field", ["rv", "best_fitness"])
 def test_build_darwin_status_text_withholds_nonfinite_derived_means(
     tmp_path,

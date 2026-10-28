@@ -501,6 +501,7 @@ class TestResearchBridgeComputeCorrelation:
         assert result.n == 3
         assert result.pearson_r is None
         assert result.spearman_rho == pytest.approx(-0.8660254037844387)
+        assert "arithmetic/nonfinite unavailability" in result.summary
         assert result.mean_rv_by_group == {"L4_full": 1e308, "baseline": -1e308}
         assert result.mean_swabhaav_by_group == {
             "L4_full": pytest.approx(0.3),

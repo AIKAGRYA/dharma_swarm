@@ -501,11 +501,16 @@ def build_darwin_status_text(
             else:
                 if all(math.isfinite(value) for value in converted_rv_values):
                     rv_values = converted_rv_values
-        fitness_values = [
-            value
-            for row in dse_rows
-            if (value := _maybe_float(row.get("best_fitness"))) is not None
-        ]
+        fitness_candidates = [row.get("best_fitness") for row in dse_rows]
+        fitness_values: list[float] = []
+        if all(type(value) in (int, float) for value in fitness_candidates):
+            try:
+                converted_fitness_values = [float(value) for value in fitness_candidates]
+            except OverflowError:
+                pass
+            else:
+                if all(math.isfinite(value) for value in converted_fitness_values):
+                    fitness_values = converted_fitness_values
         fixed_point_verdicts = [
             value
             for row in dse_rows
