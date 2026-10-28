@@ -164,7 +164,7 @@ class ObservedState(Generic[S]):
                 for key in ("is_contracted", "contraction_strength")
             )
         ):
-            self.introspection = _preserve_historical_classification(self.introspection)
+            self.introspection = _normalize_introspection_history(self.introspection)
             self.introspection["calibration_status"] = RV_CALIBRATION_STATUS
             supplied_kind = self.introspection.get("measurement_kind")
             self.introspection["measurement_kind"] = (
@@ -317,6 +317,25 @@ KleisliMorphism = Callable[[A], ObservedState[B]]
 """Type alias for a Kleisli morphism: A -> T(B)."""
 
 
+def _normalize_introspection_history(metadata: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(metadata)
+    normalized.update(
+        _preserve_historical_classification(
+            {
+                key: metadata[key]
+                for key in (
+                    "is_contracted",
+                    "contraction_strength",
+                    "historical_classification",
+                    "historical_classification_conflicts",
+                )
+                if key in metadata
+            }
+        )
+    )
+    return normalized
+
+
 def _merge_introspection(
     inner: dict[str, Any], outer: dict[str, Any]
 ) -> dict[str, Any]:
@@ -327,14 +346,14 @@ def _merge_introspection(
         "historical_classification_conflicts",
     )
     inner_metadata = (
-        _preserve_historical_classification(inner)
+        _normalize_introspection_history(inner)
         if any(key in inner for key in classification_keys)
-        else deepcopy(inner)
+        else dict(inner)
     )
     outer_metadata = (
-        _preserve_historical_classification(outer)
+        _normalize_introspection_history(outer)
         if any(key in outer for key in classification_keys)
-        else deepcopy(outer)
+        else dict(outer)
     )
     merged = {**inner_metadata, **outer_metadata}
     if (

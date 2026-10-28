@@ -330,6 +330,120 @@ def test_observed_state_without_history_preserves_shallow_ownership(
     assert observed.state["payload"] == ["shared", "caller"]
 
 
+@pytest.mark.parametrize(
+    "route",
+    ["bind-inner", "bind-outer", "flatten-inner", "flatten-outer", "observe", "direct"],
+)
+@pytest.mark.parametrize("with_history", [False, True], ids=["ordinary", "history"])
+def test_composition_retains_ordinary_references_and_owns_history(
+    route: str, with_history: bool
+) -> None:
+    state = {"payload": ["shared"]}
+    ordinary = {"values": ["shared"]}
+    metadata = {"ordinary": ordinary}
+    if with_history:
+        metadata.update(
+            historical_classification={
+                "is_contracted": False,
+                "contraction_strength": None,
+                "nested": {"values": ["accepted"]},
+            },
+            historical_classification_conflicts=[{"values": [False, 0, None]}],
+        )
+    original_metadata = deepcopy(metadata)
+    source_state = pure(state) if route == "flatten-outer" else state
+    source = ObservedState(state=source_state, introspection=metadata)
+    source_metadata = source.introspection
+    source_before = source.to_dict()
+
+    if route == "bind-inner":
+        result = bind(source, pure)
+    elif route == "bind-outer":
+        result = bind(pure(state), lambda value: source)
+    elif route == "flatten-inner":
+        result = flatten(ObservedState(state=source))
+    elif route == "flatten-outer":
+        result = flatten(source)
+    elif route == "observe":
+        result = SelfObservationMonad().observe(state, introspection=metadata)
+    else:
+        result = source
+
+    assert result.state is state
+    assert result.introspection["ordinary"] is ordinary
+    assert source.state is source_state
+    assert source.introspection is source_metadata
+    assert source.introspection["ordinary"] is ordinary
+    assert source.to_dict() == source_before
+    assert metadata == original_metadata
+    if with_history:
+        for key in ("historical_classification", "historical_classification_conflicts"):
+            assert result.introspection[key] == original_metadata[key]
+            assert result.introspection[key] is not metadata[key]
+            if result is not source:
+                assert result.introspection[key] is not source.introspection[key]
+        if route == "direct":
+            assert result.introspection.keys() == metadata.keys()
+        else:
+            assert result.introspection["is_contracted"] is None
+            assert result.introspection["contraction_strength"] is None
+        metadata["historical_classification"]["nested"]["values"].append("caller")
+        metadata["historical_classification_conflicts"][0]["values"].append("caller")
+        if result is not source:
+            source.introspection["historical_classification"]["nested"]["values"].append(
+                "source"
+            )
+            source.introspection["historical_classification_conflicts"][0]["values"].append(
+                "source"
+            )
+        assert result.introspection["historical_classification"] == original_metadata[
+            "historical_classification"
+        ]
+        assert result.introspection["historical_classification_conflicts"] == (
+            original_metadata["historical_classification_conflicts"]
+        )
+    else:
+        assert result.introspection == {"ordinary": ordinary}
+
+    ordinary["values"].append("caller")
+    state["payload"].append("caller")
+    assert result.introspection["ordinary"]["values"] == ["shared", "caller"]
+    assert source.introspection["ordinary"]["values"] == ["shared", "caller"]
+    assert result.state["payload"] == ["shared", "caller"]
+
+
+@pytest.mark.parametrize("trigger", ["legacy", "scalar", "reading"])
+def test_observed_state_normalizes_only_declared_history(trigger: str) -> None:
+    state = {"payload": []}
+    ordinary = {"values": []}
+    metadata = {"ordinary": ordinary}
+    kwargs = {}
+    if trigger == "legacy":
+        metadata["is_contracted"] = False
+    elif trigger == "scalar":
+        kwargs["rv_measurement"] = 0.4
+    else:
+        kwargs["rv_reading"] = _reading(0.4)
+    original_metadata = deepcopy(metadata)
+
+    observed = ObservedState(state=state, introspection=metadata, **kwargs)
+
+    assert metadata == original_metadata
+    assert observed.state is state
+    assert observed.introspection["ordinary"] is ordinary
+    assert observed.introspection["is_contracted"] is None
+    assert observed.introspection["contraction_strength"] is None
+    if trigger == "legacy":
+        assert observed.introspection["historical_classification"] == {
+            "is_contracted": False
+        }
+    else:
+        assert "historical_classification" not in observed.introspection
+    assert "historical_classification_conflicts" not in observed.introspection
+    ordinary["values"].append("caller")
+    assert observed.introspection["ordinary"]["values"] == ["caller"]
+
+
 def test_to_dict_snapshots_nested_introspection() -> None:
     introspection = {
         "historical_classification": {"nested": {"values": ["accepted"]}},
