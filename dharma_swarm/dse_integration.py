@@ -457,8 +457,12 @@ class DSEIntegrator:
         elif observed.rv_measurement is not None:
             rv_reading_dict = {
                 "rv": observed.rv_measurement,
-                "pr_early": observed.pr_early or 1.0,
-                "pr_late": observed.pr_late or observed.rv_measurement,
+                "pr_early": observed.pr_early if observed.pr_early is not None else 1.0,
+                "pr_late": (
+                    observed.pr_late
+                    if observed.pr_late is not None
+                    else observed.rv_measurement
+                ),
                 "model_name": observed.introspection.get("model", "evolution-proxy"),
                 "early_layer": 0,
                 "late_layer": 0,

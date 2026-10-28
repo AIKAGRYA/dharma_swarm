@@ -698,15 +698,22 @@ async def test_after_cycle_persists_l4_bridge_measurement(tmp_path):
     assert reloaded.compute_correlation().mean_rv_by_group == {}
 
 
-async def test_after_cycle_preserves_complete_accepted_reading(tmp_path):
+@pytest.mark.parametrize(
+    ("pr_early", "pr_late"),
+    [(10.0, 4.0), (0.0, 0.0)],
+    ids=["positive", "zero"],
+)
+async def test_after_cycle_preserves_complete_accepted_reading(
+    tmp_path, pr_early, pr_late
+):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
         coordination_interval=10,
     )
     accepted = RVReading(
         rv=0.4,
-        pr_early=10.0,
-        pr_late=4.0,
+        pr_early=pr_early,
+        pr_late=pr_late,
         model_name="fixture",
         early_layer=2,
         late_layer=22,
@@ -806,39 +813,83 @@ async def test_after_cycle_preserves_complete_accepted_reading(tmp_path):
     )
 
 
-@pytest.mark.parametrize("scalar", [0.4, None], ids=["scalar", "no-reading"])
-async def test_after_cycle_reading_projection_scalar_controls(tmp_path, scalar):
+@pytest.mark.parametrize(
+    ("pr_early", "pr_late"),
+    [
+        (10.0, 4.0),
+        (0.0, 0.0),
+        (0.0, 4.0),
+        (10.0, 0.0),
+        (None, 0.0),
+        (0.0, None),
+        (None, None),
+    ],
+    ids=[
+        "positive",
+        "both-zero",
+        "early-zero",
+        "late-zero",
+        "early-missing-late-zero",
+        "early-zero-late-missing",
+        "no-reading",
+    ],
+)
+async def test_after_cycle_reading_projection_scalar_controls(
+    tmp_path, pr_early, pr_late
+):
     integrator = DSEIntegrator(
         archive_path=tmp_path / "evolution",
         coordination_interval=10,
     )
+    scalar = 0.4 if pr_early is not None or pr_late is not None else None
+    introspection = {
+        "model": "scalar-model",
+        "prompt_hash": "scalar-hash",
+        "prompt_group": "scalar-group",
+    }
+    original_introspection = dict(introspection)
 
     class _ScalarMonad:
         def observe(self, observation):
             return ObservedState(
                 state=observation,
                 rv_measurement=scalar,
-                pr_early=10.0 if scalar is not None else None,
-                pr_late=4.0 if scalar is not None else None,
-                introspection={
-                    "model": "scalar-model",
-                    "prompt_hash": "scalar-hash",
-                    "prompt_group": "scalar-group",
-                },
+                pr_early=pr_early,
+                pr_late=pr_late,
+                introspection=introspection,
             )
 
+    class _FakeOuroboros:
+        def observe_cycle_text(self, text, **kwargs):
+            del text, kwargs
+            return {
+                "signature": {
+                    "recognition_type": "GENUINE",
+                    "swabhaav_ratio": 0.72,
+                },
+                "is_mimicry": False,
+                "is_genuine": True,
+            }
+
     integrator._monad = _ScalarMonad()
+    integrator._ouroboros = _FakeOuroboros()
     await integrator.after_cycle(
-        CycleResult(cycle_id=f"cycle-{scalar}", best_fitness=0.4), [], []
+        CycleResult(
+            cycle_id=f"cycle-{scalar}",
+            best_fitness=0.4,
+            reflection="Reflection on the cycle",
+        ),
+        [],
+        [],
     )
 
     projected = integrator._window.observations[-1]["rv_reading"]
     expected = None
     if scalar is not None:
         expected = {
-            "rv": 0.4,
-            "pr_early": 10.0,
-            "pr_late": 4.0,
+            "rv": scalar,
+            "pr_early": pr_early if pr_early is not None else 1.0,
+            "pr_late": pr_late if pr_late is not None else scalar,
             "model_name": "scalar-model",
             "early_layer": 0,
             "late_layer": 0,
@@ -848,6 +899,7 @@ async def test_after_cycle_reading_projection_scalar_controls(tmp_path, scalar):
             "measurement_details": {},
         }
     assert projected == expected
+    assert introspection == original_introspection
     observation_path = (
         tmp_path / "evolution" / "observations" / "coalgebra_stream.jsonl"
     )
@@ -856,6 +908,24 @@ async def test_after_cycle_reading_projection_scalar_controls(tmp_path, scalar):
     )
     assert persisted["rv_reading"] == expected
     assert persisted["rv_measurement"] == scalar
+    assert persisted["approaching_fixed_point"] is None
+
+    bridge_path = tmp_path / "evolution" / "observations" / "bridge_data.jsonl"
+    reloaded = ResearchBridge(data_path=bridge_path)
+    await reloaded.load()
+    measurements = reloaded.get_measurements()
+    assert reloaded.compute_correlation().mean_rv_by_group == {}
+    assert len(measurements) == 1
+    if expected is None:
+        assert measurements[0].rv_reading is None
+        return
+    bridged = measurements[0].rv_reading
+    assert bridged is not None
+    assert bridged.rv == scalar
+    assert bridged.pr_early == expected["pr_early"]
+    assert bridged.pr_late == expected["pr_late"]
+    assert bridged.measurement_kind == "unknown"
+    assert bridged.measurement_details == {}
 
 
 @pytest.mark.parametrize(
