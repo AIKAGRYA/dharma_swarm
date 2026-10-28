@@ -273,6 +273,63 @@ def test_observed_state_constructor_snapshots_caller_reading() -> None:
     assert metadata == {"supplied": {"values": ["keep"]}}
 
 
+@pytest.mark.parametrize("deserialize", [False, True], ids=["direct", "from-dict"])
+def test_observed_state_snapshots_declared_caller_history(deserialize: bool) -> None:
+    state = {"payload": ["shared"]}
+    ordinary = {"values": [1, False, None]}
+    introspection = {
+        "historical_classification": {
+            "nested": {"values": ["accepted", False, 0, None]}
+        },
+        "historical_classification_conflicts": [
+            {"values": ["accepted", False, 0, None]}
+        ],
+        "ordinary": ordinary,
+    }
+    original_introspection = deepcopy(introspection)
+    payload = {"state": state, "introspection": introspection}
+    observed = (
+        ObservedState.from_dict(payload) if deserialize else ObservedState(**payload)
+    )
+    accepted = observed.to_dict()
+
+    assert observed.state is state
+    assert observed.introspection["ordinary"] is ordinary
+    assert observed.introspection == original_introspection
+    assert accepted["introspection"] == original_introspection
+    assert introspection == original_introspection
+
+    introspection["historical_classification"]["nested"]["values"].append("caller")
+    introspection["historical_classification_conflicts"][0]["values"].append("caller")
+
+    assert observed.to_dict() == accepted
+    assert observed.introspection == original_introspection
+    assert observed.introspection["ordinary"] is ordinary
+    assert observed.state is state
+
+
+@pytest.mark.parametrize("deserialize", [False, True], ids=["direct", "from-dict"])
+def test_observed_state_without_history_preserves_shallow_ownership(
+    deserialize: bool,
+) -> None:
+    state = {"payload": ["shared"]}
+    ordinary = {"values": ["shared"]}
+    payload = {"state": state, "introspection": {"ordinary": ordinary}}
+    observed = (
+        ObservedState.from_dict(payload) if deserialize else ObservedState(**payload)
+    )
+
+    assert observed.introspection == {"ordinary": ordinary}
+    assert observed.introspection["ordinary"] is ordinary
+    assert observed.state is state
+
+    ordinary["values"].append("caller")
+    state["payload"].append("caller")
+
+    assert observed.introspection["ordinary"]["values"] == ["shared", "caller"]
+    assert observed.state["payload"] == ["shared", "caller"]
+
+
 def test_to_dict_snapshots_nested_introspection() -> None:
     introspection = {
         "historical_classification": {"nested": {"values": ["accepted"]}},

@@ -114,6 +114,15 @@ class ObservedState(Generic[S]):
 
     def __post_init__(self) -> None:
         """Compose reading metadata and backfill supplied scalar fields."""
+        historical_keys = (
+            "historical_classification",
+            "historical_classification_conflicts",
+        )
+        if any(key in self.introspection for key in historical_keys):
+            self.introspection = dict(self.introspection)
+            for key in historical_keys:
+                if key in self.introspection:
+                    self.introspection[key] = deepcopy(self.introspection[key])
         if self.rv_reading is not None:
             self.rv_reading = deepcopy(self.rv_reading)
             history = self.introspection.get("historical_classification", {})
