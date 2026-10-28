@@ -10,7 +10,11 @@ from collections.abc import Iterable
 from typing import Any, Literal, get_args
 
 MeasurementKind = Literal[
-    "unknown", "attention_value", "residual_hidden", "colony_density", "behavioral_proxy"
+    "unknown",
+    "attention_value",
+    "residual_hidden",
+    "colony_density",
+    "behavioral_proxy",
 ]
 
 
@@ -23,11 +27,13 @@ def _preserve_historical_classification(data: Any) -> Any:
     if not isinstance(historical, dict):
         historical = {"raw_historical_classification": historical}
     if not isinstance(conflicts, list):
-        conflicts = [{
-            "field": "historical_classification_conflicts",
-            "existing_source": "historical_classification_conflicts",
-            "existing_value": conflicts,
-        }]
+        conflicts = [
+            {
+                "field": "historical_classification_conflicts",
+                "existing_source": "historical_classification_conflicts",
+                "existing_value": conflicts,
+            }
+        ]
     had_historical = "historical_classification" in data
     had_conflicts = "historical_classification_conflicts" in data
     for key in ("is_contracted", "contraction_strength"):

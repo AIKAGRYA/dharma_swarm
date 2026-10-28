@@ -21,8 +21,14 @@ _MISSING = object()
 
 def reading(value=0.6, kind="unknown", **overrides):
     values = dict(
-        rv=value, pr_early=10, pr_late=10 * value, model_name="fixture",
-        early_layer=2, late_layer=22, prompt_hash="fixture", measurement_kind=kind,
+        rv=value,
+        pr_early=10,
+        pr_late=10 * value,
+        model_name="fixture",
+        early_layer=2,
+        late_layer=22,
+        prompt_hash="fixture",
+        measurement_kind=kind,
         measurement_details={"cohort": "retraction-fixture"},
     )
     values.update(overrides)
@@ -50,11 +56,13 @@ def test_rv_public_imports_and_runtime_type_hints_remain_resolvable():
     assert get_type_hints(rv._measurement_identity)["measurement"] == (
         RVReading | dict[str, Any]
     )
-    assert get_type_hints(rv.comparable_measurement_identity)["measurements"] == (
-        Iterable[RVReading | dict[str, Any]]
+    assert (
+        get_type_hints(rv.comparable_measurement_identity)["measurements"]
+        == (Iterable[RVReading | dict[str, Any]])
     )
     assert get_type_hints(rv._preserve_historical_classification) == {
-        "data": Any, "return": Any,
+        "data": Any,
+        "return": Any,
     }
     assert get_type_hints(RVReading)["measurement_kind"] == rv.MeasurementKind
 
@@ -63,7 +71,9 @@ def test_public_contract_helpers_preserve_nested_history_and_comparability():
     from dharma_swarm.rv import comparable_measurement_identity
 
     payload = reading(0.4, "residual_hidden").model_dump(mode="json")
-    payload.update(is_contracted=True, historical_classification={"is_contracted": False})
+    payload.update(
+        is_contracted=True, historical_classification={"is_contracted": False}
+    )
     original = deepcopy(payload)
     observed = ObservedState.from_dict({"state": "saved", "rv_reading": payload})
     restored = ObservedState.from_dict(json.loads(json.dumps(observed.to_dict())))
@@ -71,10 +81,19 @@ def test_public_contract_helpers_preserve_nested_history_and_comparability():
     assert restored.rv_reading is not None
     assert restored.rv_reading.rv == 0.4
     assert restored.rv_reading.historical_classification == {"is_contracted": False}
-    assert restored.rv_reading.historical_classification_conflicts[0]["legacy_value"] is True
+    assert (
+        restored.rv_reading.historical_classification_conflicts[0]["legacy_value"]
+        is True
+    )
     assert restored.rv_reading.is_contracted is None
-    assert comparable_measurement_identity([observed.rv_reading, restored.rv_reading]) == (
-        "residual_hidden", "retraction-fixture", "fixture", 2, 22,
+    assert comparable_measurement_identity(
+        [observed.rv_reading, restored.rv_reading]
+    ) == (
+        "residual_hidden",
+        "retraction-fixture",
+        "fixture",
+        2,
+        22,
     )
     assert comparable_measurement_identity([restored.rv_reading, reading()]) is None
     incompatible = reading(0.4, "residual_hidden", late_layer=23)
@@ -185,11 +204,15 @@ def test_nested_observed_state_preserves_legacy_classification_history():
     assert restored.to_dict() == output
 
 
-async def test_research_bridge_load_save_preserves_legacy_classification_history(tmp_path):
+async def test_research_bridge_load_save_preserves_legacy_classification_history(
+    tmp_path,
+):
     path = tmp_path / "legacy-pairs.jsonl"
     seed = ResearchBridge(path)
     paired = await seed.add_measurement(
-        "legacy", "L4", "A factual response.",
+        "legacy",
+        "L4",
+        "A factual response.",
         rv_reading=reading(0.4, "residual_hidden"),
     )
     payload = paired.model_dump(mode="json")
@@ -232,7 +255,9 @@ def test_unrecognized_instrument_cannot_assert_a_scientific_verdict():
 
 
 def test_old_aggregate_overlap_is_historical_not_current_classification():
-    result = CorrelationResult.model_validate({"n": 50, "contraction_recognition_overlap": 0.78})
+    result = CorrelationResult.model_validate(
+        {"n": 50, "contraction_recognition_overlap": 0.78}
+    )
     current = json.loads(result.model_dump_json())
     assert current["contraction_recognition_overlap"] is None
     assert current["historical_contraction_recognition_overlap"] == 0.78
@@ -261,7 +286,10 @@ async def test_tracker_separates_proxy_from_residual_and_does_not_pool(tmp_path)
     assert residual["model_name"] == "fixture"
     assert residual["early_layer"] == 2
     assert residual["late_layer"] == 22
-    rows = [json.loads(line) for line in (tmp_path / "evolution_rv.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "evolution_rv.jsonl").read_text().splitlines()
+    ]
     assert all(row["is_contracted"] is None for row in rows)
     assert tracker.get_rv_fitness_pairs() == []
     assert tracker.get_trend() is None
@@ -270,8 +298,18 @@ async def test_tracker_separates_proxy_from_residual_and_does_not_pool(tmp_path)
 
 async def test_tracker_historical_classification_is_retained_only_as_history(tmp_path):
     path = tmp_path / "evolution_rv.jsonl"
-    before = json.dumps({"rv": 0.4, "best_fitness": 0.8, "rv_source": "geometric",
-                         "is_contracted": True, "contraction_strength": "strong"}) + "\n"
+    before = (
+        json.dumps(
+            {
+                "rv": 0.4,
+                "best_fitness": 0.8,
+                "rv_source": "geometric",
+                "is_contracted": True,
+                "contraction_strength": "strong",
+            }
+        )
+        + "\n"
+    )
     path.write_text(before)
     tracker = EvolutionRVTracker(tmp_path)
     await tracker.load()
@@ -280,21 +318,31 @@ async def test_tracker_historical_classification_is_retained_only_as_history(tmp
     assert row["measurement_kind"] == "unknown"
     assert row["is_contracted"] is None
     assert row["contraction_strength"] is None
-    assert row["historical_classification"] == {"is_contracted": True, "contraction_strength": "strong"}
+    assert row["historical_classification"] == {
+        "is_contracted": True,
+        "contraction_strength": "strong",
+    }
     assert tracker.get_rv_fitness_pairs() == []
     assert path.read_text() == before  # Loading never rewrites the historical file.
 
 
 def test_monad_historical_strength_cannot_escape_as_current_classification():
-    payload = {"state": "saved", "rv_measurement": 0.4,
-               "introspection": {"contraction_strength": "strong"}, "timestamp": 1.0}
+    payload = {
+        "state": "saved",
+        "rv_measurement": 0.4,
+        "introspection": {"contraction_strength": "strong"},
+        "timestamp": 1.0,
+    }
     observed = ObservedState.from_dict(payload)
     output = observed.to_dict()
     assert observed.rv == 0.4
     assert observed.is_contracted is None
     assert output["introspection"]["contraction_strength"] is None
     assert output["introspection"]["measurement_kind"] == "unknown"
-    assert output["introspection"]["historical_classification"]["contraction_strength"] == "strong"
+    assert (
+        output["introspection"]["historical_classification"]["contraction_strength"]
+        == "strong"
+    )
     assert payload["introspection"] == {"contraction_strength": "strong"}
 
 
@@ -368,7 +416,9 @@ def test_observed_state_preserves_conflicting_introspection_history():
                 "contraction_strength": "moderate",
                 "raw_legacy_field": {"keep": [1, 2]},
             },
-            "historical_classification_conflicts": [{"field": "other", "values": ["keep"]}],
+            "historical_classification_conflicts": [
+                {"field": "other", "values": ["keep"]}
+            ],
             "is_contracted": True,
             "contraction_strength": "strong",
         },
@@ -385,9 +435,10 @@ def test_observed_state_preserves_conflicting_introspection_history():
     assert observed.is_contracted is None
     assert output["introspection"]["is_contracted"] is None
     assert output["introspection"]["contraction_strength"] is None
-    assert output["introspection"]["historical_classification"] == original[
-        "introspection"
-    ]["historical_classification"]
+    assert (
+        output["introspection"]["historical_classification"]
+        == original["introspection"]["historical_classification"]
+    )
     assert output["introspection"]["historical_classification_conflicts"][1:] == [
         {
             "field": "is_contracted",
@@ -405,9 +456,10 @@ def test_observed_state_preserves_conflicting_introspection_history():
         },
     ]
     assert output["introspection"]["measurement_kind"] == "behavioral_proxy"
-    assert output["introspection"]["measurement_details"] == original[
-        "introspection"
-    ]["measurement_details"]
+    assert (
+        output["introspection"]["measurement_details"]
+        == original["introspection"]["measurement_details"]
+    )
     assert restored.to_dict() == output
 
 
@@ -509,12 +561,14 @@ async def test_tracker_and_observed_state_retain_explicit_null_history(tmp_path)
         assert introspection["is_contracted"] is None
         assert introspection["contraction_strength"] is None
         assert introspection["historical_classification"] == historical
-        assert [conflict["existing_value"] for conflict in introspection[
-            "historical_classification_conflicts"
-        ]] == [None, None]
-        assert [conflict["legacy_value"] for conflict in introspection[
-            "historical_classification_conflicts"
-        ]] == [True, "strong"]
+        assert [
+            conflict["existing_value"]
+            for conflict in introspection["historical_classification_conflicts"]
+        ] == [None, None]
+        assert [
+            conflict["legacy_value"]
+            for conflict in introspection["historical_classification_conflicts"]
+        ] == [True, "strong"]
     assert ObservedState.from_dict(output).to_dict() == output
 
     restored_dir = tmp_path / "restored"
@@ -530,11 +584,13 @@ async def test_malformed_history_is_annotated_without_current_verdicts(tmp_path)
     raw_conflicts = {"unexpected": "metadata"}
     legacy = {"is_contracted": True, "contraction_strength": "strong"}
     expected_history = {"raw_historical_classification": historical, **legacy}
-    expected_conflicts = [{
-        "field": "historical_classification_conflicts",
-        "existing_source": "historical_classification_conflicts",
-        "existing_value": raw_conflicts,
-    }]
+    expected_conflicts = [
+        {
+            "field": "historical_classification_conflicts",
+            "existing_source": "historical_classification_conflicts",
+            "existing_value": raw_conflicts,
+        }
+    ]
     values = {
         "historical_classification": historical,
         "historical_classification_conflicts": raw_conflicts,
@@ -551,12 +607,14 @@ async def test_malformed_history_is_annotated_without_current_verdicts(tmp_path)
     await tracker.load()
     row = tracker.get_readings()[0]
 
-    observed = ObservedState.from_dict({
-        "state": "saved",
-        "rv_measurement": 0.4,
-        "introspection": values,
-        "timestamp": 1.0,
-    })
+    observed = ObservedState.from_dict(
+        {
+            "state": "saved",
+            "rv_measurement": 0.4,
+            "introspection": values,
+            "timestamp": 1.0,
+        }
+    )
     observed_output = json.loads(json.dumps(observed.to_dict()))
 
     for output in (
@@ -572,7 +630,10 @@ async def test_malformed_history_is_annotated_without_current_verdicts(tmp_path)
     assert row["contraction_strength"] is None
     assert observed_output["introspection"]["is_contracted"] is None
     assert observed_output["introspection"]["contraction_strength"] is None
-    assert RVReading.model_validate_json(restored_reading.model_dump_json()) == restored_reading
+    assert (
+        RVReading.model_validate_json(restored_reading.model_dump_json())
+        == restored_reading
+    )
     assert ObservedState.from_dict(observed_output).to_dict() == observed_output
 
     restored_dir = tmp_path / "restored"
@@ -589,7 +650,8 @@ async def test_malformed_history_is_annotated_without_current_verdicts(tmp_path)
     [None, [], [{"field": "other", "values": ["keep"]}]],
 )
 def test_correlation_result_persists_new_and_existing_conflict_lists(
-    historical_overlap, initial_conflicts,
+    historical_overlap,
+    initial_conflicts,
 ):
     payload = {
         "n": 50,
@@ -598,7 +660,9 @@ def test_correlation_result_persists_new_and_existing_conflict_lists(
         "historical_contraction_recognition_overlap": historical_overlap,
     }
     if initial_conflicts is not None:
-        payload["historical_contraction_recognition_overlap_conflicts"] = initial_conflicts
+        payload["historical_contraction_recognition_overlap_conflicts"] = (
+            initial_conflicts
+        )
     original = json.loads(json.dumps(payload))
 
     result = CorrelationResult.model_validate(payload)
@@ -622,11 +686,13 @@ def test_correlation_result_persists_new_and_existing_conflict_lists(
 
 
 def test_correlation_result_same_overlap_adds_no_conflict():
-    result = CorrelationResult.model_validate({
-        "n": 50,
-        "contraction_recognition_overlap": 0.9,
-        "historical_contraction_recognition_overlap": 0.9,
-    })
+    result = CorrelationResult.model_validate(
+        {
+            "n": 50,
+            "contraction_recognition_overlap": 0.9,
+            "historical_contraction_recognition_overlap": 0.9,
+        }
+    )
     assert result.historical_contraction_recognition_overlap == 0.9
     assert result.historical_contraction_recognition_overlap_conflicts == []
     assert CorrelationResult.model_validate_json(result.model_dump_json()) == result
@@ -635,25 +701,29 @@ def test_correlation_result_same_overlap_adds_no_conflict():
 def test_batch_result_retains_new_nested_overlap_conflict():
     from dharma_swarm.l4_rv_correlator import BatchResult
 
-    batch = BatchResult.model_validate({
-        "correlation": {
-            "n": 50,
-            "contraction_recognition_overlap": 0.9,
-            "historical_contraction_recognition_overlap": 0.1,
-        },
-    })
+    batch = BatchResult.model_validate(
+        {
+            "correlation": {
+                "n": 50,
+                "contraction_recognition_overlap": 0.9,
+                "historical_contraction_recognition_overlap": 0.1,
+            },
+        }
+    )
     output = json.loads(batch.model_dump_json())
     correlation = output["correlation"]
 
     assert correlation["contraction_recognition_overlap"] is None
     assert correlation["historical_contraction_recognition_overlap"] == 0.1
-    assert correlation["historical_contraction_recognition_overlap_conflicts"] == [{
-        "field": "contraction_recognition_overlap",
-        "existing_source": "historical_contraction_recognition_overlap",
-        "existing_value": 0.1,
-        "legacy_source": "legacy_top_level",
-        "legacy_value": 0.9,
-    }]
+    assert correlation["historical_contraction_recognition_overlap_conflicts"] == [
+        {
+            "field": "contraction_recognition_overlap",
+            "existing_source": "historical_contraction_recognition_overlap",
+            "existing_value": 0.1,
+            "legacy_source": "legacy_top_level",
+            "legacy_value": 0.9,
+        }
+    ]
     assert BatchResult.model_validate(output) == batch
 
 
@@ -704,7 +774,9 @@ def test_correlation_result_preserves_accepted_conflict_sequences(sequence_facto
 )
 def test_monad_scalar_round_trip_preserves_only_valid_explicit_kind(supplied, expected):
     introspection = {} if supplied is None else {"measurement_kind": supplied}
-    observed = ObservedState(state="saved", rv_measurement=0.4, introspection=introspection)
+    observed = ObservedState(
+        state="saved", rv_measurement=0.4, introspection=introspection
+    )
     restored = ObservedState.from_dict(observed.to_dict())
     assert restored.introspection["measurement_kind"] == expected
     assert restored.introspection["is_contracted"] is None
@@ -712,12 +784,18 @@ def test_monad_scalar_round_trip_preserves_only_valid_explicit_kind(supplied, ex
     assert restored.rv_measurement == 0.4
 
 
-@pytest.mark.parametrize("kinds", [("residual_hidden", "colony_density"), ("unknown", "unknown")])
+@pytest.mark.parametrize(
+    "kinds", [("residual_hidden", "colony_density"), ("unknown", "unknown")]
+)
 async def test_research_bridge_withholds_mixed_or_unknown_statistics(tmp_path, kinds):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
     for index, kind in enumerate(kinds):
-        await bridge.add_measurement(str(index), "same-group", "A factual response.",
-                                     rv_reading=reading(0.4 + index * 0.2, kind))
+        await bridge.add_measurement(
+            str(index),
+            "same-group",
+            "A factual response.",
+            rv_reading=reading(0.4 + index * 0.2, kind),
+        )
     result = bridge.compute_correlation()
     assert result.n == 2
     assert result.pearson_r is None
@@ -725,7 +803,9 @@ async def test_research_bridge_withholds_mixed_or_unknown_statistics(tmp_path, k
     assert result.classification_count == 0
     assert sum(result.measurement_kind_counts.values()) == 2
     assert bridge.group_summary()["same-group"]["mean_rv"] is None
-    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx([0.4, 0.6])
+    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx(
+        [0.4, 0.6]
+    )
 
 
 async def test_research_bridge_snapshots_accepted_reading_provenance(tmp_path):
@@ -772,7 +852,9 @@ async def test_research_bridge_snapshots_accepted_reading_provenance(tmp_path):
             "A factual response.",
             rv_reading=reading(value, "residual_hidden"),
         )
-    assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(0.6)
+    assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(
+        0.6
+    )
 
 
 @pytest.mark.parametrize("accessor", ["add", "all", "filtered"])
@@ -794,7 +876,9 @@ async def test_research_bridge_returned_measurements_are_private_snapshots(
             "first", "same", "First response.", rv_reading=first
         )
     else:
-        await bridge.add_measurement("first", "same", "First response.", rv_reading=first)
+        await bridge.add_measurement(
+            "first", "same", "First response.", rv_reading=first
+        )
         group = None if accessor == "all" else "same"
         returned = bridge.get_measurements(group=group)[0]
     accepted_id = returned.id
@@ -835,7 +919,9 @@ async def test_research_bridge_returned_measurements_are_private_snapshots(
             "A factual response.",
             rv_reading=reading(value, "residual_hidden"),
         )
-    assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(0.6)
+    assert compatible.compute_correlation().mean_rv_by_group["same"] == pytest.approx(
+        0.6
+    )
 
 
 async def test_tracker_returned_record_is_a_private_snapshot(tmp_path):
@@ -941,7 +1027,9 @@ async def test_tracker_invalid_or_missing_numbers_make_whole_cohort_unavailable(
         assert readings[1][field] == value
 
 
-async def test_tracker_comparable_finite_legacy_numbers_return_exact_statistics(tmp_path):
+async def test_tracker_comparable_finite_legacy_numbers_return_exact_statistics(
+    tmp_path,
+):
     records = [
         {
             "cycle_id": str(index),
@@ -1058,12 +1146,14 @@ def test_monad_composition_preserves_reading_classification_history(
         serialized_state = state
         if isinstance(state, ObservedState):
             serialized_state = {**state.to_dict(), "__observed_state__": True}
-        return ObservedState.from_dict({
-            "state": serialized_state,
-            "rv_reading": json.loads(source.model_dump_json()),
-            "introspection": {},
-            "timestamp": source.timestamp.timestamp(),
-        })
+        return ObservedState.from_dict(
+            {
+                "state": serialized_state,
+                "rv_reading": json.loads(source.model_dump_json()),
+                "introspection": {},
+                "timestamp": source.timestamp.timestamp(),
+            }
+        )
 
     inner = make_observed("core", inner_reading)
 
@@ -1072,7 +1162,11 @@ def test_monad_composition_preserves_reading_classification_history(
         assert result.state == "next"
     else:
         outer = make_observed(inner, outer_reading)
-        result = flatten(outer) if composition == "flatten" else SelfObservationMonad.multiply(outer)
+        result = (
+            flatten(outer)
+            if composition == "flatten"
+            else SelfObservationMonad.multiply(outer)
+        )
         assert result.state == "core"
 
     assert result.rv_reading == outer_reading
@@ -1118,15 +1212,21 @@ def test_monad_composition_preserves_reading_classification_history(
 async def test_known_instrument_mean_is_descriptive_with_no_classification(tmp_path):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
     for value in (0.4, 0.6, 0.8):
-        await bridge.add_measurement(str(value), "known", "A factual response.",
-                                     rv_reading=reading(value, "residual_hidden"))
+        await bridge.add_measurement(
+            str(value),
+            "known",
+            "A factual response.",
+            rv_reading=reading(value, "residual_hidden"),
+        )
     result = bridge.compute_correlation()
     assert result.mean_rv_by_group["known"] == pytest.approx(0.6)
     assert result.contraction_recognition_overlap is None
     assert result.classification_count == 0
     assert result.measurement_kind_counts == {"residual_hidden": 3}
     assert "overlap unavailable" in result.summary
-    assert json.loads(result.model_dump_json())["contraction_recognition_overlap"] is None
+    assert (
+        json.loads(result.model_dump_json())["contraction_recognition_overlap"] is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -1139,28 +1239,42 @@ async def test_known_instrument_mean_is_descriptive_with_no_classification(tmp_p
         {"measurement_details": {}},
     ],
 )
-async def test_research_bridge_withholds_incompatible_same_kind_statistics(tmp_path, overrides):
+async def test_research_bridge_withholds_incompatible_same_kind_statistics(
+    tmp_path, overrides
+):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
-    await bridge.add_measurement("one", "same", "First response.", rv_reading=reading(0.4, "residual_hidden"))
     await bridge.add_measurement(
-        "two", "same", "Second different response.",
+        "one", "same", "First response.", rv_reading=reading(0.4, "residual_hidden")
+    )
+    await bridge.add_measurement(
+        "two",
+        "same",
+        "Second different response.",
         rv_reading=reading(0.6, "residual_hidden", **overrides),
     )
     result = bridge.compute_correlation()
     assert result.n == 2
     assert result.mean_rv_by_group == {}
     assert bridge.group_summary()["same"]["mean_rv"] is None
-    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx([0.4, 0.6])
+    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx(
+        [0.4, 0.6]
+    )
 
 
 async def test_research_bridge_withholds_different_proxy_formulas(tmp_path):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
     for index, formula in enumerate(("formula-a", "formula-b")):
         await bridge.add_measurement(
-            str(index), "same", f"Response {index}",
+            str(index),
+            "same",
+            f"Response {index}",
             rv_reading=reading(
-                0.4 + index * 0.2, "behavioral_proxy",
-                measurement_details={"cohort": "retraction-fixture", "formula": formula},
+                0.4 + index * 0.2,
+                "behavioral_proxy",
+                measurement_details={
+                    "cohort": "retraction-fixture",
+                    "formula": formula,
+                },
             ),
         )
     result = bridge.compute_correlation()
@@ -1169,9 +1283,13 @@ async def test_research_bridge_withholds_different_proxy_formulas(tmp_path):
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
-async def test_nonfinite_readings_never_become_statistics_or_classifications(tmp_path, value):
+async def test_nonfinite_readings_never_become_statistics_or_classifications(
+    tmp_path, value
+):
     bridge = ResearchBridge(tmp_path / "pairs.jsonl")
-    await bridge.add_measurement("bad", "known", "Response.", rv_reading=reading(value, "residual_hidden"))
+    await bridge.add_measurement(
+        "bad", "known", "Response.", rv_reading=reading(value, "residual_hidden")
+    )
     result = bridge.compute_correlation()
     assert result.pearson_r is None
     assert result.contraction_recognition_overlap is None
@@ -1180,23 +1298,32 @@ async def test_nonfinite_readings_never_become_statistics_or_classifications(tmp
 
 def test_evolution_bridge_keeps_raw_archive_and_refuses_cross_instrument_pooling():
     bridge = EvolutionBridge()
-    for index, kind in enumerate(("residual_hidden", "colony_density", "behavioral_proxy")):
+    for index, kind in enumerate(
+        ("residual_hidden", "colony_density", "behavioral_proxy")
+    ):
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-            measurement_kind=kind, metadata=evolution_metadata(kind),
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
+            measurement_kind=kind,
+            metadata=evolution_metadata(kind),
         )
     result = bridge.correlate()
     assert result["pearson_r"] is None
     assert result["rv_trend"] is None
     assert result["n"] == 3
-    assert [r["rv"] for r in bridge.format_for_archive()] == pytest.approx([0.4, 0.5, 0.6])
+    assert [r["rv"] for r in bridge.format_for_archive()] == pytest.approx(
+        [0.4, 0.5, 0.6]
+    )
 
 
 def test_evolution_bridge_known_proxy_association_does_not_imply_self_reference():
     bridge = EvolutionBridge()
     for index in range(3):
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
             measurement_kind="behavioral_proxy",
             metadata=evolution_metadata("behavioral_proxy"),
         )
@@ -1233,7 +1360,9 @@ def test_evolution_bridge_numeric_guard_preserves_raw_archive(field, value):
             else:
                 fitness = value
         bridge.add_record(
-            str(index), rv, fitness,
+            str(index),
+            rv,
+            fitness,
             measurement_kind="behavioral_proxy",
             metadata=evolution_metadata("behavioral_proxy"),
         )
@@ -1269,7 +1398,9 @@ def test_evolution_bridge_withholds_only_uncomputable_extreme_statistics(field):
         values = {"rv": 0.4 + index * 0.1, "fitness": 0.9 - index * 0.1}
         values[field] = extreme_values[index]
         bridge.add_record(
-            str(index), values["rv"], values["fitness"],
+            str(index),
+            values["rv"],
+            values["fitness"],
             measurement_kind="behavioral_proxy",
             metadata=evolution_metadata("behavioral_proxy"),
         )
@@ -1281,7 +1412,9 @@ def test_evolution_bridge_withholds_only_uncomputable_extreme_statistics(field):
     expected_trend = -0.1 if unaffected == "fitness" else 0.1
     assert result["n"] == 3
     assert result["pearson_r"] is None
-    assert result["spearman_rho"] == pytest.approx((1 if field == "rv" else -1) * 3**0.5 / 2)
+    assert result["spearman_rho"] == pytest.approx(
+        (1 if field == "rv" else -1) * 3**0.5 / 2
+    )
     assert result[f"{field}_trend"] is None
     assert result[f"{unaffected}_trend"] == pytest.approx(expected_trend)
     assert [row[field] for row in archived] == extreme_values
@@ -1296,7 +1429,9 @@ def test_evolution_bridge_large_integer_ranks_remain_exact(field):
         values = {"rv": 0.4 + index * 0.1, "fitness": 0.4 + index * 0.1}
         values[field] = exact_values[index]
         bridge.add_record(
-            str(index), values["rv"], values["fitness"],
+            str(index),
+            values["rv"],
+            values["fitness"],
             measurement_kind="behavioral_proxy",
             metadata=evolution_metadata("behavioral_proxy"),
         )
@@ -1317,8 +1452,12 @@ def _restore_evolution_archive(rows):
     for row in rows:
         metadata = {key: row[key] for key in identity_fields if key in row}
         bridge.add_record(
-            row["cycle_id"], row["rv"], row["fitness"], row["rv_source"],
-            metadata=metadata, measurement_kind=row["measurement_kind"],
+            row["cycle_id"],
+            row["rv"],
+            row["fitness"],
+            row["rv_source"],
+            metadata=metadata,
+            measurement_kind=row["measurement_kind"],
         )
     return bridge
 
@@ -1329,8 +1468,11 @@ def test_evolution_bridge_archive_round_trip_preserves_comparable_statistics(kin
     metadata = evolution_metadata(kind)
     for index in range(3):
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-            measurement_kind=kind, metadata=metadata,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
+            measurement_kind=kind,
+            metadata=metadata,
         )
     before = bridge.correlate()
     archived = json.loads(json.dumps(bridge.format_for_archive()))
@@ -1355,7 +1497,15 @@ def test_evolution_bridge_archive_round_trip_preserves_comparable_statistics(kin
         ("residual_hidden", {"model_name": "other-model"}),
         ("residual_hidden", {"early_layer": 3}),
         ("residual_hidden", {"late_layer": 21}),
-        ("behavioral_proxy", {"measurement_details": {"cohort": "evolution-fixture", "formula": "other"}}),
+        (
+            "behavioral_proxy",
+            {
+                "measurement_details": {
+                    "cohort": "evolution-fixture",
+                    "formula": "other",
+                }
+            },
+        ),
     ],
 )
 def test_evolution_bridge_archive_round_trip_withholds_mixed_identity(kind, override):
@@ -1365,46 +1515,70 @@ def test_evolution_bridge_archive_round_trip_withholds_mixed_identity(kind, over
         if index == 2:
             metadata.update(override)
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-            measurement_kind=kind, metadata=metadata,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
+            measurement_kind=kind,
+            metadata=metadata,
         )
     archived = json.loads(json.dumps(bridge.format_for_archive()))
     restored = _restore_evolution_archive(archived)
 
     assert restored.correlate()["pearson_r"] is None
     assert restored.correlate()["rv_trend"] is None
-    assert [row["rv"] for row in restored.format_for_archive()] == pytest.approx([0.4, 0.5, 0.6])
-    assert [row["fitness"] for row in restored.format_for_archive()] == pytest.approx([0.9, 0.8, 0.7])
+    assert [row["rv"] for row in restored.format_for_archive()] == pytest.approx(
+        [0.4, 0.5, 0.6]
+    )
+    assert [row["fitness"] for row in restored.format_for_archive()] == pytest.approx(
+        [0.9, 0.8, 0.7]
+    )
 
 
 @pytest.mark.parametrize(
     ("kind", "metadata"),
     [
         ("unknown", None),
-        ("residual_hidden", {"model_name": "fixture", "measurement_details": {"cohort": "evolution-fixture"}}),
+        (
+            "residual_hidden",
+            {
+                "model_name": "fixture",
+                "measurement_details": {"cohort": "evolution-fixture"},
+            },
+        ),
     ],
 )
-def test_evolution_bridge_archive_round_trip_does_not_invent_missing_identity(kind, metadata):
+def test_evolution_bridge_archive_round_trip_does_not_invent_missing_identity(
+    kind, metadata
+):
     bridge = EvolutionBridge()
     for index in range(3):
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-            measurement_kind=kind, metadata=metadata,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
+            measurement_kind=kind,
+            metadata=metadata,
         )
     archived = json.loads(json.dumps(bridge.format_for_archive()))
     restored = _restore_evolution_archive(archived)
 
     assert restored.correlate()["pearson_r"] is None
     assert all("early_layer" not in row and "late_layer" not in row for row in archived)
-    assert [row["rv"] for row in restored.format_for_archive()] == pytest.approx([0.4, 0.5, 0.6])
-    assert [row["fitness"] for row in restored.format_for_archive()] == pytest.approx([0.9, 0.8, 0.7])
+    assert [row["rv"] for row in restored.format_for_archive()] == pytest.approx(
+        [0.4, 0.5, 0.6]
+    )
+    assert [row["fitness"] for row in restored.format_for_archive()] == pytest.approx(
+        [0.9, 0.8, 0.7]
+    )
 
 
 def test_evolution_bridge_constant_comparable_series_reports_stable_trends():
     bridge = EvolutionBridge()
     for index in range(3):
         bridge.add_record(
-            str(index), 0.4, 0.8,
+            str(index),
+            0.4,
+            0.8,
             measurement_kind="behavioral_proxy",
             metadata=evolution_metadata("behavioral_proxy"),
         )
@@ -1432,7 +1606,9 @@ def test_evolution_bridge_empty_and_short_known_kind_report_insufficient_cycles(
     assert "have 0" in empty["summary"]
     for index in range(2):
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
             measurement_kind="residual_hidden",
             metadata=evolution_metadata("residual_hidden"),
         )
@@ -1469,12 +1645,16 @@ def test_gaia_demo_prints_raw_ratio_and_unavailable_classification(monkeypatch, 
     lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
 
     def value(prefix):
-        return next(line for line in lines if line.startswith(prefix))[len(prefix):].strip()
+        return next(line for line in lines if line.startswith(prefix))[
+            len(prefix) :
+        ].strip()
 
     ratio = float(value("R_V-like reading:"))
     assert 0.0 <= ratio <= 1.0
     assert float(value("PR_early (before observation):")) == 1.0
-    assert float(value("PR_late (after observation):")) == pytest.approx(ratio, abs=1e-3)
+    assert float(value("PR_late (after observation):")) == pytest.approx(
+        ratio, abs=1e-3
+    )
     assert value("Measurement kind:") == "behavioral_proxy"
     contraction = value("Contraction:")
     assert contraction.startswith("unavailable")
@@ -1496,8 +1676,10 @@ def test_gaia_observe_ledger_carries_behavioral_proxy_provenance():
     assert reading.is_contracted is None
     assert reading.contraction_strength is None
     formula = reading.measurement_details["formula"]
-    assert all(term in formula for term in
-               ("verification_coverage", "oracle_diversity", "violation_rate"))
+    assert all(
+        term in formula
+        for term in ("verification_coverage", "oracle_diversity", "violation_rate")
+    )
 
     observed = observe_ledger(ledger)
     assert observed.rv == pytest.approx(reading.rv)
@@ -1507,23 +1689,49 @@ def test_gaia_observe_ledger_carries_behavioral_proxy_provenance():
     assert observed.to_dict()["introspection"]["measurement_kind"] == "behavioral_proxy"
 
 
-def test_historical_analysis_emits_numbers_without_retired_inference(monkeypatch, capsys):
+def test_historical_analysis_emits_numbers_without_retired_inference(
+    monkeypatch, capsys
+):
     from analysis import categorical_analysis
 
-    groups = {"L3_deeper": 0.6, "L4_full": 0.5, "champions": 0.7,
-              "baseline_factual": 0.8, "baseline_math": 0.9, "baseline_creative": 1.0}
-    stats = {"group_rv_means": groups, "group_word_means": {},
-             "h2_cohens_d": 0.1, "h2_p_value": 0.8,
-             "h1_spearman_r": 0.0, "h1_spearman_p": 1.0, "h1_significant": False,
-             "h3_point_biserial_r": 0.0, "h3_point_biserial_p": 1.0, "h3_significant": False}
-    monkeypatch.setattr(categorical_analysis, "load_gemma_bridge", lambda: {
-        "analysis": {"temp_0.0": stats}, "early_layer": 2, "late_layer": 22, "n_total_prompts": 6,
-    })
+    groups = {
+        "L3_deeper": 0.6,
+        "L4_full": 0.5,
+        "champions": 0.7,
+        "baseline_factual": 0.8,
+        "baseline_math": 0.9,
+        "baseline_creative": 1.0,
+    }
+    stats = {
+        "group_rv_means": groups,
+        "group_word_means": {},
+        "h2_cohens_d": 0.1,
+        "h2_p_value": 0.8,
+        "h1_spearman_r": 0.0,
+        "h1_spearman_p": 1.0,
+        "h1_significant": False,
+        "h3_point_biserial_r": 0.0,
+        "h3_point_biserial_p": 1.0,
+        "h3_significant": False,
+    }
+    monkeypatch.setattr(
+        categorical_analysis,
+        "load_gemma_bridge",
+        lambda: {
+            "analysis": {"temp_0.0": stats},
+            "early_layer": 2,
+            "late_layer": 22,
+            "n_total_prompts": 6,
+        },
+    )
     categorical_analysis.analyze_gemma_bridge()
     output = capsys.readouterr().out
     assert "0.5000" in output
     assert output.count("unavailable (.737 retired; instrument uncalibrated)") == 6
-    assert "No calibrated classifier or fixed-point convergence inference is available" in output
+    assert (
+        "No calibrated classifier or fixed-point convergence inference is available"
+        in output
+    )
     assert "Estimated iterations to L5" not in output
 
 
@@ -1531,12 +1739,20 @@ def test_research_annotation_exposes_retraction_as_contradiction():
     from dharma_swarm.semantic_gravity import ConceptNode, ResearchConnectionType
     from dharma_swarm.semantic_researcher import SemanticResearcher
 
-    node = ConceptNode(id="rv", name="rv", source_file="fixture", category="mathematical",
-                       salience=0.9, formal_structures=["rv_contraction"])
+    node = ConceptNode(
+        id="rv",
+        name="rv",
+        source_file="fixture",
+        category="mathematical",
+        salience=0.9,
+        formal_structures=["rv_contraction"],
+    )
     annotations = SemanticResearcher().annotate_concept(node)
     assert len(annotations) == 1
     assert annotations[0].connection_type == ResearchConnectionType.CONTRADICTION
-    assert "same-sample calibration lacked held-out validation" in annotations[0].summary
+    assert (
+        "same-sample calibration lacked held-out validation" in annotations[0].summary
+    )
 
 
 def test_field_graph_marks_rv_record_historical_and_unvalidated():
@@ -1569,7 +1785,11 @@ def test_research_director_prompt_does_not_promote_retired_classification():
 def test_shakti_rv_contexts_preserve_history_without_current_validation():
     from scripts.shakti_discovery import build_research_tasks
 
-    tasks = [task for task in build_research_tasks() if task.question.startswith("The R_V paper")]
+    tasks = [
+        task
+        for task in build_research_tasks()
+        if task.question.startswith("The R_V paper")
+    ]
     assert len(tasks) == 2
     contexts = [task.context_builder() for task in tasks]
     for context in contexts:
@@ -1600,7 +1820,9 @@ async def test_telos_seed_marks_rv_abstract_evidence_historical(tmp_path):
 
 
 @pytest.mark.parametrize("with_reading", [False, True], ids=["proxy", "rv-reading"])
-def test_observe_retires_merged_caller_classification_and_preserves_history(with_reading):
+def test_observe_retires_merged_caller_classification_and_preserves_history(
+    with_reading,
+):
     supplied = {
         "is_contracted": True,
         "contraction_strength": "strong",
@@ -1627,7 +1849,9 @@ def test_observe_retires_merged_caller_classification_and_preserves_history(with
 
 
 @pytest.mark.parametrize("operation", ["flatten", "bind"])
-def test_monad_composition_merges_classification_history_without_input_mutation(operation):
+def test_monad_composition_merges_classification_history_without_input_mutation(
+    operation,
+):
     inner_metadata = {
         "shared": "inner",
         "inner_only": "retained",
@@ -1668,13 +1892,16 @@ def test_monad_composition_merges_classification_history_without_input_mutation(
         assert result.state == "core"
         assert result.timestamp == 2.0
     else:
-        result = bind(inner, lambda _: ObservedState(
-            state="bound",
-            rv_measurement=0.4,
-            observation_depth=2,
-            introspection=outer_metadata,
-            timestamp=3.0,
-        ))
+        result = bind(
+            inner,
+            lambda _: ObservedState(
+                state="bound",
+                rv_measurement=0.4,
+                observation_depth=2,
+                introspection=outer_metadata,
+                timestamp=3.0,
+            ),
+        )
         assert result.state == "bound"
         assert result.timestamp == 3.0
 
@@ -1719,14 +1946,18 @@ def test_evolution_bridge_snapshots_provenance_before_caller_mutation():
     shared["measurement_details"]["cohort"] = "cohort-b"
     for index in (1, 2):
         bridge.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-            measurement_kind="behavioral_proxy", metadata=shared,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
+            measurement_kind="behavioral_proxy",
+            metadata=shared,
         )
 
     archived = json.loads(json.dumps(bridge.format_for_archive()))
     assert archived[0]["measurement_details"]["cohort"] == "cohort-a"
     assert [row["measurement_details"]["cohort"] for row in archived[1:]] == [
-        "cohort-b", "cohort-b"
+        "cohort-b",
+        "cohort-b",
     ]
     assert bridge.correlate()["pearson_r"] is None
     restored = _restore_evolution_archive(archived)
@@ -1737,8 +1968,11 @@ def test_evolution_bridge_snapshots_provenance_before_caller_mutation():
     unchanged = evolution_metadata("behavioral_proxy")
     for index in range(3):
         compatible.add_record(
-            str(index), 0.4 + index * 0.1, 0.9 - index * 0.1,
-            measurement_kind="behavioral_proxy", metadata=unchanged,
+            str(index),
+            0.4 + index * 0.1,
+            0.9 - index * 0.1,
+            measurement_kind="behavioral_proxy",
+            metadata=unchanged,
         )
     assert compatible.correlate()["pearson_r"] == pytest.approx(-1)
 
@@ -1759,16 +1993,22 @@ def test_rv_reading_preserves_accepted_conflict_sequences_across_json_boundaries
     original = deepcopy(payload)
 
     direct = RVReading.model_validate(payload)
-    observed = ObservedState.from_dict({
-        "state": "saved", "rv_reading": payload, "timestamp": 1.0,
-    })
-    paired = L4RVPairedResult.model_validate({
-        "prompt_text": "prompt",
-        "prompt_group": "L4",
-        "generated_text": "response",
-        "rv_reading": payload,
-        "l4_result": L4CompressionResult().model_dump(),
-    })
+    observed = ObservedState.from_dict(
+        {
+            "state": "saved",
+            "rv_reading": payload,
+            "timestamp": 1.0,
+        }
+    )
+    paired = L4RVPairedResult.model_validate(
+        {
+            "prompt_text": "prompt",
+            "prompt_group": "L4",
+            "generated_text": "response",
+            "rv_reading": payload,
+            "l4_result": L4CompressionResult().model_dump(),
+        }
+    )
     batch = BatchResult(paired_results=[paired])
 
     assert payload == original
@@ -1793,5 +2033,8 @@ def test_rv_reading_preserves_accepted_conflict_sequences_across_json_boundaries
     batch_json = batch.model_dump_json()
     assert RVReading.model_validate_json(direct_json).model_dump_json() == direct_json
     assert ObservedState.from_dict(observed_output).to_dict() == observed_output
-    assert L4RVPairedResult.model_validate_json(paired_json).model_dump_json() == paired_json
+    assert (
+        L4RVPairedResult.model_validate_json(paired_json).model_dump_json()
+        == paired_json
+    )
     assert BatchResult.model_validate_json(batch_json).model_dump_json() == batch_json

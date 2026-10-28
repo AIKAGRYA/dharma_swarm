@@ -39,8 +39,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── Constants ───────────────────────────────────────────────────────────────
-
 RV_CONTRACTION_THRESHOLD = 0.737
 """Retired legacy value, retained for import compatibility; not a monitor."""
 
@@ -49,8 +47,6 @@ RV_STRONG_THRESHOLD = 0.5
 
 RV_CALIBRATION_STATUS = "unvalidated_retired_threshold"
 
-
-# ── Utility ─────────────────────────────────────────────────────────────────
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -65,12 +61,11 @@ def _torch_available() -> bool:
     """Check if torch is importable without side effects."""
     try:
         import torch  # noqa: F401
+
         return True
     except ImportError:
         return False
 
-
-# ── Data Model ──────────────────────────────────────────────────────────────
 
 def _preserve_historical_classification(data: Any) -> Any:
     return _rv_contract._preserve_historical_classification(data)
@@ -106,7 +101,9 @@ class RVReading(BaseModel):
     measurement_details: dict[str, str] = Field(default_factory=dict)
     calibration_status: Literal["unvalidated_retired_threshold"] = RV_CALIBRATION_STATUS
     historical_classification: dict[str, Any] = Field(default_factory=dict)
-    historical_classification_conflicts: list[dict[str, Any]] = Field(default_factory=list)
+    historical_classification_conflicts: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -132,7 +129,9 @@ class RVReading(BaseModel):
         return None
 
 
-def _measurement_identity(measurement: RVReading | dict[str, Any]) -> tuple[Any, ...] | None:
+def _measurement_identity(
+    measurement: RVReading | dict[str, Any],
+) -> tuple[Any, ...] | None:
     return _rv_contract._measurement_identity(measurement)
 
 
@@ -142,8 +141,6 @@ def comparable_measurement_identity(
     """Return one explicit shared measurement identity, or None when pooling is invalid."""
     return _rv_contract.comparable_measurement_identity(measurements)
 
-
-# ── Core Metric ─────────────────────────────────────────────────────────────
 
 def compute_participation_ratio(hidden_state: "torch.Tensor") -> float:
     """Compute Participation Ratio from a hidden state tensor via SVD.
@@ -174,16 +171,17 @@ def compute_participation_ratio(hidden_state: "torch.Tensor") -> float:
     except Exception:
         return float("nan")
 
-    s_sq = s_np ** 2
+    s_sq = s_np**2
     total = s_sq.sum()
     if total < 1e-10:
         return float("nan")
 
-    pr = float((s_sq.sum() ** 2) / (s_sq ** 2).sum())
+    pr = float((s_sq.sum() ** 2) / (s_sq**2).sum())
     return pr
 
 
 # ── Measurer ────────────────────────────────────────────────────────────────
+
 
 class RVMeasurer:
     """Lazy-loading R_V measurement engine.
@@ -261,9 +259,7 @@ class RVMeasurer:
         rv = pr_late / pr_early
         return (rv, pr_early, pr_late)
 
-    async def measure(
-        self, prompt: str, group: str = "unknown"
-    ) -> Optional[RVReading]:
+    async def measure(self, prompt: str, group: str = "unknown") -> Optional[RVReading]:
         """Measure R_V for a single prompt.
 
         Args:
@@ -279,9 +275,7 @@ class RVMeasurer:
         if self._model is None:
             await asyncio.to_thread(self._load_model)
 
-        rv, pr_early, pr_late = await asyncio.to_thread(
-            self._sync_measure, prompt
-        )
+        rv, pr_early, pr_late = await asyncio.to_thread(self._sync_measure, prompt)
 
         num_layers = self._model.config.num_hidden_layers
 
@@ -398,7 +392,9 @@ class EvolutionRVTracker:
             record["rv"] = proxy
             record["rv_source"] = "proxy"
             record["measurement_kind"] = "behavioral_proxy"
-            record["measurement_details"] = {"formula": "1 - min(proposals_archived, 5) * 0.1"}
+            record["measurement_details"] = {
+                "formula": "1 - min(proposals_archived, 5) * 0.1"
+            }
 
         record["is_contracted"] = None
         record["calibration_status"] = RV_CALIBRATION_STATUS
@@ -408,7 +404,10 @@ class EvolutionRVTracker:
 
         logger.info(
             "Evolution R_V for cycle %s: rv=%.3f (%s), fitness=%.3f",
-            cycle_id, record["rv"], record["rv_source"], best_fitness,
+            cycle_id,
+            record["rv"],
+            record["rv_source"],
+            best_fitness,
         )
         return copy.deepcopy(record)
 
@@ -421,8 +420,7 @@ class EvolutionRVTracker:
         if comparable_measurement_identity(self._readings) is None:
             return []
         pairs = [
-            (record.get("rv"), record.get("best_fitness"))
-            for record in self._readings
+            (record.get("rv"), record.get("best_fitness")) for record in self._readings
         ]
         try:
             if any(
@@ -490,7 +488,9 @@ class EvolutionRVTracker:
                     line = line.strip()
                     if line:
                         record = _preserve_historical_classification(json.loads(line))
-                        if record.get("measurement_kind") not in get_args(MeasurementKind):
+                        if record.get("measurement_kind") not in get_args(
+                            MeasurementKind
+                        ):
                             record["measurement_kind"] = "unknown"
                         record["calibration_status"] = RV_CALIBRATION_STATUS
                         self._readings.append(record)
