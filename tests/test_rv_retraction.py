@@ -48,7 +48,31 @@ def evolution_metadata(kind):
 
 
 def test_rv_public_imports_and_runtime_type_hints_remain_resolvable():
-    from dharma_swarm import rv
+    import hashlib
+    import inspect
+    from datetime import datetime, timezone
+
+    from dharma_swarm import rv, rv_contract
+
+    assert rv._utc_now is rv_contract._utc_now
+    assert rv._prompt_hash is rv_contract._prompt_hash
+    assert str(inspect.signature(rv._utc_now)) == "() -> 'datetime'"
+    assert str(inspect.signature(rv._prompt_hash)) == "(prompt: 'str') -> 'str'"
+    assert get_type_hints(rv._utc_now) == {"return": datetime}
+    assert get_type_hints(rv._prompt_hash) == {"prompt": str, "return": str}
+    before = datetime.now(timezone.utc)
+    now = rv._utc_now()
+    observed = reading()
+    after = datetime.now(timezone.utc)
+    assert before <= now <= after
+    assert before <= observed.timestamp <= after
+    assert now.tzinfo is timezone.utc
+    assert observed.timestamp.tzinfo is timezone.utc
+    for prompt in ("", "fixture", "組織"):
+        assert (
+            rv._prompt_hash(prompt)
+            == hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+        )
 
     for cls in (rv.RVReading, rv.RVMeasurer, rv.EvolutionRVTracker):
         assert cls.__module__ == "dharma_swarm.rv"

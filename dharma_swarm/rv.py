@@ -19,13 +19,12 @@ from __future__ import annotations
 
 import asyncio
 import copy
-import hashlib
 import json
 import logging
 import math
 from collections import deque
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, get_args
 
@@ -33,11 +32,14 @@ from pydantic import BaseModel, Field, TypeAdapter, model_validator
 
 from dharma_swarm import rv_contract as _rv_contract
 from dharma_swarm.rv_contract import MeasurementKind as MeasurementKind
+from dharma_swarm.rv_contract import _prompt_hash, _utc_now
 
 if TYPE_CHECKING:
     import torch
 
 logger = logging.getLogger(__name__)
+
+# ── Constants ───────────────────────────────────────────────────────────────
 
 RV_CONTRACTION_THRESHOLD = 0.737
 """Retired legacy value, retained for import compatibility; not a monitor."""
@@ -48,13 +50,7 @@ RV_STRONG_THRESHOLD = 0.5
 RV_CALIBRATION_STATUS = "unvalidated_retired_threshold"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _prompt_hash(prompt: str) -> str:
-    """SHA-256 of prompt text, first 16 hex characters."""
-    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+# ── Utility ─────────────────────────────────────────────────────────────────
 
 
 def _torch_available() -> bool:
@@ -65,6 +61,9 @@ def _torch_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+# ── Data Model ──────────────────────────────────────────────────────────────
 
 
 def _preserve_historical_classification(data: Any) -> Any:
@@ -140,6 +139,9 @@ def comparable_measurement_identity(
 ) -> tuple[Any, ...] | None:
     """Return one explicit shared measurement identity, or None when pooling is invalid."""
     return _rv_contract.comparable_measurement_identity(measurements)
+
+
+# ── Core Metric ─────────────────────────────────────────────────────────────
 
 
 def compute_participation_ratio(hidden_state: "torch.Tensor") -> float:

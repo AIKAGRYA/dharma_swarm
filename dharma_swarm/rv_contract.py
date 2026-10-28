@@ -6,6 +6,8 @@ Public reading models and typed compatibility entry points remain in rv.
 from __future__ import annotations
 
 import copy
+import hashlib
+from datetime import datetime, timezone
 from collections.abc import Iterable
 from typing import Any, Literal, get_args
 
@@ -119,3 +121,12 @@ def comparable_measurement_identity(
     if len(set(identities)) != 1:
         return None
     return identities[0]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _prompt_hash(prompt: str) -> str:
+    """SHA-256 of prompt text, first 16 hex characters."""
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
