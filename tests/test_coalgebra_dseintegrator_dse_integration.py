@@ -108,7 +108,7 @@ def test_build_dse_cycle_bridge_from_cycle_uses_coalgebra_factory():
     assert "archive delta emitted" in bridge.discoveries
 
 
-def test_build_dse_cycle_bridge_uses_snapshot_fixed_point_pressure_by_default():
+def test_build_dse_cycle_bridge_preserves_historical_fixed_point_without_l5_hint():
     module = _load_module()
     result = CycleResult(
         cycle_id="cycle-bridge-3",
@@ -142,4 +142,36 @@ def test_build_dse_cycle_bridge_uses_snapshot_fixed_point_pressure_by_default():
 
     assert bridge.approaching_fixed_point is True
     assert bridge.context["approaching_fixed_point"] is True
-    assert "convergence_hint" in bridge.context
+    assert "convergence_hint" not in bridge.context
+
+
+def test_build_dse_cycle_bridge_preserves_unavailable_snapshot_and_roundtrip():
+    module = _load_module()
+    result = CycleResult(cycle_id="cycle-bridge-unavailable", best_fitness=0.4)
+
+    bridge = module.build_dse_cycle_bridge_from_cycle(
+        result,
+        coordination_snapshot=module.CoordinationSnapshot(),
+    )
+    restored = module.DSECycleBridge.model_validate_json(bridge.model_dump_json())
+
+    assert bridge.approaching_fixed_point is None
+    assert bridge.context["approaching_fixed_point"] is None
+    assert restored.approaching_fixed_point is None
+    assert "convergence_hint" not in bridge.context
+
+
+@pytest.mark.parametrize("verdict", [False, True])
+def test_build_dse_cycle_bridge_loads_explicit_historical_verdicts(verdict):
+    module = _load_module()
+    result = CycleResult(cycle_id="cycle-bridge-history", best_fitness=0.4)
+
+    bridge = module.build_dse_cycle_bridge_from_cycle(
+        result,
+        approaching_fixed_point=verdict,
+    )
+    restored = module.DSECycleBridge.model_validate_json(bridge.model_dump_json())
+
+    assert bridge.approaching_fixed_point is verdict
+    assert restored.approaching_fixed_point is verdict
+    assert "convergence_hint" not in bridge.context

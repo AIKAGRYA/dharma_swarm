@@ -85,7 +85,8 @@ TELOS_OBJECTIVES: list[dict[str, Any]] = [
         "progress": 0.0,
         "description": (
             "Live Grafana/Streamlit dashboard showing R_V scores per inference "
-            "request. Alert when R_V drops below threshold (0.737). "
+            "request with instrument provenance. The .737 threshold is retired; "
+            "scientific classification is unavailable and must not trigger alerts. "
             "WebSocket streaming from API to dashboard."
         ),
         "target_date": "2026-10-01",
@@ -945,8 +946,11 @@ TELOS_OBJECTIVES: list[dict[str, Any]] = [
         "progress": 0.9,
         "description": (
             "Submit abstract to COLM 2026. Geometric Signatures of "
-            "Self-Referential Processing. 250 words, key results: "
-            "Hedges g=-1.47, AUROC=0.909, causal at L27."
+            "Self-Referential Processing. 250 words. Historical, unvalidated "
+            "observations include Hedges g=-1.47, AUROC=0.909, and L27 ablation "
+            "results. The .737 classifier is retired after same-sample calibration "
+            "without held-out validation; no validated classification or awareness "
+            "mechanism is established."
         ),
         "target_date": "2026-03-26",
         "metadata": {"domain": "rv_empirical"},

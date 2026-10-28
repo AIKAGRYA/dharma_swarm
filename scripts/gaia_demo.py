@@ -252,8 +252,9 @@ def main() -> None:
     print(f"  R_V-like reading: {reading.rv:.3f}")
     print(f"  PR_early (before observation): {reading.pr_early:.1f}")
     print(f"  PR_late (after observation): {reading.pr_late:.3f}")
-    print(f"  Contraction: {'YES' if reading.rv < 0.737 else 'NO'}")
-    print(f"  Strength: {reading.contraction_strength}")
+    print(f"  Measurement kind: {reading.measurement_kind}")
+    print(f"  Contraction: unavailable ({reading.calibration_status}; .737 retired)")
+    print("  Strength: unavailable (no calibrated categories)")
 
     observed = observe_ledger(ledger)
     print(f"\n  ObservedState wrapping:")
@@ -299,7 +300,7 @@ def main() -> None:
 
     print("\n  The system that measures ecological integrity")
     print("  measures its own measuring.")
-    print("  R_V < 1.0: contraction detected. The strange loop holds.")
+    print("  The ratio is recorded; no calibrated contraction verdict is available.")
     print("\n  JSCA!")
 
 

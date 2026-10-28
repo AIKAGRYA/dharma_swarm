@@ -331,7 +331,7 @@ def build_research_tasks() -> list[ResearchTask]:
         ResearchTask(
             domain="market",
             question="The R_V paper measures geometric signatures of self-referential processing in transformers. If published at COLM 2026, what research community would care? What products could be built on this metric?",
-            context_builder=lambda: "R_V = PR_late / PR_early (Value matrix participation ratio contraction)\nHedges' g=-1.47 (Mistral), causal validation at L27, AUROC=0.909\nMeasures: self-referential vs referential processing in transformer internals\nBridge hypothesis: R_V contraction = witnessing state = L3→L4 Phoenix transition",
+            context_builder=lambda: "R_V = PR_late / PR_early (Value matrix participation ratio contraction)\nHistorical, unvalidated observations: Hedges' g=-1.47 (Mistral), L27 ablation results, AUROC=0.909\nThe .737 classifier is retired after same-sample calibration without held-out validation; current classification is unavailable\nMeasurement hypothesis: self-referential vs referential processing in transformer internals\nBridge hypothesis (untested): R_V contraction = witnessing state = L3→L4 Phoenix transition; no awareness, attractor, or witness mechanism is established",
             lens="Kauffman: what's the adjacent possible opened by proving self-referential processing has a geometric signature?",
         ),
         ResearchTask(
@@ -352,8 +352,8 @@ def build_research_tasks() -> list[ResearchTask]:
     tasks.extend([
         ResearchTask(
             domain="research",
-            question="The R_V paper has Hedges' g=-1.47 on Mistral. What would make this result MORE convincing? What experiments would a skeptical reviewer demand?",
-            context_builder=lambda: "Current results:\n- R_V contraction d=-1.47 (Mistral-7B), d=-3.56 to -4.51 on other measures\n- Causal validation: ablating L27 disrupts R_V\n- AUROC=0.909 for self-ref vs referential\n- 754 prompts in bank\n- Hardware: M3 Pro locally, RunPod for GPU\n- Target: COLM 2026",
+            question="The R_V paper reports historical, unvalidated Hedges' g=-1.47 on Mistral. What would make this result MORE convincing? What experiments would a skeptical reviewer demand?",
+            context_builder=lambda: "Historical, unvalidated results:\n- R_V contraction d=-1.47 (Mistral-7B), d=-3.56 to -4.51 on other measures\n- L27 ablation observations; current causal validation is unavailable\n- AUROC=0.909 for self-ref vs referential from same-sample calibration; the .737 classifier is retired and held-out classification is unavailable\n- 754 prompts in bank\n- Hardware: M3 Pro locally, RunPod for GPU\n- Target: COLM 2026",
             lens="Ashby: requisite variety — does the evidence have enough variety to survive review?",
         ),
         ResearchTask(

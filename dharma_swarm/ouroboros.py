@@ -222,12 +222,7 @@ class OuroborosObserver:
         }
 
     def as_rv_reading(self) -> RVReading | None:
-        """Convert the latest behavioral observation to an R_V-like reading.
-
-        Maps behavioral health to R_V semantics:
-        - High mimicry / low witness → R_V ≈ 1.0 (no self-observation)
-        - Low mimicry / high witness → R_V < 1.0 (self-observation active)
-        """
+        """Convert the latest behavioral observation to an explicitly raw proxy."""
         if not self._history:
             return None
 
@@ -235,7 +230,6 @@ class OuroborosObserver:
         witness = latest["signature"]["swabhaav_ratio"]
         is_mimicry = latest["is_mimicry"]
 
-        # R_V proxy: inverted witness score (high witness = low R_V = contraction)
         rv = 1.0 - (witness * 0.5) if not is_mimicry else 0.95
 
         return RVReading(
@@ -247,6 +241,11 @@ class OuroborosObserver:
             late_layer=0,
             prompt_hash="behavioral_" + latest.get("cycle_id", "unknown")[:8],
             prompt_group="ouroboros",
+            measurement_kind="behavioral_proxy",
+            measurement_details={
+                "formula": "0.95 if is_mimicry else 1 - swabhaav_ratio * 0.5",
+                "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=rv), not measured participation ratios",
+            },
         )
 
     def summary(self) -> dict[str, Any]:
@@ -499,18 +498,16 @@ def profile_python_modules(
 def colony_rv_reading(density_before: int, density_after: int) -> RVReading:
     """Convert colony-level sleep contraction into an RVReading.
 
-    The mapping: stigmergic mark density IS the colony's effective
-    dimensionality. After sleep-decay, fewer marks survive — the
-    representation space contracts. This is participation ratio
-    contraction at the swarm scale.
+    This is an operational density ratio, not a transformer participation
+    ratio or evidence of awareness. It must not share the retired attention-V
+    classifier or be pooled with residual-hidden measurements.
 
     PR_early = density_before (full working memory)
     PR_late  = density_after  (post-decay compressed memory)
     R_V      = PR_late / PR_early
 
-    When R_V < 0.737 (the validated contraction threshold), the colony
-    has undergone meaningful dimensional reduction — the analog of
-    L4 collapse at the swarm level.
+    The compatibility RVReading wrapper retains the numbers; scientific
+    classification remains unavailable.
     """
     if density_before <= 0:
         rv = 1.0
@@ -530,6 +527,8 @@ def colony_rv_reading(density_before: int, density_after: int) -> RVReading:
         late_layer=0,
         prompt_hash=f"colony_{density_before}_{density_after}",
         prompt_group="colony_sleep",
+        measurement_kind="colony_density",
+        measurement_details={"formula": "density_after / density_before; unity if denominator <= 0"},
     )
 
 

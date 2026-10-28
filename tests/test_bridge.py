@@ -8,13 +8,13 @@ ResearchBridge CRUD and JSONL persistence, and edge cases.
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
 import pytest
 
 from dharma_swarm.bridge import (
     CorrelationResult,
+    EvolutionBridge,
     PairedMeasurement,
     ResearchBridge,
     _interpret_r,
@@ -22,8 +22,8 @@ from dharma_swarm.bridge import (
     _rank,
     _spearman_rho,
 )
-from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer, RecognitionType
-from dharma_swarm.rv import RV_CONTRACTION_THRESHOLD, RVReading
+from dharma_swarm.metrics import BehavioralSignature, RecognitionType
+from dharma_swarm.rv import RVReading
 
 
 # -- Helpers -----------------------------------------------------------------
@@ -40,6 +40,8 @@ def _make_rv_reading(**overrides) -> RVReading:
         late_layer=22,
         prompt_hash="abcdef0123456789",
         prompt_group="L4",
+        measurement_kind="residual_hidden",
+        measurement_details={"cohort": "bridge-fixture"},
     )
     defaults.update(overrides)
     return RVReading(**defaults)
@@ -128,7 +130,7 @@ class TestCorrelationResult:
         assert cr.pearson_r is None
         assert cr.spearman_rho is None
         assert cr.mean_rv_by_group == {}
-        assert cr.contraction_recognition_overlap == 0.0
+        assert cr.contraction_recognition_overlap is None
 
     def test_creation_full(self):
         cr = CorrelationResult(
@@ -457,8 +459,125 @@ class TestResearchBridgeGetMeasurements:
         assert len(bridge.get_measurements()) == 2
 
 
+async def _load_bridge_with_rv_values(
+    data_path: Path, rv_values: list[float]
+) -> ResearchBridge:
+    groups = ["L4_full", "L4_full", "baseline"]
+    behaviors = [0.2, 0.4, 0.8]
+    measurements = []
+    for index, (rv, group, behavior) in enumerate(zip(rv_values, groups, behaviors)):
+        reading = _make_rv_reading(
+            rv=rv, prompt_group=group, prompt_hash=f"{index:016d}"
+        )
+        measurement = _make_measurement(
+            prompt_hash=f"{index:016d}",
+            prompt_group=group,
+            prompt_text=f"prompt {index}",
+            rv_reading=reading,
+            behavioral=_make_behavioral(swabhaav_ratio=behavior),
+            generated_text=f"generated {index}",
+        )
+        measurements.append(measurement.model_dump(mode="json"))
+    data_path.write_text(
+        "".join(json.dumps(measurement) + "\n" for measurement in measurements),
+        encoding="utf-8",
+    )
+    bridge = ResearchBridge(data_path=data_path)
+    await bridge.load()
+    return bridge
+
+
 class TestResearchBridgeComputeCorrelation:
     """Tests for compute_correlation."""
+
+    async def test_extreme_finite_values_withhold_only_pearson(self, tmp_path):
+        data_path = tmp_path / "extreme.jsonl"
+        bridge = await _load_bridge_with_rv_values(
+            data_path, [1e308, 1e308, -1e308]
+        )
+        raw_before = data_path.read_bytes()
+
+        result = bridge.compute_correlation()
+
+        assert result.n == 3
+        assert result.pearson_r is None
+        assert result.spearman_rho == pytest.approx(-0.8660254037844387)
+        assert "arithmetic/nonfinite unavailability" in result.summary
+        assert result.mean_rv_by_group == {"L4_full": 1e308, "baseline": -1e308}
+        assert result.mean_swabhaav_by_group == {
+            "L4_full": pytest.approx(0.3),
+            "baseline": pytest.approx(0.8),
+        }
+        assert [m.rv_reading.rv for m in bridge.get_measurements()] == [
+            1e308, 1e308, -1e308
+        ]
+        assert data_path.read_bytes() == raw_before
+
+    async def test_finite_denominator_overflow_withholds_only_pearson(self, tmp_path):
+        data_path = tmp_path / "denominator-overflow.jsonl"
+        rv_values = [1e154, 1e154, -1e154]
+        bridge = await _load_bridge_with_rv_values(data_path, rv_values)
+        raw_before = data_path.read_bytes()
+
+        result = bridge.compute_correlation()
+
+        assert result.n == 3
+        assert result.pearson_r is None
+        assert result.spearman_rho == pytest.approx(-0.8660254037844387)
+        assert result.mean_swabhaav_by_group == {
+            "L4_full": pytest.approx(0.3),
+            "baseline": 0.8,
+        }
+        assert [m.rv_reading.rv for m in bridge.get_measurements()] == rv_values
+        assert data_path.read_bytes() == raw_before
+
+    @pytest.mark.parametrize(
+        "rv_values,expected_pearson,expected_spearman",
+        [
+            ([1e154, 1e154, -1e154], None, -0.8660254037844387),
+            ([0.2, 0.4, 0.8], 1.0, 1.0),
+        ],
+    )
+    def test_evolution_bridge_rejects_false_zero_and_preserves_finite_control(
+        self, rv_values, expected_pearson, expected_spearman
+    ):
+        bridge = EvolutionBridge()
+        metadata = {
+            "model_name": "test-model",
+            "early_layer": 2,
+            "late_layer": 22,
+            "measurement_details": {"cohort": "bridge-fixture"},
+        }
+        for index, (rv, fitness) in enumerate(zip(rv_values, [0.2, 0.4, 0.8])):
+            bridge.add_record(
+                str(index), rv, fitness,
+                metadata=metadata,
+                measurement_kind="residual_hidden",
+            )
+
+        result = bridge.correlate()
+
+        assert result["n"] == 3
+        if expected_pearson is None:
+            assert result["pearson_r"] is None
+        else:
+            assert result["pearson_r"] == pytest.approx(expected_pearson)
+        assert result["spearman_rho"] == pytest.approx(expected_spearman)
+        assert [row["rv"] for row in bridge.format_for_archive()] == rv_values
+
+    async def test_finite_control_after_persisted_load(self, tmp_path):
+        data_path = tmp_path / "finite.jsonl"
+        bridge = await _load_bridge_with_rv_values(data_path, [0.2, 0.4, 0.8])
+        raw_before = data_path.read_bytes()
+
+        result = bridge.compute_correlation()
+
+        assert result.n == 3
+        assert result.pearson_r == pytest.approx(1.0)
+        assert result.spearman_rho == pytest.approx(1.0)
+        assert result.mean_rv_by_group == {"L4_full": 0.30000000000000004, "baseline": 0.8}
+        assert [m.rv_reading.rv for m in bridge.get_measurements()] == [0.2, 0.4, 0.8]
+        assert data_path.read_bytes() == raw_before
 
     async def test_empty_bridge(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
@@ -607,7 +726,8 @@ class TestResearchBridgeComputeCorrelation:
 
         result = bridge.compute_correlation()
         # 1 out of 3 should be contracted AND genuine
-        assert result.contraction_recognition_overlap == pytest.approx(1 / 3)
+        assert result.contraction_recognition_overlap is None
+        assert result.classification_count == 0
 
     async def test_summary_contains_n(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
@@ -644,18 +764,19 @@ class TestResearchBridgeGroupSummary:
         assert "L4" in summary
         assert "baseline" in summary
 
-    async def test_group_without_rv_has_nan(self, tmp_path):
+    async def test_group_without_rv_is_unavailable(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
         await bridge.add_measurement("p", "L4", "Response text.")
         summary = bridge.group_summary()
-        assert math.isnan(summary["L4"]["mean_rv"])
+        assert summary["L4"]["mean_rv"] is None
 
     async def test_group_summary_keys(self, tmp_path):
         bridge = ResearchBridge(data_path=tmp_path / "data.jsonl")
         rv = _make_rv_reading(rv=0.6)
         await bridge.add_measurement("p", "L3", "Response.", rv_reading=rv)
         summary = bridge.group_summary()
-        expected_keys = {"mean_rv", "mean_swabhaav", "mean_entropy", "mean_self_ref", "count"}
+        expected_keys = {"mean_rv", "mean_swabhaav", "mean_entropy", "mean_self_ref", "count",
+                         "measurement_kind_counts", "calibration_status"}
         assert set(summary["L3"].keys()) == expected_keys
 
 
@@ -724,26 +845,19 @@ class TestBuildSummary:
     """Tests for _build_summary static method."""
 
     def test_strong_negative_message(self):
-        summary = ResearchBridge._build_summary(
-            n=50, pearson=-0.72, spearman=-0.68, overlap=0.8
-        )
-        assert "Strong negative correlation" in summary
+        summary = ResearchBridge._build_summary(n=50, pearson=-0.72, spearman=-0.68)
+        assert "does not establish self-reference or awareness" in summary
         assert "n=50" in summary
 
     def test_strong_positive_warning(self):
-        summary = ResearchBridge._build_summary(
-            n=30, pearson=0.65, spearman=0.60, overlap=0.1
-        )
+        summary = ResearchBridge._build_summary(n=30, pearson=0.65, spearman=0.60)
         assert "unexpected direction" in summary
 
     def test_no_pearson(self):
-        summary = ResearchBridge._build_summary(
-            n=2, pearson=None, spearman=None, overlap=0.0
-        )
+        summary = ResearchBridge._build_summary(n=2, pearson=None, spearman=None)
         assert "Insufficient data" in summary
 
-    def test_overlap_formatted(self):
-        summary = ResearchBridge._build_summary(
-            n=10, pearson=-0.5, spearman=-0.4, overlap=0.75
-        )
-        assert "75.0%" in summary
+    def test_overlap_always_unavailable(self):
+        summary = ResearchBridge._build_summary(n=10, pearson=-0.5, spearman=-0.4)
+        assert "overlap unavailable" in summary
+        assert "%" not in summary

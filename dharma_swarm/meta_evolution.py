@@ -176,19 +176,27 @@ class MetaEvolutionEngine:
             "productive_disagreement_claim_keys": self._coordination_string_list(
                 summary.get("productive_disagreement_claim_keys"),
             ),
-            "rv_trend": self._coordination_float(summary.get("rv_trend")),
-            "fitness_trend": self._coordination_float(summary.get("fitness_trend")),
+            "rv_trend": self._coordination_float(
+                summary.get("rv_trend"),
+                default=None,
+            ),
+            "fitness_trend": self._coordination_float(
+                summary.get("fitness_trend"),
+                default=None,
+            ),
             "observation_count": self._coordination_int(
                 summary.get("observation_count"),
             ),
             "approaching_fixed_point": self._coordination_bool(
                 summary.get("approaching_fixed_point"),
-                default=False,
+                default=None,
             ),
         }
         self._coordination_history.append(payload)
         if len(self._coordination_history) > self.n_object_cycles:
-            self._coordination_history = self._coordination_history[-self.n_object_cycles :]
+            self._coordination_history = self._coordination_history[
+                -self.n_object_cycles :
+            ]
 
     @staticmethod
     def _coordination_int(value: Any, default: int = 0) -> int:
@@ -207,19 +215,22 @@ class MetaEvolutionEngine:
         return max(default, parsed)
 
     @staticmethod
-    def _coordination_float(value: Any, default: float = 0.0) -> float:
-        if value is None or isinstance(value, bool):
+    def _coordination_float(
+        value: Any,
+        default: float | None = 0.0,
+    ) -> float | None:
+        if type(value) not in (int, float):
             return default
         try:
             parsed = float(value)
-        except (TypeError, ValueError):
+        except OverflowError:
             return default
         if not math.isfinite(parsed):
             return default
         return parsed
 
     @staticmethod
-    def _coordination_bool(value: Any, *, default: bool) -> bool:
+    def _coordination_bool(value: Any, *, default: bool | None) -> bool | None:
         if isinstance(value, bool):
             return value
         return default
@@ -364,9 +375,7 @@ class MetaEvolutionEngine:
         gradients: list[float] = []
         for key in FITNESS_DIMENSIONS:
             if key in {"correctness", "dharmic_alignment", "safety", "economic_value"}:
-                gradients.append(
-                    (-0.60 * pressure) - (0.20 * coordination_pressure)
-                )
+                gradients.append((-0.60 * pressure) - (0.20 * coordination_pressure))
             elif key in {"performance", "utilization", "efficiency"}:
                 gradients.append(-0.45 * pressure)
             else:
@@ -374,12 +383,17 @@ class MetaEvolutionEngine:
 
         gradients.extend(
             [
-                -0.90 * (pressure + stagnation + coordination_pressure),  # mutation_rate
-                -0.70 * (pressure + stagnation + coordination_pressure),  # exploration_coeff
+                -0.90
+                * (pressure + stagnation + coordination_pressure),  # mutation_rate
+                -0.70
+                * (pressure + stagnation + coordination_pressure),  # exploration_coeff
                 (0.30 * instability)
                 + (0.20 * coordination_pressure)
                 - (0.10 * fitness_gap),  # circuit_breaker_limit
-                -0.50 * (pressure + stagnation + (0.5 * coordination_pressure)),  # map_elites_n_bins
+                -0.50
+                * (
+                    pressure + stagnation + (0.5 * coordination_pressure)
+                ),  # map_elites_n_bins
             ]
         )
         return gradients
@@ -398,8 +412,7 @@ class MetaEvolutionEngine:
             for item in recent
         ]
         dimensionality = [
-            min(1.0, float(item.get("cohomological_dimension", 0)))
-            for item in recent
+            min(1.0, float(item.get("cohomological_dimension", 0))) for item in recent
         ]
         truth_scarcity = [
             1.0
@@ -410,24 +423,32 @@ class MetaEvolutionEngine:
             else 0.0
             for item in recent
         ]
-        trend_regression = [
-            min(
-                1.0,
-                max(0.0, -float(item.get("rv_trend", 0.0) or 0.0))
-                + max(0.0, -float(item.get("fitness_trend", 0.0) or 0.0)),
+        trend_regression: list[float | None] = []
+        fixed_point_stall: list[float | None] = []
+        for item in recent:
+            known_trends = [
+                float(item[key])
+                for key in ("rv_trend", "fitness_trend")
+                if item.get(key) is not None
+            ]
+            trend_regression.append(
+                min(1.0, sum(max(0.0, -value) for value in known_trends))
+                if known_trends
+                else None
             )
-            for item in recent
-        ]
-        fixed_point_stall = [
-            1.0
-            if bool(item.get("approaching_fixed_point")) and (
-                not bool(item.get("is_globally_coherent", True))
-                or float(item.get("rv_trend", 0.0) or 0.0) <= 0.0
-                or float(item.get("fitness_trend", 0.0) or 0.0) <= 0.0
-            )
-            else 0.0
-            for item in recent
-        ]
+            verdict = item.get("approaching_fixed_point")
+            if verdict is None:
+                fixed_point_stall.append(None)
+            elif not verdict:
+                fixed_point_stall.append(0.0)
+            elif not bool(item.get("is_globally_coherent", True)) or any(
+                value <= 0.0 for value in known_trends
+            ):
+                fixed_point_stall.append(1.0)
+            elif len(known_trends) == 2:
+                fixed_point_stall.append(0.0)
+            else:
+                fixed_point_stall.append(None)
         counts: dict[str, int] = {}
         for item in recent:
             for claim_key in item.get("productive_disagreement_claim_keys", []):
@@ -437,6 +458,12 @@ class MetaEvolutionEngine:
             if counts
             else 0.0
         )
+        known_trend_regression = [
+            value for value in trend_regression if value is not None
+        ]
+        known_fixed_point_stall = [
+            value for value in fixed_point_stall if value is not None
+        ]
         return min(
             1.0,
             (0.32 * mean(disagreement_levels))
@@ -444,8 +471,10 @@ class MetaEvolutionEngine:
             + (0.12 * mean(dimensionality))
             + (0.10 * repeated_claims)
             + (0.08 * mean(truth_scarcity))
-            + (0.08 * mean(trend_regression))
-            + (0.06 * mean(fixed_point_stall)),
+            + (0.08 * mean(known_trend_regression) if known_trend_regression else 0.0)
+            + (
+                0.06 * mean(known_fixed_point_stall) if known_fixed_point_stall else 0.0
+            ),
         )
 
     def _current_coordination_summary(self) -> dict[str, Any]:
@@ -456,7 +485,10 @@ class MetaEvolutionEngine:
     def _natural_gradient_step_size(self, fitness_trajectory: list[float]) -> float:
         """Scale natural-gradient updates with recent fitness quality."""
         if not fitness_trajectory:
-            return max(0.05, min(0.35, 0.10 + (0.10 * self._coordination_uncertainty_pressure())))
+            return max(
+                0.05,
+                min(0.35, 0.10 + (0.10 * self._coordination_uncertainty_pressure())),
+            )
         final = max(0.0, min(1.0, fitness_trajectory[-1]))
         fitness_gap = 1.0 - final
         return max(
@@ -489,8 +521,7 @@ class MetaEvolutionEngine:
         return MetaParameters(
             fitness_weights=normalize_fitness_weights(blended_weights),
             mutation_rate=(
-                (primary.mutation_rate * w)
-                + (secondary.mutation_rate * inverse)
+                (primary.mutation_rate * w) + (secondary.mutation_rate * inverse)
             ),
             exploration_coeff=(
                 (primary.exploration_coeff * w)

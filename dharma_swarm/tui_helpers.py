@@ -7,9 +7,12 @@ Used by both the old monolithic tui.py and the new tui/ package so that
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 import shutil
 import sqlite3
+
+from dharma_swarm.rv import comparable_measurement_identity
 
 HOME = Path.home()
 DHARMA_STATE = HOME / ".dharma"
@@ -121,9 +124,7 @@ def build_status_text() -> str:
         try:
             last_line = pulse_log.read_text().strip().split("\n")[-1]
             pulse = json.loads(last_line)
-            lines.append(
-                f"  Last pulse: {pulse.get('timestamp', 'unknown')[:19]}"
-            )
+            lines.append(f"  Last pulse: {pulse.get('timestamp', 'unknown')[:19]}")
         except Exception:
             pass
 
@@ -191,19 +192,26 @@ def build_runtime_status_data(
                 "sessions": _count_rows(db, "sessions"),
                 "claims": _count_rows(db, "task_claims"),
                 "active_claims": _count_rows(
-                    db, "task_claims", " WHERE status IN ('claimed','in_progress')",
+                    db,
+                    "task_claims",
+                    " WHERE status IN ('claimed','in_progress')",
                 ),
                 "acknowledged_claims": _count_rows(
-                    db, "task_claims", " WHERE status = 'acknowledged'",
+                    db,
+                    "task_claims",
+                    " WHERE status = 'acknowledged'",
                 ),
                 "runs": _count_rows(db, "delegation_runs"),
                 "active_runs": _count_rows(
-                    db, "delegation_runs",
+                    db,
+                    "delegation_runs",
                     " WHERE status NOT IN ('completed','failed','stale_recovered')",
                 ),
                 "artifacts": _count_rows(db, "artifact_records"),
                 "promoted_facts": _count_rows(
-                    db, "memory_facts", " WHERE truth_state = 'promoted'",
+                    db,
+                    "memory_facts",
+                    " WHERE truth_state = 'promoted'",
                 ),
                 "context_bundles": _count_rows(db, "context_bundles"),
                 "operator_actions": _count_rows(db, "operator_actions"),
@@ -255,8 +263,7 @@ def build_runtime_status_data(
         result["error"] = str(exc)
 
     result["toolchain"] = {
-        prog: shutil.which(prog) or None
-        for prog in ("claude", "python3", "node")
+        prog: shutil.which(prog) or None for prog in ("claude", "python3", "node")
     }
     return result
 
@@ -267,7 +274,9 @@ def build_runtime_status_text(
     runtime_db_path: Path | None = None,
 ) -> str:
     """Build a runtime control-plane summary from the canonical SQLite spine."""
-    lines: list[str] = [f"[bold {AI_DEEP}]--- Runtime Control Plane ---[/bold {AI_DEEP}]"]
+    lines: list[str] = [
+        f"[bold {AI_DEEP}]--- Runtime Control Plane ---[/bold {AI_DEEP}]"
+    ]
     db_path = runtime_db_path or _runtime_db_path()
 
     if db_path.exists():
@@ -430,8 +439,7 @@ def build_darwin_status_text(
             promotion_counts[key] = promotion_counts.get(key, 0) + 1
         if promotion_counts:
             ordered = ", ".join(
-                f"{key}={promotion_counts[key]}"
-                for key in sorted(promotion_counts)
+                f"{key}={promotion_counts[key]}" for key in sorted(promotion_counts)
             )
             lines.append(f"  Promotion ladder: {ordered}")
 
@@ -447,8 +455,7 @@ def build_darwin_status_text(
 
         if snapshot.caution_components:
             lines.append(
-                "  Fragile components: "
-                + ", ".join(snapshot.caution_components[:3])
+                "  Fragile components: " + ", ".join(snapshot.caution_components[:3])
             )
 
         if snapshot.avoidance_hints:
@@ -485,19 +492,60 @@ def build_darwin_status_text(
             for row in dse_rows
             if str(row.get("component") or "").strip()
         }
-        rv_values = [
+        rv_readings = []
+        rv_scalars_agree = True
+        for row in dse_rows:
+            reading = row.get("rv_reading")
+            if reading is None:
+                rv_readings.append(row)
+                continue
+            rv_readings.append(reading)
+            if not isinstance(reading, dict):
+                rv_scalars_agree = False
+                continue
+            nested_value = reading.get("rv")
+            if type(nested_value) not in (int, float) or nested_value != row.get("rv"):
+                rv_scalars_agree = False
+                continue
+            try:
+                nested_is_finite = math.isfinite(float(nested_value))
+            except OverflowError:
+                nested_is_finite = False
+            if not nested_is_finite:
+                rv_scalars_agree = False
+        rv_candidates = [row.get("rv") for row in dse_rows]
+        rv_values: list[float] = []
+        if (
+            rv_scalars_agree
+            and comparable_measurement_identity(rv_readings) is not None
+            and all(type(value) in (int, float) for value in rv_candidates)
+        ):
+            try:
+                converted_rv_values = [float(value) for value in rv_candidates]
+            except OverflowError:
+                pass
+            else:
+                if all(math.isfinite(value) for value in converted_rv_values):
+                    rv_values = converted_rv_values
+        fitness_candidates = [row.get("best_fitness") for row in dse_rows]
+        fitness_values: list[float] = []
+        if all(type(value) in (int, float) for value in fitness_candidates):
+            try:
+                converted_fitness_values = [
+                    float(value) for value in fitness_candidates
+                ]
+            except OverflowError:
+                pass
+            else:
+                if all(math.isfinite(value) for value in converted_fitness_values):
+                    fitness_values = converted_fitness_values
+        fixed_point_verdicts = [
             value
             for row in dse_rows
-            if (value := _maybe_float(row.get("rv"))) is not None
+            if isinstance((value := row.get("approaching_fixed_point")), bool)
         ]
-        fitness_values = [
-            value
-            for row in dse_rows
-            if (value := _maybe_float(row.get("best_fitness"))) is not None
-        ]
-        fixed_point_count = sum(
-            1 for row in dse_rows if _as_bool(row.get("approaching_fixed_point"))
-        )
+        fixed_point_count = sum(fixed_point_verdicts)
+        fixed_point_unavailable = len(dse_rows) - len(fixed_point_verdicts)
 
         ouroboros_count = 0
         mimicry_count = 0
@@ -548,19 +596,23 @@ def build_darwin_status_text(
         dse_summary = [f"observations={len(dse_rows)}"]
         if components:
             dse_summary.append(f"components={len(components)}")
-        avg_rv = _mean(rv_values)
-        if avg_rv is not None:
+        try:
+            avg_rv = _mean(rv_values)
+        except ArithmeticError:
+            avg_rv = None
+        if avg_rv is not None and math.isfinite(avg_rv):
             dse_summary.append(f"avg_rv={avg_rv:.2f}")
-        avg_fitness = _mean(fitness_values)
-        if avg_fitness is not None:
+        try:
+            avg_fitness = _mean(fitness_values)
+        except ArithmeticError:
+            avg_fitness = None
+        if avg_fitness is not None and math.isfinite(avg_fitness):
             dse_summary.append(f"avg_fitness={avg_fitness:.2f}")
         lines.append("    " + "  ".join(dse_summary))
 
         ouroboros_summary: list[str] = []
         if ouroboros_count > 0:
-            ouroboros_summary.append(
-                f"mimicry={mimicry_count / ouroboros_count:.1%}"
-            )
+            ouroboros_summary.append(f"mimicry={mimicry_count / ouroboros_count:.1%}")
             avg_witness = _mean(witness_values)
             if avg_witness is not None:
                 ouroboros_summary.append(f"witness={avg_witness:.2f}")
@@ -582,7 +634,9 @@ def build_darwin_status_text(
                 if fresh_reciprocity_count > 0
                 else reciprocity_count
             )
-            reciprocity_summary = [f"invalid_chain={invalid_numerator}/{invalid_denominator}"]
+            reciprocity_summary = [
+                f"invalid_chain={invalid_numerator}/{invalid_denominator}"
+            ]
             if stale_reciprocity_count > 0:
                 reciprocity_summary.append(
                     f"stale_rows={stale_reciprocity_count}/{reciprocity_count}"
@@ -606,7 +660,15 @@ def build_darwin_status_text(
             lines.append("    reciprocity " + "  ".join(reciprocity_summary))
 
         latest_component = str(dse_rows[-1].get("component") or "").strip()
-        tail_summary = [f"fixed_point={fixed_point_count}/{len(dse_rows)}"]
+        tail_summary = []
+        if fixed_point_verdicts:
+            tail_summary.append(
+                f"fixed_point_raw={fixed_point_count}/{len(fixed_point_verdicts)}"
+            )
+        if fixed_point_unavailable:
+            tail_summary.append(
+                f"fixed_point_unavailable={fixed_point_unavailable}/{len(dse_rows)}"
+            )
         if latest_component:
             tail_summary.append(f"latest_component={latest_component}")
         lines.append("    " + "  ".join(tail_summary))
@@ -614,7 +676,9 @@ def build_darwin_status_text(
         latest_coordination = _load_jsonl_tail(coordination_path, limit=1)
         if latest_coordination:
             snapshot = latest_coordination[-1]
-            coherence = "yes" if _as_bool(snapshot.get("is_globally_coherent", True)) else "no"
+            coherence = (
+                "yes" if _as_bool(snapshot.get("is_globally_coherent", True)) else "no"
+            )
             lines.append(
                 "    coordination "
                 f"truths={int(snapshot.get('global_truths', 0) or 0)}  "

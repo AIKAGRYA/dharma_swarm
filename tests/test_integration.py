@@ -45,7 +45,7 @@ from dharma_swarm.monitor import (
     HealthStatus,
     SystemMonitor,
 )
-from dharma_swarm.rv import RV_CONTRACTION_THRESHOLD, RVReading
+from dharma_swarm.rv import RV_CONTRACTION_THRESHOLD, MeasurementKind, RVReading
 from dharma_swarm.selector import elite_select, select_parent, tournament_select
 from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER, TelosGatekeeper, check_action
 from dharma_swarm.traces import TraceEntry, TraceStore, atomic_write_json
@@ -61,8 +61,13 @@ def _make_rv_reading(
     rv: float = 0.6,
     group: str = "L4",
     model: str = "test-model",
+    kind: MeasurementKind = "residual_hidden",
 ) -> RVReading:
-    """Create a synthetic RVReading without torch."""
+    """Create a synthetic RVReading without torch.
+
+    ``kind`` simulates one known instrument; supply ``"unknown"`` for a
+    legacy row whose provenance was never recorded.
+    """
     return RVReading(
         rv=rv,
         pr_early=10.0,
@@ -72,6 +77,8 @@ def _make_rv_reading(
         late_layer=20,
         prompt_hash="abcdef1234567890",
         prompt_group=group,
+        measurement_kind=kind,
+        measurement_details={"cohort": "integration-fixture"},
     )
 
 
@@ -546,7 +553,7 @@ async def test_multiple_measurements_compute_correlation(tmp_path: Path) -> None
 
 @pytest.mark.asyncio
 async def test_group_summary_with_multiple_groups(tmp_path: Path) -> None:
-    """Group summary computes per-group means for L1, L3, L4."""
+    """Same-kind readings yield descriptive per-group means for L1, L3, L4."""
     bridge = ResearchBridge(data_path=tmp_path / "bridge.jsonl")
 
     groups = {
@@ -574,6 +581,27 @@ async def test_group_summary_with_multiple_groups(tmp_path: Path) -> None:
     assert "L4" in summary
     assert summary["L1"]["mean_rv"] > summary["L4"]["mean_rv"]
     assert summary["L4"]["count"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_group_summary_unknown_provenance_means_unavailable(tmp_path: Path) -> None:
+    """Legacy readings without recorded provenance keep raw values but no group mean."""
+    bridge = ResearchBridge(data_path=tmp_path / "bridge_legacy.jsonl")
+
+    for group, rv_val in (("L1", 0.95), ("L4", 0.5)):
+        await bridge.add_measurement(
+            prompt_text=f"{group} legacy prompt",
+            prompt_group=group,
+            generated_text="A plain factual response.",
+            rv_reading=_make_rv_reading(rv=rv_val, group=group, kind="unknown"),
+        )
+
+    summary = bridge.group_summary()
+
+    assert summary["L1"]["mean_rv"] is None
+    assert summary["L4"]["mean_rv"] is None
+    assert summary["L4"]["measurement_kind_counts"] == {"unknown": 1}
+    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx([0.95, 0.5])
 
 
 @pytest.mark.asyncio
@@ -641,7 +669,7 @@ async def test_correlation_with_anti_correlated_data(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_contraction_recognition_overlap(tmp_path: Path) -> None:
-    """Craft data where some readings are both contracted AND GENUINE."""
+    """Low-ratio GENUINE text still yields no calibrated overlap; raw ratios survive."""
     bridge = ResearchBridge(data_path=tmp_path / "bridge_overlap.jsonl")
 
     genuine_text = (
@@ -668,7 +696,9 @@ async def test_contraction_recognition_overlap(tmp_path: Path) -> None:
 
     corr = bridge.compute_correlation()
     assert corr.n == 2
-    assert corr.contraction_recognition_overlap >= 0.0
+    assert corr.contraction_recognition_overlap is None
+    assert corr.classification_count == 0
+    assert [m.rv_reading.rv for m in bridge.get_measurements()] == pytest.approx([0.4, 1.1])
 
 
 # =========================================================================

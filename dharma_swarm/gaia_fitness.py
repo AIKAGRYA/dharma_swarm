@@ -1,8 +1,8 @@
 """GAIA fitness criterion for the Darwin Engine.
 
-Uses R_V-like contraction as ecological fitness:
-- R_V ~ 1.0 -> blind optimization, Goodhart drift
-- R_V < 1.0 -> self-correcting, catches proxy drift
+Ecological fitness is an operational behavioral proxy.
+R_V/PR-format values are compatibility fields, not measured geometry.
+Calibrated contraction categories are unavailable.
 
 Wraps GaiaObserver readings into FitnessScore compatible with
 evolution.py's PROPOSE->GATE->EVALUATE cycle.
@@ -170,11 +170,13 @@ class EcologicalGatekeeper:
 
 
 def gaia_observer_function(ledger: GaiaLedger) -> RVReading | None:
-    """Produce an R_V-like reading from ledger self-observation.
+    """Record the ledger's operational ecological-fitness proxy in RVReading form.
 
-    Maps ecological fitness to R_V semantics:
-    - fitness near 0 -> R_V near 0 (strong contraction = healthy)
-    - fitness near 1 -> R_V near 1 (no contraction = drifting)
+    The value is GaiaObserver's fitness,
+    ``1 - verification_coverage * oracle_diversity * (1 - violation_rate)``.
+    It is a behavioral proxy, not a participation-ratio measurement and not a
+    calibrated scientific signal; ``pr_early``/``pr_late`` are compatibility
+    placeholders in PR format, not measured dimensions.
     """
     observer = GaiaObserver()
     obs = observer.observe(ledger)
@@ -182,13 +184,19 @@ def gaia_observer_function(ledger: GaiaLedger) -> RVReading | None:
 
     return RVReading(
         rv=fitness,
-        pr_early=1.0,  # Nominal: full dimensionality before observation
-        pr_late=fitness,  # Contracted dimensionality after
+        pr_early=1.0,
+        pr_late=fitness,
         model_name="gaia_ledger",
         early_layer=0,
         late_layer=1,
         prompt_hash="gaia_self_observation",
         prompt_group="ecological",
+        measurement_kind="behavioral_proxy",
+        measurement_details={
+            "source": "GaiaObserver.observe()['self_referential_fitness']",
+            "formula": "1 - verification_coverage * oracle_diversity * (1 - violation_rate)",
+            "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=fitness), not measured participation ratios",
+        },
     )
 
 
@@ -197,8 +205,8 @@ def observe_ledger(
 ) -> ObservedState[dict[str, Any]]:
     """Wrap ledger summary in the self-observation monad.
 
-    The strange loop: GAIA measures its own ecological integrity,
-    producing an ObservedState that carries R_V-like contraction metadata.
+    The ObservedState carries the ecological-fitness proxy reading and its
+    provenance; it carries no calibrated contraction classification.
     """
     reading = gaia_observer_function(ledger)
 

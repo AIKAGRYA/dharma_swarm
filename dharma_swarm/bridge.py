@@ -17,19 +17,29 @@ import json
 import logging
 import math
 import statistics
+from collections import Counter
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, get_args
+
+from pydantic import BaseModel, Field, TypeAdapter, model_validator
+
+from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer
+from dharma_swarm.models import _new_id
+from dharma_swarm.rv import (
+    RV_CALIBRATION_STATUS,
+    MeasurementKind,
+    RVReading,
+    _preserve_historical_classification,
+    _prompt_hash,
+    comparable_measurement_identity,
+)
+from dharma_swarm.rv_contract import _historical_values_equal
 
 logger = logging.getLogger(__name__)
 
 PHI = (1 + math.sqrt(5)) / 2  # Golden ratio ≈ 1.618
 PHI_PLUS_1 = PHI + 1  # ≈ 2.618 — URA finding: L3/L4 word count ratio
-
-from pydantic import BaseModel, Field
-
-from dharma_swarm.metrics import BehavioralSignature, MetricsAnalyzer, RecognitionType
-from dharma_swarm.models import _new_id
-from dharma_swarm.rv import RVReading, _prompt_hash
 
 
 # -- Data Models -------------------------------------------------------------
@@ -66,7 +76,8 @@ class CorrelationResult(BaseModel):
         spearman_rho: Spearman rank correlation between R_V and swabhaav_ratio.
         mean_rv_by_group: Mean R_V value per prompt group.
         mean_swabhaav_by_group: Mean swabhaav_ratio per prompt group.
-        contraction_recognition_overlap: Fraction where is_contracted AND GENUINE.
+        contraction_recognition_overlap: Always None; no calibrated classification exists.
+        historical_contraction_recognition_overlap: Old serialized aggregate, history only.
         summary: Human-readable interpretation of results.
         pearson_r_ci: Bootstrap 95% CI for Pearson r, or None if n < 3.
         spearman_rho_ci: Bootstrap 95% CI for Spearman rho, or None if n < 3.
@@ -79,15 +90,71 @@ class CorrelationResult(BaseModel):
     spearman_rho: Optional[float] = None
     mean_rv_by_group: dict[str, float] = Field(default_factory=dict)
     mean_swabhaav_by_group: dict[str, float] = Field(default_factory=dict)
-    contraction_recognition_overlap: float = 0.0
+    contraction_recognition_overlap: Optional[float] = None
+    historical_contraction_recognition_overlap: Optional[float] = None
+    historical_contraction_recognition_overlap_conflicts: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
+    classification_count: int = 0
+    calibration_status: str = RV_CALIBRATION_STATUS
+    measurement_kind_counts: dict[str, int] = Field(default_factory=dict)
     summary: str = ""
     pearson_r_ci: Optional[tuple[float, float]] = None
     spearman_rho_ci: Optional[tuple[float, float]] = None
     cohens_d_l4_baseline: Optional[float] = None
     phi_score: dict[str, float] = Field(default_factory=dict)
 
+    @model_validator(mode="before")
+    @classmethod
+    def retire_aggregate_classification(cls, data: Any) -> Any:
+        """Old serialized aggregates retain their number as history only."""
+        if not isinstance(data, dict):
+            return data
+        data = deepcopy(data)
+        legacy_overlap = data.get("contraction_recognition_overlap")
+        if legacy_overlap is not None:
+            historical_overlap = data.get("historical_contraction_recognition_overlap")
+            if "historical_contraction_recognition_overlap" not in data:
+                data["historical_contraction_recognition_overlap"] = legacy_overlap
+            elif not _historical_values_equal(historical_overlap, legacy_overlap):
+                conflicts = data.get(
+                    "historical_contraction_recognition_overlap_conflicts", []
+                )
+                if not isinstance(conflicts, list):
+                    field = cls.model_fields[
+                        "historical_contraction_recognition_overlap_conflicts"
+                    ]
+                    conflicts = TypeAdapter(field.annotation).validate_python(conflicts)
+                conflict = {
+                    "field": "contraction_recognition_overlap",
+                    "existing_source": "historical_contraction_recognition_overlap",
+                    "existing_value": historical_overlap,
+                    "legacy_source": "legacy_top_level",
+                    "legacy_value": legacy_overlap,
+                }
+                if not any(
+                    _historical_values_equal(conflict, existing)
+                    for existing in conflicts
+                ):
+                    conflicts.append(conflict)
+                data["historical_contraction_recognition_overlap_conflicts"] = conflicts
+        data["contraction_recognition_overlap"] = None
+        data["classification_count"] = 0
+        data["calibration_status"] = RV_CALIBRATION_STATUS
+        return data
+
 
 # -- Statistics (stdlib only) ------------------------------------------------
+
+
+def _finite_mean(values: list[float]) -> Optional[float]:
+    if not values or not all(math.isfinite(value) for value in values):
+        return None
+    try:
+        result = statistics.mean(values)
+    except ArithmeticError:
+        return None
+    return result if math.isfinite(result) else None
 
 
 def _pearson_r(xs: list[float], ys: list[float]) -> Optional[float]:
@@ -113,6 +180,11 @@ def _pearson_r(xs: list[float], ys: list[float]) -> Optional[float]:
 
     if denom_x < 1e-15 or denom_y < 1e-15:
         return None
+    if not all(
+        math.isfinite(value)
+        for value in (numerator, denom_x, denom_y, denom_x * denom_y)
+    ):
+        raise ArithmeticError("Nonfinite Pearson correlation intermediate")
 
     return numerator / (denom_x * denom_y)
 
@@ -248,7 +320,7 @@ class ResearchBridge:
             rv_reading: Optional mechanistic R_V measurement.
 
         Returns:
-            The newly created PairedMeasurement.
+            An independent snapshot of the newly created PairedMeasurement.
         """
         behavioral = self._analyzer.analyze(generated_text)
 
@@ -256,14 +328,14 @@ class ResearchBridge:
             prompt_hash=_prompt_hash(prompt_text),
             prompt_group=prompt_group,
             prompt_text=prompt_text,
-            rv_reading=rv_reading,
+            rv_reading=deepcopy(rv_reading),
             behavioral=behavioral,
             generated_text=generated_text,
         )
 
         self._measurements.append(measurement)
         await self.save()
-        return measurement
+        return deepcopy(measurement)
 
     def compute_correlation(self) -> CorrelationResult:
         """Compute statistical correlation between R_V and behavioral metrics.
@@ -272,11 +344,12 @@ class ResearchBridge:
         Correlates R_V values against swabhaav_ratio from behavioral analysis.
 
         Returns:
-            CorrelationResult with Pearson r, Spearman rho, group means,
-            contraction/recognition overlap, and a human-readable summary.
+            CorrelationResult with Pearson r, Spearman rho, comparable group means,
+            unavailable classification overlap, and a human-readable summary.
         """
         paired = [m for m in self._measurements if m.rv_reading is not None]
         n = len(paired)
+        kinds = dict(Counter(m.rv_reading.measurement_kind for m in paired))
 
         if n == 0:
             return CorrelationResult(
@@ -284,11 +357,40 @@ class ResearchBridge:
                 summary="No paired measurements with R_V readings available.",
             )
 
+        if comparable_measurement_identity([m.rv_reading for m in paired]) is None:
+            return CorrelationResult(
+                n=n,
+                measurement_kind_counts=kinds,
+                summary="Pooled statistics unavailable: missing or incompatible measurement identity. "
+                "Raw readings are retained; scientific classification is unvalidated.",
+            )
+
+        if any(
+            not math.isfinite(m.rv_reading.rv)
+            or not math.isfinite(m.behavioral.swabhaav_ratio)
+            for m in paired
+        ):
+            return CorrelationResult(
+                n=n,
+                measurement_kind_counts=kinds,
+                summary="Statistics unavailable: nonfinite paired observations. Raw readings retained.",
+            )
+
         rv_values = [m.rv_reading.rv for m in paired if m.rv_reading is not None]
         swabhaav_values = [m.behavioral.swabhaav_ratio for m in paired]
 
-        pearson = _pearson_r(rv_values, swabhaav_values)
-        spearman = _spearman_rho(rv_values, swabhaav_values)
+        try:
+            pearson = _pearson_r(rv_values, swabhaav_values)
+        except ArithmeticError:
+            pearson = None
+        if pearson is not None and not math.isfinite(pearson):
+            pearson = None
+        try:
+            spearman = _spearman_rho(rv_values, swabhaav_values)
+        except ArithmeticError:
+            spearman = None
+        if spearman is not None and not math.isfinite(spearman):
+            spearman = None
 
         # Group means
         mean_rv: dict[str, float] = {}
@@ -298,25 +400,29 @@ class ResearchBridge:
             groups.setdefault(m.prompt_group, []).append(m)
 
         for group, members in sorted(groups.items()):
-            mean_rv[group] = statistics.mean(
-                m.rv_reading.rv for m in members if m.rv_reading is not None
-            )
-            mean_swabhaav[group] = statistics.mean(
-                m.behavioral.swabhaav_ratio for m in members
-            )
+            try:
+                group_rv_mean = statistics.mean(
+                    m.rv_reading.rv for m in members if m.rv_reading is not None
+                )
+            except ArithmeticError:
+                pass
+            else:
+                if math.isfinite(group_rv_mean):
+                    mean_rv[group] = group_rv_mean
+            try:
+                group_swabhaav_mean = statistics.mean(
+                    m.behavioral.swabhaav_ratio for m in members
+                )
+            except ArithmeticError:
+                pass
+            else:
+                if math.isfinite(group_swabhaav_mean):
+                    mean_swabhaav[group] = group_swabhaav_mean
 
-        # Contraction-recognition overlap
-        contracted_and_genuine = sum(
-            1
-            for m in paired
-            if m.rv_reading is not None
-            and m.rv_reading.is_contracted
-            and m.behavioral.recognition_type == RecognitionType.GENUINE
+        summary = self._build_summary(n, pearson, spearman)
+        summary += (
+            f" Measurement kind: {next(iter(kinds))}; descriptive association only."
         )
-        overlap = contracted_and_genuine / n if n > 0 else 0.0
-
-        # Summary
-        summary = self._build_summary(n, pearson, spearman, overlap)
 
         return CorrelationResult(
             n=n,
@@ -324,57 +430,60 @@ class ResearchBridge:
             spearman_rho=spearman,
             mean_rv_by_group=mean_rv,
             mean_swabhaav_by_group=mean_swabhaav,
-            contraction_recognition_overlap=overlap,
+            contraction_recognition_overlap=None,
+            classification_count=0,
+            measurement_kind_counts=kinds,
             summary=summary,
         )
 
-    def group_summary(self) -> dict[str, dict[str, float]]:
+    def group_summary(self) -> dict[str, dict[str, Any]]:
         """Compute mean metrics per prompt group across all measurements.
 
         Returns:
             Dict mapping group name to a dict of mean metric values:
-            ``mean_rv`` (NaN if no R_V readings), ``mean_swabhaav``,
+            ``mean_rv`` (None if nonfinite or incomparable), ``mean_swabhaav``,
             ``mean_entropy``, ``mean_self_ref``, ``count``.
         """
         groups: dict[str, list[PairedMeasurement]] = {}
         for m in self._measurements:
             groups.setdefault(m.prompt_group, []).append(m)
 
-        result: dict[str, dict[str, float]] = {}
+        result: dict[str, dict[str, Any]] = {}
         for group, members in sorted(groups.items()):
-            rv_vals = [
-                m.rv_reading.rv for m in members if m.rv_reading is not None
-            ]
+            readings = [m.rv_reading for m in members if m.rv_reading is not None]
+            rv_vals = [reading.rv for reading in readings]
+            kinds = dict(Counter(reading.measurement_kind for reading in readings))
+            comparable = comparable_measurement_identity(readings) is not None
             result[group] = {
-                "mean_rv": statistics.mean(rv_vals) if rv_vals else float("nan"),
-                "mean_swabhaav": statistics.mean(
-                    m.behavioral.swabhaav_ratio for m in members
+                "mean_rv": statistics.mean(rv_vals)
+                if rv_vals and comparable and all(map(math.isfinite, rv_vals))
+                else None,
+                "measurement_kind_counts": kinds,
+                "calibration_status": RV_CALIBRATION_STATUS,
+                "mean_swabhaav": _finite_mean(
+                    [m.behavioral.swabhaav_ratio for m in members]
                 ),
-                "mean_entropy": statistics.mean(
-                    m.behavioral.entropy for m in members
-                ),
-                "mean_self_ref": statistics.mean(
-                    m.behavioral.self_reference_density for m in members
+                "mean_entropy": _finite_mean([m.behavioral.entropy for m in members]),
+                "mean_self_ref": _finite_mean(
+                    [m.behavioral.self_reference_density for m in members]
                 ),
                 "count": float(len(members)),
             }
 
         return result
 
-    def get_measurements(
-        self, group: str | None = None
-    ) -> list[PairedMeasurement]:
+    def get_measurements(self, group: str | None = None) -> list[PairedMeasurement]:
         """Retrieve stored measurements, optionally filtered by group.
 
         Args:
             group: If provided, only return measurements in this prompt group.
 
         Returns:
-            List of PairedMeasurement objects.
+            Independent snapshots of the selected PairedMeasurement objects.
         """
         if group is None:
-            return list(self._measurements)
-        return [m for m in self._measurements if m.prompt_group == group]
+            return deepcopy(self._measurements)
+        return deepcopy([m for m in self._measurements if m.prompt_group == group])
 
     # -- Private helpers -----------------------------------------------------
 
@@ -383,7 +492,6 @@ class ResearchBridge:
         n: int,
         pearson: float | None,
         spearman: float | None,
-        overlap: float,
     ) -> str:
         """Build a human-readable summary from correlation results.
 
@@ -391,7 +499,6 @@ class ResearchBridge:
             n: Sample size.
             pearson: Pearson r or None.
             spearman: Spearman rho or None.
-            overlap: Contraction-recognition overlap fraction.
 
         Returns:
             Multi-sentence interpretation string.
@@ -406,8 +513,8 @@ class ResearchBridge:
             )
             if pearson < -0.5:
                 parts.append(
-                    "Strong negative correlation suggests R_V contraction "
-                    "co-occurs with higher witness stance (swabhaav)."
+                    "Lower raw ratios co-occur with higher behavioral scores; "
+                    "this does not establish self-reference or awareness."
                 )
             elif pearson > 0.5:
                 parts.append(
@@ -416,15 +523,15 @@ class ResearchBridge:
                 )
         else:
             parts.append(
-                "Insufficient data or zero variance for Pearson correlation."
+                "Insufficient data, zero variance, or arithmetic/nonfinite "
+                "unavailability for Pearson correlation."
             )
 
         if spearman is not None:
             parts.append(f"Spearman rho={spearman:.3f}.")
 
         parts.append(
-            f"Contraction-recognition overlap: {overlap:.1%} "
-            f"of contracted readings also showed GENUINE recognition."
+            "Contraction-recognition overlap unavailable: no calibrated classifications."
         )
 
         return " ".join(parts)
@@ -459,9 +566,8 @@ class EvolutionBridge:
     itself. EvolutionBridge takes R_V readings from EvolutionRVTracker and
     correlates them with fitness scores from the Darwin Engine archive.
 
-    The hypothesis: as the system evolves, its self-referential R_V contraction
-    should correlate with evolutionary fitness — better self-reference leads
-    to better self-improvement.
+    Associations are descriptive and require explicitly comparable measurements.
+    They do not establish self-reference or a cause of fitness improvement.
     """
 
     def __init__(self) -> None:
@@ -474,6 +580,7 @@ class EvolutionBridge:
         fitness: float,
         rv_source: str = "proxy",
         metadata: dict[str, Any] | None = None,
+        measurement_kind: MeasurementKind = "unknown",
     ) -> None:
         """Add an evolution R_V / fitness pair.
 
@@ -484,13 +591,19 @@ class EvolutionBridge:
             rv_source: 'geometric' or 'proxy'.
             metadata: Additional cycle metadata.
         """
-        self._records.append({
-            "cycle_id": cycle_id,
-            "rv": rv,
-            "fitness": fitness,
-            "rv_source": rv_source,
-            **(metadata or {}),
-        })
+        if measurement_kind not in get_args(MeasurementKind):
+            raise ValueError(f"Unknown measurement kind: {measurement_kind}")
+        self._records.append(
+            {
+                **deepcopy(metadata or {}),
+                "cycle_id": cycle_id,
+                "rv": rv,
+                "fitness": fitness,
+                "rv_source": rv_source,
+                "measurement_kind": measurement_kind,
+                "calibration_status": RV_CALIBRATION_STATUS,
+            }
+        )
 
     def correlate(self) -> dict[str, Any]:
         """Compute correlation between R_V and fitness across evolution cycles.
@@ -499,24 +612,70 @@ class EvolutionBridge:
             Dict with pearson_r, spearman_rho, n, rv_trend, fitness_trend,
             and summary string.
         """
+        kinds = dict(Counter(r["measurement_kind"] for r in self._records))
+        if self._records and comparable_measurement_identity(self._records) is None:
+            return {
+                "n": len(self._records),
+                "pearson_r": None,
+                "spearman_rho": None,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "measurement_kind_counts": kinds,
+                "calibration_status": RV_CALIBRATION_STATUS,
+                "summary": "Pooled statistics unavailable: missing, unknown, mixed, or incompatible measurement identity. Raw records retained.",
+            }
         if len(self._records) < 3:
             return {
                 "n": len(self._records),
                 "pearson_r": None,
                 "spearman_rho": None,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "measurement_kind_counts": kinds,
+                "calibration_status": RV_CALIBRATION_STATUS,
                 "summary": f"Need >= 3 cycles for correlation (have {len(self._records)}).",
             }
 
         rv_values = [r["rv"] for r in self._records]
         fitness_values = [r["fitness"] for r in self._records]
+        raw_values = rv_values + fitness_values
+        try:
+            if any(type(value) not in (int, float) for value in raw_values):
+                raise ValueError
+            if any(not math.isfinite(float(value)) for value in raw_values):
+                raise ValueError
+        except (OverflowError, ValueError):
+            return {
+                "n": len(self._records),
+                "pearson_r": None,
+                "spearman_rho": None,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "measurement_kind_counts": kinds,
+                "calibration_status": RV_CALIBRATION_STATUS,
+                "summary": "Statistics unavailable: invalid or nonfinite observations. Raw records retained.",
+            }
 
-        pearson = _pearson_r(rv_values, fitness_values)
-        spearman = _spearman_rho(rv_values, fitness_values)
+        def finite_statistic(operation, *args):
+            try:
+                value = operation(*args)
+                if value is not None and not math.isfinite(value):
+                    return None
+                return value
+            except ArithmeticError:
+                return None
 
-        # Trends
+        pearson = finite_statistic(_pearson_r, rv_values, fitness_values)
+        spearman = finite_statistic(_spearman_rho, rv_values, fitness_values)
         n = len(rv_values)
-        rv_trend = self._slope(rv_values)
-        fitness_trend = self._slope(fitness_values)
+        try:
+            if any(type(value) is int and float(value) != value for value in rv_values):
+                rv_trend = None
+            else:
+                rv_trend = finite_statistic(self._slope, rv_values)
+        except OverflowError:
+            rv_trend = None
+        fitness_trend = finite_statistic(self._slope, fitness_values)
 
         summary_parts = [f"n={n} evolution cycles."]
         if pearson is not None:
@@ -527,17 +686,26 @@ class EvolutionBridge:
             )
             if pearson < -0.3:
                 summary_parts.append(
-                    "Negative correlation: greater R_V contraction associates "
-                    "with higher fitness. The system improves by deepening "
-                    "self-reference."
+                    "Lower raw ratios associate with higher fitness; "
+                    "this does not establish a mechanism or causation."
                 )
         if rv_trend is not None:
-            direction = "contracting" if rv_trend < 0 else "expanding"
-            summary_parts.append(
-                f"R_V trend: {rv_trend:+.4f}/cycle ({direction})."
+            direction = (
+                "increasing"
+                if rv_trend > 0
+                else "decreasing"
+                if rv_trend < 0
+                else "stable"
             )
+            summary_parts.append(f"R_V trend: {rv_trend:+.4f}/cycle ({direction}).")
         if fitness_trend is not None:
-            direction = "improving" if fitness_trend > 0 else "degrading"
+            direction = (
+                "improving"
+                if fitness_trend > 0
+                else "degrading"
+                if fitness_trend < 0
+                else "stable"
+            )
             summary_parts.append(
                 f"Fitness trend: {fitness_trend:+.4f}/cycle ({direction})."
             )
@@ -548,6 +716,8 @@ class EvolutionBridge:
             "spearman_rho": spearman,
             "rv_trend": rv_trend,
             "fitness_trend": fitness_trend,
+            "measurement_kind_counts": kinds,
+            "calibration_status": RV_CALIBRATION_STATUS,
             "summary": " ".join(summary_parts),
         }
 
@@ -572,12 +742,27 @@ class EvolutionBridge:
         Returns:
             List of dicts ready for JSON serialization alongside fitness scores.
         """
-        return [
-            {
-                "cycle_id": r["cycle_id"],
-                "rv": r["rv"],
-                "fitness": r["fitness"],
-                "rv_source": r["rv_source"],
+        archived = []
+        for record in self._records:
+            record = _preserve_historical_classification(record)
+            row = {
+                "cycle_id": record["cycle_id"],
+                "rv": record["rv"],
+                "fitness": record["fitness"],
+                "rv_source": record["rv_source"],
+                "measurement_kind": record["measurement_kind"],
+                "is_contracted": None,
+                "calibration_status": RV_CALIBRATION_STATUS,
             }
-            for r in self._records
-        ]
+            for key in (
+                "model_name",
+                "early_layer",
+                "late_layer",
+                "measurement_details",
+                "historical_classification",
+                "historical_classification_conflicts",
+            ):
+                if key in record:
+                    row[key] = deepcopy(record[key])
+            archived.append(row)
+        return archived

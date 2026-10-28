@@ -539,6 +539,15 @@ class TestOuroborosObserver:
         result = observer.as_rv_reading()
         assert isinstance(result, RVReading)
 
+    def test_as_rv_reading_records_behavioral_formula_and_placeholders(self, observer):
+        observer.observe_cycle_text(BASELINE_TEXT, cycle_id="c1")
+        reading = observer.as_rv_reading()
+        assert reading.measurement_kind == "behavioral_proxy"
+        assert reading.measurement_details == {
+            "formula": "0.95 if is_mimicry else 1 - swabhaav_ratio * 0.5",
+            "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=rv), not measured participation ratios",
+        }
+
     def test_as_rv_reading_model_name(self, observer):
         observer.observe_cycle_text(BASELINE_TEXT, cycle_id="c1")
         reading = observer.as_rv_reading()

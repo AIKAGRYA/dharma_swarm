@@ -9,7 +9,7 @@ operational swarm.  It:
    disagreements (H¹ obstructions backed by Anekanta).
 4. Feeds coordination results back to the DarwinEngine so future
    cycles can incorporate collective intelligence.
-5. Tracks the observation stream for fixed-point convergence (L5).
+5. Tracks raw observation streams without scientific fixed-point promotion.
 
 Usage::
 
@@ -22,6 +22,7 @@ All failures are non-fatal — the integrator never blocks the core pipeline.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import math
@@ -35,8 +36,8 @@ from pydantic import BaseModel, Field
 from dharma_swarm.archive import ArchiveEntry
 from dharma_swarm.coalgebra import EvolutionObservation, build_evolution_observation
 from dharma_swarm.evolution import CycleResult, Proposal
-from dharma_swarm.monad import SelfObservationMonad, is_idempotent
-from dharma_swarm.rv import RVReading
+from dharma_swarm.monad import SelfObservationMonad
+from dharma_swarm.rv import RVReading, comparable_measurement_identity
 from dharma_swarm.sheaf import (
     CoordinationProtocol,
     Discovery,
@@ -196,37 +197,91 @@ class ObservationWindow(BaseModel):
     rv_trajectory: list[float] = Field(default_factory=list)
     fitness_trajectory: list[float] = Field(default_factory=list)
 
+    @staticmethod
+    def _measurement_float(value: Any) -> float | None:
+        if type(value) not in (int, float):
+            return None
+        try:
+            return float(value)
+        except OverflowError:
+            return None
+
     def _refresh_trajectories(self) -> None:
         self.rv_trajectory = [
-            float(record["rv"])
+            value
             for record in self.observations
-            if record.get("rv") is not None
+            if (value := self._measurement_float(record.get("rv"))) is not None
         ]
         self.fitness_trajectory = [
-            float(record["best_fitness"])
+            value
             for record in self.observations
-            if record.get("best_fitness") is not None
+            if (value := self._measurement_float(record.get("best_fitness")))
+            is not None
         ]
 
     def append(self, record: dict[str, Any]) -> None:
-        self.observations.append(record)
+        self.observations.append(copy.deepcopy(record))
         if len(self.observations) > self.max_size:
-            self.observations = self.observations[-self.max_size:]
+            self.observations = self.observations[-self.max_size :]
         self._refresh_trajectories()
 
     @property
     def rv_trend(self) -> float | None:
-        if len(self.rv_trajectory) < 2:
+        if len(self.observations) < 2:
             return None
-        diffs = [b - a for a, b in zip(self.rv_trajectory, self.rv_trajectory[1:])]
-        return sum(diffs) / len(diffs)
+        values = [
+            self._measurement_float(record.get("rv")) for record in self.observations
+        ]
+        if any(value is None or not math.isfinite(value) for value in values):
+            return None
+        readings = []
+        for record in self.observations:
+            reading = record.get("rv_reading")
+            if reading is None:
+                readings.append(record)
+                continue
+            if not isinstance(reading, dict):
+                return None
+            nested_value = self._measurement_float(reading.get("rv"))
+            if (
+                nested_value is None
+                or not math.isfinite(nested_value)
+                or reading.get("rv") != record.get("rv")
+            ):
+                return None
+            readings.append(reading)
+        if comparable_measurement_identity(readings) is None:
+            return None
+        rv_values = [value for value in values if value is not None]
+        try:
+            if any(
+                type(record.get("rv")) is int and float(record["rv"]) != record["rv"]
+                for record in self.observations
+            ):
+                return None
+            diffs = [b - a for a, b in zip(rv_values, rv_values[1:])]
+            trend = sum(diffs) / len(diffs)
+        except ArithmeticError:
+            return None
+        return trend if math.isfinite(trend) else None
 
     @property
     def fitness_trend(self) -> float | None:
-        if len(self.fitness_trajectory) < 2:
+        if len(self.observations) < 2:
             return None
-        diffs = [b - a for a, b in zip(self.fitness_trajectory, self.fitness_trajectory[1:])]
-        return sum(diffs) / len(diffs)
+        values = [
+            self._measurement_float(record.get("best_fitness"))
+            for record in self.observations
+        ]
+        if any(value is None or not math.isfinite(value) for value in values):
+            return None
+        fitness_values = [value for value in values if value is not None]
+        try:
+            diffs = [b - a for a, b in zip(fitness_values, fitness_values[1:])]
+            trend = sum(diffs) / len(diffs)
+        except ArithmeticError:
+            return None
+        return trend if math.isfinite(trend) else None
 
 
 class CoordinationSnapshot(BaseModel):
@@ -242,7 +297,7 @@ class CoordinationSnapshot(BaseModel):
     rv_trend: float | None = None
     fitness_trend: float | None = None
     observation_count: int = 0
-    approaching_fixed_point: bool = False
+    approaching_fixed_point: bool | None = None
 
 
 class DSEIntegrator:
@@ -268,15 +323,15 @@ class DSEIntegrator:
         workspace_root: Path | str | None = None,
         provenance_root: Path | str | None = None,
     ) -> None:
-        self._archive_path = archive_path or (
-            Path.home() / ".dharma" / "evolution"
-        )
+        self._archive_path = archive_path or (Path.home() / ".dharma" / "evolution")
         self._runtime_root = self._archive_path.parent
         self._coordination_interval = max(1, coordination_interval)
         self._cycles_since_coordination = 0
         self._window = ObservationWindow()
         self._last_coordination: CoordinationSnapshot | None = None
-        self._observation_log = self._archive_path / "observations" / "coalgebra_stream.jsonl"
+        self._observation_log = (
+            self._archive_path / "observations" / "coalgebra_stream.jsonl"
+        )
 
         # Monad with proxy R_V observer (real R_V requires torch)
         self._monad: SelfObservationMonad = SelfObservationMonad(
@@ -292,7 +347,9 @@ class DSEIntegrator:
         self._reciprocity_enabled = _reciprocity_lane_enabled()
         self._reciprocity_interval = max(
             1,
-            reciprocity_interval if reciprocity_interval is not None else coordination_interval,
+            reciprocity_interval
+            if reciprocity_interval is not None
+            else coordination_interval,
         )
         self._cycles_since_reciprocity = self._reciprocity_interval
         self._last_reciprocity_summary: dict[str, Any] | None = None
@@ -307,22 +364,31 @@ class DSEIntegrator:
         self._evaluation_run_id = _coerce_text(evaluation_run_id)
         self._evaluation_session_id = _coerce_text(evaluation_session_id)
         self._evaluation_task_id = _coerce_text(evaluation_task_id)
-        self._evaluation_trace_id = _coerce_text(
-            evaluation_trace_id,
-            default="",
-        ) or None
+        self._evaluation_trace_id = (
+            _coerce_text(
+                evaluation_trace_id,
+                default="",
+            )
+            or None
+        )
         self._evaluation_created_by = (
             _coerce_text(evaluation_created_by, default="dse.integration")
             or "dse.integration"
         )
-        self._runtime_db_path = Path(runtime_db_path) if runtime_db_path is not None else (
-            self._runtime_root / "state" / "runtime.db"
+        self._runtime_db_path = (
+            Path(runtime_db_path)
+            if runtime_db_path is not None
+            else (self._runtime_root / "state" / "runtime.db")
         )
-        self._event_log_dir = Path(event_log_dir) if event_log_dir is not None else (
-            self._runtime_root / "events"
+        self._event_log_dir = (
+            Path(event_log_dir)
+            if event_log_dir is not None
+            else (self._runtime_root / "events")
         )
-        self._workspace_root = Path(workspace_root) if workspace_root is not None else (
-            self._runtime_root / "workspace" / "sessions"
+        self._workspace_root = (
+            Path(workspace_root)
+            if workspace_root is not None
+            else (self._runtime_root / "workspace" / "sessions")
         )
         self._provenance_root = (
             Path(provenance_root)
@@ -349,6 +415,11 @@ class DSEIntegrator:
             late_layer=0,
             prompt_hash="0" * 16,
             prompt_group="evolution_cycle",
+            measurement_kind="behavioral_proxy",
+            measurement_details={
+                "formula": "1 - min(proposals_archived, 5) * 0.1",
+                "pr_fields": "nominal placeholders (pr_early=1.0, pr_late=proxy), not measured participation ratios",
+            },
         )
 
     async def after_cycle(
@@ -381,13 +452,9 @@ class DSEIntegrator:
             proposals,
         )
 
-        # 2. Observe the current cycle, then probe one step deeper for stability.
+        # 2. Observe the current cycle.
         observed = self._monad.observe(observation)
         self._last_observed = observed
-
-        # 3. Check for fixed-point convergence (L5 condition)
-        double = self._monad.observe(observed)
-        approaching_fp = is_idempotent(double, tolerance=0.05)
 
         # Extract component from archive entries or proposals
         component = None
@@ -405,16 +472,28 @@ class DSEIntegrator:
 
         # 4. Build an RVReading dict from the observation for downstream consumers
         rv_reading_dict: dict[str, Any] | None = None
-        if observed.rv_measurement is not None:
+        if observed.rv_reading is not None:
+            rv_reading_dict = observed.rv_reading.model_dump()
+        elif observed.rv_measurement is not None:
             rv_reading_dict = {
                 "rv": observed.rv_measurement,
-                "pr_early": observed.pr_early or 1.0,
-                "pr_late": observed.pr_late or observed.rv_measurement,
+                "pr_early": observed.pr_early if observed.pr_early is not None else 1.0,
+                "pr_late": (
+                    observed.pr_late
+                    if observed.pr_late is not None
+                    else observed.rv_measurement
+                ),
                 "model_name": observed.introspection.get("model", "evolution-proxy"),
                 "early_layer": 0,
                 "late_layer": 0,
                 "prompt_hash": observed.introspection.get("prompt_hash", "0" * 16),
-                "prompt_group": observed.introspection.get("prompt_group", "evolution_cycle"),
+                "prompt_group": observed.introspection.get(
+                    "prompt_group", "evolution_cycle"
+                ),
+                "measurement_kind": observed.introspection.get(
+                    "measurement_kind", "unknown"
+                ),
+                "measurement_details": {},
             }
 
         # 4. Record to observation window + JSONL
@@ -431,7 +510,7 @@ class DSEIntegrator:
                 "rv": observed.rv_measurement,
                 "best_fitness": result.best_fitness,
                 "proposals_archived": result.proposals_archived,
-                "approaching_fixed_point": approaching_fp,
+                "approaching_fixed_point": None,
                 "discoveries_count": len(observation.discoveries),
                 "lessons": observation.discoveries[:5],
                 "component": component,
@@ -499,8 +578,11 @@ class DSEIntegrator:
         try:
             if self._ouroboros is None:
                 from dharma_swarm.ouroboros import OuroborosObserver
+
                 self._ouroboros = OuroborosObserver(
-                    log_path=self._archive_path / "observations" / "ouroboros_log.jsonl",
+                    log_path=self._archive_path
+                    / "observations"
+                    / "ouroboros_log.jsonl",
                 )
 
             if cycle_text.strip():
@@ -539,15 +621,20 @@ class DSEIntegrator:
             # Add correlation-relevant grouping for the ResearchBridge.
             from dharma_swarm.bridge import ResearchBridge
 
-            if not hasattr(self, '_research_bridge') or self._research_bridge is None:
+            if not hasattr(self, "_research_bridge") or self._research_bridge is None:
                 bridge_path = self._archive_path / "observations" / "bridge_data.jsonl"
                 self._research_bridge = ResearchBridge(data_path=bridge_path)
                 self._research_bridge_loaded = False
 
             swabhaav = ouroboros_data.get("swabhaav_ratio", 0.5)
-            recognition = str(ouroboros_data.get("recognition_type", "NONE")).strip() or "NONE"
+            recognition = (
+                str(ouroboros_data.get("recognition_type", "NONE")).strip() or "NONE"
+            )
             normalized_recognition = recognition.upper()
-            is_l4_like = swabhaav > 0.6 and normalized_recognition in ("GENUINE", "WITNESSED")
+            is_l4_like = swabhaav > 0.6 and normalized_recognition in (
+                "GENUINE",
+                "WITNESSED",
+            )
             bridge_group = "dse_l4_like" if is_l4_like else "dse_evolution"
 
             record["l4_correlation"] = {
@@ -565,9 +652,7 @@ class DSEIntegrator:
 
             raw_rv = record.get("rv_reading") or record.get("rv_measurement")
             rv_reading = (
-                RVReading.model_validate(raw_rv)
-                if isinstance(raw_rv, dict)
-                else None
+                RVReading.model_validate(raw_rv) if isinstance(raw_rv, dict) else None
             )
             prompt_text = (
                 f"dse_cycle:{record.get('cycle_id', 'unknown')}:"
@@ -623,11 +708,12 @@ class DSEIntegrator:
         return (fresh_summary, fresh_summary is not None)
 
     @staticmethod
-    def _normalize_reciprocity_summary(summary_payload: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_reciprocity_summary(
+        summary_payload: dict[str, Any],
+    ) -> dict[str, Any]:
         return {
             "source": _coerce_text(
-                summary_payload.get("service")
-                or summary_payload.get("source"),
+                summary_payload.get("service") or summary_payload.get("source"),
                 default="reciprocity_commons",
             ),
             "summary_type": _coerce_text(
@@ -685,7 +771,9 @@ class DSEIntegrator:
     ) -> tuple[str, bool]:
         values: list[str] = []
         for proposal in proposals:
-            raw_meta = getattr(proposal, "metadata", None) or getattr(proposal, "test_results", None)
+            raw_meta = getattr(proposal, "metadata", None) or getattr(
+                proposal, "test_results", None
+            )
             metadata = raw_meta if isinstance(raw_meta, dict) else {}
             for key in keys:
                 value = _coerce_text(metadata.get(key))
@@ -777,7 +865,9 @@ class DSEIntegrator:
                 provenance_root=self._provenance_root,
             )
         except Exception as exc:
-            logger.debug("Canonical evaluation registry unavailable (non-fatal): %s", exc)
+            logger.debug(
+                "Canonical evaluation registry unavailable (non-fatal): %s", exc
+            )
             return None
         return self._evaluation_registry
 
@@ -881,9 +971,7 @@ class DSEIntegrator:
                 observation_count=len(self._window.observations),
                 rv_trend=self._window.rv_trend,
                 fitness_trend=self._window.fitness_trend,
-                approaching_fixed_point=any(
-                    o.get("approaching_fixed_point") for o in self._window.observations[-3:]
-                ),
+                approaching_fixed_point=None,
             )
 
         # Build virtual agents and channels (all-to-all within evolution)
@@ -891,16 +979,18 @@ class DSEIntegrator:
         channels = []
         seen = set()
         for i, a in enumerate(agent_ids):
-            for b in agent_ids[i + 1:]:
+            for b in agent_ids[i + 1 :]:
                 key = (a, b)
                 if key not in seen:
                     seen.add(key)
-                    channels.append(InformationChannel(
-                        source_agent=a,
-                        target_agent=b,
-                        topics=[_EVOLUTION_TOPIC],
-                        weight=1.0,
-                    ))
+                    channels.append(
+                        InformationChannel(
+                            source_agent=a,
+                            target_agent=b,
+                            topics=[_EVOLUTION_TOPIC],
+                            weight=1.0,
+                        )
+                    )
 
         site = NoosphereSite(agent_ids, channels=channels)
         protocol = CoordinationProtocol(site)
@@ -913,28 +1003,32 @@ class DSEIntegrator:
                 lessons = obs.get("lessons", [])
                 for lesson in lessons:
                     if lesson.strip():
-                        discoveries.append(Discovery(
-                            agent_id=agent_id,
-                            claim_key=lesson.strip().lower()[:80],
-                            content=lesson.strip(),
-                            confidence=min(1.0, obs.get("best_fitness", 0.5)),
-                            evidence=[f"cycle:{obs.get('cycle_id', 'unknown')}"],
-                            perspective=comp,
-                        ))
+                        discoveries.append(
+                            Discovery(
+                                agent_id=agent_id,
+                                claim_key=lesson.strip().lower()[:80],
+                                content=lesson.strip(),
+                                confidence=min(1.0, obs.get("best_fitness", 0.5)),
+                                evidence=[f"cycle:{obs.get('cycle_id', 'unknown')}"],
+                                perspective=comp,
+                            )
+                        )
 
                 # Also publish fitness/rv trends as discoveries
                 rv = obs.get("rv")
                 fitness = obs.get("best_fitness")
                 if rv is not None and fitness is not None:
                     trend_claim = f"rv={rv:.2f} fitness={fitness:.3f}"
-                    discoveries.append(Discovery(
-                        agent_id=agent_id,
-                        claim_key=f"trend:{comp}",
-                        content=trend_claim,
-                        confidence=min(1.0, fitness),
-                        evidence=[f"cycle:{obs.get('cycle_id', 'unknown')}"],
-                        perspective=comp,
-                    ))
+                    discoveries.append(
+                        Discovery(
+                            agent_id=agent_id,
+                            claim_key=f"trend:{comp}",
+                            content=trend_claim,
+                            confidence=min(1.0, fitness),
+                            evidence=[f"cycle:{obs.get('cycle_id', 'unknown')}"],
+                            perspective=comp,
+                        )
+                    )
 
             if discoveries:
                 protocol.publish(agent_id, discoveries)
@@ -958,9 +1052,7 @@ class DSEIntegrator:
             rv_trend=self._window.rv_trend,
             fitness_trend=self._window.fitness_trend,
             observation_count=len(self._window.observations),
-            approaching_fixed_point=any(
-                o.get("approaching_fixed_point") for o in self._window.observations[-3:]
-            ),
+            approaching_fixed_point=None,
         )
 
     async def _persist_observation(self, record: dict[str, Any]) -> None:
@@ -1004,8 +1096,7 @@ class DSEIntegrator:
         This feeds sheaf results back into the engine: global truths become
         guidance, disagreements become exploration targets.
         """
-        context: dict[str, Any] = {
-        }
+        context: dict[str, Any] = {}
         snap = self._last_coordination
         if snap is not None:
             context.update(
@@ -1022,11 +1113,6 @@ class DSEIntegrator:
                 context["exploration_hint"] = (
                     f"H¹ ≠ 0: {snap.productive_disagreements} productive disagreements "
                     f"across components. Consider exploring: {', '.join(snap.disagreement_claims[:3])}"
-                )
-            if snap.approaching_fixed_point:
-                context["convergence_hint"] = (
-                    "System approaching observation fixed point (L5). "
-                    "Consider bolder mutations to escape or validate stability."
                 )
 
         # Ouroboros: inject behavioral drift warnings

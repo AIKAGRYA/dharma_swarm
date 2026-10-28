@@ -27,23 +27,28 @@ from dharma_swarm.rv import RVReading
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 
-def _mock_rv_reading(rv: float, group: str = "unknown") -> RVReading:
+def _mock_rv_reading(value: float, group: str = "unknown", **overrides) -> RVReading:
     """Create a mock RVReading with given R_V value."""
-    return RVReading(
-        rv=rv,
+    values = dict(
+        rv=value,
         pr_early=10.0,
-        pr_late=rv * 10.0,
+        pr_late=value * 10.0,
         model_name="test-model",
         early_layer=2,
         late_layer=20,
         prompt_hash="abc123",
         prompt_group=group,
+        measurement_kind="residual_hidden",
+        measurement_details={"cohort": "l4-fixture"},
     )
+    values.update(overrides)
+    return RVReading(**values)
 
 
 def _make_correlator(
     gen_responses: list[str] | None = None,
     rv_values: list[float] | None = None,
+    reading_overrides: list[dict] | None = None,
 ) -> L4RVCorrelator:
     """Create a correlator with mocked generate_fn and RVMeasurer.
 
@@ -62,14 +67,16 @@ def _make_correlator(
 
     rv_idx = {"i": 0}
     rv_list = rv_values or [0.7]
+    overrides_list = reading_overrides or [{}]
 
     measurer = MagicMock()
     measurer.is_available.return_value = True
 
     async def mock_measure(prompt: str, group: str = "unknown") -> RVReading:
         idx = rv_idx["i"] % len(rv_list)
+        overrides = overrides_list[rv_idx["i"] % len(overrides_list)]
         rv_idx["i"] += 1
-        return _mock_rv_reading(rv_list[idx], group)
+        return _mock_rv_reading(rv_list[idx], group, **overrides)
 
     measurer.measure = mock_measure
 
@@ -338,6 +345,283 @@ class TestRunBatch:
         correlator = _make_correlator()
         result = await correlator.run_batch([])
         assert result.n_total == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "reading_overrides",
+        [
+            [{"measurement_kind": "unknown"}],
+            [{}, {"measurement_kind": "behavioral_proxy"}],
+            [{}, {"model_name": "other-model"}],
+            [{}, {"early_layer": 3}],
+            [{}, {"measurement_details": {"cohort": "other-cohort"}}],
+            [{"measurement_details": {}}],
+            [{"rv": float("nan")}],
+            [
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-a"},
+                },
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-b"},
+                },
+            ],
+        ],
+    )
+    async def test_batch_withholds_all_rv_statistics_for_incomparable_readings(
+        self, reading_overrides
+    ):
+        correlator = _make_correlator(
+            rv_values=[0.6, 0.65, 0.95, 0.98],
+            reading_overrides=reading_overrides,
+        )
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        assert result.n_with_rv == 4
+        assert len(result.paired_results) == 4
+        assert result.mean_compression_by_group
+        assert result.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert result.spearman_rho_ci is None
+        assert result.correlation is not None
+        assert result.correlation.pearson_r is None
+        assert result.correlation.mean_rv_by_group == {}
+        assert result.correlation.cohens_d_l4_baseline is None
+        assert result.correlation.pearson_r_ci is None
+        assert result.correlation.spearman_rho_ci is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "historical_overrides,batch_overrides",
+        [
+            ({"measurement_kind": "unknown", "measurement_details": {}}, None),
+            (
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-a"},
+                },
+                None,
+            ),
+            ({"model_name": "other-model"}, None),
+            ({"early_layer": 3}, None),
+            ({"late_layer": 19}, None),
+            ({"measurement_details": {"cohort": "other-cohort"}}, None),
+            (
+                {
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-a"},
+                },
+                [{
+                    "measurement_kind": "behavioral_proxy",
+                    "measurement_details": {"cohort": "l4-fixture", "formula": "formula-b"},
+                }],
+            ),
+            ({"rv": float("nan")}, None),
+        ],
+    )
+    async def test_batch_withholds_statistics_when_full_history_is_unavailable(
+        self, historical_overrides, batch_overrides
+    ):
+        correlator = _make_correlator(
+            rv_values=[0.6, 0.65, 0.95, 0.98],
+            reading_overrides=batch_overrides,
+        )
+        await correlator._bridge.add_measurement(
+            prompt_text="historical prompt",
+            prompt_group="L4_full",
+            generated_text="historical response",
+            rv_reading=_mock_rv_reading(0.4, "L4_full", **historical_overrides),
+        )
+
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        assert result.n_with_rv == 4
+        assert len(result.paired_results) == 4
+        assert len(correlator._bridge.get_measurements()) == 5
+        assert result.mean_compression_by_group
+        assert result.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert result.spearman_rho_ci is None
+        assert result.correlation is not None
+        assert result.correlation.n == 5
+        assert result.correlation.pearson_r is None
+        assert result.correlation.mean_rv_by_group == {}
+        assert result.correlation.cohens_d_l4_baseline is None
+        assert result.correlation.pearson_r_ci is None
+        assert result.correlation.spearman_rho_ci is None
+
+    @pytest.mark.asyncio
+    async def test_batch_derived_statistics_use_compatible_full_history(
+        self, monkeypatch
+    ):
+        correlator = _make_correlator(rv_values=[0.6, 0.65, 0.95, 0.98])
+        await correlator._bridge.add_measurement(
+            prompt_text="historical prompt",
+            prompt_group="L4_full",
+            generated_text="historical response",
+            rv_reading=_mock_rv_reading(0.4, "L4_full"),
+        )
+        bootstrap_samples = []
+
+        def fake_bootstrap(xs, ys, stat_fn):
+            bootstrap_samples.append((list(xs), list(ys)))
+            return (-0.5, 0.5)
+
+        monkeypatch.setattr(
+            "dharma_swarm.l4_rv_correlator._bootstrap_ci", fake_bootstrap
+        )
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        expected_rv = [0.4, 0.6, 0.65, 0.95, 0.98]
+        assert len(bootstrap_samples) == 2
+        assert all(sample[0] == expected_rv for sample in bootstrap_samples)
+        assert all(len(sample[1]) == 5 for sample in bootstrap_samples)
+        assert result.n_with_rv == 4
+        assert result.pearson_r_ci == (-0.5, 0.5)
+        assert result.spearman_rho_ci == (-0.5, 0.5)
+        assert result.cohens_d_l4_baseline == pytest.approx(
+            _cohens_d([0.4, 0.6, 0.65], [0.95, 0.98])
+        )
+        assert result.correlation is not None
+        assert result.correlation.n == 5
+        assert result.correlation.pearson_r_ci == (-0.5, 0.5)
+        assert result.correlation.spearman_rho_ci == (-0.5, 0.5)
+        assert result.correlation.cohens_d_l4_baseline == result.cohens_d_l4_baseline
+
+    @pytest.mark.asyncio
+    async def test_batch_contains_extreme_finite_arithmetic(self, tmp_path):
+        from dharma_swarm.bridge import ResearchBridge
+
+        gen_responses = [
+            "I observe the observer observing itself recursively.",
+            "recursive observer loop",
+            "Recursive self-observation and witness stance patterns.",
+            "Attention to attention reveals emergent patterns.",
+            "meta attention emergence",
+            "Attention patterns observing their own operation.",
+            "The weather today is sunny and warm.",
+            "sunny warm weather",
+            "It describes sunny and warm weather conditions.",
+        ]
+        correlator = _make_correlator(
+            gen_responses=gen_responses,
+            rv_values=[1e308, 1e308, -1e308],
+        )
+        correlator._bridge = ResearchBridge(data_path=tmp_path / "batch.jsonl")
+
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+        ])
+
+        assert result.n_total == 3
+        assert result.n_with_rv == 3
+        assert result.correlation is not None
+        assert result.correlation.n == 3
+        assert result.correlation.pearson_r is None
+        assert result.correlation.spearman_rho is not None
+        assert result.correlation.mean_rv_by_group == {
+            "L4_full": 1e308,
+            "baseline": -1e308,
+        }
+        assert result.pearson_r_ci is None
+        assert result.spearman_rho_ci is not None
+        assert all(abs(endpoint) < float("inf") for endpoint in result.spearman_rho_ci)
+        assert result.cohens_d_l4_baseline is None
+        assert [m.rv_reading.rv for m in result.paired_results] == [
+            1e308, 1e308, -1e308
+        ]
+
+        raw_before = correlator._bridge.data_path.read_bytes()
+        loaded = ResearchBridge(data_path=correlator._bridge.data_path)
+        await loaded.load()
+        loaded_result = loaded.compute_correlation()
+        assert [m.rv_reading.rv for m in loaded.get_measurements()] == [
+            1e308, 1e308, -1e308
+        ]
+        assert loaded_result.pearson_r is None
+        assert loaded_result.spearman_rho == pytest.approx(
+            result.correlation.spearman_rho
+        )
+        assert correlator._bridge.data_path.read_bytes() == raw_before
+
+    @pytest.mark.asyncio
+    async def test_batch_withholds_false_zero_from_pooled_variance_overflow(self, tmp_path):
+        from dharma_swarm.bridge import ResearchBridge
+
+        rv_values = [1e154, 1e154, -1e154, 0.0, 0.0, 0.0]
+        correlator = _make_correlator(rv_values=rv_values)
+        correlator._bridge = ResearchBridge(data_path=tmp_path / "pooled.jsonl")
+
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "L4_full"),
+            ("prompt four", "baseline"),
+            ("prompt five", "baseline"),
+            ("prompt six", "baseline"),
+        ])
+
+        assert result.n_total == 6
+        assert result.n_with_rv == 6
+        assert result.cohens_d_l4_baseline is None
+        assert result.correlation is not None
+        assert result.correlation.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert result.correlation.pearson_r_ci is None
+        assert [m.rv_reading.rv for m in result.paired_results] == rv_values
+        assert [
+            m.rv_reading.rv for m in correlator._bridge.get_measurements()
+        ] == rv_values
+
+    @pytest.mark.asyncio
+    async def test_batch_contains_effect_arithmetic_without_bridge_correlation(
+        self, tmp_path
+    ):
+        from dharma_swarm.bridge import CorrelationResult, ResearchBridge
+
+        correlator = _make_correlator(
+            rv_values=[1e308, -1e308, 1e308, -1e308]
+        )
+        correlator._bridge = ResearchBridge(data_path=tmp_path / "effects.jsonl")
+        correlator._bridge.compute_correlation = lambda: CorrelationResult(n=4)
+
+        result = await correlator.run_batch([
+            ("prompt one", "L4_full"),
+            ("prompt two", "L4_full"),
+            ("prompt three", "baseline"),
+            ("prompt four", "baseline"),
+        ])
+
+        assert result.n_total == 4
+        assert result.n_with_rv == 4
+        assert result.correlation is not None
+        assert result.correlation.n == 4
+        assert result.cohens_d_l4_baseline is None
+        assert result.pearson_r_ci is None
+        assert [m.rv_reading.rv for m in result.paired_results] == [
+            1e308, -1e308, 1e308, -1e308
+        ]
+        assert [
+            m.rv_reading.rv for m in correlator._bridge.get_measurements()
+        ] == [1e308, -1e308, 1e308, -1e308]
 
 
 # ── Prompt Bank Loader Tests ─────────────────────────────────────────────────

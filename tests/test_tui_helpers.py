@@ -242,6 +242,13 @@ def test_build_darwin_status_text_reports_dse_observation_stream(tmp_path, monke
     dharma_dir = tmp_path / ".dharma"
     observations_dir = dharma_dir / "evolution" / "observations"
     observations_dir.mkdir(parents=True)
+    measurement = {
+        "measurement_kind": "behavioral_proxy",
+        "measurement_details": {
+            "cohort": "darwin-status-test",
+            "formula": "raw_cycle_rv",
+        },
+    }
     (observations_dir / "coalgebra_stream.jsonl").write_text(
         "\n".join(
             [
@@ -252,6 +259,7 @@ def test_build_darwin_status_text_reports_dse_observation_stream(tmp_path, monke
                         "rv": 0.9,
                         "best_fitness": 0.4,
                         "approaching_fixed_point": False,
+                        **measurement,
                         "ouroboros": {
                             "recognition_type": "GENUINE",
                             "swabhaav_ratio": 0.72,
@@ -271,6 +279,7 @@ def test_build_darwin_status_text_reports_dse_observation_stream(tmp_path, monke
                         "rv": 0.8,
                         "best_fitness": 0.6,
                         "approaching_fixed_point": True,
+                        **measurement,
                         "ouroboros": {
                             "recognition_type": "NONE",
                             "swabhaav_ratio": 0.2,
@@ -312,11 +321,358 @@ def test_build_darwin_status_text_reports_dse_observation_stream(tmp_path, monke
     assert "witness=0.46" in result
     assert "latest=NONE" in result
     assert "l4_like=1/2" in result
-    assert "fixed_point=1/2" in result
+    assert "fixed_point_raw=1/2" in result
     assert "latest_component=other.py" in result
     assert "coordination truths=2" in result
     assert "disagreements=1" in result
     assert "coherent=no" in result
+
+
+def _write_dse_status_rows(tmp_path, monkeypatch, rows):
+    import dharma_swarm.tui_helpers as helpers
+
+    dharma_dir = tmp_path / ".dharma"
+    observations_dir = dharma_dir / "evolution" / "observations"
+    observations_dir.mkdir(parents=True)
+    (observations_dir / "coalgebra_stream.jsonl").write_text(
+        "\n".join(json.dumps(row) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(helpers, "DHARMA_STATE", dharma_dir)
+
+
+def _dse_measurement(**overrides):
+    measurement = {
+        "measurement_kind": "behavioral_proxy",
+        "measurement_details": {
+            "cohort": "darwin-status-test",
+            "formula": "raw_cycle_rv",
+        },
+    }
+    measurement.update(overrides)
+    return measurement
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "omitted",
+        "explicit-none",
+        "matching",
+        "zero",
+        "mismatch",
+        "empty",
+        "nonmapping",
+        "missing",
+        "null",
+        "boolean",
+        "text",
+        "nan",
+        "infinity",
+        "oversized-int",
+    ],
+)
+def test_build_darwin_status_text_requires_nested_rv_agreement(
+    tmp_path,
+    monkeypatch,
+    case,
+):
+    outer_values = [0.0, 0.2] if case == "zero" else [0.4, 0.7]
+    rows = []
+    for index, value in enumerate(outer_values):
+        row = {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": value,
+            **_dse_measurement(),
+        }
+        if case == "explicit-none":
+            row["rv_reading"] = None
+        elif case != "omitted":
+            reading = {"rv": value, **_dse_measurement()}
+            if index == 1:
+                if case == "mismatch":
+                    reading["rv"] = 20.0
+                elif case == "empty":
+                    reading = {}
+                elif case == "nonmapping":
+                    reading = "invalid"
+                elif case == "missing":
+                    del reading["rv"]
+                elif case == "null":
+                    reading["rv"] = None
+                elif case == "boolean":
+                    reading["rv"] = True
+                elif case == "text":
+                    reading["rv"] = str(value)
+                elif case == "nan":
+                    reading["rv"] = float("nan")
+                elif case == "infinity":
+                    reading["rv"] = float("inf")
+                elif case == "oversized-int":
+                    reading["rv"] = 10**400
+            row["rv_reading"] = reading
+        rows.append(row)
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=2" in result
+    if case in {"omitted", "explicit-none", "matching", "zero"}:
+        expected_mean = sum(outer_values) / len(outer_values)
+        assert f"avg_rv={expected_mean:.2f}" in result
+    else:
+        assert "avg_rv=" not in result
+
+
+def test_build_darwin_status_text_marks_unavailable_verdicts(tmp_path, monkeypatch):
+    rows = [
+        {"component": "probe", "rv": 0.4, "approaching_fixed_point": None},
+        {"component": "probe", "rv": 0.7},
+    ]
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+
+    result = build_darwin_status_text()
+
+    assert "fixed_point_unavailable=2/2" in result
+    assert "fixed_point=" not in result
+    assert "avg_rv=" not in result
+
+
+def test_build_darwin_status_text_separates_raw_and_unavailable_verdicts(
+    tmp_path,
+    monkeypatch,
+):
+    measurement = _dse_measurement()
+    rows = [
+        {
+            "component": "probe",
+            "rv": 0.4,
+            "approaching_fixed_point": False,
+            **measurement,
+        },
+        {
+            "component": "probe",
+            "rv": 0.7,
+            "approaching_fixed_point": None,
+            **measurement,
+        },
+    ]
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+
+    result = build_darwin_status_text()
+
+    assert "fixed_point_raw=0/1" in result
+    assert "fixed_point_unavailable=1/2" in result
+    assert "avg_rv=0.55" in result
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "unknown",
+        "mixed_cohort",
+        "incompatible_formula",
+        "incompatible_model",
+        "incompatible_layers",
+        "nonfinite",
+        "missing_rv",
+    ],
+)
+def test_build_darwin_status_text_withholds_incomparable_rv_mean(
+    tmp_path,
+    monkeypatch,
+    case,
+):
+    first = {"component": "probe", "rv": 0.4, **_dse_measurement()}
+    second = {"component": "probe", "rv": 0.7, **_dse_measurement()}
+    if case == "unknown":
+        first = {"component": "probe", "rv": 0.4}
+        second = {"component": "probe", "rv": 0.7}
+    elif case == "mixed_cohort":
+        second["measurement_details"] = {
+            "cohort": "another-cohort",
+            "formula": "raw_cycle_rv",
+        }
+    elif case == "incompatible_formula":
+        second["measurement_details"] = {
+            "cohort": "darwin-status-test",
+            "formula": "another_formula",
+        }
+    elif case in {"incompatible_model", "incompatible_layers"}:
+        residual = {
+            "measurement_kind": "residual_hidden",
+            "measurement_details": {"cohort": "darwin-status-test"},
+            "model_name": "model-a",
+            "early_layer": 1,
+            "late_layer": 8,
+        }
+        first.update(residual)
+        second.update(residual)
+        if case == "incompatible_model":
+            second["model_name"] = "model-b"
+        else:
+            second["late_layer"] = 9
+    elif case == "nonfinite":
+        second["rv"] = float("nan")
+    elif case == "missing_rv":
+        del second["rv"]
+    _write_dse_status_rows(tmp_path, monkeypatch, [first, second])
+
+    result = build_darwin_status_text()
+
+    assert "observations=2" in result
+    assert "avg_rv=" not in result
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_mean"),
+    [
+        pytest.param(None, None, id="null"),
+        pytest.param("bad", None, id="nonnumeric"),
+        pytest.param(True, None, id="true"),
+        pytest.param(False, None, id="false"),
+        pytest.param(float("nan"), None, id="nan"),
+        pytest.param(float("inf"), None, id="positive-infinity"),
+        pytest.param(-float("inf"), None, id="negative-infinity"),
+        pytest.param(10**400, None, id="oversized-int"),
+        pytest.param("missing", None, id="missing"),
+        pytest.param(0.5, "0.50", id="valid-float"),
+        pytest.param(2, "1.00", id="valid-int"),
+    ],
+)
+def test_build_darwin_status_text_preserves_legacy_rows_without_invalid_rv_mean(
+    tmp_path,
+    monkeypatch,
+    value,
+    expected_mean,
+):
+    measurement = _dse_measurement()
+    rows = [
+        {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": 0.6,
+            **measurement,
+        }
+        for index in range(3)
+    ]
+    if value == "missing":
+        del rows[1]["rv"]
+    else:
+        rows[1]["rv"] = value
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=3" in result
+    assert "avg_fitness=0.60" in result
+    if expected_mean is None:
+        assert "avg_rv=" not in result
+    else:
+        assert f"avg_rv={expected_mean}" in result
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_mean"),
+    [
+        pytest.param(None, None, id="null"),
+        pytest.param("bad", None, id="nonnumeric"),
+        pytest.param("0.5", None, id="numeric-text"),
+        pytest.param(True, None, id="true"),
+        pytest.param(False, None, id="false"),
+        pytest.param(float("nan"), None, id="nan"),
+        pytest.param(float("inf"), None, id="positive-infinity"),
+        pytest.param(-float("inf"), None, id="negative-infinity"),
+        pytest.param(10**400, None, id="oversized-int"),
+        pytest.param("missing", None, id="missing"),
+        pytest.param(0.5, "0.43", id="valid-float"),
+        pytest.param(2, "0.93", id="valid-int"),
+    ],
+)
+def test_build_darwin_status_text_preserves_legacy_rows_without_invalid_fitness_mean(
+    tmp_path,
+    monkeypatch,
+    value,
+    expected_mean,
+):
+    measurement = _dse_measurement()
+    rows = [
+        {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": fitness,
+            **measurement,
+        }
+        for index, fitness in enumerate([0.2, 0.4, 0.6])
+    ]
+    if value == "missing":
+        del rows[1]["best_fitness"]
+    else:
+        rows[1]["best_fitness"] = value
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=3" in result
+    assert "avg_rv=0.50" in result
+    if expected_mean is None:
+        assert "avg_fitness=" not in result
+    else:
+        assert f"avg_fitness={expected_mean}" in result
+
+
+@pytest.mark.parametrize("field", ["rv", "best_fitness"])
+def test_build_darwin_status_text_withholds_nonfinite_derived_means(
+    tmp_path,
+    monkeypatch,
+    field,
+):
+    measurement = _dse_measurement()
+    rows = []
+    for index, value in enumerate([1e308, 1e308, -1e308]):
+        row = {
+            "component": "probe",
+            "cycle_id": f"cycle-{index}",
+            "rv": 0.4 + index * 0.1,
+            "best_fitness": 0.6 + index * 0.1,
+            **measurement,
+        }
+        row[field] = value
+        rows.append(row)
+    _write_dse_status_rows(tmp_path, monkeypatch, rows)
+    archive_path = (
+        tmp_path / ".dharma" / "evolution" / "observations" / "coalgebra_stream.jsonl"
+    )
+    before = archive_path.read_bytes()
+
+    result = build_darwin_status_text()
+
+    assert archive_path.read_bytes() == before
+    assert "observations=3" in result
+    if field == "rv":
+        assert "avg_rv=" not in result
+        assert "avg_fitness=0.70" in result
+    else:
+        assert "avg_rv=0.50" in result
+        assert "avg_fitness=" not in result
 
 
 def test_build_darwin_status_text_reports_reciprocity_summary(tmp_path, monkeypatch):
@@ -371,8 +727,7 @@ def test_build_darwin_status_text_reports_reciprocity_summary(tmp_path, monkeypa
     assert "challenged=1" in result
     assert "routed_usd=5000.00" in result
     assert (
-        "issue_codes=routing_missing_project,verified_ecology_missing_audit"
-        in result
+        "issue_codes=routing_missing_project,verified_ecology_missing_audit" in result
     )
 
 
@@ -609,7 +964,8 @@ def test_build_runtime_status_data_returns_structured_dict(tmp_path, monkeypatch
 
     monkeypatch.setattr(helpers, "DHARMA_STATE", dharma_dir)
     monkeypatch.setattr(
-        helpers.shutil, "which",
+        helpers.shutil,
+        "which",
         lambda prog: f"/mock/bin/{prog}" if prog != "claude" else None,
     )
 

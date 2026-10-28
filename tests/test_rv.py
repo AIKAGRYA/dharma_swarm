@@ -54,51 +54,13 @@ class TestRVReading:
         reading = _make_reading(prompt_group="unknown")
         assert reading.prompt_group == "unknown"
 
-    def test_is_contracted_below_threshold(self):
-        reading = _make_reading(rv=0.5)
-        assert reading.is_contracted is True
-
-    def test_is_contracted_at_threshold(self):
-        reading = _make_reading(rv=RV_CONTRACTION_THRESHOLD)
-        assert reading.is_contracted is False
-
-    def test_is_contracted_above_threshold(self):
-        reading = _make_reading(rv=0.9)
-        assert reading.is_contracted is False
-
-    def test_is_contracted_at_unity(self):
-        reading = _make_reading(rv=1.0)
-        assert reading.is_contracted is False
-
-    def test_contraction_strength_strong(self):
-        reading = _make_reading(rv=0.3)
-        assert reading.contraction_strength == "strong"
-
-    def test_contraction_strength_moderate(self):
-        reading = _make_reading(rv=0.6)
-        assert reading.contraction_strength == "moderate"
-
-    def test_contraction_strength_weak(self):
-        reading = _make_reading(rv=0.85)
-        assert reading.contraction_strength == "weak"
-
-    def test_contraction_strength_none(self):
-        reading = _make_reading(rv=1.2)
-        assert reading.contraction_strength == "none"
-
-    def test_contraction_strength_at_boundary_strong(self):
-        """rv exactly at 0.5 should be moderate, not strong."""
-        reading = _make_reading(rv=RV_STRONG_THRESHOLD)
-        assert reading.contraction_strength == "moderate"
-
-    def test_contraction_strength_at_boundary_moderate(self):
-        """rv exactly at 0.737 should be weak, not moderate."""
-        reading = _make_reading(rv=RV_CONTRACTION_THRESHOLD)
-        assert reading.contraction_strength == "weak"
-
-    def test_contraction_strength_exactly_one(self):
-        reading = _make_reading(rv=1.0)
-        assert reading.contraction_strength == "none"
+    @pytest.mark.parametrize("value", [0.3, 0.5, 0.736, 0.737, 0.738, 0.9, 1.0, 1.2])
+    def test_retired_classification_preserves_raw_value(self, value):
+        reading = _make_reading(rv=value)
+        assert reading.rv == value
+        assert reading.is_contracted is None
+        assert reading.contraction_strength is None
+        assert reading.calibration_status == "unvalidated_retired_threshold"
 
     def test_json_roundtrip(self):
         reading = _make_reading()
@@ -221,6 +183,8 @@ class TestRVMeasurer:
         assert result is not None
         assert isinstance(result, RVReading)
         assert result.rv == 0.65
+        assert result.measurement_kind == "residual_hidden"
+        assert result.measurement_details["centering"] == "none"
         assert result.pr_early == 8.3
         assert result.pr_late == 5.4
         assert result.model_name == "pythia-1.4b"
@@ -283,7 +247,7 @@ class TestRVMeasurer:
 
 
 class TestConstants:
-    """Verify research-derived constants are correctly set."""
+    """Retain retired values for callers importing legacy constants."""
 
     def test_contraction_threshold(self):
         assert RV_CONTRACTION_THRESHOLD == 0.737

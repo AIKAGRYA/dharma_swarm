@@ -1,12 +1,8 @@
 """L4-R_V Correlation Engine for DHARMA SWARM.
 
-THE MISSING EXPERIMENT: Runs both R_V measurement (geometric contraction)
-and L4 compression protocol (behavioral compression) on the SAME prompts,
-then computes statistical correlation.
-
-Bridge hypothesis: R_V contraction in Value space correlates with
-L4 behavioral compression ability. If true, geometric signature
-CAUSES the phenomenological phase transition.
+Runs raw R_V observations and the L4 compression protocol on the same
+prompts, then computes descriptive associations for explicitly comparable
+measurement cohorts. These associations do not establish causation.
 
 Provider-agnostic: accepts any async generate function.
 Uses existing rv.py, bridge.py, metrics.py infrastructure.
@@ -26,12 +22,13 @@ from pydantic import BaseModel, Field
 
 from dharma_swarm.bridge import (
     CorrelationResult,
+    PairedMeasurement,
     ResearchBridge,
     _pearson_r,
     _spearman_rho,
 )
 from dharma_swarm.metrics import MetricsAnalyzer
-from dharma_swarm.rv import RVMeasurer, RVReading
+from dharma_swarm.rv import RVMeasurer, RVReading, comparable_measurement_identity
 
 logger = logging.getLogger(__name__)
 
@@ -279,20 +276,43 @@ class L4RVCorrelator:
             mean_fidelity[grp] = statistics.mean(fids) if fids else 0.0
             pass_rate[grp] = statistics.mean(passes) if passes else 0.0
 
-        # Cohen's d between L4 and baseline R_V groups
-        cohens_d = self._cohens_d_groups(results, "L4_full", "baseline")
+        paired = [
+            measurement
+            for measurement in self._bridge.get_measurements()
+            if measurement.rv_reading is not None
+        ]
+        rv_vals = [measurement.rv_reading.rv for measurement in paired]
+        swab_vals = [measurement.behavioral.swabhaav_ratio for measurement in paired]
+        statistics_available = (
+            comparable_measurement_identity(
+                [measurement.rv_reading for measurement in paired]
+            )
+            is not None
+            and all(map(math.isfinite, rv_vals + swab_vals))
+        )
 
-        # Bootstrap CIs for correlation
-        rv_vals = [
-            r.rv_reading.rv for r in results if r.rv_reading is not None
-        ]
-        swab_vals = [
-            r.behavioral_swabhaav
-            for r in results
-            if r.rv_reading is not None
-        ]
-        pearson_ci = _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
-        spearman_ci = _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
+        cohens_d = None
+        pearson_ci = None
+        spearman_ci = None
+        if statistics_available:
+            try:
+                cohens_d = self._cohens_d_groups(paired, "L4_full", "baseline")
+            except ArithmeticError:
+                pass
+            if cohens_d is not None and not math.isfinite(cohens_d):
+                cohens_d = None
+            try:
+                pearson_ci = _bootstrap_ci(rv_vals, swab_vals, _pearson_r)
+            except ArithmeticError:
+                pass
+            if pearson_ci is not None and not all(map(math.isfinite, pearson_ci)):
+                pearson_ci = None
+            try:
+                spearman_ci = _bootstrap_ci(rv_vals, swab_vals, _spearman_rho)
+            except ArithmeticError:
+                pass
+            if spearman_ci is not None and not all(map(math.isfinite, spearman_ci)):
+                spearman_ci = None
 
         # Patch CIs into correlation result
         if correlation:
@@ -302,7 +322,7 @@ class L4RVCorrelator:
 
         return BatchResult(
             n_total=len(results),
-            n_with_rv=len(rv_vals),
+            n_with_rv=sum(result.rv_reading is not None for result in results),
             correlation=correlation,
             cohens_d_l4_baseline=cohens_d,
             pearson_r_ci=pearson_ci,
@@ -315,7 +335,7 @@ class L4RVCorrelator:
 
     def _cohens_d_groups(
         self,
-        results: list[L4RVPairedResult],
+        results: list[L4RVPairedResult | PairedMeasurement],
         group_a: str,
         group_b: str,
     ) -> Optional[float]:
@@ -363,6 +383,8 @@ def _cohens_d(group_a: list[float], group_b: list[float]) -> Optional[float]:
     pooled_var = ((na - 1) * var_a + (nb - 1) * var_b) / (na + nb - 2)
     pooled_sd = math.sqrt(pooled_var)
 
+    if not all(map(math.isfinite, (pooled_var, pooled_sd))):
+        raise ArithmeticError("Nonfinite Cohen's d intermediate")
     if pooled_sd < 1e-15:
         return None
 

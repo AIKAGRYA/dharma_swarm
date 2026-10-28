@@ -30,7 +30,9 @@ async def test_meta_fitness_correlates_with_trend(engine_paths):
 
 
 @pytest.mark.asyncio
-async def test_meta_cycle_archives_and_evolves_when_poor(engine_paths, tmp_path, monkeypatch):
+async def test_meta_cycle_archives_and_evolves_when_poor(
+    engine_paths, tmp_path, monkeypatch
+):
     engine = DarwinEngine(**engine_paths)
     await engine.init()
     archive_path = tmp_path / "meta_archive.jsonl"
@@ -107,7 +109,9 @@ def test_meta_archive_loads_legacy_economic_fitness_dimensions(
 
 
 @pytest.mark.asyncio
-async def test_meta_cycle_keeps_parameters_when_strong(engine_paths, tmp_path, monkeypatch):
+async def test_meta_cycle_keeps_parameters_when_strong(
+    engine_paths, tmp_path, monkeypatch
+):
     engine = DarwinEngine(**engine_paths)
     await engine.init()
     meta = MetaEvolutionEngine(
@@ -166,7 +170,9 @@ async def test_observe_cycle_result_applies_bounded_update(
     monkeypatch.setattr(meta, "_evolve_meta_params", fake_evolve)
 
     first = meta.observe_cycle_result(CycleResult(cycle_id="cycle-1", best_fitness=0.1))
-    second = meta.observe_cycle_result(CycleResult(cycle_id="cycle-2", best_fitness=0.1))
+    second = meta.observe_cycle_result(
+        CycleResult(cycle_id="cycle-2", best_fitness=0.1)
+    )
 
     assert first is None
     assert second is not None
@@ -177,9 +183,7 @@ async def test_observe_cycle_result_applies_bounded_update(
     assert len(meta.meta_archive) == 1
     assert abs(second.meta_parameters.mutation_rate - baseline.mutation_rate) <= 0.031
     assert (
-        abs(
-            second.meta_parameters.exploration_coeff - baseline.exploration_coeff
-        )
+        abs(second.meta_parameters.exploration_coeff - baseline.exploration_coeff)
         <= 0.101
     )
     assert (
@@ -338,11 +342,16 @@ async def test_stalled_fixed_point_increases_coordination_pressure(engine_paths)
     )
 
     assert stable._coordination_uncertainty_pressure() == 0.0
-    assert stalled._coordination_uncertainty_pressure() > stable._coordination_uncertainty_pressure()
+    assert (
+        stalled._coordination_uncertainty_pressure()
+        > stable._coordination_uncertainty_pressure()
+    )
 
 
 @pytest.mark.asyncio
-async def test_meta_cycle_reports_coordination_pressure(engine_paths, tmp_path, monkeypatch):
+async def test_meta_cycle_reports_coordination_pressure(
+    engine_paths, tmp_path, monkeypatch
+):
     engine = DarwinEngine(**engine_paths)
     await engine.init()
     meta = MetaEvolutionEngine(
@@ -385,7 +394,9 @@ async def test_meta_cycle_reports_coordination_pressure(engine_paths, tmp_path, 
 
 
 @pytest.mark.asyncio
-async def test_default_threshold_evolves_on_flat_fitness(engine_paths, tmp_path, monkeypatch):
+async def test_default_threshold_evolves_on_flat_fitness(
+    engine_paths, tmp_path, monkeypatch
+):
     """With default threshold 0.7, flat fitness at 0.48 should trigger evolution.
 
     This is a regression test for the stagnation bug where 310 meta-cycles
@@ -418,3 +429,249 @@ async def test_default_threshold_evolves_on_flat_fitness(engine_paths, tmp_path,
         f"(threshold=0.7), but parameters were NOT evolved"
     )
     assert meta.meta_params != initial
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "summary",
+    [
+        {"observation_count": 2},
+        {"rv_trend": None, "fitness_trend": None, "approaching_fixed_point": None},
+        {"rv_trend": float("nan"), "fitness_trend": float("inf")},
+        {"rv_trend": 10**400, "fitness_trend": 10**400},
+        {"rv_trend": "0.25", "fitness_trend": "0.25"},
+        {"rv_trend": "invalid", "fitness_trend": False, "approaching_fixed_point": 0},
+    ],
+)
+async def test_meta_cycle_preserves_unavailable_coordination_values(
+    engine_paths,
+    tmp_path,
+    monkeypatch,
+    summary,
+):
+    engine = DarwinEngine(**engine_paths)
+    await engine.init()
+    meta = MetaEvolutionEngine(
+        engine,
+        meta_archive_path=tmp_path / "meta_archive_unavailable.jsonl",
+        n_object_cycles_per_meta=1,
+    )
+    meta.observe_coordination_summary(summary)
+
+    async def fake_run_cycle(proposals):
+        del proposals
+        return CycleResult(best_fitness=0.8)
+
+    monkeypatch.setattr(engine, "run_cycle", fake_run_cycle)
+    result = await meta.run_meta_cycle([])
+
+    assert result.coordination_summary["rv_trend"] is None
+    assert result.coordination_summary["fitness_trend"] is None
+    assert result.coordination_summary["approaching_fixed_point"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rv_trend", [0.0, 0.2, -0.2, 1])
+@pytest.mark.parametrize("verdict", [False, True])
+async def test_meta_cycle_preserves_known_coordination_values(
+    engine_paths,
+    tmp_path,
+    monkeypatch,
+    rv_trend,
+    verdict,
+):
+    engine = DarwinEngine(**engine_paths)
+    await engine.init()
+    meta = MetaEvolutionEngine(
+        engine,
+        meta_archive_path=tmp_path / f"meta_archive_known_{rv_trend}_{verdict}.jsonl",
+        n_object_cycles_per_meta=1,
+    )
+    meta.observe_coordination_summary(
+        {
+            "rv_trend": rv_trend,
+            "fitness_trend": 0.0,
+            "approaching_fixed_point": verdict,
+        }
+    )
+
+    async def fake_run_cycle(proposals):
+        del proposals
+        return CycleResult(best_fitness=0.8)
+
+    monkeypatch.setattr(engine, "run_cycle", fake_run_cycle)
+    result = await meta.run_meta_cycle([])
+
+    assert result.coordination_summary["rv_trend"] == rv_trend
+    assert result.coordination_summary["fitness_trend"] == 0.0
+    assert result.coordination_summary["approaching_fixed_point"] is verdict
+
+
+@pytest.mark.asyncio
+async def test_coordination_pressure_ignores_unknown_trends_and_verdicts(engine_paths):
+    engine = DarwinEngine(**engine_paths)
+    await engine.init()
+    meta = MetaEvolutionEngine(engine, n_object_cycles_per_meta=4)
+    meta.observe_coordination_summary(
+        {
+            "is_globally_coherent": True,
+            "rv_trend": -0.2,
+            "fitness_trend": None,
+            "approaching_fixed_point": True,
+        }
+    )
+    known_pressure = meta._coordination_uncertainty_pressure()
+    meta.observe_coordination_summary(
+        {
+            "is_globally_coherent": True,
+            "rv_trend": None,
+            "fitness_trend": float("nan"),
+            "approaching_fixed_point": None,
+        }
+    )
+
+    assert known_pressure == pytest.approx((0.08 * 0.2) + 0.06)
+    assert meta._coordination_uncertainty_pressure() == pytest.approx(known_pressure)
+
+
+@pytest.mark.asyncio
+async def test_unknown_trend_does_not_satisfy_fixed_point_stall(engine_paths):
+    unknown_engine = DarwinEngine(**engine_paths)
+    await unknown_engine.init()
+    unknown = MetaEvolutionEngine(unknown_engine, n_object_cycles_per_meta=2)
+    unknown.observe_coordination_summary(
+        {
+            "is_globally_coherent": True,
+            "rv_trend": None,
+            "fitness_trend": None,
+            "approaching_fixed_point": True,
+        }
+    )
+
+    zero_engine = DarwinEngine(**engine_paths)
+    await zero_engine.init()
+    zero = MetaEvolutionEngine(zero_engine, n_object_cycles_per_meta=2)
+    zero.observe_coordination_summary(
+        {
+            "is_globally_coherent": True,
+            "rv_trend": 0.0,
+            "fitness_trend": None,
+            "approaching_fixed_point": True,
+        }
+    )
+
+    assert unknown._coordination_uncertainty_pressure() == 0.0
+    assert zero._coordination_uncertainty_pressure() == pytest.approx(0.06)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("second_summary", "expected_pressure"),
+    [
+        (
+            {
+                "is_globally_coherent": True,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "approaching_fixed_point": True,
+            },
+            0.076,
+        ),
+        (
+            {
+                "is_globally_coherent": True,
+                "rv_trend": 0.1,
+                "fitness_trend": None,
+                "approaching_fixed_point": True,
+            },
+            0.068,
+        ),
+        (
+            {
+                "is_globally_coherent": True,
+                "rv_trend": 0.1,
+                "fitness_trend": 0.05,
+                "approaching_fixed_point": True,
+            },
+            0.038,
+        ),
+        (
+            {
+                "is_globally_coherent": True,
+                "rv_trend": 0.0,
+                "fitness_trend": None,
+                "approaching_fixed_point": True,
+            },
+            0.068,
+        ),
+        (
+            {
+                "is_globally_coherent": False,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "approaching_fixed_point": True,
+            },
+            0.196,
+        ),
+        (
+            {
+                "is_globally_coherent": True,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "approaching_fixed_point": False,
+            },
+            0.046,
+        ),
+        (
+            {
+                "is_globally_coherent": True,
+                "rv_trend": None,
+                "fitness_trend": None,
+                "approaching_fixed_point": None,
+            },
+            0.076,
+        ),
+    ],
+)
+async def test_fixed_point_pressure_excludes_incomplete_trends(
+    engine_paths,
+    tmp_path,
+    second_summary,
+    expected_pressure,
+):
+    engine = DarwinEngine(**engine_paths)
+    await engine.init()
+    meta = MetaEvolutionEngine(
+        engine,
+        meta_archive_path=tmp_path / "meta_archive_incomplete_trends.jsonl",
+        n_object_cycles_per_meta=2,
+        poor_meta_fitness_threshold=0.0,
+    )
+    initial_parameters = meta.meta_params.model_copy(deep=True)
+    summaries = [
+        {
+            "is_globally_coherent": True,
+            "rv_trend": -0.2,
+            "fitness_trend": None,
+            "approaching_fixed_point": True,
+        },
+        second_summary,
+    ]
+    original_summaries = [dict(summary) for summary in summaries]
+
+    for summary in summaries:
+        meta.observe_coordination_summary(summary)
+    assert meta.observe_cycle_result(CycleResult(best_fitness=0.8)) is None
+    result = meta.observe_cycle_result(CycleResult(best_fitness=0.8))
+
+    assert result is not None
+    assert result.coordination_pressure == pytest.approx(expected_pressure)
+    assert summaries == original_summaries
+    assert meta.meta_params == initial_parameters
+    for key in (
+        "is_globally_coherent",
+        "rv_trend",
+        "fitness_trend",
+        "approaching_fixed_point",
+    ):
+        assert result.coordination_summary[key] == second_summary[key]

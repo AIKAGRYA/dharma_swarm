@@ -395,8 +395,7 @@ def pulse(config: DaemonConfig | None = None) -> str:
                     reading = colony_rv_reading(
                         report.density_before, report.density_after,
                     )
-                    if reading.is_contracted:
-                        summary += " [CONTRACTED]"
+                    summary += f" [{reading.measurement_kind}; classification unavailable]"
                 except Exception:
                     logger.debug("Colony R_V reading failed", exc_info=True)
             if report.errors:
