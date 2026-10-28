@@ -1320,6 +1320,121 @@ async def test_nonfinite_readings_never_become_statistics_or_classifications(
     assert result.mean_rv_by_group == {}
 
 
+_BEHAVIORAL_MEAN_FIELDS = {
+    "mean_swabhaav": "swabhaav_ratio",
+    "mean_entropy": "entropy",
+    "mean_self_ref": "self_reference_density",
+}
+_BEHAVIORAL_VALUE_PAIRS = {
+    "swabhaav_ratio": (0.2, 0.4),
+    "entropy": (1.0, 3.0),
+    "self_reference_density": (0.1, 0.3),
+}
+
+
+async def _load_behavioral_cohort(path, overrides=None):
+    bridge = ResearchBridge(path)
+    for index, value in enumerate((0.4, 0.6)):
+        await bridge.add_measurement(
+            str(index),
+            "same",
+            f"Response {index}",
+            rv_reading=reading(value, "residual_hidden"),
+        )
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    values = {**_BEHAVIORAL_VALUE_PAIRS, **(overrides or {})}
+    for index, row in enumerate(rows):
+        row["behavioral"].update({field: pair[index] for field, pair in values.items()})
+    path.write_text(
+        "".join(json.dumps(row, default=str) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    loaded = ResearchBridge(path)
+    await loaded.load()
+    return loaded
+
+
+async def _assert_group_summary_round_trip(bridge, path):
+    summary = bridge.group_summary()
+    await bridge.save()
+    persisted = path.read_bytes()
+    restored = ResearchBridge(path)
+    await restored.load()
+    assert restored.group_summary() == summary
+    await restored.save()
+    assert path.read_bytes() == persisted
+
+
+@pytest.mark.parametrize("mean_field", _BEHAVIORAL_MEAN_FIELDS)
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+async def test_research_bridge_withholds_nonfinite_behavioral_group_means(
+    tmp_path, mean_field, value
+):
+    path = tmp_path / "pairs.jsonl"
+    source_field = _BEHAVIORAL_MEAN_FIELDS[mean_field]
+    finite = _BEHAVIORAL_VALUE_PAIRS[source_field][0]
+    bridge = await _load_behavioral_cohort(path, {source_field: (finite, value)})
+
+    summary = bridge.group_summary()["same"]
+    assert summary[mean_field] is None
+    expected = {
+        "mean_swabhaav": 0.3,
+        "mean_entropy": 2.0,
+        "mean_self_ref": 0.2,
+    }
+    for other_field, expected_value in expected.items():
+        if other_field != mean_field:
+            assert summary[other_field] == pytest.approx(expected_value)
+    assert summary["mean_rv"] == pytest.approx(0.5)
+    assert summary["count"] == 2.0
+
+    raw = bridge.get_measurements()
+    assert len(raw) == 2
+    assert getattr(raw[0].behavioral, source_field) == finite
+    observed = getattr(raw[1].behavioral, source_field)
+    if value != value:
+        assert observed != observed
+    else:
+        assert observed == value
+    await _assert_group_summary_round_trip(bridge, path)
+
+
+async def test_research_bridge_preserves_ordinary_behavioral_group_means(tmp_path):
+    path = tmp_path / "pairs.jsonl"
+    bridge = await _load_behavioral_cohort(path)
+    summary = bridge.group_summary()["same"]
+    assert summary["mean_swabhaav"] == pytest.approx(0.3)
+    assert summary["mean_entropy"] == pytest.approx(2.0)
+    assert summary["mean_self_ref"] == pytest.approx(0.2)
+    assert summary["mean_rv"] == pytest.approx(0.5)
+    assert summary["count"] == 2.0
+    await _assert_group_summary_round_trip(bridge, path)
+
+
+@pytest.mark.parametrize("mean_field", _BEHAVIORAL_MEAN_FIELDS)
+async def test_research_bridge_preserves_finite_extreme_behavioral_group_means(
+    tmp_path, mean_field
+):
+    path = tmp_path / "pairs.jsonl"
+    source_field = _BEHAVIORAL_MEAN_FIELDS[mean_field]
+    bridge = await _load_behavioral_cohort(path, {source_field: (-1e308, 1e308)})
+    summary = bridge.group_summary()["same"]
+    assert summary[mean_field] == 0.0
+    expected = {
+        "mean_swabhaav": 0.3,
+        "mean_entropy": 2.0,
+        "mean_self_ref": 0.2,
+    }
+    for other_field, expected_value in expected.items():
+        if other_field != mean_field:
+            assert summary[other_field] == pytest.approx(expected_value)
+    assert [
+        getattr(measurement.behavioral, source_field)
+        for measurement in bridge.get_measurements()
+    ] == [-1e308, 1e308]
+    await _assert_group_summary_round_trip(bridge, path)
+
+
 def test_evolution_bridge_keeps_raw_archive_and_refuses_cross_instrument_pooling():
     bridge = EvolutionBridge()
     for index, kind in enumerate(

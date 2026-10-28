@@ -142,6 +142,16 @@ class CorrelationResult(BaseModel):
 # -- Statistics (stdlib only) ------------------------------------------------
 
 
+def _finite_mean(values: list[float]) -> Optional[float]:
+    if not values or not all(math.isfinite(value) for value in values):
+        return None
+    try:
+        result = statistics.mean(values)
+    except ArithmeticError:
+        return None
+    return result if math.isfinite(result) else None
+
+
 def _pearson_r(xs: list[float], ys: list[float]) -> Optional[float]:
     """Compute Pearson correlation coefficient.
 
@@ -437,14 +447,12 @@ class ResearchBridge:
                 if rv_vals and comparable and all(map(math.isfinite, rv_vals)) else None,
                 "measurement_kind_counts": kinds,
                 "calibration_status": RV_CALIBRATION_STATUS,
-                "mean_swabhaav": statistics.mean(
-                    m.behavioral.swabhaav_ratio for m in members
+                "mean_swabhaav": _finite_mean(
+                    [m.behavioral.swabhaav_ratio for m in members]
                 ),
-                "mean_entropy": statistics.mean(
-                    m.behavioral.entropy for m in members
-                ),
-                "mean_self_ref": statistics.mean(
-                    m.behavioral.self_reference_density for m in members
+                "mean_entropy": _finite_mean([m.behavioral.entropy for m in members]),
+                "mean_self_ref": _finite_mean(
+                    [m.behavioral.self_reference_density for m in members]
                 ),
                 "count": float(len(members)),
             }
